@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fluxo de Caixa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%231f6feb'/><path d='M7 21l6-6 4 4 8-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+</head>
+<body>
+  <!-- Tela de login / cadastro -->
+  <section id="auth-view" class="auth hidden">
+    <div class="auth-card">
+      <div class="brand big"><span class="logo"></span>Fluxo de Caixa</div>
+      <p class="muted">Gestão financeira: lançamentos, fluxo de caixa, DRE, orçamento e autorização de pagamentos.</p>
+      <form id="auth-form" class="form">
+        <label>E-mail<input type="email" name="email" required autocomplete="email"></label>
+        <label>Senha<input type="password" name="password" required minlength="6" autocomplete="current-password"></label>
+        <button class="btn primary" type="submit" id="auth-submit">Entrar</button>
+        <button class="btn link" type="button" id="auth-toggle">Não tem conta? Cadastre-se</button>
+        <button class="btn link" type="button" id="auth-reset">Esqueci minha senha</button>
+      </form>
+      <div id="auth-msg" class="msg"></div>
+    </div>
+  </section>
+
+  <!-- Onboarding: escolher / criar empresa -->
+  <section id="empresa-view" class="auth hidden">
+    <div class="auth-card wide">
+      <div class="brand big"><span class="logo"></span>Suas empresas</div>
+      <div id="empresa-list" class="empresa-list"></div>
+      <form id="empresa-form" class="form">
+        <h3>Criar nova empresa</h3>
+        <label>Nome<input name="nome" required></label>
+        <label>CNPJ (opcional)<input name="cnpj"></label>
+        <button class="btn primary" type="submit">Criar empresa</button>
+      </form>
+      <button class="btn link" id="logout-2">Sair</button>
+    </div>
+  </section>
+
+  <!-- Aplicação -->
+  <div id="app-view" class="layout hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><span class="logo"></span><span>Fluxo de Caixa</span></div>
+      <button class="empresa-switch" id="empresa-switch" title="Trocar empresa"></button>
+      <nav id="nav">
+        <a href="#/dashboard" data-route="dashboard">Dashboard</a>
+        <div class="nav-group">Movimento</div>
+        <a href="#/lancamentos" data-route="lancamentos">Lançamentos</a>
+        <a href="#/abertos" data-route="abertos">Contas a pagar / receber</a>
+        <a href="#/autorizacao" data-route="autorizacao">Autorização de pagamentos</a>
+        <div class="nav-group">Relatórios</div>
+        <a href="#/fluxo-mensal" data-route="fluxo-mensal">Fluxo de caixa mensal</a>
+        <a href="#/fluxo-diario" data-route="fluxo-diario">Fluxo de caixa diário</a>
+        <a href="#/dre" data-route="dre">DRE gerencial</a>
+        <div class="nav-group">Planejamento</div>
+        <a href="#/orcamento" data-route="orcamento">Budget / Forecast</a>
+        <a href="#/orcado-realizado" data-route="orcado-realizado">Orçado x Realizado</a>
+        <a href="#/fidc" data-route="fidc">Análise FIDC</a>
+        <div class="nav-group">Cadastros</div>
+        <a href="#/cadastros/plano" data-route="cadastros/plano">Plano de contas</a>
+        <a href="#/cadastros/contas" data-route="cadastros/contas">Contas bancárias</a>
+        <a href="#/cadastros/favorecidos" data-route="cadastros/favorecidos">Favorecidos</a>
+        <a href="#/cadastros/centros" data-route="cadastros/centros">Centros de custo e grupos</a>
+        <a href="#/config" data-route="config">Empresa e usuários</a>
+      </nav>
+      <div class="sidebar-foot">
+        <span id="user-email" class="muted small"></span>
+        <button class="btn ghost small" id="logout">Sair</button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <button class="btn ghost icon" id="menu-btn" aria-label="Menu">☰</button>
+        <h1 id="page-title">Dashboard</h1>
+        <div class="topbar-right">
+          <label class="ano-sel">Ano <select id="ano-global"></select></label>
+          <button class="btn ghost icon" id="theme-btn" title="Tema claro/escuro" aria-label="Alternar tema"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg></button>
+        </div>
+      </header>
+      <div id="page" class="page"></div>
+    </main>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toasts"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

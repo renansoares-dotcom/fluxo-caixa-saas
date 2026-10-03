@@ -1,0 +1,11 @@
+# Dados da empresa NUNCA vão para o repositório
+dados/
+supabase/seed/
+*.json
+!package.json
+*.xlsx
+*.xlsm
+*.csv
+.env
+.DS_Store
+node_modules/
