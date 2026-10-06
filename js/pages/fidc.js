@@ -1,10 +1,10 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
-import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formData, parseNum, exportXLSX, chart, CORES, COR, MESES, MESES_CURTO, loading } from '../lib/ui.js';
+import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formData, parseNum, exportXLSX, chart, CORES, COR, MESES, MESES_CURTO, loading, logoPNG } from '../lib/ui.js';
 
 export const title = 'Análise FIDC';
 const f = { mes: 0, fundo: '' };
 const sim = { valor: '', prazo: '' };
-let ops = [], tits = [], cdiMes = {}; // cdiMes[mês] = CDI a.m. em fração (0,0108 = 1,08%)
+let ops = [], tits = [], cdiMes = {}, lancF = [], receitaMes = {}; // cdiMes[mês] = CDI a.m. em fração (0,0108 = 1,08%)
 
 const num1 = (v) => (+v || 0).toFixed(1).replace('.', ',');
 const pp = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2).replace('.', ',') + ' p.p.';
@@ -33,7 +33,7 @@ export async function render(root) {
   root.innerHTML = `<div class="card"><div class="toolbar" id="flt">
       <label>Mês<select name="mes">${options([{ id: 0, nome: 'Acumulado' }, ...MESES.map((n, i) => ({ id: i + 1, nome: n }))], { selected: f.mes })}</select></label>
       <label>Fundo<select name="fundo" id="sel-fundo"></select></label>
-      <span class="spacer"></span><button class="btn" id="exp">Exportar operações</button>
+      <span class="spacer"></span><button class="btn" id="pdf">PDF da análise</button><button class="btn" id="exp">Exportar operações</button>
       ${podeEditar() ? '<button class="btn primary" id="novo">+ Novo borderô</button>' : ''}</div></div>
     <div class="exec-head"><h2 id="exec-tit">Resumo executivo</h2><span class="muted small" id="exec-sub"></span></div>
     <div class="kpis" id="kp"></div>
@@ -54,6 +54,15 @@ export async function render(root) {
       <div class="card"><h2>Participação acumulada dos sacados</h2><div class="chart-box"><canvas id="ch-sac"></canvas></div></div>
     </div>
     ${card('rec', 'Recompras descontadas nos borderôs', 'Por fundo e mês, ano inteiro (não segue os filtros).')}
+    ${card('conc', 'Conciliação borderôs × fluxo de caixa', 'Segue o filtro de mês e compara só meses com borderô. Fluxo de caixa = lançamentos pagos na conta do próprio fundo: transferências 3.02.01, juros 2.07.08, tarifas 2.07.32 + 2.07.05 e recompras 2.07.11. Diferença ≠ 0 = borderô não lançado, lançado em outra conta/classificação ou valor divergente. Clique num fundo para ver mês a mês.')}
+    <div class="grid2">
+      ${card('peso', 'Peso no faturamento', 'Só meses com receita de vendas (1.01) lançada e operação FIDC. Segue o filtro de mês.')}
+      ${card('fora', 'Custos fora do borderô', 'Tarifas dos fundos (2.07.32 / 2.07.05) pagas por outras contas e identificadas pelo nome do fundo na descrição. Entram no custo total com custos fora.')}
+    </div>
+    <div class="grid2">
+      ${card('cal', 'Calendário de liquidação', 'Títulos cedidos a vencer por semana (próximas 12 semanas), por fundo. É o valor que os sacados devem pagar aos fundos; o que não for pago volta como recompra.')}
+      <div class="card"><h2>Coobrigação por semana</h2><div class="chart-box"><canvas id="ch-cal"></canvas></div></div>
+    </div>
     ${card('comp', 'Composição do custo', 'Segue o filtro de mês. Custo = deságio + ad valorem + tarifas + IOF + prorrogação/encargos; recompras e descontos ao sacado não são custo.')}
     ${card('evo', 'Evolução mensal', 'Segue o filtro de fundo.')}
     ${card('fx', 'Taxa por faixa de prazo × fundo', 'Mapa de calor: quanto mais escura a célula, maior a taxa do fundo naquela faixa. Colunas totais seguem mês e fundo; as colunas por fundo seguem só o mês.')}
@@ -62,16 +71,23 @@ export async function render(root) {
   $('#simf', root).addEventListener('input', (e) => { sim[e.target.name] = e.target.value; simular(root); });
   $('#simf', root).addEventListener('submit', (e) => e.preventDefault());
   $('#exp', root).onclick = () => exportXLSX($('#ops table', root), `fidc_operacoes_${state.ano}`);
+  $('#pdf', root).onclick = () => gerarPDF(root);
   $('#novo', root) && ($('#novo', root).onclick = () => editar({}, root));
   loading($('#ops', root));
   try {
     const e = state.empresa.id;
-    let idx;
-    [ops, tits, idx] = await Promise.all([
+    let idx, recRows;
+    const codigos = ['3.02.01', '2.07.08', '2.07.32', '2.07.05', '2.07.11'];
+    const planoIds = state.cad.plano.filter(p => codigos.includes(p.codigo)).map(p => p.id);
+    [ops, tits, idx, lancF, recRows] = await Promise.all([
       fetchAll(() => sb.from('fidc_operacoes').select('*').eq('empresa_id', e).gte('data', `${state.ano}-01-01`).lte('data', `${state.ano}-12-31`).order('data')),
       fetchAll(() => sb.from('fidc_titulos').select('operacao_id,fundo,valor,vencimento,data_operacao,sacado_agrupado,sacado').eq('empresa_id', e).gte('data_operacao', `${state.ano}-01-01`).lte('data_operacao', `${state.ano}-12-31`)),
       q(sb.from('indices_mensais').select('mes,cdi').eq('empresa_id', e).eq('ano', state.ano)),
+      planoIds.length ? fetchAll(() => sb.from('lancamentos').select('data,valor,plano_id,conta_id,descricao').eq('empresa_id', e).eq('status', 'Pago').in('plano_id', planoIds).gte('data', `${state.ano}-01-01`).lte('data', `${state.ano}-12-31`)) : [],
+      q(sb.rpc('resumo_mensal', { p_empresa: e, p_ano: state.ano })),
     ]);
+    receitaMes = {};
+    for (const r of recRows || []) if (state.cad.planoById[r.classe_id]?.codigo === '1.01') receitaMes[r.mes] = (receitaMes[r.mes] || 0) + +r.total;
     cdiMes = Object.fromEntries((idx || []).filter(r => r.cdi != null).map(r => [r.mes, +r.cdi / 100]));
     desenhar(root);
   } catch (err) { fail(err); }
@@ -162,9 +178,10 @@ function desenhar(root) {
   const top = sacOrd.slice(0, 20).map(([k, v]) => { acum += v.v; return { k, v, acum }; });
   const demais = sacOrd.slice(20);
   $('#sac', root).innerHTML = tsel.length ? `<table><thead><tr><th>#</th><th>Sacado</th><th>Fundos</th><th class="num">Títulos</th><th class="num">Valor de face</th><th class="num">Part.</th><th class="num">% acum.</th><th class="num">Prazo méd.</th></tr></thead><tbody>
-    ${top.map((x, i) => `<tr><td>${i + 1}</td><td class="wrap">${esc(x.k)}</td><td class="small">${esc([...x.v.fundos].sort().join(', '))}</td><td class="num">${x.v.n}</td><td class="num">${money0(x.v.v)}</td><td class="num${x.v.v / totT > .3 ? ' neg' : ''}">${pct(x.v.v / totT)}</td><td class="num">${pct(x.acum / totT)}</td><td class="num">${x.v.v ? num1(x.v.pz / x.v.v) : '–'}</td></tr>`).join('')}
+    ${top.map((x, i) => `<tr class="clickable" data-sac="${esc(x.k)}"><td>${i + 1}</td><td class="wrap">${esc(x.k)}</td><td class="small">${esc([...x.v.fundos].sort().join(', '))}</td><td class="num">${x.v.n}</td><td class="num">${money0(x.v.v)}</td><td class="num${x.v.v / totT > .3 ? ' neg' : ''}">${pct(x.v.v / totT)}</td><td class="num">${pct(x.acum / totT)}</td><td class="num">${x.v.v ? num1(x.v.pz / x.v.v) : '–'}</td></tr>`).join('')}
     ${demais.length ? `<tr><td></td><td>Demais sacados (${demais.length})</td><td></td><td class="num">${demais.reduce((s, [, v]) => s + v.n, 0)}</td><td class="num">${money0(demais.reduce((s, [, v]) => s + v.v, 0))}</td><td class="num">${pct(demais.reduce((s, [, v]) => s + v.v, 0) / totT)}</td><td class="num">100%</td><td></td></tr>` : ''}
     <tr class="row-total"><td></td><td>TOTAL</td><td></td><td class="num">${tsel.length}</td><td class="num">${money0(totT)}</td><td class="num">100%</td><td></td><td></td></tr></tbody></table>` : '<div class="empty">Nenhum título no período.</div>';
+  $('#sac', root).onclick = (e) => { const tr = e.target.closest('tr[data-sac]'); if (tr) fichaSacado(tr.dataset.sac); };
   const curva = sacOrd.slice(0, 20);
   chart($('#ch-sac', root), {
     type: 'bar',
@@ -267,6 +284,7 @@ function desenhar(root) {
     : '<div class="empty">Sem operações no período.</div>';
 
   simular(root);
+  blocoConciliacao(root, { fundos, mesOk, corFundo, hoje, aVencer, fundoOk });
 
   // ---------- Operações ----------
   $('#ops', root).innerHTML = sel.length ? `<table><thead><tr><th>Data</th><th>Fundo</th><th>Borderô</th><th>Conta</th><th class="num">Títulos</th><th class="num">Face</th><th class="num">Deságio</th><th class="num">Ad valorem</th><th class="num">Tarifas</th><th class="num">IOF</th><th class="num">Encargos</th><th class="num">Custo</th><th class="num">Recompra</th><th class="num">Líquido</th><th class="num">Prazo cobr.</th><th class="num">Prazo real</th><th class="num">Taxa do fundo</th></tr></thead><tbody>
@@ -324,6 +342,178 @@ function simular(root) {
   el.innerHTML = `<table><thead><tr><th>Fundo</th><th class="num">Taxa a.m. (${f.mes ? MESES_CURTO[f.mes - 1] : 'período'})</th><th class="num">Custo estimado</th><th class="num">Líquido estimado</th><th class="num">Taxa a.m. (ano)</th><th class="num">Custo (taxa do ano)</th><th class="num">Líquido (taxa do ano)</th><th></th></tr></thead><tbody>
     ${linhas.map(x => { const c = custo(x.tp), ca = custo(x.ta); return `<tr><td>${esc(x.fd)}</td><td class="num">${x.tp ? pct(x.tp, 2) : '–'}</td><td class="num">${c != null ? money(c) : '–'}</td><td class="num">${c != null ? money(V - c) : '–'}</td><td class="num">${pct(x.ta, 2)}</td><td class="num">${ca != null ? money(ca) : '–'}</td><td class="num">${ca != null ? money(V - ca) : '–'}</td><td>${melhor && melhor.fd === x.fd ? '<span class="badge pago">✓ Menor custo</span>' : ''}</td></tr>`; }).join('')}</tbody></table>
     ${ok ? '' : '<div class="small muted" style="padding:8px 16px 14px">Informe o valor de face e o prazo médio para simular.</div>'}`;
+}
+
+// ---------- Conciliação, peso no faturamento, custos fora, calendário ----------
+const contaDoFundo = (fd) => state.cad.contas.find(c => (c.nome || '').trim().toUpperCase() === fd.trim().toUpperCase());
+const codigoDe = (planoId) => state.cad.planoById[planoId]?.codigo;
+function custosFora(fundos) {
+  const contasFundo = new Set(fundos.map(contaDoFundo).filter(Boolean).map(c => c.id));
+  const out = [];
+  for (const l of lancF) {
+    if (contasFundo.has(l.conta_id) || !['2.07.32', '2.07.05'].includes(codigoDe(l.plano_id))) continue;
+    const d = (l.descricao || '').toUpperCase();
+    const fd = fundos.find(f => f.length > 2 && new RegExp(`\\b${f.toUpperCase()}\\b`).test(d));
+    if (fd) out.push({ ...l, fundo: fd });
+  }
+  return out;
+}
+let concDet = '';
+function blocoConciliacao(root, { fundos, mesOk, corFundo, hoje, aVencer, fundoOk }) {
+  const cats = [['liq', 'Líquido × transferências', ['3.02.01']], ['jur', 'Juros (deságio + prorrog.)', ['2.07.08']], ['tar', 'Tarifas + IOF', ['2.07.32', '2.07.05']], ['rec', 'Recompras', ['2.07.11']]];
+  const bord = (o, k) => k === 'liq' ? +o.liquido : k === 'jur' ? +o.desagio + +o.encargos : k === 'tar' ? +o.tarifas + +o.iof : +o.recompra;
+  const linhas = fundos.map(fd => {
+    const conta = contaDoFundo(fd); const meses = new Set(ops.filter(o => o.fundo === fd && mesOk(o)).map(o => +o.data.slice(5, 7)));
+    const porMes = {};
+    for (const m of meses) {
+      const b = {}, c = {};
+      for (const [k, , cods] of cats) {
+        b[k] = ops.filter(o => o.fundo === fd && +o.data.slice(5, 7) === m).reduce((s, o) => s + bord(o, k), 0);
+        c[k] = conta ? lancF.filter(l => l.conta_id === conta.id && +l.data.slice(5, 7) === m && cods.includes(codigoDe(l.plano_id))).reduce((s, l) => s + +l.valor, 0) : 0;
+      }
+      porMes[m] = { b, c };
+    }
+    const tot = (k, w) => Object.values(porMes).reduce((s, x) => s + x[w][k], 0);
+    return { fd, conta, porMes, tot };
+  }).filter(x => Object.keys(x.porMes).length);
+  const cel = (b, c) => { const d = b - c; return `<td class="num">${money0(b)}</td><td class="num">${money0(c)}</td><td class="num ${Math.abs(d) > 1 ? 'neg' : 'pos'}"><strong>${Math.abs(d) > 1 ? money0(d) : '✓'}</strong></td>`; };
+  const head = `<thead><tr><th rowspan="2">Fundo (conta)</th>${cats.map(([, n]) => `<th colspan="3" class="grp">${n}</th>`).join('')}</tr><tr>${cats.map(() => '<th class="num">Borderôs</th><th class="num">Fluxo de caixa</th><th class="num">Diferença</th>').join('')}</tr></thead>`;
+  const T = (k, w) => linhas.reduce((s, x) => s + x.tot(k, w), 0);
+  $('#conc', root).innerHTML = linhas.length ? `<table class="conc">${head}<tbody>
+    ${linhas.map(x => `<tr class="clickable" data-fd="${esc(x.fd)}"><td>${esc(x.fd)} <span class="muted small">(${esc(x.conta?.nome || 'sem conta')})</span></td>${cats.map(([k]) => cel(x.tot(k, 'b'), x.tot(k, 'c'))).join('')}</tr>
+      ${concDet === x.fd ? Object.entries(x.porMes).sort((a, b) => a[0] - b[0]).map(([m, v]) => `<tr class="sub"><td>↳ ${MESES[m - 1].toLowerCase()}</td>${cats.map(([k]) => cel(v.b[k], v.c[k])).join('')}</tr>`).join('') : ''}`).join('')}
+    <tr class="row-total"><td>TOTAL</td>${cats.map(([k]) => cel(T(k, 'b'), T(k, 'c'))).join('')}</tr></tbody></table>` : '<div class="empty">Sem borderôs no período.</div>';
+  $('#conc', root).onclick = (e) => { const tr = e.target.closest('tr[data-fd]'); if (!tr) return; concDet = concDet === tr.dataset.fd ? '' : tr.dataset.fd; blocoConciliacao(root, { fundos, mesOk, corFundo, hoje, aVencer, fundoOk }); };
+
+  // Peso no faturamento
+  const mesesOk = Object.keys(receitaMes).map(Number).filter(m => receitaMes[m] > 0 && ops.some(o => +o.data.slice(5, 7) === m) && (!f.mes || m === f.mes));
+  const lp = ops.filter(o => mesesOk.includes(+o.data.slice(5, 7)) && fundoOk(o)); const ip = ind(lp);
+  const rec = mesesOk.reduce((s, m) => s + receitaMes[m], 0);
+  $('#peso', root).innerHTML = mesesOk.length ? `<table><tbody>
+    <tr><td>Receita de vendas (1.01) — ${mesesOk.map(m => MESES_CURTO[m - 1]).join(', ')}</td><td class="num">${money0(rec)}</td></tr>
+    <tr><td>Valor de face antecipado nos mesmos meses</td><td class="num">${money0(ip.face)}</td></tr>
+    <tr class="row-total"><td>% das vendas antecipadas nos FIDCs</td><td class="num">${pct(rec ? ip.face / rec : 0)}</td></tr>
+    <tr><td>Custo dos FIDCs nos mesmos meses</td><td class="num">${money0(ip.custo)}</td></tr>
+    <tr><td>Custo dos FIDCs % da receita</td><td class="num">${pct(rec ? ip.custo / rec : 0, 2)}</td></tr>
+    <tr class="row-total"><td>Custo por R$ 1.000 vendidos</td><td class="num">${money(rec ? ip.custo / rec * 1000 : 0)}</td></tr></tbody></table>` : '<div class="empty">Sem meses com receita lançada e operação FIDC.</div>';
+
+  // Custos fora do borderô
+  const fora = custosFora(fundos).filter(l => (!f.mes || +l.data.slice(5, 7) === f.mes) && (!f.fundo || l.fundo === f.fundo));
+  const I = ind(ops.filter(o => mesOk(o) && fundoOk(o))); const tf = fora.reduce((s, l) => s + +l.valor, 0);
+  $('#fora', root).innerHTML = `<table><thead><tr><th>Data</th><th>Fundo</th><th>Conta</th><th>Descrição</th><th class="num">Valor</th></tr></thead><tbody>
+    ${fora.map(l => `<tr><td>${dateBR(l.data)}</td><td>${esc(l.fundo)}</td><td>${esc(state.cad.contaById[l.conta_id]?.nome || '')}</td><td class="wrap small">${esc(l.descricao || '')}</td><td class="num">${money(l.valor)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum no período.</td></tr>'}
+    <tr class="row-total"><td colspan="4">Custo dos borderôs + custos fora</td><td class="num">${money0(I.custo + tf)}</td></tr>
+    <tr><td colspan="4" class="muted">Custo % da face com custos fora</td><td class="num">${pct(I.face ? (I.custo + tf) / I.face : 0, 2)}</td></tr></tbody></table>`;
+
+  // Calendário de liquidação (12 semanas, segunda a domingo)
+  const d0 = new Date(hoje + 'T12:00:00'); const seg = new Date(d0); seg.setDate(d0.getDate() - ((d0.getDay() + 6) % 7));
+  const semanas = Array.from({ length: 12 }, (_, i) => { const a = new Date(seg); a.setDate(seg.getDate() + 7 * i); const b = new Date(a); b.setDate(a.getDate() + 6); return [a.toISOString().slice(0, 10), b.toISOString().slice(0, 10)]; });
+  const fdCal = fundos.filter(fd => aVencer.some(t => t.fundo === fd));
+  const somaS = (a, b, fd) => aVencer.filter(t => t.vencimento >= a && t.vencimento <= b && (!fd || t.fundo === fd)).reduce((s, t) => s + +t.valor, 0);
+  const depois = aVencer.filter(t => t.vencimento > semanas.at(-1)[1]).reduce((s, t) => s + +t.valor, 0);
+  const lbl = ([a, b]) => `${dateBR(a).slice(0, 5)}–${dateBR(b).slice(0, 5)}`;
+  $('#cal', root).innerHTML = `<table><thead><tr><th>Semana</th>${fdCal.map(fd => `<th class="num">${esc(fd)}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>
+    ${semanas.map(w => `<tr><td>${lbl(w)}</td>${fdCal.map(fd => { const v = somaS(w[0], w[1], fd); return `<td class="num">${v ? money0(v) : '–'}</td>`; }).join('')}<td class="num"><strong>${money0(somaS(w[0], w[1]))}</strong></td></tr>`).join('')}
+    ${depois ? `<tr class="muted"><td>Depois de ${dateBR(semanas.at(-1)[1])}</td>${fdCal.map(fd => `<td class="num">${money0(aVencer.filter(t => t.fundo === fd && t.vencimento > semanas.at(-1)[1]).reduce((s, t) => s + +t.valor, 0))}</td>`).join('')}<td class="num">${money0(depois)}</td></tr>` : ''}</tbody></table>`;
+  chart($('#ch-cal', root), {
+    type: 'bar',
+    data: { labels: semanas.map(lbl), datasets: fdCal.map(fd => ({ label: fd, data: semanas.map(w => +somaS(w[0], w[1], fd).toFixed(2)), backgroundColor: corFundo[fd], borderColor: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim(), borderWidth: { top: 2 }, maxBarThickness: 40 })) },
+    options: { maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => moneyCurto(v) } } },
+      plugins: { tooltip: { callbacks: { label: (x) => `${x.dataset.label}: ${money0(x.raw)}` } } } },
+  });
+}
+
+// ---------- Ficha do sacado ----------
+function fichaSacado(nome) {
+  const ts = tits.filter(t => (t.sacado_agrupado || t.sacado || '(sem nome)') === nome).sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || ''));
+  const hoje = hojeISO(); const totT = tits.reduce((s, t) => s + +t.valor, 0);
+  const v = ts.reduce((s, t) => s + +t.valor, 0);
+  const pz = v ? ts.reduce((s, t) => s + +t.valor * Math.max(0, dias(t.data_operacao, t.vencimento)), 0) / v : 0;
+  const av = ts.filter(t => t.vencimento > hoje); const vav = av.reduce((s, t) => s + +t.valor, 0);
+  const porF = {}; for (const t of ts) porF[t.fundo] = (porF[t.fundo] || 0) + +t.valor;
+  const porM = Array(12).fill(0); for (const t of ts) porM[+t.data_operacao.slice(5, 7) - 1] += +t.valor;
+  const docs = [...new Set(ts.map(t => t.sacado).filter(Boolean))];
+  const opById = Object.fromEntries(ops.map(o => [o.id, o]));
+  modal({
+    title: nome, wide: true,
+    body: `<div class="kpis">
+        <div class="kpi"><div class="k-label">Valor cedido no ano</div><div class="k-value">${money0(v)}</div><div class="k-sub">${pct(totT ? v / totT : 0)} do total · ${ts.length} títulos</div></div>
+        <div class="kpi"><div class="k-label">A vencer (coobrigação)</div><div class="k-value">${money0(vav)}</div><div class="k-sub">${av.length} títulos</div></div>
+        <div class="kpi"><div class="k-label">Prazo médio</div><div class="k-value">${num1(pz)} dias</div></div>
+        <div class="kpi"><div class="k-label">Fundos</div><div class="k-value" style="font-size:15px">${Object.entries(porF).sort((a, b) => b[1] - a[1]).map(([fd, x]) => `${esc(fd)} ${pct(x / v)}`).join('<br>')}</div></div>
+      </div>
+      ${docs.length > 1 ? `<p class="small muted" style="margin:10px 0 0">Empresas do grupo: ${docs.map(esc).join(' · ')}</p>` : ''}
+      <h3 style="margin-top:16px">Cedido por mês</h3>
+      <div class="table-wrap"><table><thead><tr>${MESES_CURTO.map(m => `<th class="num">${m}</th>`).join('')}</tr></thead><tbody><tr>${porM.map(x => `<td class="num">${x ? money0(x) : '–'}</td>`).join('')}</tr></tbody></table></div>
+      <h3 style="margin-top:16px">Títulos (${ts.length})</h3>
+      <div class="table-wrap" style="max-height:320px"><table><thead><tr><th>Vencimento</th><th>Situação</th><th>Fundo</th><th>Borderô</th><th>Operação</th><th>Empresa</th><th class="num">Valor</th></tr></thead><tbody>
+      ${ts.map(t => `<tr><td>${dateBR(t.vencimento)}</td><td>${t.vencimento > hoje ? `<span class="badge aberto">vence em ${dias(hoje, t.vencimento)} d</span>` : '<span class="badge pago">vencido</span>'}</td><td>${esc(t.fundo)}</td><td>${esc(opById[t.operacao_id]?.bordero || '')}</td><td>${dateBR(t.data_operacao)}</td><td class="small">${esc(t.sacado || '')}</td><td class="num">${money(t.valor)}</td></tr>`).join('')}</tbody></table></div>`,
+    foot: '<button class="btn" data-close>Fechar</button>',
+  });
+}
+
+// ---------- PDF da análise ----------
+// A fonte padrão do PDF não tem alguns símbolos; troca por equivalentes simples
+const pdfTxt = (t) => String(t ?? '').replace(/✓/g, 'OK').replace(/↳\s*/g, '   ').replace(/[−–]/g, '-').replace(/Δ/g, 'Dif.').replace(/×/g, 'x').replace(/[⚠ℹ]\s*/g, '').replace(/\u00a0/g, ' ');
+async function gerarPDF(root) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const azul = [43, 85, 152], marinho = [42, 31, 111];
+  const logo = await logoPNG();
+  const periodo = pdfTxt($('#exec-tit', root).textContent.replace('Resumo executivo — ', ''));
+  const cabecalho = () => {
+    if (logo) doc.addImage(logo.data, 'PNG', 14, 8, 13 * logo.ratio, 13);
+    doc.setTextColor(...marinho); doc.setFontSize(15); doc.setFont(undefined, 'bold');
+    doc.text('Análise de operações FIDC', W - 14, 14, { align: 'right' });
+    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+    doc.text(`${state.empresa.nome} · ${periodo} · emitido em ${dateBR(hojeISO())}`, W - 14, 19.5, { align: 'right' });
+    doc.setDrawColor(...marinho); doc.setLineWidth(.6); doc.line(14, 24, W - 14, 24); doc.setTextColor(20);
+  };
+  const tabela = (sel, titulo, opts = {}) => {
+    const t = $(sel + ' table', root); if (!t) return;
+    let y = (doc.lastAutoTable?.finalY ?? 24) + 9;
+    if (y > H - 40) { doc.addPage(); cabecalho(); y = 33; }
+    doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.setTextColor(...marinho); doc.text(pdfTxt(titulo), 14, y); doc.setTextColor(20); doc.setFont(undefined, 'normal');
+    doc.autoTable({ html: t, startY: y + 2, theme: 'grid', styles: { fontSize: 7.5, cellPadding: 1.4, lineColor: [226, 231, 239] }, headStyles: { fillColor: azul, textColor: 255 },
+      didParseCell: (d) => { d.cell.text = d.cell.text.map(pdfTxt); if (d.section === 'body' && d.row.raw?.classList?.contains('row-total')) { d.cell.styles.fontStyle = 'bold'; d.cell.styles.fillColor = [232, 238, 248]; } if (d.section === 'body' && d.column.index > 0) d.cell.styles.halign = 'right'; },
+      margin: { left: 14, right: 14, top: 30 }, didDrawPage: () => {}, ...opts });
+  };
+  cabecalho();
+  // Indicadores
+  const kp = [...root.querySelectorAll('#kp .kpi')].map(k => [k.querySelector('.k-label').textContent, k.querySelector('.k-value').textContent, k.querySelector('.k-sub')?.textContent || ''].map(pdfTxt));
+  doc.autoTable({ startY: 28, theme: 'plain', body: [kp.slice(0, 4).map(x => x[0]), kp.slice(0, 4).map(x => x[1]), kp.slice(0, 4).map(x => x[2]), kp.slice(4).map(x => x[0]), kp.slice(4).map(x => x[1]), kp.slice(4).map(x => x[2])],
+    styles: { fontSize: 8, cellPadding: { top: .6, bottom: .6, left: 2, right: 2 } }, margin: { left: 14, right: 14 },
+    columnStyles: Object.fromEntries([0, 1, 2, 3].map(i => [i, { cellWidth: (W - 28) / 4 }])),
+    didParseCell: (d) => { const r = d.row.index % 3; if (r === 0) { d.cell.styles.textColor = 110; d.cell.styles.fontSize = 7.5; } if (r === 1) { d.cell.styles.fontSize = 13; d.cell.styles.fontStyle = 'bold'; d.cell.styles.textColor = marinho; } if (r === 2) { d.cell.styles.textColor = 110; d.cell.styles.fontSize = 7.5; } } });
+  // Alertas
+  const al = [...root.querySelectorAll('#alertas .alert-row')].map(a => [a.querySelector('.alert-tag').textContent.replace(/^\S+\s/, ''), a.querySelector('strong').textContent, a.querySelector('.small').textContent].map(pdfTxt));
+  let y = doc.lastAutoTable.finalY + 6;
+  doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.setTextColor(...marinho); doc.text('Alertas', 14, y); doc.setTextColor(20); doc.setFont(undefined, 'normal');
+  doc.autoTable({ startY: y + 2, theme: 'grid', head: [['Status', 'Alerta', 'Detalhe']], body: al, styles: { fontSize: 7.5, cellPadding: 1.4 }, headStyles: { fillColor: azul },
+    columnStyles: { 0: { cellWidth: 20, fontStyle: 'bold' }, 1: { cellWidth: 70 } }, margin: { left: 14, right: 14 },
+    didParseCell: (d) => { if (d.section === 'body' && d.column.index === 0) d.cell.styles.textColor = d.cell.raw === 'Atenção' ? [192, 53, 43] : d.cell.raw === 'OK' ? [18, 122, 74] : azul; } });
+  // Gráficos
+  const graf = [['#ch', 'Taxa do fundo a.m. por mês × CDI'], ['#ch-cart', 'Coobrigação por prazo de vencimento']].map(([s2, t]) => [$(s2, root), t]).filter(([c]) => c && c._chart && c.width);
+  if (graf.length) try {
+    doc.addPage(); cabecalho();
+    const gw = (W - 28 - 8) / 2;
+    graf.forEach(([c, t], i) => { const x = 14 + i * (gw + 8); doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.setTextColor(...marinho); doc.text(pdfTxt(t), x, 33); doc.setTextColor(20);
+      const h = gw * c.height / c.width; const bg = document.createElement('canvas'); bg.width = c.width; bg.height = c.height; const g = bg.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, bg.width, bg.height); g.drawImage(c, 0, 0);
+      doc.addImage(bg.toDataURL('image/png'), 'PNG', x, 36, gw, Math.min(h, 95)); });
+    doc.lastAutoTable.finalY = 36 + 95;
+  } catch (e) { console.warn('Gráficos fora do PDF:', e); }
+  tabela('#cmp', 'Comparativo entre fundos');
+  tabela('#cart', 'Carteira cedida a vencer (coobrigação)');
+  tabela('#rec', 'Recompras descontadas nos borderôs');
+  tabela('#comp', 'Composição do custo');
+  tabela('#opo', 'Custo de oportunidade');
+  const sac = $('#sac table', root);
+  if (sac) { const clone = sac.cloneNode(true); [...clone.tBodies[0].rows].slice(10).forEach(r => { if (!r.classList.contains('row-total')) r.remove(); }); const tmp = document.createElement('div'); tmp.id = 'tmp-sac'; tmp.style.display = 'none'; tmp.appendChild(clone); root.appendChild(tmp); tabela('#tmp-sac', `Concentração por sacado — top 10 · ${$('#hhi', root).textContent.trim()}`); tmp.remove(); }
+  tabela('#conc', 'Conciliação borderôs × fluxo de caixa');
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(130); doc.text(`Página ${i} de ${n}`, W - 14, H - 7, { align: 'right' }); doc.text('Fonte: borderôs dos fundos e lançamentos do fluxo de caixa', 14, H - 7); }
+  doc.save(`analise_fidc_${periodo.replace(/[^\wÀ-ú]+/g, '_')}.pdf`);
 }
 
 const moneyCurto = (v) => { const a = Math.abs(v); return a >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' mi' : a >= 1e3 ? Math.round(v / 1e3) + ' mil' : v; };

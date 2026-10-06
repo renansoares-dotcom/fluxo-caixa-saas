@@ -193,3 +193,5 @@ table.heat td.heat-cell span{display:block;font-weight:400}
 .cdi-in{width:64px;text-align:right;padding:4px 6px;font:inherit;font-variant-numeric:tabular-nums}
 .sim-form{padding:0;margin:0;gap:12px}
 .sim-form input{width:170px}
+table.conc th.grp{text-align:center;border-left:1px solid var(--border)}
+table.conc tr.sub td{font-size:12px;color:var(--muted);background:var(--surface-2)}

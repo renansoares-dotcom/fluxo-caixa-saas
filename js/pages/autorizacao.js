@@ -1,5 +1,5 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
-import { $, $$, esc, money, cls, dateBR, today, options, fail, toast, parseNum, loading } from '../lib/ui.js';
+import { $, $$, esc, money, cls, dateBR, today, options, fail, toast, parseNum, loading, logoPNG } from '../lib/ui.js';
 
 export const title = 'Autorização de pagamentos';
 const f = { de: '', ate: '', conta: '', grupo: '', cc: '', favorecido: '', situacao: '', prioridade: '' };
@@ -141,10 +141,12 @@ async function gerar(root) {
   } catch (e) { fail(e); }
 }
 
-export function pdf(aut, rows) {
+export async function pdf(aut, rows) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
+  const logo = await logoPNG();
+  if (logo) doc.addImage(logo.data, 'PNG', W - 14 - 14 * logo.ratio, 7, 14 * logo.ratio, 14);
   doc.setFontSize(14); doc.setFont(undefined, 'bold');
   doc.text(`AUTORIZAÇÃO DE PAGAMENTOS — ${state.empresa.nome}`, 14, 15);
   doc.setFontSize(10); doc.setFont(undefined, 'normal');

@@ -112,3 +112,20 @@ export const moneyTick = (v) => {
   const a = Math.abs(v);
   return a >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' mi' : a >= 1e3 ? (v / 1e3).toFixed(0) + ' mil' : v;
 };
+
+// Logo da empresa em PNG (para PDFs). Renderiza o SVG de assets/ num canvas; resultado em cache.
+let _logo;
+export function logoPNG(alturaPx = 160) {
+  return _logo ||= new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const h = alturaPx, w = Math.round(img.naturalWidth / img.naturalHeight * h) || h * 2;
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve({ data: c.toDataURL('image/png'), ratio: w / h });
+    };
+    img.onerror = () => resolve(null);
+    setTimeout(() => resolve(null), 4000);
+    img.src = new URL('../../assets/iplamm-logo.svg', import.meta.url).href;
+  });
+}
