@@ -1,40 +1,9 @@
 // Títulos de clientes (NFs) → lançamentos em aberto na receita 1.01.01.
-// Usado na aba Lançamentos e em Propostas de borderô: importação do relatório do ERP e lançamento manual em lote.
+// Usado na aba Lançamentos e em Propostas de borderô: importação dos XML das NF-e e lançamento manual em lote.
 import { sb, state, q, loadCadastros } from './data.js';
 import { $, esc, money, dateBR, options, fail, toast, modal, parseNum } from './ui.js';
 
-const ALIAS = {
-  documento: ['nota', 'nf', 'n.f', 'numero', 'número', 'documento', 'titulo', 'título', 'duplicata', 'doc'],
-  parcela: ['parcela', 'parc', 'prestacao', 'prestação', 'seq'],
-  emissao: ['emissao', 'emissão', 'dt emis', 'data emis', 'data da nota'],
-  vencimento: ['vencimento', 'venc', 'dt venc', 'data venc', 'vcto'],
-  cliente: ['cliente', 'razao', 'razão', 'sacado', 'nome', 'destinatario', 'destinatário'],
-  cnpj: ['cnpj', 'cpf', 'cnpj/cpf', 'documento cliente', 'inscricao', 'inscrição'],
-  valor: ['valor', 'vlr', 'valor parcela', 'valor título', 'valor titulo', 'saldo', 'total'],
-};
 export const normTxt = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-function adivinhar(cabecalhos) {
-  const map = {}; const usados = new Set();
-  for (const campo of ['vencimento', 'emissao', 'parcela', 'cnpj', 'valor', 'cliente', 'documento']) {
-    const al = ALIAS[campo].map(normTxt);
-    let ix = cabecalhos.findIndex((h, i) => !usados.has(i) && al.includes(normTxt(h)));
-    if (ix < 0) ix = cabecalhos.findIndex((h, i) => !usados.has(i) && al.some(a => normTxt(h).includes(a)));
-    if (ix >= 0) { map[campo] = ix; usados.add(ix); }
-  }
-  return map;
-}
-const toISO = (v) => {
-  if (v == null || v === '') return null;
-  if (v instanceof Date) return new Date(v.getTime() - v.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
-  if (typeof v === 'number') { const d = new Date(Math.round((v - 25569) * 864e5)); return d.toISOString().slice(0, 10); }
-  const s = String(v).trim(); let m;
-  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/))) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`;
-  return null;
-};
-const toNum = (v) => typeof v === 'number' ? v : parseNum(String(v ?? '').replace(/[R$\s]/g, ''));
-
-
 const padroes = () => ({ conta: state.cad.contas.find(c => c.nome === 'BRADESCO'), ccV: (state.cad.cc || []).find(c => c.nome === 'VENDAS') });
 const soDig = (s) => String(s || '').replace(/\D/g, '');
 
@@ -156,55 +125,133 @@ export function lancarNFs(onDone = () => {}) {
   desenhar();
 }
 
-export function importarNFs(onDone = () => {}) {
-  const cc = state.cad.cc || [];
-  const m = modal({
-    title: 'Importar notas fiscais do ERP', wide: true,
-    body: `<p class="small muted" style="margin-top:0">Arquivo Excel ou CSV com uma linha por parcela (NF, parcela, emissão, vencimento, cliente, CNPJ, valor). Cada parcela vira um título em aberto (receita 1.01.01) no fluxo de caixa, com data = vencimento. Parcelas já importadas (mesma NF/parcela e cliente) são ignoradas.</p>
-      <div class="toolbar"><input type="file" id="arq-nf" accept=".xlsx,.xls,.csv,.txt"></div><div id="map" style="margin-top:12px"></div>`,
-    foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="imp-ok" disabled>Importar</button>',
+// ======================================================================
+// Importação dos XML das NF-e (duplicatas → títulos em aberto)
+// ======================================================================
+const JSZIP = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+let jszipP = null;
+const carregarJSZip = () => globalThis.JSZip ? Promise.resolve(globalThis.JSZip) : (jszipP ??= new Promise((ok, erro) => {
+  const sc = document.createElement('script'); sc.src = JSZIP;
+  sc.onload = () => ok(globalThis.JSZip); sc.onerror = () => { jszipP = null; erro(new Error('não foi possível carregar o leitor de .zip')); };
+  document.head.appendChild(sc);
+}));
+
+/** Lê o XML de uma NF-e (nfeProc ou NFe) ou de um evento de cancelamento. Retorna null se não for nenhum dos dois. */
+export function lerNFe(xml) {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) return null;
+  const un = (el, tag) => el?.getElementsByTagName(tag)[0] || null;
+  const tx = (el, tag) => un(el, tag)?.textContent?.trim() || '';
+  const ev = un(doc, 'infEvento');
+  if (ev && !un(doc, 'infNFe')) {
+    return tx(ev, 'tpEvento') === '110111' ? { tipo: 'cancelamento', chave: tx(ev, 'chNFe') } : null;
+  }
+  const inf = un(doc, 'infNFe'); if (!inf) return null;
+  const ide = un(inf, 'ide'), emit = un(inf, 'emit'), dest = un(inf, 'dest'), tot = un(inf, 'ICMSTot'), prot = un(doc, 'infProt');
+  const num = (v) => +String(v || '0').replace(',', '.') || 0;
+  const emissao = (tx(ide, 'dhEmi') || tx(ide, 'dEmi')).slice(0, 10);
+  const numero = tx(ide, 'nNF');
+  const dups = [...(un(inf, 'cobr')?.getElementsByTagName('dup') || [])].map((d, i) => {
+    const nd = tx(d, 'nDup'); const parc = /^\d+$/.test(nd) ? +nd : (+(nd.match(/(\d+)\s*$/)?.[1]) || i + 1);
+    return { parcela: parc > 0 && parc < 1000 ? parc : i + 1, vencimento: tx(d, 'dVenc').slice(0, 10), valor: num(tx(d, 'vDup')) };
   });
-  let linhas = [], cab = [];
-  const { conta, ccV } = padroes();
-  $('#arq-nf', m.el).onchange = async (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    try {
-      const buf = await f.arrayBuffer();
-      let wb;
-      if (/\.(csv|txt)$/i.test(f.name)) {
-        // CSV: lê como texto (UTF-8, ou Windows-1252 se vier com acento quebrado) sem converter valores — "1/2" não vira data e "1.234,56" fica certo
-        let t = new TextDecoder('utf-8').decode(buf); if (t.includes('\uFFFD')) t = new TextDecoder('windows-1252').decode(buf);
-        wb = XLSX.read(t, { type: 'string', raw: true });
-      } else wb = XLSX.read(buf, { type: 'array', cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
-      // cabeçalho = primeira linha com 3+ textos e alguma palavra de vencimento/valor
-      let hi = rows.findIndex(r => r && r.filter(x => typeof x === 'string').length >= 3 && r.some(x => /venc|valor/i.test(String(x || ''))));
-      if (hi < 0) hi = 0;
-      cab = rows[hi].map(x => String(x ?? '').trim()); linhas = rows.slice(hi + 1).filter(r => r && r.some(x => x != null && x !== ''));
-      const mp = adivinhar(cab);
-      const sel = (campo, nome, obrig) => `<label>${nome}${obrig ? ' *' : ''}<select data-campo="${campo}"><option value="">—</option>${cab.map((h, i) => `<option value="${i}" ${mp[campo] === i ? 'selected' : ''}>${esc(h || `coluna ${i + 1}`)}</option>`).join('')}</select></label>`;
-      $('#map', m.el).innerHTML = `<p class="small">Encontrei <strong>${linhas.length}</strong> linhas. Confira as colunas:</p>
-        <div class="grid-form">${sel('documento', 'NF / documento', true)}${sel('parcela', 'Parcela')}${sel('emissao', 'Emissão')}${sel('vencimento', 'Vencimento', true)}${sel('cliente', 'Cliente', true)}${sel('cnpj', 'CNPJ/CPF')}${sel('valor', 'Valor', true)}
-        <label>Conta prevista do recebimento<select id="conta-nf">${options(state.cad.contas, { selected: conta?.id })}</select></label>
-        <label>Centro de custo<select id="cc-nf">${options(cc, { empty: '—', selected: ccV?.id })}</select></label></div>
-        <div id="prev" style="margin-top:10px"></div>`;
-      const prev = () => { const M = mapa(); const ok = ['documento', 'vencimento', 'cliente', 'valor'].every(k => M[k] != null);
-        $('#imp-ok', m.el).disabled = !ok;
-        const amostra = ok ? linhas.slice(0, 5).map(r => montar(r, M)) : [];
-        $('#prev', m.el).innerHTML = ok ? `<div class="table-wrap"><table><thead><tr><th>NF/parcela</th><th>Emissão</th><th>Vencimento</th><th>Cliente</th><th>CNPJ</th><th class="num">Valor</th></tr></thead><tbody>${amostra.map(x => `<tr><td>${esc(x.documento)}</td><td>${dateBR(x.emissao || '')}</td><td>${dateBR(x.vencimento || '')}</td><td>${esc(x.cliente)}</td><td>${esc(x.cnpj || '')}</td><td class="num">${money(x.valor)}</td></tr>`).join('')}</tbody></table></div><p class="small muted">Prévia das 5 primeiras linhas.</p>` : '<p class="small neg">Indique as colunas obrigatórias (*).</p>'; };
-      $('#map', m.el).onchange = prev; prev();
-    } catch (err) { fail(err); }
+  const cfops = [...new Set([...inf.getElementsByTagName('CFOP')].map(c => c.textContent.trim()))];
+  return {
+    tipo: 'nfe', chave: (inf.getAttribute('Id') || '').replace(/^NFe/, '') || tx(prot, 'chNFe'), numero, serie: tx(ide, 'serie'), emissao,
+    tpNF: tx(ide, 'tpNF'), natOp: tx(ide, 'natOp'), cfops, emitCnpj: tx(emit, 'CNPJ'), emitNome: tx(emit, 'xNome'),
+    cliente: tx(dest, 'xNome'), cnpj: tx(dest, 'CNPJ') || tx(dest, 'CPF'), valor: num(tx(tot, 'vNF')), dups,
+    autorizada: !prot || ['100', '150'].includes(tx(prot, 'cStat')), cStat: tx(prot, 'cStat'),
   };
-  const mapa = () => Object.fromEntries([...m.el.querySelectorAll('select[data-campo]')].map(s => [s.dataset.campo, s.value === '' ? null : +s.value]));
-  const montar = (r, M) => { const doc = String(r[M.documento] ?? '').trim(); const par = M.parcela != null ? String(r[M.parcela] ?? '').trim().replace(/^(\d+)\s*\/\s*\d+$/, '$1') : '';
-    return { documento: par && !doc.includes('/') && !doc.includes('-') ? `${doc}-${par}` : doc, emissao: M.emissao != null ? toISO(r[M.emissao]) : null, vencimento: toISO(r[M.vencimento]),
-      cliente: String(r[M.cliente] ?? '').trim(), cnpj: M.cnpj != null ? String(r[M.cnpj] ?? '').replace(/\D/g, '') : '', valor: Math.abs(toNum(r[M.valor]) || 0) }; };
+}
+
+async function lerArquivos(files) {
+  const textos = [];
+  for (const f of files) {
+    if (/\.zip$/i.test(f.name)) {
+      const Z = await carregarJSZip(); const zip = await Z.loadAsync(await f.arrayBuffer());
+      for (const e of Object.values(zip.files)) if (!e.dir && /\.xml$/i.test(e.name)) textos.push({ nome: e.name.split('/').pop(), xml: await e.async('string') });
+    } else textos.push({ nome: f.name, xml: new TextDecoder('utf-8').decode(await f.arrayBuffer()) });
+  }
+  return textos;
+}
+
+// Classifica cada NF lida: o que será lançado por padrão e por quê
+export function analisarNFes(lidas, { cnpjEmpresa = '', incluirAVista = false } = {}) {
+  const canceladas = new Set(lidas.filter(x => x.tipo === 'cancelamento').map(x => x.chave));
+  const vistas = new Set(); const out = [];
+  const raizEmp = soDig(cnpjEmpresa).slice(0, 8);
+  for (const n of lidas.filter(x => x.tipo === 'nfe')) {
+    let sit = 'ok', motivo = '';
+    if (vistas.has(n.chave)) continue; // mesmo XML selecionado duas vezes
+    if (canceladas.has(n.chave)) { sit = 'ignorar'; motivo = 'cancelada'; }
+    else if (!n.autorizada) { sit = 'ignorar'; motivo = `não autorizada (${n.cStat})`; }
+    else if (n.tpNF === '0') { sit = 'ignorar'; motivo = 'NF de entrada'; }
+    else if (raizEmp && soDig(n.emitCnpj).slice(0, 8) !== raizEmp) { sit = 'ignorar'; motivo = `emitida por ${n.emitNome}`; }
+    else if (!n.dups.length) { sit = incluirAVista ? 'ok' : 'ignorar'; motivo = 'sem duplicatas' + (incluirAVista ? ' — 1 título na emissão' : ''); }
+    vistas.add(n.chave);
+    const parcelas = n.dups.length ? n.dups : [{ parcela: 1, vencimento: n.emissao, valor: n.valor }];
+    out.push({ ...n, sit, motivo, parcelas, soma: parcelas.reduce((s, p) => s + p.valor, 0) });
+  }
+  return out.sort((a, b) => (a.emissao + a.numero).localeCompare(b.emissao + b.numero));
+}
+
+export function importarNFs(onDone = () => {}) {
+  const { conta, ccV } = padroes();
+  let lidas = [], lista = [], marcadas = new Set(), naoLidos = 0;
+  const m = modal({
+    title: 'Importar XML das notas fiscais', wide: true,
+    body: `<p class="small muted" style="margin-top:0">Selecione os XML das NF-e de venda (vários de uma vez) ou um .zip com eles. Cada duplicata da NF vira um título em aberto (receita 1.01.01) com data = vencimento e documento NF-parcela.
+      São ignoradas: NF de entrada, emitida por outro CNPJ, não autorizada, cancelada (se o XML do cancelamento vier junto) e parcelas já lançadas.</p>
+      <div class="toolbar"><input type="file" id="arq-nf" accept=".xml,.zip" multiple>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="avista"> Lançar NF sem duplicatas como 1 título com vencimento na emissão</label></div>
+      <div id="nf-res" style="margin-top:12px"></div>`,
+    foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="imp-ok" disabled>Lançar títulos</button>',
+  });
+  const desenhar = () => {
+    lista = analisarNFes(lidas, { cnpjEmpresa: state.empresa?.cnpj, incluirAVista: $('#avista', m.el).checked });
+    marcadas = new Set(lista.filter(n => n.sit === 'ok').map(n => n.chave));
+    pintar();
+  };
+  const pintar = () => {
+    const sel = lista.filter(n => marcadas.has(n.chave)); const nt = sel.reduce((s, n) => s + n.parcelas.length, 0); const vt = sel.reduce((s, n) => s + n.soma, 0);
+    const ign = lista.filter(n => n.sit !== 'ok');
+    $('#nf-res', m.el).innerHTML = !lista.length ? (lidas.length || naoLidos ? '<div class="empty">Nenhuma NF-e encontrada nos arquivos.</div>' : '') : `
+      <p class="small"><strong>${lista.length}</strong> NF-e lida(s)${naoLidos ? ` · ${naoLidos} arquivo(s) que não são NF-e` : ''} · <strong>${sel.length}</strong> selecionada(s) = ${nt} título(s), ${money(vt)}${ign.length ? ` · ${ign.length} ignorada(s)` : ''}.</p>
+      <div class="table-wrap" style="max-height:380px"><table><thead><tr><th></th><th>NF</th><th>Emissão</th><th>Cliente</th><th>Natureza / CFOP</th><th>Parcelas (vencimento · valor)</th><th class="num">Valor NF</th><th>Situação</th></tr></thead><tbody>
+      ${lista.map(n => `<tr data-ch="${n.chave}" class="${n.sit === 'ok' ? '' : 'muted'}"><td><input type="checkbox" ${marcadas.has(n.chave) ? 'checked' : ''}></td>
+        <td>${esc(n.numero)}${n.serie && n.serie !== '1' ? `<span class="muted small"> s.${esc(n.serie)}</span>` : ''}</td><td>${dateBR(n.emissao)}</td>
+        <td class="wrap">${esc(n.cliente)}<div class="muted small">${esc(n.cnpj)}</div></td><td class="wrap small">${esc(n.natOp)}<div class="muted">${esc(n.cfops.join(', '))}</div></td>
+        <td class="small">${n.parcelas.map(p => `${n.numero}-${p.parcela} · ${dateBR(p.vencimento)} · ${money(p.valor)}`).join('<br>')}</td>
+        <td class="num">${money(n.valor)}${Math.abs(n.soma - n.valor) > 0.05 && n.dups.length ? `<div class="small muted" title="Soma das duplicatas diferente do total da NF">dup. ${money(n.soma)}</div>` : ''}</td>
+        <td class="small">${n.sit === 'ok' ? (n.motivo ? esc(n.motivo) : 'ok') : `<span class="neg">${esc(n.motivo)}</span>`}</td></tr>`).join('')}</tbody></table></div>
+      <div class="toolbar" style="margin-top:10px">
+        <label>Conta prevista do recebimento<select id="conta-nf">${options(state.cad.contas, { selected: conta?.id })}</select></label>
+        <label>Centro de custo<select id="cc-nf">${options(state.cad.cc || [], { empty: '—', selected: ccV?.id })}</select></label></div>`;
+    $('#imp-ok', m.el).disabled = !nt; $('#imp-ok', m.el).textContent = nt ? `Lançar ${nt} título(s)` : 'Lançar títulos';
+  };
+  $('#nf-res', m.el).addEventListener('change', (e) => {
+    const tr = e.target.closest('tr[data-ch]'); if (!tr || e.target.type !== 'checkbox') return;
+    e.target.checked ? marcadas.add(tr.dataset.ch) : marcadas.delete(tr.dataset.ch);
+    const cs = $('#conta-nf', m.el)?.value, cc = $('#cc-nf', m.el)?.value; pintar();
+    if (cs != null) { $('#conta-nf', m.el).value = cs; $('#cc-nf', m.el).value = cc; }
+  });
+  $('#avista', m.el).onchange = desenhar;
+  $('#arq-nf', m.el).onchange = async (e) => {
+    const files = [...e.target.files]; if (!files.length) return;
+    $('#nf-res', m.el).innerHTML = '<p class="small">Lendo os arquivos…</p>';
+    try {
+      const textos = await lerArquivos(files);
+      lidas = []; naoLidos = 0;
+      for (const t of textos) { const r = lerNFe(t.xml); if (r) lidas.push(r); else naoLidos++; }
+      desenhar();
+    } catch (err) { fail(err); $('#nf-res', m.el).innerHTML = ''; }
+  };
   $('#imp-ok', m.el).onclick = async () => {
-    const M = mapa(); const contaId = $('#conta-nf', m.el).value || null; const ccId = $('#cc-nf', m.el).value || null;
-    const regs = linhas.map(r => montar(r, M)).filter(x => x.documento && x.vencimento && x.valor > 0 && x.cliente);
+    const regs = [];
+    for (const n of lista.filter(n => marcadas.has(n.chave)))
+      for (const p of n.parcelas) regs.push({ documento: `${n.numero}-${p.parcela}`, emissao: n.emissao, vencimento: p.vencimento, cliente: n.cliente, cnpj: n.cnpj, valor: p.valor, origem: `nfe:${n.chave}` });
     $('#imp-ok', m.el).disabled = true;
-    try { await gravarTitulos(regs, { contaId, ccId }); m.close(); await onDone(); }
+    try { await gravarTitulos(regs, { contaId: $('#conta-nf', m.el).value || null, ccId: $('#cc-nf', m.el).value || null }); m.close(); await onDone(); }
     catch (err) { fail(err); $('#imp-ok', m.el).disabled = false; }
   };
 }

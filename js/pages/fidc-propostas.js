@@ -34,7 +34,7 @@ export async function render(root) {
   root.innerHTML = `<div class="card"><div class="toolbar tabs" id="tabs">
       ${[['titulos', 'Títulos em aberto'], ['propostas', 'Propostas'], ['fundos', 'Condições dos fundos']].map(([k, n]) => `<button class="chip${ui.aba === k ? ' on' : ''}" data-aba="${k}">${n}</button>`).join('')}
       <span class="spacer"></span>
-      ${podeEditar() ? '<button class="btn" id="lanc-nf">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar NFs do ERP</button>' : ''}</div></div>
+      ${podeEditar() ? '<button class="btn" id="lanc-nf">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar XML das NFs</button>' : ''}</div></div>
     <div id="corpo"></div>`;
   $('#tabs', root).onclick = (e) => { const b = e.target.closest('[data-aba]'); if (b) { ui.aba = b.dataset.aba; render(root); } };
   $('#imp-nf', root) && ($('#imp-nf', root).onclick = () => importarNFs(async () => { await carregar(); ui.aba = 'titulos'; render(root); }));
@@ -146,7 +146,7 @@ function abaTitulos(c, root) {
           ${filt.map(t => { const ep = emProposta[t.id]; const pz = dias(ui.dataOp, t.data); return `<tr class="${ep ? 'muted' : 'clickable'}" data-id="${t.id}">
             <td>${ep ? `<span class="badge ${STATUS_CLS[ep.status]}" title="Já está na proposta nº ${ep.numero}">nº ${ep.numero}</span>` : `<input type="checkbox" ${ui.sel.has(t.id) ? 'checked' : ''} ${ed ? '' : 'disabled'} aria-label="Selecionar">`}</td>
             <td>${dateBR(t.data)}</td><td class="num${pz < 7 ? ' neg' : ''}">${pz}</td><td class="wrap">${esc(sacadoDe(t))}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td></tr>`; }).join('')}
-          </tbody></table>` : `<div class="empty">${titulos.length ? 'Nenhum título no filtro.' : 'Nenhum título em aberto. Use “Importar NFs do ERP”.'}</div>`}</div></div>
+          </tbody></table>` : `<div class="empty">${titulos.length ? 'Nenhum título no filtro.' : 'Nenhum título em aberto. Use “Importar XML das NFs”.'}</div>`}</div></div>
       <div id="painel"></div>
     </div>`;
   const f = $('#flt-t', c);

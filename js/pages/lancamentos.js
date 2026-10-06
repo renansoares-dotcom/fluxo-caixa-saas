@@ -15,7 +15,7 @@ export async function render(root) {
         <div class="chips" id="meses">${['Ano', ...MESES_CURTO].map((m, i) => `<span class="chip ${f.mes === i ? 'on' : ''}" data-m="${i}">${m}</span>`).join('')}</div>
         <div style="display:flex;gap:8px">
           <button class="btn" id="exp">Exportar Excel</button>
-          ${podeEditar() ? '<button class="btn" id="lanc-nf" title="Títulos a receber por NF, com parcelas">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar NFs do ERP</button><button class="btn primary" id="novo">+ Novo lançamento</button>' : ''}
+          ${podeEditar() ? '<button class="btn" id="lanc-nf" title="Títulos a receber por NF, com parcelas">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar XML das NFs</button><button class="btn primary" id="novo">+ Novo lançamento</button>' : ''}
         </div>
       </div>
       <div class="toolbar" id="flt">
