@@ -167,3 +167,21 @@ input.cell{width:110px;min-height:28px;padding:4px 6px;text-align:right}
   .sidebar,.topbar,.toolbar,.btn{display:none!important}
   .page{padding:0} .table-wrap{max-height:none;overflow:visible}
 }
+
+/* Análise FIDC */
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.card.flush .card-head{padding:16px 16px 0}
+.card-head h2{margin:0}
+.card-head p{margin:4px 0 0;max-width:70ch}
+.exec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:4px 2px -4px}
+.exec-head h2{margin:0;color:var(--brand-navy)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
+.alert-list{display:flex;flex-direction:column;gap:8px}
+.alert-row{display:grid;grid-template-columns:92px 1fr;gap:12px;align-items:start;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2)}
+.alert-tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;text-align:center;white-space:nowrap}
+.alert-row.atencao{border-color:color-mix(in srgb,var(--neg) 35%,var(--border))}
+.alert-row.atencao .alert-tag{background:var(--neg-soft);color:var(--neg)}
+.alert-row.info .alert-tag{background:var(--primary-soft);color:var(--primary)}
+.alert-row.ok .alert-tag{background:var(--pos-soft);color:var(--pos)}
+tr.muted td{color:var(--muted)}
+@media (max-width:640px){.alert-row{grid-template-columns:1fr}.alert-tag{justify-self:start}}
