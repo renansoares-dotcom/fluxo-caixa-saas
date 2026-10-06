@@ -84,7 +84,8 @@ function simular(fu, tits, dataOp, recompras = 0) {
   let desagio = 0, fp = 0, fpc = 0; const itens = [];
   for (const t of tits) {
     const prazo = Math.max(1, dias(dataOp, t.data)); const pc = prazo + (+fu.dias_compensacao || 0);
-    const k = (+fu.taxa_am / 100) * pc / 30; const d = +t.valor * k / (1 + k);
+    // simples = juros sobre a face (FS); fator = por dentro, v·k/(1+k)
+    const k = (+fu.taxa_am / 100) * pc / 30; const d = fu.metodo_desagio === 'simples' ? +t.valor * k : +t.valor * k / (1 + k);
     desagio += d; fp += +t.valor * prazo; fpc += +t.valor * pc;
     itens.push({ t, prazo, pc, custo: d });
   }
@@ -255,7 +256,7 @@ async function salvarProposta(root, S, tits, chk, sims, status) {
     observacao: ui.obs || null, enviado_em: status === 'Pendente' ? new Date().toISOString() : null,
     analise: { checagens: chk, comparacao: sims.map(s => ({ fundo: s.fu.nome, taxa_cad: +s.fu.taxa_am, custo: +s.custo.toFixed(2), liquido: +s.liquido.toFixed(2), taxa: +(s.taxaEf * 100).toFixed(4) })),
       custos: Object.fromEntries(Object.entries(S.custos).map(([k, v]) => [k, +(+v).toFixed(2)])),
-      condicoes: { taxa_am: +S.fu.taxa_am, ad_valorem_pct: +S.fu.ad_valorem_pct, tarifa_operacao: +S.fu.tarifa_operacao, custo_assinatura: +S.fu.custo_assinatura, tarifa_titulo: +S.fu.tarifa_titulo, custo_consulta: +S.fu.custo_consulta, iof_pct: +S.fu.iof_pct, dias_compensacao: S.fu.dias_compensacao } } };
+      condicoes: { taxa_am: +S.fu.taxa_am, ad_valorem_pct: +S.fu.ad_valorem_pct, tarifa_operacao: +S.fu.tarifa_operacao, custo_assinatura: +S.fu.custo_assinatura, tarifa_titulo: +S.fu.tarifa_titulo, custo_consulta: +S.fu.custo_consulta, iof_pct: +S.fu.iof_pct, dias_compensacao: S.fu.dias_compensacao, metodo_desagio: S.fu.metodo_desagio || 'fator' } } };
   try {
     let p;
     if (ui.propostaEdit) {
@@ -416,11 +417,11 @@ function abaFundos(c, root) {
   const campos = [['taxa_am', 'Taxa a.m. (%)'], ['ad_valorem_pct', 'Ad valorem (% face)'], ['tarifa_operacao', 'TED / tarifa por borderô (R$)'], ['custo_assinatura', 'Assinatura eletrônica por borderô (R$)'],
     ['tarifa_titulo', 'Boleto / cobrança por título (R$)'], ['custo_consulta', 'Consulta Serasa por sacado novo (R$)'],
     ['iof_pct', 'IOF (% face)'], ['dias_compensacao', 'Dias de compensação'], ['prazo_min', 'Prazo mín. (dias)'], ['prazo_max', 'Prazo máx. (dias)'], ['limite_credito', 'Limite de crédito (R$)'], ['limite_sacado_pct', 'Limite por sacado (%)']];
-  c.innerHTML = `<div class="card flush"><div class="card-head"><div><h2>Condições dos fundos</h2><p class="muted small">Usadas para simular as propostas. Os valores iniciais vieram da média dos borderôs de jul–set/2026; ajuste conforme o contrato de cada fundo. Prazo cobrado = prazo real + dias de compensação. Assinatura, boletos e consultas Serasa entram no custo do borderô (FS e Negocial conferidos com os borderôs de set/2026); a consulta só é cobrada para sacado que ainda não teve título no fundo.</p></div>
+  c.innerHTML = `<div class="card flush"><div class="card-head"><div><h2>Condições dos fundos</h2><p class="muted small">Usadas para simular as propostas. Os valores iniciais vieram da média dos borderôs de jul–set/2026; ajuste conforme o contrato de cada fundo. Prazo cobrado = prazo real + dias de compensação. FS conferida com o borderô 001226 (06/10): 2,46% a.m. em juros simples sobre a face, prazo + 3 dias. Assinatura, boletos e consultas Serasa entram no custo do borderô (FS e Negocial conferidos com os borderôs de set/2026); a consulta só é cobrada para sacado que ainda não teve título no fundo.</p></div>
     ${ed ? '<button class="btn" id="novo-f">+ Fundo</button>' : ''}</div>
-    <div class="table-wrap"><table><thead><tr><th>Fundo</th><th>Conta do fundo</th><th>Crédito do líquido</th>${campos.map(([, n]) => `<th class="num">${n}</th>`).join('')}<th>Ativo</th></tr></thead><tbody>
+    <div class="table-wrap"><table><thead><tr><th>Fundo</th><th>Conta do fundo</th><th>Crédito do líquido</th>${campos.map(([, n]) => `<th class="num">${n}</th>`).join('')}<th>Deságio</th><th>Ativo</th></tr></thead><tbody>
       ${fundos.map(f => `<tr class="${ed ? 'clickable' : ''}" data-id="${f.id}"><td><strong>${esc(f.nome)}</strong></td><td>${esc(state.cad.contaById[f.conta_id]?.nome || '—')}</td><td>${esc(state.cad.contaById[f.conta_credito_id]?.nome || '—')}</td>
-        ${campos.map(([k]) => `<td class="num">${f[k] == null ? '–' : ['tarifa_operacao', 'custo_assinatura', 'tarifa_titulo', 'custo_consulta', 'limite_credito'].includes(k) ? money(f[k]) : String(f[k]).replace('.', ',')}</td>`).join('')}<td>${f.ativo ? 'sim' : 'não'}</td></tr>`).join('')}
+        ${campos.map(([k]) => `<td class="num">${f[k] == null ? '–' : ['tarifa_operacao', 'custo_assinatura', 'tarifa_titulo', 'custo_consulta', 'limite_credito'].includes(k) ? money(f[k]) : String(f[k]).replace('.', ',')}</td>`).join('')}<td class="small">${f.metodo_desagio === 'simples' ? 'juros simples' : 'por dentro'}</td><td>${f.ativo ? 'sim' : 'não'}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   if (!ed) return;
   const editar = (f) => {
@@ -431,13 +432,14 @@ function abaFundos(c, root) {
         <label>Conta do fundo<select name="conta_id">${options(state.cad.contas, { empty: '—', selected: f.conta_id })}</select></label>
         <label>Conta de crédito do líquido<select name="conta_credito_id">${options(state.cad.contas, { empty: '—', selected: f.conta_credito_id })}</select></label>
         ${campos.map(([k, n]) => `<label>${n}<input name="${k}" inputmode="decimal" value="${f[k] == null ? '' : String(f[k]).replace('.', ',')}"></label>`).join('')}
+        <label>Cálculo do deságio<select name="metodo_desagio"><option value="fator" ${f.metodo_desagio !== 'simples' ? 'selected' : ''}>Por dentro — v·k/(1+k)</option><option value="simples" ${f.metodo_desagio === 'simples' ? 'selected' : ''}>Juros simples sobre a face — v × taxa × dias/30</option></select></label>
         <label>Ativo<select name="ativo"><option value="1" ${f.ativo !== false ? 'selected' : ''}>sim</option><option value="0" ${f.ativo === false ? 'selected' : ''}>não</option></select></label>
         <label class="span2">Observação<input name="observacao" value="${esc(f.observacao || '')}"></label></form>`,
       foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="fs">Salvar</button>',
     });
     $('#fs', m.el).onclick = async () => {
       const form = $('#ff', m.el); if (!form.reportValidity()) return; const d = formData(form);
-      const row = { empresa_id: state.empresa.id, nome: d.nome.trim(), conta_id: d.conta_id || null, conta_credito_id: d.conta_credito_id || null, ativo: d.ativo === '1', observacao: d.observacao || null, updated_at: new Date().toISOString() };
+      const row = { empresa_id: state.empresa.id, nome: d.nome.trim(), conta_id: d.conta_id || null, conta_credito_id: d.conta_credito_id || null, ativo: d.ativo === '1', metodo_desagio: d.metodo_desagio || 'fator', observacao: d.observacao || null, updated_at: new Date().toISOString() };
       for (const [k] of campos) { const v = String(d[k] ?? '').trim(); row[k] = v === '' ? (['prazo_min', 'prazo_max', 'limite_credito', 'limite_sacado_pct'].includes(k) ? null : 0) : parseNum(v); }
       try { if (f.id) await q(sb.from('fidc_fundos').update(row).eq('id', f.id)); else await q(sb.from('fidc_fundos').insert(row)); toast('Condições salvas'); m.close(); await carregar(); desenhar(root); } catch (e) { fail(e); }
     };

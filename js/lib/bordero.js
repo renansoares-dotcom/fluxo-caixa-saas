@@ -89,6 +89,8 @@ export function parseBordero(t, fundo, arquivo = '') {
       if (/^(TOTAL|LÍQUIDO)/.test(H)) continue;
       const mr = h.match(/Nº\s*(\S+)/); const ref = mr ? ' ' + mr[1].replace(/-$/, '') : '';
       if (/^(CUSTAS|ASSINATURA|CONSULTA|ENVIO CARTORIO|SUST\. PROT|RENOVACAO)/.test(H)) o.tarifas += v;
+      // baixa/alteração de vencimento de valor pequeno (ex.: 7,44) é tarifa de instrução, não recompra
+      else if (/^(BAIXA|ALTER)/.test(H) && v < 15) { o.tarifas += v; o.observacao += `Tarifa de instrução (${H.startsWith('BAIXA') ? 'baixa' : 'alteração de vencimento'})${ref}; `; }
       else if (/^(RECOMPRA|LIQUID|BAIXA|DIFERENCA LIQUID)/.test(H)) { o.recompra += v; o.observacao += ({ RECOMPRA: 'Recompra', LIQUID: 'Liquidação', BAIXA: 'Baixa', DIFERENCA: 'Dif. liquidação cartório' }[H.split(' ')[0].split('.')[0]] || 'Recompra') + ref + '; '; }
       else if (/^(PRORR|ALTER|JUROS)/.test(H)) { o.encargos += v; o.observacao += (H.startsWith('PRORR') ? 'Prorrogação' : H.startsWith('ALTER') ? 'Alteração vcto' : 'Juros/multa recompra') + ref + '; '; }
       else if (H.startsWith('DIFERENCA JUROS')) { o.encargos += v; o.observacao += 'Diferença de juros; '; }
