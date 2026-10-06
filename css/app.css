@@ -185,3 +185,11 @@ input.cell{width:110px;min-height:28px;padding:4px 6px;text-align:right}
 .alert-row.ok .alert-tag{background:var(--pos-soft);color:var(--pos)}
 tr.muted td{color:var(--muted)}
 @media (max-width:640px){.alert-row{grid-template-columns:1fr}.alert-tag{justify-self:start}}
+:root{--heat:var(--c2)}
+table.heat td.heat-cell{line-height:1.2}
+table.heat td.heat-cell span{display:block;font-weight:400}
+.heat-legend{display:flex;align-items:center;gap:8px;padding:8px 16px 14px}
+.heat-bar{display:inline-block;width:120px;height:10px;border-radius:5px;background:linear-gradient(90deg,color-mix(in srgb,var(--heat) 8%,var(--surface)),color-mix(in srgb,var(--heat) 70%,var(--surface)))}
+.cdi-in{width:64px;text-align:right;padding:4px 6px;font:inherit;font-variant-numeric:tabular-nums}
+.sim-form{padding:0;margin:0;gap:12px}
+.sim-form input{width:170px}

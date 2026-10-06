@@ -2,8 +2,9 @@ import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formData, parseNum, exportXLSX, chart, CORES, COR, MESES, MESES_CURTO, loading } from '../lib/ui.js';
 
 export const title = 'Análise FIDC';
-const f = { mes: 0, fundo: '', cdi: '' };
-let ops = [], tits = [];
+const f = { mes: 0, fundo: '' };
+const sim = { valor: '', prazo: '' };
+let ops = [], tits = [], cdiMes = {}; // cdiMes[mês] = CDI a.m. em fração (0,0108 = 1,08%)
 
 const num1 = (v) => (+v || 0).toFixed(1).replace('.', ',');
 const pp = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2).replace('.', ',') + ' p.p.';
@@ -32,7 +33,6 @@ export async function render(root) {
   root.innerHTML = `<div class="card"><div class="toolbar" id="flt">
       <label>Mês<select name="mes">${options([{ id: 0, nome: 'Acumulado' }, ...MESES.map((n, i) => ({ id: i + 1, nome: n }))], { selected: f.mes })}</select></label>
       <label>Fundo<select name="fundo" id="sel-fundo"></select></label>
-      <label>CDI a.m. (%)<input name="cdi" inputmode="decimal" value="${esc(f.cdi)}" placeholder="ex.: 1,10"></label>
       <span class="spacer"></span><button class="btn" id="exp">Exportar operações</button>
       ${podeEditar() ? '<button class="btn primary" id="novo">+ Novo borderô</button>' : ''}</div></div>
     <div class="exec-head"><h2 id="exec-tit">Resumo executivo</h2><span class="muted small" id="exec-sub"></span></div>
@@ -40,8 +40,11 @@ export async function render(root) {
     <div class="card"><div class="card-head"><h2>Alertas</h2><span class="muted small">Seguem os filtros de mês e fundo, exceto a conferência dos borderôs (base inteira).</span></div><div id="alertas" class="alert-list"></div></div>
     <div class="grid2">
       ${card('cmp', 'Comparativo entre fundos', 'Segue só o filtro de mês. Taxa do fundo usa o prazo cobrado no borderô; custo efetivo, o prazo real dos títulos. Ranking 1 = menor taxa.')}
-      <div class="card"><h2>Taxa do fundo a.m. por mês</h2><div class="chart-box"><canvas id="ch"></canvas></div></div>
+      <div class="card"><h2>Taxa do fundo a.m. por mês × CDI</h2><div class="chart-box"><canvas id="ch"></canvas></div></div>
     </div>
+    ${card('cdi', 'CDI e spread por mês', 'CDI do mês em % a.m. (editável). Spread = taxa do fundo − CDI. No acumulado, o CDI é a média dos meses ponderada pelo valor antecipado.')}
+    ${card('opo', 'Custo de oportunidade', 'Quanto custaria cada operação no fundo de menor taxa do mesmo mês e da mesma faixa de prazo (ou do mês, quando só um fundo operou a faixa), mantendo valor e prazo cobrado. Não considera limites de crédito, sacados aceitos nem disponibilidade dos fundos. Segue o filtro de mês.')}
+    ${card('simu', 'Simulador de antecipação', 'Custo estimado = valor × taxa × prazo/30 ÷ (1 + taxa × prazo/30), a mesma convenção da taxa do fundo (use o prazo que o fundo cobra). Taxa do período segue o filtro de mês; taxa do ano usa todos os meses.', `<form id="simf" class="toolbar sim-form"><label>Valor de face (R$)<input name="valor" inputmode="decimal" value="${esc(sim.valor)}" placeholder="ex.: 500.000,00"></label><label>Prazo médio (dias)<input name="prazo" inputmode="decimal" value="${esc(sim.prazo)}" placeholder="ex.: 45"></label></form>`)}
     <div class="grid2">
       ${card('cart', 'Carteira cedida a vencer', 'Coobrigação: títulos cedidos ainda não vencidos. Se o sacado não pagar, o fundo cobra a recompra da IPLAMM. Posição de hoje, todos os meses.')}
       <div class="card"><h2>Coobrigação por prazo de vencimento</h2><div class="chart-box"><canvas id="ch-cart"></canvas></div></div>
@@ -53,18 +56,23 @@ export async function render(root) {
     ${card('rec', 'Recompras descontadas nos borderôs', 'Por fundo e mês, ano inteiro (não segue os filtros).')}
     ${card('comp', 'Composição do custo', 'Segue o filtro de mês. Custo = deságio + ad valorem + tarifas + IOF + prorrogação/encargos; recompras e descontos ao sacado não são custo.')}
     ${card('evo', 'Evolução mensal', 'Segue o filtro de fundo.')}
-    ${card('fx', 'Custo por faixa de prazo', 'Segue os filtros de mês e fundo (as colunas por fundo seguem só o mês).')}
+    ${card('fx', 'Taxa por faixa de prazo × fundo', 'Mapa de calor: quanto mais escura a célula, maior a taxa do fundo naquela faixa. Colunas totais seguem mês e fundo; as colunas por fundo seguem só o mês.')}
     ${card('ops', 'Operações (borderôs)', 'Clique numa linha para ver os títulos ou editar.')}`;
   $('#flt', root).addEventListener('change', (e) => { f[e.target.name] = e.target.name === 'mes' ? +e.target.value : e.target.value; desenhar(root); });
+  $('#simf', root).addEventListener('input', (e) => { sim[e.target.name] = e.target.value; simular(root); });
+  $('#simf', root).addEventListener('submit', (e) => e.preventDefault());
   $('#exp', root).onclick = () => exportXLSX($('#ops table', root), `fidc_operacoes_${state.ano}`);
   $('#novo', root) && ($('#novo', root).onclick = () => editar({}, root));
   loading($('#ops', root));
   try {
     const e = state.empresa.id;
-    [ops, tits] = await Promise.all([
+    let idx;
+    [ops, tits, idx] = await Promise.all([
       fetchAll(() => sb.from('fidc_operacoes').select('*').eq('empresa_id', e).gte('data', `${state.ano}-01-01`).lte('data', `${state.ano}-12-31`).order('data')),
       fetchAll(() => sb.from('fidc_titulos').select('operacao_id,fundo,valor,vencimento,data_operacao,sacado_agrupado,sacado').eq('empresa_id', e).gte('data_operacao', `${state.ano}-01-01`).lte('data_operacao', `${state.ano}-12-31`)),
+      q(sb.from('indices_mensais').select('mes,cdi').eq('empresa_id', e).eq('ano', state.ano)),
     ]);
+    cdiMes = Object.fromEntries((idx || []).filter(r => r.cdi != null).map(r => [r.mes, +r.cdi / 100]));
     desenhar(root);
   } catch (err) { fail(err); }
 }
@@ -75,7 +83,7 @@ function desenhar(root) {
   const mesOk = (o) => !f.mes || +o.data.slice(5, 7) === f.mes;
   const fundoOk = (o) => !f.fundo || o.fundo === f.fundo;
   const sel = ops.filter(o => mesOk(o) && fundoOk(o));
-  const I = ind(sel); const cdi = f.cdi ? parseNum(f.cdi) / 100 : null;
+  const I = ind(sel); const cdi = cdiDe(sel);
   const hoje = hojeISO();
   const opById = Object.fromEntries(ops.map(o => [o.id, o]));
   const corFundo = Object.fromEntries(fundos.map((fd, i) => [fd, CORES[i % CORES.length]]));
@@ -102,7 +110,7 @@ function desenhar(root) {
   $('#kp', root).innerHTML = `
     <div class="kpi"><div class="k-label">Valor de face antecipado</div><div class="k-value">${money0(I.face)}</div><div class="k-sub">líquido creditado ${money0(I.liq)}</div></div>
     <div class="kpi"><div class="k-label">Custo total</div><div class="k-value">${money0(I.custo)}</div><div class="k-sub">${pct(I.custoPct, 2)} da face</div></div>
-    <div class="kpi"><div class="k-label">Taxa do fundo a.m.</div><div class="k-value">${pct(I.taxa, 2)}</div><div class="k-sub">custo efetivo ${pct(I.taxaEf, 2)}${cdi ? ' · spread ' + pp(I.taxa - cdi) : ''}</div></div>
+    <div class="kpi"><div class="k-label">Taxa do fundo a.m.</div><div class="k-value">${pct(I.taxa, 2)}</div><div class="k-sub">custo efetivo ${pct(I.taxaEf, 2)}${cdi != null ? ` · CDI ${pct(cdi, 2)} · spread ${pp(I.taxa - cdi)}` : ''}</div></div>
     <div class="kpi"><div class="k-label">Prazo cobrado</div><div class="k-value">${num1(I.prazoC)} dias</div><div class="k-sub">prazo real ${num1(I.prazo)} dias</div></div>
     <div class="kpi"><div class="k-label">Coobrigação a vencer</div><div class="k-value">${money0(totVencer)}</div><div class="k-sub">${money0(prox30)} nos próximos 30 dias</div></div>
     <div class="kpi"><div class="k-label">Recompras</div><div class="k-value">${money0(I.rec)}</div><div class="k-sub">${pct(I.recPct, 2)} da face</div></div>
@@ -110,16 +118,16 @@ function desenhar(root) {
     <div class="kpi"><div class="k-label">Concentração (HHI)</div><div class="k-value">${Math.round(hhi).toLocaleString('pt-BR')}</div><div class="k-sub"><span class="badge ${hhiCls}">${hhiNome}</span></div></div>`;
 
   // ---------- Comparativo entre fundos (só filtro de mês) ----------
-  const porFundo = fundos.map(fd => ({ fd, ...ind(ops.filter(o => mesOk(o) && o.fundo === fd)) })).filter(x => x.n);
-  const tot = ind(ops.filter(mesOk));
+  const porFundo = fundos.map(fd => { const l = ops.filter(o => mesOk(o) && o.fundo === fd); return { fd, ...ind(l), cdi: cdiDe(l) }; }).filter(x => x.n);
+  const tot = ind(ops.filter(mesOk)); const cdiP = cdiDe(ops.filter(mesOk));
   const minT = Math.min(...porFundo.map(x => x.taxa).filter(Boolean));
   const rank = [...porFundo].sort((a, b) => a.taxa - b.taxa).map(x => x.fd);
-  $('#cmp', root).innerHTML = `<table><thead><tr><th>Fundo</th><th class="num">Op.</th><th class="num">Face</th><th class="num">Part.</th><th class="num">Custo %</th><th class="num">Prazo cobr.</th><th class="num">Taxa do fundo</th><th class="num">Custo efetivo</th><th class="num">Δ vs. + barato</th>${cdi ? '<th class="num">Spread CDI</th>' : ''}<th class="num">Recompra %</th><th class="num">Rank</th></tr></thead><tbody>
+  $('#cmp', root).innerHTML = `<table><thead><tr><th>Fundo</th><th class="num">Op.</th><th class="num">Face</th><th class="num">Part.</th><th class="num">Custo %</th><th class="num">Prazo cobr.</th><th class="num">Taxa do fundo</th><th class="num">Custo efetivo</th><th class="num">Δ vs. + barato</th>${cdiP != null ? '<th class="num">Spread CDI</th>' : ''}<th class="num">Recompra %</th><th class="num">Rank</th></tr></thead><tbody>
     ${porFundo.map(x => `<tr><td><span class="dot" style="background:${corFundo[x.fd]}"></span>${esc(x.fd)}</td><td class="num">${x.n}</td><td class="num">${money0(x.face)}</td><td class="num">${pct(tot.face ? x.face / tot.face : 0)}</td>
       <td class="num">${pct(x.custoPct, 2)}</td><td class="num">${num1(x.prazoC)}</td><td class="num"><strong>${pct(x.taxa, 2)}</strong></td><td class="num">${pct(x.taxaEf, 2)}</td>
-      <td class="num">${x.taxa - minT > 1e-9 ? pp(x.taxa - minT) : '—'}</td>${cdi ? `<td class="num">${pp(x.taxa - cdi)}</td>` : ''}
+      <td class="num">${x.taxa - minT > 1e-9 ? pp(x.taxa - minT) : '—'}</td>${cdiP != null ? `<td class="num">${x.cdi != null ? pp(x.taxa - x.cdi) : '–'}</td>` : ''}
       <td class="num${x.recPct > 0.05 ? ' neg' : ''}">${pct(x.recPct, 2)}</td><td class="num">${rank.indexOf(x.fd) + 1}º</td></tr>`).join('')}
-    <tr class="row-total"><td>TOTAL</td><td class="num">${tot.n}</td><td class="num">${money0(tot.face)}</td><td class="num">100%</td><td class="num">${pct(tot.custoPct, 2)}</td><td class="num">${num1(tot.prazoC)}</td><td class="num">${pct(tot.taxa, 2)}</td><td class="num">${pct(tot.taxaEf, 2)}</td><td></td>${cdi ? `<td class="num">${pp(tot.taxa - cdi)}</td>` : ''}<td class="num">${pct(tot.recPct, 2)}</td><td></td></tr></tbody></table>`;
+    <tr class="row-total"><td>TOTAL</td><td class="num">${tot.n}</td><td class="num">${money0(tot.face)}</td><td class="num">100%</td><td class="num">${pct(tot.custoPct, 2)}</td><td class="num">${num1(tot.prazoC)}</td><td class="num">${pct(tot.taxa, 2)}</td><td class="num">${pct(tot.taxaEf, 2)}</td><td></td>${cdiP != null ? `<td class="num">${pp(tot.taxa - cdiP)}</td>` : ''}<td class="num">${pct(tot.recPct, 2)}</td><td></td></tr></tbody></table>`;
 
   const porMes = (list) => Array.from({ length: 12 }, (_, i) => ind(list.filter(o => +o.data.slice(5, 7) === i + 1)));
   const ultimoMes = Math.max(0, ...ops.map(o => +o.data.slice(5, 7)));
@@ -127,7 +135,9 @@ function desenhar(root) {
   chart($('#ch', root), {
     type: 'line',
     data: { labels: labelsAte, datasets: fundos.map(fd => ({ label: fd, data: porMes(ops.filter(o => o.fundo === fd)).slice(0, labelsAte.length).map(x => x.n ? +(x.taxa * 100).toFixed(3) : null),
-      borderColor: corFundo[fd], backgroundColor: corFundo[fd], spanGaps: false, tension: .2, pointRadius: 4 })) },
+      borderColor: corFundo[fd], backgroundColor: corFundo[fd], spanGaps: false, tension: .2, pointRadius: 4 })).concat(Object.keys(cdiMes).length ? [{
+      label: 'CDI', data: labelsAte.map((_, i) => cdiMes[i + 1] != null ? +(cdiMes[i + 1] * 100).toFixed(3) : null), borderColor: getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#667085',
+      backgroundColor: 'transparent', borderDash: [6, 4], pointRadius: 0, tension: 0 }] : []) },
     options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { ticks: { callback: v => String(v).replace('.', ',') + '%' } } },
       plugins: { tooltip: { callbacks: { label: (x) => x.raw == null ? null : `${x.dataset.label}: ${x.raw.toFixed(2).replace('.', ',')}% a.m.` } } } },
   });
@@ -190,12 +200,73 @@ function desenhar(root) {
     ${linha('Custo % da face', x => x.custoPct, v => pct(v, 2))}${linha('Taxa do fundo a.m.', x => x.taxa, v => pct(v, 2))}${linha('Custo efetivo a.m.', x => x.taxaEf, v => pct(v, 2))}
     ${linha('Prazo cobrado (dias)', x => x.prazoC, num1)}${linha('Prazo real (dias)', x => x.prazo, num1)}${linha('Nº operações', x => x.n, v => v)}${linha('Recompras', x => x.rec, money0)}</tbody></table>`;
 
-  // ---------- Faixa de prazo ----------
+  // ---------- Faixa de prazo × fundo (mapa de calor) ----------
   const fx = {}; for (const o of sel) { const k = faixa(prazoCob(o)); (fx[k] ||= []).push(o); }
   const fxF = {}; for (const o of ops.filter(mesOk)) { const k = faixa(prazoCob(o)); ((fxF[k] ||= {})[o.fundo] ||= []).push(o); }
-  $('#fx', root).innerHTML = `<table><thead><tr><th>Faixa (prazo cobrado)</th><th class="num">Op.</th><th class="num">Face</th><th class="num">% do volume</th><th class="num">Custo % face</th><th class="num">Taxa do fundo</th>${fundos.map(fd => `<th class="num">Taxa ${esc(fd)}</th>`).join('')}</tr></thead><tbody>
-    ${Object.keys(fx).sort().map(k => { const x = ind(fx[k]); return `<tr><td>${k}</td><td class="num">${x.n}</td><td class="num">${money0(x.face)}</td><td class="num">${pct(I.face ? x.face / I.face : 0)}</td><td class="num">${pct(x.custoPct, 2)}</td><td class="num"><strong>${pct(x.taxa, 2)}</strong></td>${fundos.map(fd => { const l = fxF[k]?.[fd]; return `<td class="num">${l ? pct(ind(l).taxa, 2) : '–'}</td>`; }).join('')}</tr>`; }).join('')}
-    <tr class="row-total"><td>TOTAL</td><td class="num">${I.n}</td><td class="num">${money0(I.face)}</td><td class="num">100%</td><td class="num">${pct(I.custoPct, 2)}</td><td class="num">${pct(I.taxa, 2)}</td>${fundos.map(() => '<td></td>').join('')}</tr></tbody></table>`;
+  const celTaxas = Object.values(fxF).flatMap(g => Object.values(g).map(l => ind(l).taxa)).filter(Boolean);
+  const tMin = Math.min(...celTaxas), tMax = Math.max(...celTaxas);
+  const calor = (t) => { const k = tMax > tMin ? (t - tMin) / (tMax - tMin) : .5; return `background:color-mix(in srgb, var(--heat) ${Math.round(8 + k * 62)}%, var(--surface))`; };
+  $('#fx', root).innerHTML = `<table class="heat"><thead><tr><th>Faixa (prazo cobrado)</th><th class="num">Op.</th><th class="num">Face</th><th class="num">% do volume</th><th class="num">Custo % face</th><th class="num">Taxa do fundo</th>${fundos.map(fd => `<th class="num">${esc(fd)}</th>`).join('')}</tr></thead><tbody>
+    ${Object.keys(fx).sort().map(k => { const x = ind(fx[k]); return `<tr><td>${k}</td><td class="num">${x.n}</td><td class="num">${money0(x.face)}</td><td class="num">${pct(I.face ? x.face / I.face : 0)}</td><td class="num">${pct(x.custoPct, 2)}</td><td class="num"><strong>${pct(x.taxa, 2)}</strong></td>${fundos.map(fd => { const l = fxF[k]?.[fd]; if (!l) return '<td class="num muted">–</td>'; const y = ind(l); return `<td class="num heat-cell" style="${calor(y.taxa)}" title="${esc(fd)} · ${k}: ${y.n} op., ${money0(y.face)}"><strong>${pct(y.taxa, 2)}</strong><span class="small muted">${y.n} op.</span></td>`; }).join('')}</tr>`; }).join('')}
+    <tr class="row-total"><td>TOTAL</td><td class="num">${I.n}</td><td class="num">${money0(I.face)}</td><td class="num">100%</td><td class="num">${pct(I.custoPct, 2)}</td><td class="num">${pct(I.taxa, 2)}</td>${fundos.map(fd => { const x = porFundo.find(z => z.fd === fd); return `<td class="num">${x ? pct(x.taxa, 2) : '–'}</td>`; }).join('')}</tr></tbody></table>
+    <div class="heat-legend small muted">menor taxa <span class="heat-bar"></span> maior taxa${celTaxas.length ? ` (${pct(tMin, 2)} a ${pct(tMax, 2)} a.m.)` : ''}</div>`;
+
+  // ---------- CDI e spread por mês ----------
+  const tabCdi = () => {
+    const ed = podeEditar();
+    const evT = porMes(ops).slice(0, mesesAte.length);
+    const linhaF = (fd) => { const ev2 = porMes(ops.filter(o => o.fundo === fd)).slice(0, mesesAte.length); return `<tr><td class="sticky">Spread ${esc(fd)}</td>${ev2.map((x, m) => `<td class="num">${x.n && cdiMes[m + 1] != null ? pp(x.taxa - cdiMes[m + 1]) : '–'}</td>`).join('')}<td class="num">${(() => { const l = ops.filter(o => o.fundo === fd); const c = cdiDe(l); return c != null ? pp(ind(l).taxa - c) : '–'; })()}</td></tr>`; };
+    const cAno = cdiDe(ops);
+    return `<table><thead><tr><th class="sticky"></th>${mesesAte.map(m => `<th class="num">${MESES_CURTO[m]}</th>`).join('')}<th class="num">Ano</th></tr></thead><tbody>
+      <tr><td class="sticky"><strong>CDI a.m.</strong></td>${mesesAte.map(m => `<td class="num">${ed ? `<input class="cdi-in" data-mes="${m + 1}" inputmode="decimal" value="${cdiMes[m + 1] != null ? (cdiMes[m + 1] * 100).toFixed(2).replace('.', ',') : ''}" placeholder="–" aria-label="CDI ${MESES[m]}">` : (cdiMes[m + 1] != null ? pct(cdiMes[m + 1], 2) : '–')}</td>`).join('')}<td class="num">${cAno != null ? pct(cAno, 2) : '–'}</td></tr>
+      <tr><td class="sticky">Taxa do fundo (todos)</td>${evT.map(x => `<td class="num">${x.n ? pct(x.taxa, 2) : '–'}</td>`).join('')}<td class="num">${pct(ind(ops).taxa, 2)}</td></tr>
+      <tr class="row-total"><td class="sticky">Spread (todos)</td>${evT.map((x, m) => `<td class="num">${x.n && cdiMes[m + 1] != null ? pp(x.taxa - cdiMes[m + 1]) : '–'}</td>`).join('')}<td class="num">${cAno != null ? pp(ind(ops).taxa - cAno) : '–'}</td></tr>
+      ${fundos.map(linhaF).join('')}</tbody></table>`;
+  };
+  $('#cdi', root).innerHTML = tabCdi();
+  $('#cdi', root).onchange = async (e) => {
+    const inp = e.target.closest('.cdi-in'); if (!inp) return;
+    const mes = +inp.dataset.mes; const v = inp.value.trim() ? parseNum(inp.value) : null;
+    try {
+      await q(sb.from('indices_mensais').upsert({ empresa_id: state.empresa.id, ano: state.ano, mes, cdi: v, updated_at: new Date().toISOString() }));
+      if (v == null) delete cdiMes[mes]; else cdiMes[mes] = v / 100;
+      toast(`CDI de ${MESES[mes - 1].toLowerCase()} salvo`); desenhar(root);
+    } catch (err) { fail(err); }
+  };
+
+  // ---------- Custo de oportunidade (filtro de mês) ----------
+  // Referência: fundo de menor taxa no mesmo mês e mesma faixa de prazo (com ao menos 2 operações na célula);
+  // sem concorrência na faixa, vale o fundo mais barato do mês.
+  const opoMes = {}, opoCel = {};
+  for (let m = 1; m <= 12; m++) {
+    const fm = porFundoMes(m).filter(x => x.taxa > 0);
+    if (fm.length) { const b = fm.reduce((a, x) => x.taxa < a.taxa ? x : a); opoMes[m] = { fd: b.fd, taxa: b.taxa }; }
+    const lm = ops.filter(o => +o.data.slice(5, 7) === m); const cel = {};
+    for (const o of lm) ((cel[faixa(prazoCob(o))] ||= {})[o.fundo] ||= []).push(o);
+    for (const [fx2, g] of Object.entries(cel)) {
+      const cands = Object.entries(g).filter(([, l]) => l.length >= 2).map(([fd, l]) => ({ fd, taxa: ind(l).taxa })).filter(x => x.taxa > 0);
+      if (cands.length >= 2) opoCel[`${m}|${fx2}`] = cands.reduce((a, x) => x.taxa < a.taxa ? x : a);
+    }
+  }
+  const custoA = (face, t, p) => { const k = t * p / 30; return face * k / (1 + k); };
+  const baseOpo = ops.filter(mesOk);
+  const opoF = {};
+  for (const o of baseOpo) {
+    const m = +o.data.slice(5, 7); const ref = opoCel[`${m}|${faixa(prazoCob(o))}`] || opoMes[m]; if (!ref) continue;
+    const alt = custoA(+o.valor_face, ref.taxa, prazoCob(o));
+    const g = (opoF[o.fundo] ||= { real: 0, alt: 0, face: 0, n: 0, nMaisBarato: 0 });
+    g.real += +o.custo_total; g.alt += alt; g.face += +o.valor_face; g.n++; if (ref.fd === o.fundo) g.nMaisBarato++;
+  }
+  const opoRows = Object.entries(opoF).sort((a, b) => (b[1].real - b[1].alt) - (a[1].real - a[1].alt));
+  const opoTot = opoRows.reduce((t, [, g]) => ({ real: t.real + g.real, alt: t.alt + g.alt, face: t.face + g.face, n: t.n + g.n }), { real: 0, alt: 0, face: 0, n: 0 });
+  const mesesOpo = Object.keys(opoMes).map(Number).filter(m => !f.mes || m === f.mes);
+  $('#opo', root).innerHTML = opoRows.length ? `<table><thead><tr><th>Fundo</th><th class="num">Op.</th><th class="num">Face</th><th class="num">Custo real</th><th class="num">Custo no + barato</th><th class="num">Economia potencial</th><th class="num">% do custo</th><th class="num">Op. já no + barato</th></tr></thead><tbody>
+    ${opoRows.map(([fd, g]) => `<tr><td><span class="dot" style="background:${corFundo[fd]}"></span>${esc(fd)}</td><td class="num">${g.n}</td><td class="num">${money0(g.face)}</td><td class="num">${money0(g.real)}</td><td class="num">${money0(g.alt)}</td><td class="num"><strong>${money0(Math.max(0, g.real - g.alt))}</strong></td><td class="num">${pct(g.real ? Math.max(0, g.real - g.alt) / g.real : 0)}</td><td class="num">${g.nMaisBarato} de ${g.n}</td></tr>`).join('')}
+    <tr class="row-total"><td>TOTAL</td><td class="num">${opoTot.n}</td><td class="num">${money0(opoTot.face)}</td><td class="num">${money0(opoTot.real)}</td><td class="num">${money0(opoTot.alt)}</td><td class="num">${money0(Math.max(0, opoTot.real - opoTot.alt))}</td><td class="num">${pct(opoTot.real ? Math.max(0, opoTot.real - opoTot.alt) / opoTot.real : 0)}</td><td></td></tr></tbody></table>
+    <div class="small muted" style="padding:8px 16px 14px">Fundo mais barato no mês (referência quando não há concorrência na faixa): ${mesesOpo.map(m => `${MESES_CURTO[m - 1]} ${esc(opoMes[m].fd)} (${pct(opoMes[m].taxa, 2)})`).join(' · ')}</div>`
+    : '<div class="empty">Sem operações no período.</div>';
+
+  simular(root);
 
   // ---------- Operações ----------
   $('#ops', root).innerHTML = sel.length ? `<table><thead><tr><th>Data</th><th>Fundo</th><th>Borderô</th><th>Conta</th><th class="num">Títulos</th><th class="num">Face</th><th class="num">Deságio</th><th class="num">Ad valorem</th><th class="num">Tarifas</th><th class="num">IOF</th><th class="num">Encargos</th><th class="num">Custo</th><th class="num">Recompra</th><th class="num">Líquido</th><th class="num">Prazo cobr.</th><th class="num">Prazo real</th><th class="num">Taxa do fundo</th></tr></thead><tbody>
@@ -221,13 +292,38 @@ function desenhar(root) {
     maior && totT && maior[1].v / totT > .3 ? ['atencao', 'Sacado acima de 30% do volume', `${maior[0]} responde por ${pct(maior[1].v / totT)} do valor cedido.`] : null,
     hhi > 2500 ? ['atencao', 'Concentração de sacados alta', `HHI ${Math.round(hhi).toLocaleString('pt-BR')} (acima de 2.500). Os 5 maiores somam ${pct(sacOrd.slice(0, 5).reduce((s, [, v]) => s + v.v, 0) / (totT || 1))}.`]
       : hhi >= 1500 ? ['info', 'Concentração de sacados moderada', `HHI ${Math.round(hhi).toLocaleString('pt-BR')}.`] : null,
-    cdi != null ? (I.taxa > cdi + 0.02 ? ['atencao', 'Taxa acima do CDI + 2 p.p.', `Spread de ${pp(I.taxa - cdi)} sobre o CDI informado.`] : ['ok', 'Taxa dentro de CDI + 2 p.p.', `Spread de ${pp(I.taxa - cdi)}.`])
-      : ['info', 'Spread sobre o CDI', 'Informe o CDI a.m. no filtro para comparar.'],
+    cdi != null ? (I.taxa > cdi + 0.02 ? ['atencao', 'Taxa acima do CDI + 2 p.p.', `Spread de ${pp(I.taxa - cdi)} sobre o CDI do período (${pct(cdi, 2)} a.m.).`] : ['ok', 'Taxa dentro de CDI + 2 p.p.', `Spread de ${pp(I.taxa - cdi)}.`])
+      : ['info', 'Spread sobre o CDI', 'Cadastre o CDI do mês na tabela "CDI e spread por mês" para comparar.'],
     venc7 ? ['info', 'Coobrigação vencendo em 7 dias', `${money0(venc7)} em títulos cedidos vencem até ${dateBR(new Date(Date.parse(hoje) + 7 * 864e5).toISOString().slice(0, 10))}.`] : null,
     foraBrad.length ? ['info', 'Créditos fora do Bradesco', `${foraBrad.length} borderô(s), ${money0(foraBrad.reduce((s, o) => s + +o.liquido, 0))} creditados em outras contas.`] : null,
   ].filter(Boolean).sort((a, b) => ['atencao', 'info', 'ok'].indexOf(a[0]) - ['atencao', 'info', 'ok'].indexOf(b[0]));
   const ROT = { atencao: ['⚠', 'Atenção'], info: ['ℹ', 'Info'], ok: ['✓', 'OK'] };
   $('#alertas', root).innerHTML = A.map(([st, t, d]) => `<div class="alert-row ${st}"><span class="alert-tag">${ROT[st][0]} ${ROT[st][1]}</span><div><strong>${esc(t)}</strong><div class="small muted">${esc(d)}</div></div></div>`).join('');
+}
+
+// CDI médio do conjunto de borderôs, ponderado pelo valor de face de cada mês (null se não houver CDI cadastrado)
+function cdiDe(list) {
+  let w = 0, s = 0;
+  for (const o of list) { const c = cdiMes[+o.data.slice(5, 7)]; if (c != null) { w += +o.valor_face; s += +o.valor_face * c; } }
+  return w ? s / w : null;
+}
+// Indicadores por fundo num mês (ignora fundos com volume irrisório: < 2% do mês)
+function porFundoMes(m) {
+  const lm = ops.filter(o => +o.data.slice(5, 7) === m); const faceM = lm.reduce((s, o) => s + +o.valor_face, 0);
+  return [...new Set(lm.map(o => o.fundo))].map(fd => ({ fd, ...ind(lm.filter(o => o.fundo === fd)) })).filter(x => faceM && x.face / faceM >= 0.02);
+}
+function simular(root) {
+  const el = $('#simu', root); if (!el) return;
+  const V = parseNum(sim.valor), P = parseNum(sim.prazo);
+  const mesOk = (o) => !f.mes || +o.data.slice(5, 7) === f.mes;
+  const fundos = [...new Set(ops.map(o => o.fundo))].sort();
+  const linhas = fundos.map(fd => { const lp = ops.filter(o => mesOk(o) && o.fundo === fd), la = ops.filter(o => o.fundo === fd); return { fd, tp: lp.length ? ind(lp).taxa : null, ta: ind(la).taxa }; });
+  const custo = (t) => { if (!t || !V || !P) return null; const k = t * P / 30; return V * k / (1 + k); };
+  const ok = V > 0 && P > 0;
+  const melhor = ok ? linhas.filter(x => x.tp).reduce((a, x) => !a || x.tp < a.tp ? x : a, null) : null;
+  el.innerHTML = `<table><thead><tr><th>Fundo</th><th class="num">Taxa a.m. (${f.mes ? MESES_CURTO[f.mes - 1] : 'período'})</th><th class="num">Custo estimado</th><th class="num">Líquido estimado</th><th class="num">Taxa a.m. (ano)</th><th class="num">Custo (taxa do ano)</th><th class="num">Líquido (taxa do ano)</th><th></th></tr></thead><tbody>
+    ${linhas.map(x => { const c = custo(x.tp), ca = custo(x.ta); return `<tr><td>${esc(x.fd)}</td><td class="num">${x.tp ? pct(x.tp, 2) : '–'}</td><td class="num">${c != null ? money(c) : '–'}</td><td class="num">${c != null ? money(V - c) : '–'}</td><td class="num">${pct(x.ta, 2)}</td><td class="num">${ca != null ? money(ca) : '–'}</td><td class="num">${ca != null ? money(V - ca) : '–'}</td><td>${melhor && melhor.fd === x.fd ? '<span class="badge pago">✓ Menor custo</span>' : ''}</td></tr>`; }).join('')}</tbody></table>
+    ${ok ? '' : '<div class="small muted" style="padding:8px 16px 14px">Informe o valor de face e o prazo médio para simular.</div>'}`;
 }
 
 const moneyCurto = (v) => { const a = Math.abs(v); return a >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' mi' : a >= 1e3 ? Math.round(v / 1e3) + ' mil' : v; };
