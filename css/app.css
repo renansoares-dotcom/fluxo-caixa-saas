@@ -199,3 +199,9 @@ table.conc tr.sub td{font-size:12px;color:var(--muted);background:var(--surface-
 /* Propostas de borderô */
 tr.row-sel>td{background:var(--primary-soft)}
 .tabs .chip{font-size:13px;padding:6px 12px}
+.fundo-pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.fundo-op{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer;text-align:left;font:inherit;color:inherit}
+.fundo-op:hover{border-color:var(--primary)}
+.fundo-op.on{border:2px solid var(--primary);background:var(--primary-soft);padding:9px 11px}
+.fundo-op .fo-nome{font-weight:600}
+.fundo-op .fo-num{font-variant-numeric:tabular-nums}

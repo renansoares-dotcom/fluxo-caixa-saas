@@ -33,7 +33,7 @@ export async function render(root) {
   if (!ui.dataOp) ui.dataOp = hojeISO();
   let vindos = null;
   if (state.borderoSel?.length) { // títulos marcados na aba A receber
-    vindos = state.borderoSel; delete state.borderoSel;
+    vindos = state.borderoSel; delete state.borderoSel; ui.fundoId = '';
     ui.sel = new Set(vindos); ui.soSel = true; ui.aba = 'titulos'; ui.propostaEdit = null; ui.busca = ''; ui.venDe = ''; ui.venAte = '';
   }
   root.innerHTML = `<div class="card"><div class="toolbar tabs" id="tabs">
@@ -136,7 +136,7 @@ function checagens(sim, tits, dataOp) {
 function abaTitulos(c, root) {
   const ed = podeEditar();
   const ativos = fundos.filter(f => f.ativo);
-  if (!ui.fundoId && ativos.length) ui.fundoId = ativos.slice().sort((a, b) => a.taxa_am - b.taxa_am)[0].id;
+  if (ui.fundoId && !ativos.some(f => f.id === ui.fundoId)) ui.fundoId = '';
   const filt = titulos.filter(t => (!ui.busca || (sacadoDe(t) + ' ' + (t.documento || '')).toUpperCase().includes(ui.busca.toUpperCase()))
     && (!ui.venDe || t.data >= ui.venDe) && (!ui.venAte || t.data <= ui.venAte) && (!ui.soSel || ui.sel.has(t.id)));
   const livres = filt.filter(t => !emProposta[t.id]);
@@ -179,7 +179,7 @@ function painel(el, root) {
   if (!tits.length) { el.innerHTML = `<div class="card"><h2>Nova proposta</h2><div class="empty">Marque os títulos ao lado para simular o borderô.</div>
     ${!ativos.length ? '<p class="small neg">Cadastre as condições dos fundos antes (aba “Condições dos fundos”).</p>' : ''}</div>`; return; }
   const sims = ativos.map(fu => simular(fu, tits, ui.dataOp, parseNum(ui.recompras) || 0));
-  const S = sims.find(s => s.fu.id === ui.fundoId) || sims[0];
+  const S = sims.find(s => s.fu.id === ui.fundoId) || null; // o fundo é sempre escolhido pelo usuário
   const melhor = sims.slice().sort((a, b) => a.custo - b.custo)[0];
   // melhor fundo por título (distribuição ótima)
   let otimo = 0; const porFundoOt = {};
@@ -188,30 +188,41 @@ function painel(el, root) {
     otimo += best.c; porFundoOt[best.fu.nome] = (porFundoOt[best.fu.nome] || 0) + +t.valor;
   }
   const fixosOt = Object.keys(porFundoOt).reduce((s, n) => { const f = ativos.find(x => x.nome === n); return s + (+f.tarifa_operacao || 0) + (+f.custo_assinatura || 0); }, 0); otimo += fixosOt;
-  const chk = checagens(S, tits, ui.dataOp);
-  const porSac = {}; for (const t of tits) { const k = sacadoDe(t); porSac[k] = (porSac[k] || 0) + +t.valor; }
-  const sacOrd = Object.entries(porSac).sort((a, b) => b[1] - a[1]);
-  const vencs = {}; for (const x of S.itens) { const k = x.prazo <= 30 ? 'até 30 dias' : x.prazo <= 45 ? '31 a 45' : x.prazo <= 60 ? '46 a 60' : x.prazo <= 90 ? '61 a 90' : 'acima de 90'; vencs[k] = (vencs[k] || 0) + +x.t.valor; }
+  const face = sims[0]?.face || 0;
   const ROT = { atencao: ['⚠', 'Atenção'], info: ['ℹ', 'Info'], ok: ['✓', 'OK'] };
-  el.innerHTML = `<div class="card">
-    <div class="card-head"><h2>Nova proposta${ui.propostaEdit ? ` — editando nº ${ui.propostaEdit.numero}` : ''}</h2><span class="muted small">${tits.length} títulos · ${money0(S.face)}</span></div>
-    <form id="pf" class="toolbar">
-      <label>Fundo<select name="fundoId">${options(ativos.map(f => ({ id: f.id, nome: f.nome })), { selected: S.fu.id })}</select></label>
+  const comparacao = `<h3 style="margin-top:16px">Comparação entre fundos para estes títulos</h3>
+    <div class="table-wrap"><table class="cmp-fundos"><thead><tr><th>Fundo</th><th class="num">Taxa cad.</th><th class="num">Deságio</th><th class="num">Tarifas / IOF</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Taxa efetiva</th><th class="num">Dif. vs. + barato</th></tr></thead><tbody>
+      ${sims.map(s => `<tr class="clickable ${S && s.fu.id === S.fu.id ? 'row-sel' : ''}" data-fu="${s.fu.id}" title="Usar ${esc(s.fu.nome)} nesta proposta"><td><strong>${esc(s.fu.nome)}</strong></td><td class="num">${pct(s.fu.taxa_am / 100, 2)}</td><td class="num">${money0(s.desagio)}</td><td class="num">${money0(s.ad + s.tar + s.iof)}</td><td class="num"><strong>${money0(s.custo)}</strong></td><td class="num">${money0(s.liquido)}</td><td class="num">${pct(s.taxaEf, 2)}</td><td class="num">${s === melhor ? '<span class="badge pago">menor custo</span>' : '+' + money0(s.custo - melhor.custo)}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${Object.keys(porFundoOt).length > 1 && otimo < melhor.custo - 1 ? `<p class="small" style="margin:8px 0 0">💡 Dividindo os títulos entre fundos (cada título no mais barato) o custo seria <strong>${money0(otimo)}</strong>, ${money0(melhor.custo - otimo)} a menos: ${Object.entries(porFundoOt).map(([n, v]) => `${esc(n)} ${money0(v)}`).join(' · ')}.</p>` : ''}`;
+  const escolha = `<div class="fundo-pick" id="fpick" role="radiogroup" aria-label="Fundo da operação">
+      ${sims.map(s => `<button type="button" class="fundo-op${S && s.fu.id === S.fu.id ? ' on' : ''}" data-fu="${s.fu.id}" role="radio" aria-checked="${S && s.fu.id === S.fu.id}">
+        <span class="fo-nome">${esc(s.fu.nome)}${s === melhor ? ' <span class="badge pago">menor custo</span>' : ''}</span>
+        <span class="fo-num">${money0(s.custo)} <span class="muted small">custo · ${pct(s.taxaEf, 2)} a.m.</span></span></button>`).join('')}</div>`;
+  const form = `<form id="pf" class="toolbar" style="margin-top:12px">
       <label>Data da operação<input type="date" name="dataOp" value="${ui.dataOp}"></label>
       <label>Recompras a descontar (R$)<input name="recompras" inputmode="decimal" value="${esc(ui.recompras)}" placeholder="0,00"></label>
-    </form>
+    </form>`;
+  const head = `<div class="card-head"><h2>Nova proposta${ui.propostaEdit ? ` — editando nº ${ui.propostaEdit.numero}` : ''}</h2><span class="muted small">${tits.length} títulos · ${money0(face)}</span></div>
+    <h3 style="margin:4px 0 8px">Escolha o fundo (FIDC)</h3>${escolha}${form}`;
+  if (!S) {
+    el.innerHTML = `<div class="card">${head}
+      <div class="empty" style="margin-top:12px">Escolha o fundo acima (ou clique numa linha da comparação) para ver a proposta, as verificações e enviar para aprovação.</div>
+      ${comparacao}</div>`;
+  } else {
+    const chk = checagens(S, tits, ui.dataOp);
+    const porSac = {}; for (const t of tits) { const k = sacadoDe(t); porSac[k] = (porSac[k] || 0) + +t.valor; }
+    const sacOrd = Object.entries(porSac).sort((a, b) => b[1] - a[1]);
+    const vencs = {}; for (const x of S.itens) { const k = x.prazo <= 30 ? 'até 30 dias' : x.prazo <= 45 ? '31 a 45' : x.prazo <= 60 ? '46 a 60' : x.prazo <= 90 ? '61 a 90' : 'acima de 90'; vencs[k] = (vencs[k] || 0) + +x.t.valor; }
+    el.innerHTML = `<div class="card">${head}
     <div class="kpis" style="margin-top:12px">
-      <div class="kpi"><div class="k-label">Valor de face</div><div class="k-value">${money0(S.face)}</div><div class="k-sub">${S.n} títulos</div></div>
-      <div class="kpi"><div class="k-label">Custo estimado</div><div class="k-value">${money0(S.custo)}</div><div class="k-sub">${pct(S.face ? S.custo / S.face : 0, 2)} da face</div></div>
+      <div class="kpi"><div class="k-label">Valor de face</div><div class="k-value">${money0(S.face)}</div><div class="k-sub">${S.n} títulos · ${esc(S.fu.nome)}</div></div>
+      <div class="kpi"><div class="k-label">Custo estimado</div><div class="k-value">${money0(S.custo)}</div><div class="k-sub">${pct(S.face ? S.custo / S.face : 0, 2)} da face${S !== melhor ? ` · +${money0(S.custo - melhor.custo)} vs. ${esc(melhor.fu.nome)}` : ''}</div></div>
       <div class="kpi"><div class="k-label">Líquido estimado</div><div class="k-value">${money0(S.liquido)}</div><div class="k-sub">crédito em ${esc(state.cad.contaById[S.fu.conta_credito_id]?.nome || '—')}</div></div>
       <div class="kpi"><div class="k-label">Taxa a.m.</div><div class="k-value">${pct(S.taxaEf, 2)}</div><div class="k-sub">prazo ${num1(S.prazo)} d · cobrado ${num1(S.prazoC)} d</div></div>
     </div>
-    <h3 style="margin-top:16px">Comparação entre fundos para estes títulos</h3>
-    <div class="table-wrap"><table><thead><tr><th>Fundo</th><th class="num">Taxa cad.</th><th class="num">Deságio</th><th class="num">Tarifas, assin., boletos, Serasa, IOF</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Dif. vs. + barato</th><th></th></tr></thead><tbody>
-      ${sims.map(s => `<tr class="${s.fu.id === S.fu.id ? 'row-sel' : ''}"><td>${esc(s.fu.nome)}</td><td class="num">${pct(s.fu.taxa_am / 100, 2)}</td><td class="num">${money0(s.desagio)}</td><td class="num">${money0(s.ad + s.tar + s.iof)}</td><td class="num"><strong>${money0(s.custo)}</strong></td><td class="num">${money0(s.liquido)}</td><td class="num">${s === melhor ? '—' : '+' + money0(s.custo - melhor.custo)}</td><td>${s === melhor ? '<span class="badge pago">menor custo</span>' : ''}</td></tr>`).join('')}
-    </tbody></table></div>
-    <p class="small muted" style="margin:6px 0 0">Custos da operação no ${esc(S.fu.nome)}: ${descCustos(S.custos, S.fu, S.n)}.</p>
-    ${Object.keys(porFundoOt).length > 1 && otimo < melhor.custo - 1 ? `<p class="small" style="margin:8px 0 0">💡 Dividindo os títulos entre fundos (cada título no mais barato) o custo seria <strong>${money0(otimo)}</strong>, ${money0(melhor.custo - otimo)} a menos: ${Object.entries(porFundoOt).map(([n, v]) => `${esc(n)} ${money0(v)}`).join(' · ')}.</p>` : ''}
+    <p class="small muted" style="margin:8px 0 0">Custos da operação no ${esc(S.fu.nome)}: ${descCustos(S.custos, S.fu, S.n)}.</p>
+    ${comparacao}
     <h3 style="margin-top:16px">Verificações — ${esc(S.fu.nome)}</h3>
     <div class="alert-list">${chk.map(([st, t, d]) => `<div class="alert-row ${st}"><span class="alert-tag">${ROT[st][0]} ${ROT[st][1]}</span><div><strong>${esc(t)}</strong><div class="small muted">${esc(d)}</div></div></div>`).join('')}</div>
     <div class="grid2" style="margin-top:12px">
@@ -221,12 +232,17 @@ function painel(el, root) {
     <label class="span2" style="margin-top:12px">Observação para o diretor<textarea id="obs" rows="2">${esc(ui.obs)}</textarea></label>
     <div class="toolbar" style="margin-top:12px;justify-content:flex-end">
       ${ui.propostaEdit ? '<button class="btn" id="cancel-ed">Cancelar edição</button>' : ''}
-      <button class="btn" id="salvar">Salvar rascunho</button><button class="btn primary" id="enviar">Enviar para aprovação</button></div>
+      <button class="btn" id="salvar">Salvar rascunho</button><button class="btn primary" id="enviar">Enviar para aprovação — ${esc(S.fu.nome)}</button></div>
   </div>`;
+    $('#salvar', el).onclick = () => salvarProposta(root, S, tits, chk, sims, 'Rascunho');
+    $('#enviar', el).onclick = () => salvarProposta(root, S, tits, chk, sims, 'Pendente');
+  }
+  const escolher = (e) => { const b = e.target.closest('[data-fu]'); if (!b) return; ui.fundoId = b.dataset.fu; painel(el, root); };
+  $('#fpick', el).onclick = escolher;
+  $('table.cmp-fundos', el).onclick = escolher;
   $('#pf', el).addEventListener('change', (e) => { ui[e.target.name] = e.target.value; if (e.target.name === 'dataOp') return abaTitulos($('#corpo', root), root); painel(el, root); });
+  if (!S) return;
   $('#obs', el).oninput = (e) => { ui.obs = e.target.value; };
-  $('#salvar', el).onclick = () => salvarProposta(root, S, tits, chk, sims, 'Rascunho');
-  $('#enviar', el).onclick = () => salvarProposta(root, S, tits, chk, sims, 'Pendente');
   $('#cancel-ed', el) && ($('#cancel-ed', el).onclick = () => { ui.propostaEdit = null; ui.sel.clear(); abaTitulos($('#corpo', root), root); });
 }
 
@@ -250,7 +266,7 @@ async function salvarProposta(root, S, tits, chk, sims, status) {
       emissao: x.t.emissao, vencimento: x.t.data, valor: x.t.valor, prazo: x.prazo, custo_estimado: +x.custo.toFixed(2) }));
     for (let i = 0; i < itens.length; i += 500) await q(sb.from('fidc_proposta_itens').insert(itens.slice(i, i + 500)));
     toast(status === 'Pendente' ? `Proposta nº ${p.numero} enviada para aprovação` : `Rascunho nº ${p.numero} salvo`);
-    ui.sel.clear(); ui.soSel = false; ui.obs = ''; ui.recompras = ''; ui.propostaEdit = null; ui.aba = 'propostas';
+    ui.sel.clear(); ui.soSel = false; ui.fundoId = ''; ui.obs = ''; ui.recompras = ''; ui.propostaEdit = null; ui.aba = 'propostas';
     render(root);
   } catch (err) { fail(err); }
 }
