@@ -6,7 +6,7 @@ import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formDa
 
 export const title = 'Propostas de borderô';
 
-const ui = { aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', propostaEdit: null };
+const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', propostaEdit: null };
 let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [];
 // sacado: raiz do CNPJ (8 dígitos) quando houver; senão o nome normalizado (os borderôs cortam o nome em ~40 letras)
 const chaveSac = (cnpj, nome) => { const d = String(cnpj || '').replace(/\D/g, ''); return d.length >= 8 ? 'c' + d.slice(0, 8) : 'n' + String(nome || '').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 25); };
@@ -31,6 +31,11 @@ const STATUS_CLS = { Rascunho: 'negoc', Pendente: 'aberto', Aprovada: 'pago', Re
 
 export async function render(root) {
   if (!ui.dataOp) ui.dataOp = hojeISO();
+  let vindos = null;
+  if (state.borderoSel?.length) { // títulos marcados na aba A receber
+    vindos = state.borderoSel; delete state.borderoSel;
+    ui.sel = new Set(vindos); ui.soSel = true; ui.aba = 'titulos'; ui.propostaEdit = null; ui.busca = ''; ui.venDe = ''; ui.venAte = '';
+  }
   root.innerHTML = `<div class="card"><div class="toolbar tabs" id="tabs">
       ${[['titulos', 'Títulos em aberto'], ['propostas', 'Propostas'], ['fundos', 'Condições dos fundos']].map(([k, n]) => `<button class="chip${ui.aba === k ? ' on' : ''}" data-aba="${k}">${n}</button>`).join('')}
       <span class="spacer"></span>
@@ -40,7 +45,10 @@ export async function render(root) {
   $('#imp-nf', root) && ($('#imp-nf', root).onclick = () => importarNFs(async () => { await carregar(); ui.aba = 'titulos'; render(root); }));
   $('#lanc-nf', root) && ($('#lanc-nf', root).onclick = () => lancarNFs(async () => { await carregar(); ui.aba = 'titulos'; render(root); }));
   loading($('#corpo', root));
-  try { await carregar(); desenhar(root); } catch (err) { fail(err); }
+  try {
+    await carregar(); desenhar(root);
+    if (vindos) { const ok = vindos.filter(id => ui.sel.has(id)).length; toast(`${ok} título(s) da aba A receber prontos para simular${ok < vindos.length ? ` · ${vindos.length - ok} não disponíveis` : ''}`); $('#painel', root)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }
+  } catch (err) { fail(err); }
 }
 
 async function carregar() {
@@ -58,7 +66,7 @@ async function carregar() {
   const hj = hojeISO(); carteira = historico.filter(t => t.vencimento > hj);
   emProposta = {};
   for (const i of itensAbertos || []) emProposta[i.lancamento_id] = i.fidc_propostas;
-  for (const id of [...ui.sel]) if (!titulos.some(t => t.id === id)) ui.sel.delete(id);
+  for (const id of [...ui.sel]) if (!titulos.some(t => t.id === id) || (emProposta[id] && !ui.propostaEdit)) ui.sel.delete(id);
 }
 
 function desenhar(root) {
@@ -130,13 +138,14 @@ function abaTitulos(c, root) {
   const ativos = fundos.filter(f => f.ativo);
   if (!ui.fundoId && ativos.length) ui.fundoId = ativos.slice().sort((a, b) => a.taxa_am - b.taxa_am)[0].id;
   const filt = titulos.filter(t => (!ui.busca || (sacadoDe(t) + ' ' + (t.documento || '')).toUpperCase().includes(ui.busca.toUpperCase()))
-    && (!ui.venDe || t.data >= ui.venDe) && (!ui.venAte || t.data <= ui.venAte));
+    && (!ui.venDe || t.data >= ui.venDe) && (!ui.venAte || t.data <= ui.venAte) && (!ui.soSel || ui.sel.has(t.id)));
   const livres = filt.filter(t => !emProposta[t.id]);
   c.innerHTML = `
     <div class="card"><div class="toolbar" id="flt-t">
       <label>Buscar cliente / NF<input name="busca" value="${esc(ui.busca)}" placeholder="nome ou número"></label>
       <label>Vencimento de<input type="date" name="venDe" value="${ui.venDe}"></label>
       <label>até<input type="date" name="venAte" value="${ui.venAte}"></label>
+      <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="soSel" ${ui.soSel ? 'checked' : ''}> Só os marcados</label>
       <span class="spacer"></span>
       <span class="muted small">${titulos.length} títulos em aberto · ${money0(titulos.reduce((s, t) => s + +t.valor, 0))}</span></div></div>
     <div class="grid2 prop-grid">
@@ -150,7 +159,7 @@ function abaTitulos(c, root) {
       <div id="painel"></div>
     </div>`;
   const f = $('#flt-t', c);
-  f.addEventListener('change', (e) => { ui[e.target.name] = e.target.value; abaTitulos(c, root); });
+  f.addEventListener('change', (e) => { ui[e.target.name] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; abaTitulos(c, root); });
   if (ed) {
     $('table', c)?.addEventListener('click', (e) => {
       const tr = e.target.closest('tr[data-id]'); if (!tr || emProposta[tr.dataset.id]) return;
@@ -241,7 +250,7 @@ async function salvarProposta(root, S, tits, chk, sims, status) {
       emissao: x.t.emissao, vencimento: x.t.data, valor: x.t.valor, prazo: x.prazo, custo_estimado: +x.custo.toFixed(2) }));
     for (let i = 0; i < itens.length; i += 500) await q(sb.from('fidc_proposta_itens').insert(itens.slice(i, i + 500)));
     toast(status === 'Pendente' ? `Proposta nº ${p.numero} enviada para aprovação` : `Rascunho nº ${p.numero} salvo`);
-    ui.sel.clear(); ui.obs = ''; ui.recompras = ''; ui.propostaEdit = null; ui.aba = 'propostas';
+    ui.sel.clear(); ui.soSel = false; ui.obs = ''; ui.recompras = ''; ui.propostaEdit = null; ui.aba = 'propostas';
     render(root);
   } catch (err) { fail(err); }
 }

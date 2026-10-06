@@ -19,7 +19,8 @@ export async function render(root) {
     <div class="kpis" id="kp"></div>
     <div class="card flush">${podeEditar() ? `<div class="toolbar" style="padding:10px 12px"><span class="muted small" id="si">Nenhum selecionado</span>
       <label style="flex-direction:row;align-items:center;gap:6px">Data do pagamento <input type="date" id="dt-baixa" value="${today()}"></label>
-      <button class="btn small" id="baixar" disabled>Baixar selecionados</button></div>` : ''}
+      <button class="btn small" id="baixar" disabled>Baixar selecionados</button>
+      ${f.aba === 'E' ? '<span class="spacer"></span><button class="btn small primary" id="bordero" disabled title="Simular o borderô FIDC com os títulos marcados e gerar a proposta para aprovação">Montar borderô FIDC</button>' : ''}</div>` : ''}
       <div class="table-wrap" id="tbl"></div></div>`;
   $('#abas', root).onclick = (e) => { if (e.target.dataset.k) { f.aba = e.target.dataset.k; render(root); } };
   $('#flt', root).addEventListener('change', (e) => { f[e.target.name] = e.target.value; load(root); });
@@ -29,7 +30,25 @@ export async function render(root) {
     const ids = $$('.sel:checked', root).map(c => c.value);
     try { const n = await q(sb.rpc('baixar_lancamentos', { p_ids: ids, p_data: $('#dt-baixa', root).value || null })); toast(`${n} título(s) baixado(s)`); load(root); } catch (e) { fail(e); }
   };
+  $('#bordero', root) && ($('#bordero', root).onclick = () => {
+    const ids = $$('.sel:checked', root).map(c => c.value).filter(id => elegiveis.has(id));
+    const fora = $$('.sel:checked', root).length - ids.length;
+    if (!ids.length) return toast('Nenhum título marcado pode ir para borderô (só receitas 1.01 em aberto que não estão em outra proposta)', true);
+    if (fora) toast(`${fora} título(s) ficaram de fora: não são receita 1.01 ou já estão em proposta`);
+    state.borderoSel = ids; location.hash = '#/fidc-propostas';
+  });
   await load(root);
+}
+
+// títulos que podem ir para borderô: receita 1.01 em aberto, fora de proposta ativa
+let elegiveis = new Set(), emProp = {};
+function atualizarSel(root) {
+  const marc = $$('.sel:checked', root); const n = marc.length;
+  const lista = marc.map(c => c.value); const el = lista.filter(id => elegiveis.has(id));
+  const tot = marc.reduce((s, c) => s + Math.abs(+c.dataset.v || 0), 0);
+  if ($('#si', root)) $('#si', root).textContent = n ? `${n} selecionado(s) · ${money(tot)}` : 'Nenhum selecionado';
+  if ($('#baixar', root)) $('#baixar', root).disabled = !n;
+  if ($('#bordero', root)) { $('#bordero', root).disabled = !el.length; $('#bordero', root).textContent = el.length ? `Montar borderô FIDC (${el.length})` : 'Montar borderô FIDC'; }
 }
 
 async function load(root) {
@@ -41,6 +60,13 @@ async function load(root) {
       if (f.conta) qy = qy.eq('conta_id', f.conta);
       return qy.order('data');
     });
+    // propostas de borderô em rascunho/pendentes que já contêm títulos
+    emProp = {};
+    try {
+      const its = await q(sb.from('fidc_proposta_itens').select('lancamento_id, fidc_propostas!inner(numero,status)').eq('empresa_id', state.empresa.id).in('fidc_propostas.status', ['Rascunho', 'Pendente']));
+      for (const i of its || []) emProp[i.lancamento_id] = i.fidc_propostas;
+    } catch { /* sem acesso às propostas: segue sem a marcação */ }
+    elegiveis = new Set(rows.filter(r => r.tipo === 'E' && r.plano_codigo?.startsWith('1.01') && !emProp[r.id] && !r.fidc_proposta_id).map(r => r.id));
     if (f.busca) { const s = f.busca.toLowerCase(); rows = rows.filter(r => `${r.favorecido_nome} ${r.descricao} ${r.plano_nome} ${r.documento || ''}`.toLowerCase().includes(s)); }
     const hoje = today();
     const sum = (a) => a.reduce((s, x) => s + Math.abs(+x.valor_sinal), 0);
@@ -64,16 +90,17 @@ async function load(root) {
     if (!lista.length) { tbl.innerHTML = '<div class="empty">Nada em aberto aqui.</div>'; return; }
     tbl.innerHTML = `<table><thead><tr>${podeEditar() ? '<th><input type="checkbox" id="all"></th>' : ''}<th>Vencimento</th><th>Dias</th><th>Favorecido</th><th>Descrição</th><th>Plano de contas</th><th>Conta</th><th>Prioridade</th><th class="num">Valor</th></tr></thead><tbody>
       ${lista.map(r => { const dias = Math.floor((new Date(hoje) - new Date(r.data)) / 864e5);
-        return `<tr class="clickable" data-id="${r.id}">${podeEditar() ? `<td><input type="checkbox" class="sel" value="${r.id}"></td>` : ''}
+        return `<tr class="clickable" data-id="${r.id}">${podeEditar() ? `<td><input type="checkbox" class="sel" value="${r.id}" data-v="${r.valor}"></td>` : ''}
         <td>${dateBR(r.data)}</td><td>${dias > 0 ? `<span class="badge vencido">${dias} d atraso</span>` : `<span class="muted small">em ${-dias} d</span>`}</td>
-        <td class="wrap">${esc(r.favorecido_nome || '')}</td><td class="wrap">${esc(r.descricao || '')}${r.documento && !(r.descricao || '').includes(r.documento) ? `<div class="muted small">NF ${esc(r.documento)}</div>` : ''}</td><td>${esc(r.plano_codigo + ' - ' + r.plano_nome)}</td>
+        <td class="wrap">${esc(r.favorecido_nome || '')}</td><td class="wrap">${esc(r.descricao || '')}${r.documento && !(r.descricao || '').includes(r.documento) ? `<div class="muted small">NF ${esc(r.documento)}</div>` : ''}${emProp[r.id] ? `<div class="small"><span class="badge ${emProp[r.id].status === 'Pendente' ? 'aberto' : 'negoc'}">borderô proposta nº ${emProp[r.id].numero} · ${emProp[r.id].status.toLowerCase()}</span></div>` : ''}</td><td>${esc(r.plano_codigo + ' - ' + r.plano_nome)}</td>
         <td>${esc(r.conta_nome || '—')}</td><td>${r.tipo === 'S' ? `<span class="badge ${r.prioridade_efetiva === 'Obrigatório' ? 'obrig' : 'negoc'}">${r.prioridade_efetiva}</span>` : ''}</td>
         <td class="num ${cls(r.valor_sinal)}">${money(r.valor_sinal)}</td></tr>`; }).join('')}
       <tr class="row-total">${podeEditar() ? '<td></td>' : ''}<td colspan="7">Total</td><td class="num">${money(lista.reduce((s, r) => s + +r.valor_sinal, 0))}</td></tr></tbody></table>`;
     tbl.onclick = (e) => {
-      if (e.target.matches('input')) { const n = $$('.sel:checked', root).length; if ($('#si', root)) { $('#si', root).textContent = n ? `${n} selecionado(s)` : 'Nenhum selecionado'; $('#baixar', root).disabled = !n; } return; }
+      if (e.target.matches('input')) return atualizarSel(root);
       const tr = e.target.closest('tr[data-id]'); if (tr) abrirLancamento(lista.find(x => x.id === tr.dataset.id), () => load(root));
     };
-    const all = $('#all', root); if (all) all.onchange = () => { $$('.sel', root).forEach(c => c.checked = all.checked); tbl.onclick({ target: all }); };
+    const all = $('#all', root); if (all) all.onchange = () => { $$('.sel', root).forEach(c => c.checked = all.checked); atualizarSel(root); };
+    atualizarSel(root);
   } catch (e) { fail(e); }
 }
