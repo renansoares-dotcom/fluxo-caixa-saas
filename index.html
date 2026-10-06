@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fluxo de Caixa</title>
+  <title>IPLAMM · Fluxo de Caixa</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/app.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%231f6feb'/><path d='M7 21l6-6 4 4 8-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="icon" type="image/svg+xml" href="assets/iplamm-icon.svg">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js" defer></script>
@@ -17,7 +17,7 @@
   <!-- Tela de login / cadastro -->
   <section id="auth-view" class="auth hidden">
     <div class="auth-card">
-      <div class="brand big"><span class="logo"></span>Fluxo de Caixa</div>
+      <div class="brand-logo big"><img class="logo-light" src="assets/iplamm-logo.svg" alt="IPLAMM"><img class="logo-dark" src="assets/iplamm-logo-dark.svg" alt="IPLAMM"><span class="brand-sub">Fluxo de Caixa</span></div>
       <p class="muted">Gestão financeira: lançamentos, fluxo de caixa, DRE, orçamento e autorização de pagamentos.</p>
       <form id="auth-form" class="form">
         <label>E-mail<input type="email" name="email" required autocomplete="email"></label>
@@ -33,7 +33,7 @@
   <!-- Onboarding: escolher / criar empresa -->
   <section id="empresa-view" class="auth hidden">
     <div class="auth-card wide">
-      <div class="brand big"><span class="logo"></span>Suas empresas</div>
+      <div class="brand-logo big"><img class="logo-light" src="assets/iplamm-logo.svg" alt="IPLAMM"><img class="logo-dark" src="assets/iplamm-logo-dark.svg" alt="IPLAMM"><span class="brand-sub">Suas empresas</span></div>
       <div id="empresa-list" class="empresa-list"></div>
       <form id="empresa-form" class="form">
         <h3>Criar nova empresa</h3>
@@ -48,7 +48,7 @@
   <!-- Aplicação -->
   <div id="app-view" class="layout hidden">
     <aside class="sidebar" id="sidebar">
-      <div class="brand"><span class="logo"></span><span>Fluxo de Caixa</span></div>
+      <div class="brand-logo"><img class="logo-light" src="assets/iplamm-logo.svg" alt="IPLAMM"><img class="logo-dark" src="assets/iplamm-logo-dark.svg" alt="IPLAMM"><span class="brand-sub">Fluxo de Caixa</span></div>
       <button class="empresa-switch" id="empresa-switch" title="Trocar empresa"></button>
       <nav id="nav">
         <a href="#/dashboard" data-route="dashboard">Dashboard</a>

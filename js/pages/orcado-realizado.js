@@ -1,5 +1,5 @@
 import { sb, state, q, fetchAll, filtrosHTML, bindFiltros, matrizMensal, montarMatriz, montarDRE, soma, z, mesesHeader } from '../lib/data.js';
-import { $, esc, money, pct, cls, exportXLSX, fail, loading, options, MESES, chart, CORES, MESES_CURTO, moneyTick } from '../lib/ui.js';
+import { $, esc, money, pct, cls, exportXLSX, fail, loading, options, MESES, chart, CORES, COR, MESES_CURTO, moneyTick } from '../lib/ui.js';
 
 export const title = 'Orçado x Realizado';
 let comp = 'budget', periodo = 0, vis = 'classe';
@@ -84,12 +84,12 @@ async function load(root) {
     chart($('#ch', root), {
       type: 'bar',
       data: { labels: MESES_CURTO, datasets: [
-        { label: 'Entradas realizadas', data: real.tipo.E, backgroundColor: CORES[1] + 'bb' },
-        { label: `Entradas ${nomeRef}`, data: ref.tipo.E, backgroundColor: CORES[1] + '44', borderColor: CORES[1], borderWidth: 1 },
-        { label: 'Saídas realizadas', data: real.tipo.S.map(Math.abs), backgroundColor: CORES[2] + 'bb' },
-        { label: `Saídas ${nomeRef}`, data: ref.tipo.S.map(Math.abs), backgroundColor: CORES[2] + '44', borderColor: CORES[2], borderWidth: 1 },
-        { type: 'line', label: 'Resultado realizado', data: res(real), borderColor: CORES[0], backgroundColor: CORES[0] },
-        { type: 'line', label: `Resultado ${nomeRef}`, data: res(ref), borderColor: CORES[4], backgroundColor: CORES[4], borderDash: [5, 4] },
+        { label: 'Entradas realizadas', data: real.tipo.E, backgroundColor: COR.entrada },
+        { label: `Entradas ${nomeRef}`, data: ref.tipo.E, backgroundColor: COR.entrada + '33', borderColor: COR.entrada, borderWidth: 1 },
+        { label: 'Saídas realizadas', data: real.tipo.S.map(Math.abs), backgroundColor: COR.saida },
+        { label: `Saídas ${nomeRef}`, data: ref.tipo.S.map(Math.abs), backgroundColor: COR.saida + '33', borderColor: COR.saida, borderWidth: 1 },
+        { type: 'line', label: 'Resultado realizado', data: res(real), borderColor: COR.resultado, backgroundColor: COR.resultado },
+        { type: 'line', label: `Resultado ${nomeRef}`, data: res(ref), borderColor: COR.resultado, backgroundColor: COR.resultado, borderDash: [5, 4] },
       ] },
       options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { ticks: { callback: moneyTick } } },
         plugins: { tooltip: { callbacks: { label: (x) => `${x.dataset.label}: ${money(x.raw)}` } } } },

@@ -1,5 +1,5 @@
 import { sb, state, q, filtrosHTML, bindFiltros, rpcFiltros, descricaoFiltros, soma } from '../lib/data.js';
-import { $, esc, money, cls, exportXLSX, fail, loading, MESES, options, chart, moneyTick, CORES } from '../lib/ui.js';
+import { $, esc, money, cls, exportXLSX, fail, loading, MESES, options, chart, moneyTick, CORES, COR } from '../lib/ui.js';
 
 export const title = 'Fluxo de caixa diário';
 let mes = new Date().getMonth() + 1;
@@ -50,9 +50,9 @@ async function load(root) {
     chart($('#ch', root), {
       type: 'bar',
       data: { labels: dias, datasets: [
-        { type: 'line', label: 'Saldo final', data: sFim, borderColor: CORES[0], backgroundColor: CORES[0], tension: .25, pointRadius: 2, yAxisID: 'y' },
-        { label: 'Entradas', data: porTipo.E, backgroundColor: CORES[1] + 'aa', yAxisID: 'y' },
-        { label: 'Saídas', data: porTipo.S, backgroundColor: CORES[2] + 'aa', yAxisID: 'y' },
+        { type: 'line', label: 'Saldo final', data: sFim, borderColor: COR.saldo, backgroundColor: COR.saldo, tension: .25, pointRadius: 2, yAxisID: 'y' },
+        { label: 'Entradas', data: porTipo.E, backgroundColor: COR.entrada, yAxisID: 'y' },
+        { label: 'Saídas', data: porTipo.S, backgroundColor: COR.saida, yAxisID: 'y' },
       ] },
       options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
         scales: { y: { ticks: { callback: moneyTick } } },

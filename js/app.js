@@ -1,5 +1,5 @@
 import { sb, state, q, loadCadastros, anosSelect } from './lib/data.js';
-import { $, $$, esc, toast, fail, formData, loading } from './lib/ui.js';
+import { $, $$, esc, toast, fail, formData, loading, lerCores } from './lib/ui.js';
 import { SUPABASE_URL } from './config.js';
 
 const routes = {
@@ -114,6 +114,7 @@ $('#menu-btn').onclick = () => $('#sidebar').classList.toggle('open');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa || !state.cad) return;
+  lerCores();
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'dashboard';
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));

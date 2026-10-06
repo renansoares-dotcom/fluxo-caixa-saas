@@ -1,5 +1,5 @@
 import { sb, state, q, matrizMensal, montarDRE, soma, z } from '../lib/data.js';
-import { $, esc, money, money0, pct, cls, dateBR, today, fail, chart, CORES, MESES_CURTO, moneyTick } from '../lib/ui.js';
+import { $, esc, money, money0, pct, cls, dateBR, today, fail, chart, CORES, COR, MESES_CURTO, moneyTick } from '../lib/ui.js';
 
 export const title = 'Dashboard';
 
@@ -43,9 +43,9 @@ export async function render(root) {
     chart($('#c1', root), {
       type: 'bar',
       data: { labels: MESES_CURTO, datasets: [
-        { label: 'Entradas', data: m.tipo.E, backgroundColor: CORES[1] + 'cc', order: 2 },
-        { label: 'Saídas', data: m.tipo.S.map(Math.abs), backgroundColor: CORES[2] + 'cc', order: 2 },
-        { type: 'line', label: 'Saldo final', data: saldoFim, borderColor: CORES[0], backgroundColor: CORES[0], yAxisID: 'y2', tension: .25, order: 1 },
+        { label: 'Entradas', data: m.tipo.E, backgroundColor: COR.entrada, order: 2 },
+        { label: 'Saídas', data: m.tipo.S.map(Math.abs), backgroundColor: COR.saida, order: 2 },
+        { type: 'line', label: 'Saldo final', data: saldoFim, borderColor: COR.saldo, backgroundColor: COR.saldo, yAxisID: 'y2', tension: .25, order: 1 },
       ] },
       options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
         scales: { y: { ticks: { callback: moneyTick } }, y2: { position: 'right', grid: { display: false }, ticks: { callback: moneyTick } } },
@@ -57,7 +57,7 @@ export async function render(root) {
     if (resto) top.push({ l: 'Demais', v: resto });
     chart($('#c2', root), {
       type: 'doughnut',
-      data: { labels: top.map(x => x.l), datasets: [{ data: top.map(x => x.v), backgroundColor: CORES, borderWidth: 0 }] },
+      data: { labels: top.map(x => x.l), datasets: [{ data: top.map(x => x.v), backgroundColor: CORES, borderWidth: 2, borderColor: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() }] },
       options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' },
         tooltip: { callbacks: { label: (x) => `${x.label}: ${money(x.raw)} (${pct(x.raw / soma(top.map(t => t.v)))})` } } } },
     });

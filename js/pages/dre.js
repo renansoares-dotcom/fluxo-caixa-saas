@@ -1,5 +1,5 @@
 import { state, filtrosHTML, bindFiltros, matrizMensal, montarDRE, descricaoFiltros, soma, mesesHeader } from '../lib/data.js';
-import { $, esc, money, pct, cls, exportXLSX, fail, loading, chart, CORES, MESES_CURTO, moneyTick } from '../lib/ui.js';
+import { $, esc, money, pct, cls, exportXLSX, fail, loading, chart, CORES, COR, MESES_CURTO, moneyTick } from '../lib/ui.js';
 
 export const title = 'DRE gerencial';
 let modo = 'mensal';
@@ -44,9 +44,9 @@ async function load(root) {
     chart($('#ch', root), {
       type: 'bar',
       data: { labels: MESES_CURTO, datasets: [
-        { label: 'Receita bruta', data: val.receita_bruta, backgroundColor: CORES[0] + 'cc' },
-        { label: 'EBITDA gerencial', data: val.ebitda, backgroundColor: CORES[1] + 'cc' },
-        { label: 'Resultado gerencial', data: val.resultado, backgroundColor: CORES[4] },
+        { label: 'Receita bruta', data: val.receita_bruta, backgroundColor: COR.entrada },
+        { label: 'EBITDA gerencial', data: val.ebitda, backgroundColor: COR.saldo },
+        { label: 'Resultado gerencial', data: val.resultado, backgroundColor: COR.resultado },
       ] },
       options: { maintainAspectRatio: false, scales: { y: { ticks: { callback: moneyTick } } },
         plugins: { tooltip: { callbacks: { label: (x) => `${x.dataset.label}: ${money(x.raw)}` } } } },

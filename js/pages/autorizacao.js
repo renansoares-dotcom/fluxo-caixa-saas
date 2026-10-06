@@ -152,7 +152,7 @@ export function pdf(aut, rows) {
   const aprov = rows.filter(r => r.autoriza);
   doc.text(`Total em aberto listado: R$ ${money(aut.total_listado)}   |   Saldo em bancos: R$ ${money(aut.saldo_bancos)}   |   TOTAL AUTORIZADO: R$ ${money(aut.total_autorizado)}   |   Saldo após pagamentos: R$ ${money((+aut.saldo_bancos || 0) - aut.total_autorizado)}`, 14, 28);
   doc.autoTable({
-    startY: 33, styles: { fontSize: 7.5, cellPadding: 1.5 }, headStyles: { fillColor: [31, 111, 235] },
+    startY: 33, styles: { fontSize: 7.5, cellPadding: 1.5 }, headStyles: { fillColor: [43, 85, 152] },
     head: [['Nº', 'Vencimento', 'Favorecido', 'Descrição', 'Plano de contas', 'Banco', 'Prioridade', 'Valor', 'Autoriza', 'Valor autorizado', 'Observação']],
     body: rows.map((r, i) => [i + 1, dateBR(r.vencimento), r.favorecido || '', r.descricao || '', r.plano || '', r.conta || '', r.prioridade || '',
       money(r.valor), r.autoriza ? 'SIM' : 'NÃO', r.autoriza ? money(r.valor_autorizado) : '', r.observacao || '']),

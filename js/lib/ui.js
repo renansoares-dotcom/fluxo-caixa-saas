@@ -83,13 +83,27 @@ export function exportXLSX(tableOrRows, nome = 'relatorio') {
 
 export function debounce(fn, ms = 300) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
-export const CORES = ['#1f6feb', '#12a26a', '#e5534b', '#b26a00', '#8250df', '#0f9bb3', '#d4458f', '#6e7781'];
+// Paleta dos gráficos (identidade IPLAMM). Os valores vêm das variáveis --c1..--c8 do CSS,
+// que mudam entre o tema claro e o escuro; a ordem é fixa (nunca reciclar cores).
+export const CORES = ['#0a8ed3', '#eb6834', '#4a3aa7', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#e34948'];
+// Papéis fixos: a mesma grandeza tem sempre a mesma cor em todos os gráficos.
+export const COR = {};
+export function lerCores() {
+  const css = getComputedStyle(document.documentElement);
+  CORES.forEach((c, i) => { const v = css.getPropertyValue(`--c${i + 1}`).trim(); if (/^#[0-9a-f]{6}$/i.test(v)) CORES[i] = v; });
+  Object.assign(COR, { entrada: CORES[0], saida: CORES[1], saldo: CORES[2], resultado: CORES[3], destaque: CORES[4] });
+  return CORES;
+}
+lerCores();
 export function chart(canvas, cfg) {
   if (!window.Chart) return null;
   const css = getComputedStyle(document.documentElement);
   Chart.defaults.color = css.getPropertyValue('--muted').trim();
   Chart.defaults.borderColor = css.getPropertyValue('--border').trim();
   Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.elements.bar.borderRadius = 4;
+  Chart.defaults.elements.line.borderWidth = 2;
   if (canvas._chart) canvas._chart.destroy();
   canvas._chart = new Chart(canvas, cfg);
   return canvas._chart;
