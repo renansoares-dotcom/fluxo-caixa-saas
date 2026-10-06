@@ -1,12 +1,15 @@
 // Propostas de borderô FIDC: escolher títulos em aberto + fundo, simular, analisar, enviar e aprovar (diretor).
 // O borderô original do fundo entra depois só para comparação (tela de comparação, na mesma página).
 import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.js';
+import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
 import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formData, parseNum, exportXLSX, loading, MESES_CURTO, logoPNG } from '../lib/ui.js';
 
 export const title = 'Propostas de borderô';
 
 const ui = { aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', propostaEdit: null };
-let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [];
+let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [];
+// sacado: raiz do CNPJ (8 dígitos) quando houver; senão o nome normalizado (os borderôs cortam o nome em ~40 letras)
+const chaveSac = (cnpj, nome) => { const d = String(cnpj || '').replace(/\D/g, ''); return d.length >= 8 ? 'c' + d.slice(0, 8) : 'n' + String(nome || '').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 25); };
 
 const hojeISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
 const dias = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
@@ -14,6 +17,16 @@ const num1 = (v) => (+v || 0).toFixed(1).replace('.', ',');
 const ehDiretor = () => state.papel === 'diretor';
 const sacadoDe = (t) => state.cad.favById[t.favorecido_id]?.nome || t.descricao || '(sem cliente)';
 const cnpjDe = (t) => state.cad.favById[t.favorecido_id]?.documento || '';
+function descCustos(c, fu, n) {
+  if (!c) return '';
+  const p = [];
+  if (c.ted) p.push(`TED/tarifa ${money(c.ted)}`);
+  if (c.assinatura) p.push(`assinatura ${money(c.assinatura)}`);
+  if (c.boletos) p.push(`boletos ${n} × ${money(fu?.tarifa_titulo ?? c.boletos / n)} = ${money(c.boletos)}`);
+  if (c.consultas) p.push(`Serasa ${c.novos} sacado(s) novo(s) = ${money(c.consultas)}`);
+  else if (c.novos === 0 && (+fu?.custo_consulta || 0) > 0) p.push('sem consulta Serasa (sacados já operados no fundo)');
+  return p.length ? p.join(' · ') : 'sem tarifas cadastradas';
+}
 const STATUS_CLS = { Rascunho: 'negoc', Pendente: 'aberto', Aprovada: 'pago', Rejeitada: 'vencido', Cancelada: '' };
 
 export async function render(root) {
@@ -21,10 +34,11 @@ export async function render(root) {
   root.innerHTML = `<div class="card"><div class="toolbar tabs" id="tabs">
       ${[['titulos', 'Títulos em aberto'], ['propostas', 'Propostas'], ['fundos', 'Condições dos fundos']].map(([k, n]) => `<button class="chip${ui.aba === k ? ' on' : ''}" data-aba="${k}">${n}</button>`).join('')}
       <span class="spacer"></span>
-      ${podeEditar() ? '<button class="btn" id="imp-nf">Importar NFs do ERP</button>' : ''}</div></div>
+      ${podeEditar() ? '<button class="btn" id="lanc-nf">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar NFs do ERP</button>' : ''}</div></div>
     <div id="corpo"></div>`;
   $('#tabs', root).onclick = (e) => { const b = e.target.closest('[data-aba]'); if (b) { ui.aba = b.dataset.aba; render(root); } };
-  $('#imp-nf', root) && ($('#imp-nf', root).onclick = () => importarNFs(root));
+  $('#imp-nf', root) && ($('#imp-nf', root).onclick = () => importarNFs(async () => { await carregar(); ui.aba = 'titulos'; render(root); }));
+  $('#lanc-nf', root) && ($('#lanc-nf', root).onclick = () => lancarNFs(async () => { await carregar(); ui.aba = 'titulos'; render(root); }));
   loading($('#corpo', root));
   try { await carregar(); desenhar(root); } catch (err) { fail(err); }
 }
@@ -34,13 +48,14 @@ async function carregar() {
   const e = state.empresa.id;
   const receitas = state.cad.plano.filter(p => p.nivel === 2 && p.codigo.startsWith('1.01')).map(p => p.id);
   let itensAbertos;
-  [fundos, titulos, propostas, itensAbertos, carteira] = await Promise.all([
+  [fundos, titulos, propostas, itensAbertos, historico] = await Promise.all([
     q(sb.from('fidc_fundos').select('*').eq('empresa_id', e).order('nome')),
     receitas.length ? fetchAll(() => sb.from('lancamentos').select('id,data,emissao,documento,descricao,favorecido_id,valor,conta_id,status,fidc_proposta_id').eq('empresa_id', e).eq('status', 'Em aberto').in('plano_id', receitas).order('data')) : [],
     q(sb.from('fidc_propostas').select('*').eq('empresa_id', e).order('numero', { ascending: false })),
     q(sb.from('fidc_proposta_itens').select('lancamento_id, proposta_id, fidc_propostas!inner(numero,status)').eq('empresa_id', e).in('fidc_propostas.status', ['Rascunho', 'Pendente'])),
-    fetchAll(() => sb.from('fidc_titulos').select('fundo,valor,vencimento,sacado_agrupado,sacado').eq('empresa_id', e).gt('vencimento', hojeISO())),
+    fetchAll(() => sb.from('fidc_titulos').select('fundo,valor,vencimento,sacado_agrupado,sacado,cnpj_sacado').eq('empresa_id', e)),
   ]);
+  const hj = hojeISO(); carteira = historico.filter(t => t.vencimento > hj);
   emProposta = {};
   for (const i of itensAbertos || []) emProposta[i.lancamento_id] = i.fidc_propostas;
   for (const id of [...ui.sel]) if (!titulos.some(t => t.id === id)) ui.sel.delete(id);
@@ -66,13 +81,18 @@ function simular(fu, tits, dataOp, recompras = 0) {
     itens.push({ t, prazo, pc, custo: d });
   }
   const ad = face * (+fu.ad_valorem_pct || 0) / 100;
-  const tar = tits.length ? (+fu.tarifa_operacao || 0) + tits.length * (+fu.tarifa_titulo || 0) : 0;
+  // custos da operação: TED/fixo e assinatura por borderô, boleto por título, Serasa por sacado novo no fundo
+  const jaNoFundo = new Set(historico.filter(h => h.fundo === fu.nome).map(h => chaveSac(h.cnpj_sacado, h.sacado)));
+  const sacs = new Set(tits.map(t => chaveSac(cnpjDe(t), sacadoDe(t))));
+  const novos = [...sacs].filter(k => !jaNoFundo.has(k)).length;
+  const custos = tits.length ? { ted: +fu.tarifa_operacao || 0, assinatura: +fu.custo_assinatura || 0, boletos: tits.length * (+fu.tarifa_titulo || 0), consultas: novos * (+fu.custo_consulta || 0), novos } : { ted: 0, assinatura: 0, boletos: 0, consultas: 0, novos: 0 };
+  const tar = custos.ted + custos.assinatura + custos.boletos + custos.consultas;
   const iof = face * (+fu.iof_pct || 0) / 100;
   const custo = desagio + ad + tar + iof;
   const prazo = face ? fp / face : 0, prazoC = face ? fpc / face : 0;
   const taxaEf = face && prazoC && face - custo ? custo / (face - custo) / prazoC * 30 : 0;
   const liquido = face - custo - (+recompras || 0);
-  return { fu, face, desagio, ad, tar, iof, custo, prazo, prazoC, taxaEf, liquido, itens, n: tits.length };
+  return { fu, face, desagio, ad, tar, custos, iof, custo, prazo, prazoC, taxaEf, liquido, itens, n: tits.length };
 }
 
 // Verificações de limite e concentração para um fundo
@@ -158,7 +178,7 @@ function painel(el, root) {
     const best = ativos.map(fu => ({ fu, c: simular(fu, [t], ui.dataOp).desagio + t.valor * (+fu.ad_valorem_pct || 0) / 100 + (+fu.tarifa_titulo || 0) })).sort((a, b) => a.c - b.c)[0];
     otimo += best.c; porFundoOt[best.fu.nome] = (porFundoOt[best.fu.nome] || 0) + +t.valor;
   }
-  const fixosOt = Object.keys(porFundoOt).reduce((s, n) => s + (+ativos.find(f => f.nome === n).tarifa_operacao || 0), 0); otimo += fixosOt;
+  const fixosOt = Object.keys(porFundoOt).reduce((s, n) => { const f = ativos.find(x => x.nome === n); return s + (+f.tarifa_operacao || 0) + (+f.custo_assinatura || 0); }, 0); otimo += fixosOt;
   const chk = checagens(S, tits, ui.dataOp);
   const porSac = {}; for (const t of tits) { const k = sacadoDe(t); porSac[k] = (porSac[k] || 0) + +t.valor; }
   const sacOrd = Object.entries(porSac).sort((a, b) => b[1] - a[1]);
@@ -178,9 +198,10 @@ function painel(el, root) {
       <div class="kpi"><div class="k-label">Taxa a.m.</div><div class="k-value">${pct(S.taxaEf, 2)}</div><div class="k-sub">prazo ${num1(S.prazo)} d · cobrado ${num1(S.prazoC)} d</div></div>
     </div>
     <h3 style="margin-top:16px">Comparação entre fundos para estes títulos</h3>
-    <div class="table-wrap"><table><thead><tr><th>Fundo</th><th class="num">Taxa cad.</th><th class="num">Deságio</th><th class="num">Tarifas/IOF/ad val.</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Dif. vs. + barato</th><th></th></tr></thead><tbody>
+    <div class="table-wrap"><table><thead><tr><th>Fundo</th><th class="num">Taxa cad.</th><th class="num">Deságio</th><th class="num">Tarifas, assin., boletos, Serasa, IOF</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Dif. vs. + barato</th><th></th></tr></thead><tbody>
       ${sims.map(s => `<tr class="${s.fu.id === S.fu.id ? 'row-sel' : ''}"><td>${esc(s.fu.nome)}</td><td class="num">${pct(s.fu.taxa_am / 100, 2)}</td><td class="num">${money0(s.desagio)}</td><td class="num">${money0(s.ad + s.tar + s.iof)}</td><td class="num"><strong>${money0(s.custo)}</strong></td><td class="num">${money0(s.liquido)}</td><td class="num">${s === melhor ? '—' : '+' + money0(s.custo - melhor.custo)}</td><td>${s === melhor ? '<span class="badge pago">menor custo</span>' : ''}</td></tr>`).join('')}
     </tbody></table></div>
+    <p class="small muted" style="margin:6px 0 0">Custos da operação no ${esc(S.fu.nome)}: ${descCustos(S.custos, S.fu, S.n)}.</p>
     ${Object.keys(porFundoOt).length > 1 && otimo < melhor.custo - 1 ? `<p class="small" style="margin:8px 0 0">💡 Dividindo os títulos entre fundos (cada título no mais barato) o custo seria <strong>${money0(otimo)}</strong>, ${money0(melhor.custo - otimo)} a menos: ${Object.entries(porFundoOt).map(([n, v]) => `${esc(n)} ${money0(v)}`).join(' · ')}.</p>` : ''}
     <h3 style="margin-top:16px">Verificações — ${esc(S.fu.nome)}</h3>
     <div class="alert-list">${chk.map(([st, t, d]) => `<div class="alert-row ${st}"><span class="alert-tag">${ROT[st][0]} ${ROT[st][1]}</span><div><strong>${esc(t)}</strong><div class="small muted">${esc(d)}</div></div></div>`).join('')}</div>
@@ -208,7 +229,8 @@ async function salvarProposta(root, S, tits, chk, sims, status) {
     tarifas: +S.tar.toFixed(2), iof: +S.iof.toFixed(2), recompras: parseNum(ui.recompras) || 0, liquido: +S.liquido.toFixed(2), conta_credito_id: S.fu.conta_credito_id,
     observacao: ui.obs || null, enviado_em: status === 'Pendente' ? new Date().toISOString() : null,
     analise: { checagens: chk, comparacao: sims.map(s => ({ fundo: s.fu.nome, taxa_cad: +s.fu.taxa_am, custo: +s.custo.toFixed(2), liquido: +s.liquido.toFixed(2), taxa: +(s.taxaEf * 100).toFixed(4) })),
-      condicoes: { taxa_am: +S.fu.taxa_am, ad_valorem_pct: +S.fu.ad_valorem_pct, tarifa_operacao: +S.fu.tarifa_operacao, tarifa_titulo: +S.fu.tarifa_titulo, iof_pct: +S.fu.iof_pct, dias_compensacao: S.fu.dias_compensacao } } };
+      custos: Object.fromEntries(Object.entries(S.custos).map(([k, v]) => [k, +(+v).toFixed(2)])),
+      condicoes: { taxa_am: +S.fu.taxa_am, ad_valorem_pct: +S.fu.ad_valorem_pct, tarifa_operacao: +S.fu.tarifa_operacao, custo_assinatura: +S.fu.custo_assinatura, tarifa_titulo: +S.fu.tarifa_titulo, custo_consulta: +S.fu.custo_consulta, iof_pct: +S.fu.iof_pct, dias_compensacao: S.fu.dias_compensacao } } };
   try {
     let p;
     if (ui.propostaEdit) {
@@ -261,6 +283,7 @@ async function detalhe(p, root) {
         <div class="kpi"><div class="k-label">Líquido estimado</div><div class="k-value">${money0(p.liquido)}</div><div class="k-sub">${p.recompras > 0 ? `recompras ${money0(p.recompras)} · ` : ''}crédito em ${esc(state.cad.contaById[p.conta_credito_id]?.nome || '—')}</div></div>
         <div class="kpi"><div class="k-label">Taxa a.m.</div><div class="k-value">${pct(p.taxa_am / 100, 2)}</div><div class="k-sub">prazo ${num1(p.prazo_medio)} d · cobrado ${num1(p.prazo_cobrado)} d</div></div>
       </div>
+      ${an.custos ? `<p class="small" style="margin-top:10px"><strong>Custos da operação:</strong> ${descCustos(an.custos, an.condicoes, p.qtd_titulos)}${+p.ad_valorem ? ` · ad valorem ${money(p.ad_valorem)}` : ''}${+p.iof ? ` · IOF ${money(p.iof)}` : ''}.</p>` : ''}
       ${p.observacao ? `<p class="small" style="margin-top:10px"><strong>Observação:</strong> ${esc(p.observacao)}</p>` : ''}
       ${an.comparacao ? `<h3 style="margin-top:14px">Comparação entre fundos (no envio)</h3><div class="table-wrap"><table><thead><tr><th>Fundo</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Taxa a.m.</th></tr></thead><tbody>
         ${an.comparacao.slice().sort((a, b) => a.custo - b.custo).map(x => `<tr class="${x.fundo === fu.nome ? 'row-sel' : ''}"><td>${esc(x.fundo)}</td><td class="num">${money0(x.custo)}</td><td class="num">${money0(x.liquido)}</td><td class="num">${pct(x.taxa / 100, 2)}</td></tr>`).join('')}</tbody></table></div>` : ''}
@@ -365,13 +388,14 @@ async function compararBordero(p, fu, itens, root) {
 // ======================================================================
 function abaFundos(c, root) {
   const ed = podeEditar();
-  const campos = [['taxa_am', 'Taxa a.m. (%)'], ['ad_valorem_pct', 'Ad valorem (% face)'], ['tarifa_operacao', 'Tarifa por borderô (R$)'], ['tarifa_titulo', 'Tarifa por título (R$)'],
+  const campos = [['taxa_am', 'Taxa a.m. (%)'], ['ad_valorem_pct', 'Ad valorem (% face)'], ['tarifa_operacao', 'TED / tarifa por borderô (R$)'], ['custo_assinatura', 'Assinatura eletrônica por borderô (R$)'],
+    ['tarifa_titulo', 'Boleto / cobrança por título (R$)'], ['custo_consulta', 'Consulta Serasa por sacado novo (R$)'],
     ['iof_pct', 'IOF (% face)'], ['dias_compensacao', 'Dias de compensação'], ['prazo_min', 'Prazo mín. (dias)'], ['prazo_max', 'Prazo máx. (dias)'], ['limite_credito', 'Limite de crédito (R$)'], ['limite_sacado_pct', 'Limite por sacado (%)']];
-  c.innerHTML = `<div class="card flush"><div class="card-head"><div><h2>Condições dos fundos</h2><p class="muted small">Usadas para simular as propostas. Os valores iniciais vieram da média dos borderôs de jul–set/2026; ajuste conforme o contrato de cada fundo. Prazo cobrado = prazo real + dias de compensação.</p></div>
+  c.innerHTML = `<div class="card flush"><div class="card-head"><div><h2>Condições dos fundos</h2><p class="muted small">Usadas para simular as propostas. Os valores iniciais vieram da média dos borderôs de jul–set/2026; ajuste conforme o contrato de cada fundo. Prazo cobrado = prazo real + dias de compensação. Assinatura, boletos e consultas Serasa entram no custo do borderô (FS e Negocial conferidos com os borderôs de set/2026); a consulta só é cobrada para sacado que ainda não teve título no fundo.</p></div>
     ${ed ? '<button class="btn" id="novo-f">+ Fundo</button>' : ''}</div>
     <div class="table-wrap"><table><thead><tr><th>Fundo</th><th>Conta do fundo</th><th>Crédito do líquido</th>${campos.map(([, n]) => `<th class="num">${n}</th>`).join('')}<th>Ativo</th></tr></thead><tbody>
       ${fundos.map(f => `<tr class="${ed ? 'clickable' : ''}" data-id="${f.id}"><td><strong>${esc(f.nome)}</strong></td><td>${esc(state.cad.contaById[f.conta_id]?.nome || '—')}</td><td>${esc(state.cad.contaById[f.conta_credito_id]?.nome || '—')}</td>
-        ${campos.map(([k]) => `<td class="num">${f[k] == null ? '–' : ['tarifa_operacao', 'tarifa_titulo', 'limite_credito'].includes(k) ? money(f[k]) : String(f[k]).replace('.', ',')}</td>`).join('')}<td>${f.ativo ? 'sim' : 'não'}</td></tr>`).join('')}
+        ${campos.map(([k]) => `<td class="num">${f[k] == null ? '–' : ['tarifa_operacao', 'custo_assinatura', 'tarifa_titulo', 'custo_consulta', 'limite_credito'].includes(k) ? money(f[k]) : String(f[k]).replace('.', ',')}</td>`).join('')}<td>${f.ativo ? 'sim' : 'não'}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   if (!ed) return;
   const editar = (f) => {
@@ -398,117 +422,6 @@ function abaFundos(c, root) {
 }
 
 // ======================================================================
-// Importação das NFs do ERP → lançamentos em aberto (receita 1.01.01)
-// ======================================================================
-const ALIAS = {
-  documento: ['nota', 'nf', 'n.f', 'numero', 'número', 'documento', 'titulo', 'título', 'duplicata', 'doc'],
-  parcela: ['parcela', 'parc', 'prestacao', 'prestação', 'seq'],
-  emissao: ['emissao', 'emissão', 'dt emis', 'data emis', 'data da nota'],
-  vencimento: ['vencimento', 'venc', 'dt venc', 'data venc', 'vcto'],
-  cliente: ['cliente', 'razao', 'razão', 'sacado', 'nome', 'destinatario', 'destinatário'],
-  cnpj: ['cnpj', 'cpf', 'cnpj/cpf', 'documento cliente', 'inscricao', 'inscrição'],
-  valor: ['valor', 'vlr', 'valor parcela', 'valor título', 'valor titulo', 'saldo', 'total'],
-};
-const normTxt = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-function adivinhar(cabecalhos) {
-  const map = {}; const usados = new Set();
-  for (const campo of ['vencimento', 'emissao', 'parcela', 'cnpj', 'valor', 'cliente', 'documento']) {
-    const al = ALIAS[campo].map(normTxt);
-    let ix = cabecalhos.findIndex((h, i) => !usados.has(i) && al.includes(normTxt(h)));
-    if (ix < 0) ix = cabecalhos.findIndex((h, i) => !usados.has(i) && al.some(a => normTxt(h).includes(a)));
-    if (ix >= 0) { map[campo] = ix; usados.add(ix); }
-  }
-  return map;
-}
-const toISO = (v) => {
-  if (v == null || v === '') return null;
-  if (v instanceof Date) return new Date(v.getTime() - v.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
-  if (typeof v === 'number') { const d = new Date(Math.round((v - 25569) * 864e5)); return d.toISOString().slice(0, 10); }
-  const s = String(v).trim(); let m;
-  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/))) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`;
-  return null;
-};
-const toNum = (v) => typeof v === 'number' ? v : parseNum(String(v ?? '').replace(/[R$\s]/g, ''));
-
-function importarNFs(root) {
-  const cc = state.cad.cc || [];
-  const m = modal({
-    title: 'Importar notas fiscais do ERP', wide: true,
-    body: `<p class="small muted" style="margin-top:0">Arquivo Excel ou CSV com uma linha por parcela (NF, parcela, emissão, vencimento, cliente, CNPJ, valor). Cada parcela vira um título em aberto (receita 1.01.01) no fluxo de caixa, com data = vencimento. Parcelas já importadas (mesma NF/parcela e cliente) são ignoradas.</p>
-      <div class="toolbar"><input type="file" id="arq-nf" accept=".xlsx,.xls,.csv,.txt"></div><div id="map" style="margin-top:12px"></div>`,
-    foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="imp-ok" disabled>Importar</button>',
-  });
-  let linhas = [], cab = [];
-  const planoRec = state.cad.plano.find(p => p.codigo === '1.01.01');
-  const conta = state.cad.contas.find(c => c.nome === 'BRADESCO');
-  const ccV = cc.find(c => c.nome === 'VENDAS');
-  $('#arq-nf', m.el).onchange = async (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    try {
-      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
-      // cabeçalho = primeira linha com 3+ textos e alguma palavra de vencimento/valor
-      let hi = rows.findIndex(r => r && r.filter(x => typeof x === 'string').length >= 3 && r.some(x => /venc|valor/i.test(String(x || ''))));
-      if (hi < 0) hi = 0;
-      cab = rows[hi].map(x => String(x ?? '').trim()); linhas = rows.slice(hi + 1).filter(r => r && r.some(x => x != null && x !== ''));
-      const mp = adivinhar(cab);
-      const sel = (campo, nome, obrig) => `<label>${nome}${obrig ? ' *' : ''}<select data-campo="${campo}"><option value="">—</option>${cab.map((h, i) => `<option value="${i}" ${mp[campo] === i ? 'selected' : ''}>${esc(h || `coluna ${i + 1}`)}</option>`).join('')}</select></label>`;
-      $('#map', m.el).innerHTML = `<p class="small">Encontrei <strong>${linhas.length}</strong> linhas. Confira as colunas:</p>
-        <div class="grid-form">${sel('documento', 'NF / documento', true)}${sel('parcela', 'Parcela')}${sel('emissao', 'Emissão')}${sel('vencimento', 'Vencimento', true)}${sel('cliente', 'Cliente', true)}${sel('cnpj', 'CNPJ/CPF')}${sel('valor', 'Valor', true)}
-        <label>Conta prevista do recebimento<select id="conta-nf">${options(state.cad.contas, { selected: conta?.id })}</select></label>
-        <label>Centro de custo<select id="cc-nf">${options(cc, { empty: '—', selected: ccV?.id })}</select></label></div>
-        <div id="prev" style="margin-top:10px"></div>`;
-      const prev = () => { const M = mapa(); const ok = ['documento', 'vencimento', 'cliente', 'valor'].every(k => M[k] != null);
-        $('#imp-ok', m.el).disabled = !ok;
-        const amostra = ok ? linhas.slice(0, 5).map(r => montar(r, M)) : [];
-        $('#prev', m.el).innerHTML = ok ? `<div class="table-wrap"><table><thead><tr><th>NF/parcela</th><th>Emissão</th><th>Vencimento</th><th>Cliente</th><th>CNPJ</th><th class="num">Valor</th></tr></thead><tbody>${amostra.map(x => `<tr><td>${esc(x.documento)}</td><td>${dateBR(x.emissao || '')}</td><td>${dateBR(x.vencimento || '')}</td><td>${esc(x.cliente)}</td><td>${esc(x.cnpj || '')}</td><td class="num">${money(x.valor)}</td></tr>`).join('')}</tbody></table></div><p class="small muted">Prévia das 5 primeiras linhas.</p>` : '<p class="small neg">Indique as colunas obrigatórias (*).</p>'; };
-      $('#map', m.el).onchange = prev; prev();
-    } catch (err) { fail(err); }
-  };
-  const mapa = () => Object.fromEntries([...m.el.querySelectorAll('select[data-campo]')].map(s => [s.dataset.campo, s.value === '' ? null : +s.value]));
-  const montar = (r, M) => { const doc = String(r[M.documento] ?? '').trim(); const par = M.parcela != null ? String(r[M.parcela] ?? '').trim() : '';
-    return { documento: par && !doc.includes('/') && !doc.includes('-') ? `${doc}-${par}` : doc, emissao: M.emissao != null ? toISO(r[M.emissao]) : null, vencimento: toISO(r[M.vencimento]),
-      cliente: String(r[M.cliente] ?? '').trim(), cnpj: M.cnpj != null ? String(r[M.cnpj] ?? '').replace(/\D/g, '') : '', valor: Math.abs(toNum(r[M.valor]) || 0) }; };
-  $('#imp-ok', m.el).onclick = async () => {
-    const M = mapa(); const contaId = $('#conta-nf', m.el).value || null; const ccId = $('#cc-nf', m.el).value || null;
-    const regs = linhas.map(r => montar(r, M)).filter(x => x.documento && x.vencimento && x.valor > 0 && x.cliente);
-    if (!planoRec) return fail(new Error('Plano 1.01.01 não encontrado'));
-    $('#imp-ok', m.el).disabled = true;
-    try {
-      // favorecidos (clientes): casa por CNPJ e depois por nome
-      const favs = state.cad.favorecidos; const porDoc = {}, porNome = {};
-      for (const f of favs) { if (f.documento) porDoc[String(f.documento).replace(/\D/g, '')] = f; porNome[normTxt(f.nome)] = f; }
-      const novos = [];
-      for (const x of regs) {
-        if ((x.cnpj && porDoc[x.cnpj]) || porNome[normTxt(x.cliente)]) continue;
-        const f = { empresa_id: state.empresa.id, tipo: 'CLIENTES', sigla: 'CLI', nome: x.cliente, documento: x.cnpj || null, ativo: true };
-        novos.push(f); porNome[normTxt(x.cliente)] = f; if (x.cnpj) porDoc[x.cnpj] = f;
-      }
-      if (novos.length) { const ins = await q(sb.from('favorecidos').insert(novos.map(({ id, ...r }) => r)).select()); for (const f of ins) { porNome[normTxt(f.nome)] = f; if (f.documento) porDoc[String(f.documento).replace(/\D/g, '')] = f; } }
-      // já importados
-      const docs = [...new Set(regs.map(x => x.documento))];
-      const exist = new Set();
-      for (let i = 0; i < docs.length; i += 300) {
-        const r = await q(sb.from('lancamentos').select('documento,favorecido_id').eq('empresa_id', state.empresa.id).in('documento', docs.slice(i, i + 300)));
-        for (const l of r) exist.add(`${l.documento}|${l.favorecido_id}`);
-      }
-      const rows = [];
-      for (const x of regs) {
-        const fav = (x.cnpj && porDoc[x.cnpj]) || porNome[normTxt(x.cliente)];
-        if (exist.has(`${x.documento}|${fav.id}`)) continue; exist.add(`${x.documento}|${fav.id}`);
-        rows.push({ empresa_id: state.empresa.id, data: x.vencimento, emissao: x.emissao, documento: x.documento, plano_id: planoRec.id, descricao: `NF ${x.documento} - ${x.cliente}`,
-          favorecido_id: fav.id, centro_custo_id: ccId, status: 'Em aberto', conta_id: contaId, valor: +x.valor.toFixed(2), origem: 'erp:nf' });
-      }
-      for (let i = 0; i < rows.length; i += 500) await q(sb.from('lancamentos').insert(rows.slice(i, i + 500)));
-      toast(`${rows.length} título(s) importado(s)${regs.length - rows.length ? ` · ${regs.length - rows.length} já existiam` : ''}${novos.length ? ` · ${novos.length} cliente(s) novo(s)` : ''}`);
-      m.close(); await loadCadastros(true); await carregar(); ui.aba = 'titulos'; render(root);
-    } catch (err) { fail(err); $('#imp-ok', m.el).disabled = false; }
-  };
-}
-
-// ======================================================================
 // PDF da proposta (para aprovação do diretor)
 // ======================================================================
 async function pdfProposta(p, fu, itens) {
@@ -525,6 +438,7 @@ async function pdfProposta(p, fu, itens) {
   doc.text(`${state.empresa.nome} · operação em ${dateBR(p.data_operacao)} · status: ${p.status}`, W - 14, 18.5, { align: 'right' });
   doc.setDrawColor(...marinho); doc.setLineWidth(.6); doc.line(14, 23, W - 14, 23); doc.setTextColor(20);
   const kv = [['Valor de face', money(p.valor_face)], ['Títulos', String(p.qtd_titulos)], ['Deságio estimado', money(p.desagio)], ['Tarifas, IOF e ad valorem', money(+p.tarifas + +p.iof + +p.ad_valorem)],
+    ...(p.analise?.custos ? [['   TED / tarifa do borderô', money(p.analise.custos.ted)], ['   Assinatura eletrônica', money(p.analise.custos.assinatura)], [`   Boletos (${p.qtd_titulos} títulos)`, money(p.analise.custos.boletos)], [`   Consulta Serasa (${p.analise.custos.novos} sacado(s) novo(s))`, money(p.analise.custos.consultas)]].filter(r => r[1] !== money(0)) : []),
     ['Custo total estimado', money(p.custo_total)], ['Recompras a descontar', money(p.recompras)], ['Líquido estimado', money(p.liquido)], ['Taxa a.m.', pct(p.taxa_am / 100, 2)],
     ['Prazo médio / cobrado', `${num1(p.prazo_medio)} / ${num1(p.prazo_cobrado)} dias`], ['Conta de crédito', state.cad.contaById[p.conta_credito_id]?.nome || '-']];
   doc.autoTable({ startY: 27, theme: 'grid', body: kv, styles: { fontSize: 8.5, cellPadding: 1.6 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 }, 1: { halign: 'right' } }, margin: { left: 14, right: W / 2 + 4 } });

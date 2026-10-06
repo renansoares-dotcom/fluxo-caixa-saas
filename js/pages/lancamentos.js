@@ -1,6 +1,7 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, $$, esc, money, cls, dateBR, options, MESES_CURTO, debounce, exportXLSX, fail, toast } from '../lib/ui.js';
 import { abrirLancamento } from '../lib/lanc-form.js';
+import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
 
 export const title = 'Lançamentos';
 const PAGE = 100;
@@ -14,11 +15,11 @@ export async function render(root) {
         <div class="chips" id="meses">${['Ano', ...MESES_CURTO].map((m, i) => `<span class="chip ${f.mes === i ? 'on' : ''}" data-m="${i}">${m}</span>`).join('')}</div>
         <div style="display:flex;gap:8px">
           <button class="btn" id="exp">Exportar Excel</button>
-          ${podeEditar() ? '<button class="btn primary" id="novo">+ Novo lançamento</button>' : ''}
+          ${podeEditar() ? '<button class="btn" id="lanc-nf" title="Títulos a receber por NF, com parcelas">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar NFs do ERP</button><button class="btn primary" id="novo">+ Novo lançamento</button>' : ''}
         </div>
       </div>
       <div class="toolbar" id="flt">
-        <label class="grow">Buscar<input name="busca" placeholder="Descrição, favorecido, opcional…" value="${esc(f.busca)}"></label>
+        <label class="grow">Buscar<input name="busca" placeholder="Descrição, favorecido, NF, opcional…" value="${esc(f.busca)}"></label>
         <label>Status<select name="status">${options([{ id: 'Pago' }, { id: 'Em aberto' }], { label: 'id', empty: 'Todos', selected: f.status })}</select></label>
         <label>Classificação<select name="classe">${options(c.classes, { label: 'label', empty: 'Todas', selected: f.classe })}</select></label>
         <label>Conta<select name="conta">${options(c.contas, { empty: 'Todas', selected: f.conta })}<option value="none" ${f.conta === 'none' ? 'selected' : ''}>(sem conta)</option></select></label>
@@ -38,6 +39,8 @@ export async function render(root) {
   $('#flt', root).addEventListener('input', debounce((e) => { f[e.target.name] = e.target.value; f.page = 0; load(root); }, 350));
   $('#novo', root) && ($('#novo', root).onclick = () => abrirLancamento({ data: defaultDate() }, () => load(root)));
   $('#exp', root).onclick = () => exportar();
+  $('#lanc-nf', root) && ($('#lanc-nf', root).onclick = () => lancarNFs(() => load(root)));
+  $('#imp-nf', root) && ($('#imp-nf', root).onclick = () => importarNFs(() => load(root)));
   if (podeEditar()) {
     $('#baixar', root).onclick = async () => {
       const ids = selecionados(root); if (!ids.length) return;
@@ -70,7 +73,7 @@ function base(sel = '*', opts) {
   if (f.cc) qy = qy.eq('centro_custo_id', f.cc);
   if (f.busca) {
     const s = f.busca.replace(/[%,()]/g, ' ').trim();
-    qy = qy.or(`descricao.ilike.%${s}%,favorecido_nome.ilike.%${s}%,opc1.ilike.%${s}%,plano_nome.ilike.%${s}%`);
+    qy = qy.or(`descricao.ilike.%${s}%,favorecido_nome.ilike.%${s}%,opc1.ilike.%${s}%,plano_nome.ilike.%${s}%,documento.ilike.%${s}%`);
   }
   return qy;
 }
@@ -97,7 +100,7 @@ async function load(root) {
       <tbody>${data.map(l => `<tr class="clickable" data-id="${l.id}">
         ${podeEditar() ? `<td><input type="checkbox" class="sel" value="${l.id}"></td>` : ''}
         <td>${dateBR(l.data)}</td><td>${esc(l.plano_codigo + ' - ' + l.plano_nome)}</td>
-        <td class="wrap">${esc(l.descricao || '')}${l.opc1 ? `<div class="muted small">${esc(l.opc1)}</div>` : ''}</td>
+        <td class="wrap">${esc(l.descricao || '')}${l.documento ? `<div class="muted small">NF ${esc(l.documento)}${l.emissao ? ` · emissão ${dateBR(l.emissao)}` : ''}${l.fidc_proposta_id ? ' · FIDC' : ''}</div>` : ''}${l.opc1 ? `<div class="muted small">${esc(l.opc1)}</div>` : ''}</td>
         <td class="wrap">${esc(l.favorecido_nome || '')}</td><td>${esc(l.centro_custo_nome || '')}</td>
         <td>${esc(l.conta_nome || '—')}</td>
         <td><span class="badge ${l.status === 'Pago' ? 'pago' : 'aberto'}">${l.status}</span></td>
@@ -131,8 +134,8 @@ async function exportar() {
   try {
     const rows = await fetchAll(() => base('*').order('data'));
     exportXLSX([
-      ['Data', 'Classificação', 'Plano de contas', 'Descrição', 'Opcional 1', 'Opcional 2', 'Opcional 3', 'Opcional 4', 'Favorecido', 'Centro de custo', 'Status', 'Conta', 'Valor', 'Grupo', 'Disponibilidade'],
-      ...rows.map(l => [l.data, `${l.classe_codigo} - ${l.classe_nome}`, `${l.plano_codigo} - ${l.plano_nome}`, l.descricao, l.opc1, l.opc2, l.opc3, l.opc4,
+      ['Data', 'Classificação', 'Plano de contas', 'Descrição', 'NF / documento', 'Emissão', 'Opcional 1', 'Opcional 2', 'Opcional 3', 'Opcional 4', 'Favorecido', 'Centro de custo', 'Status', 'Conta', 'Valor', 'Grupo', 'Disponibilidade'],
+      ...rows.map(l => [l.data, `${l.classe_codigo} - ${l.classe_nome}`, `${l.plano_codigo} - ${l.plano_nome}`, l.descricao, l.documento, l.emissao, l.opc1, l.opc2, l.opc3, l.opc4,
         l.favorecido_nome, l.centro_custo_nome, l.status, l.conta_nome, +l.valor_sinal, l.grupo_nome, l.disponibilidade])
     ], `lancamentos_${state.ano}${f.mes ? '_' + String(f.mes).padStart(2, '0') : ''}`);
   } catch (e) { fail(e); }

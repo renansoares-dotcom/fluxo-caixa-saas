@@ -904,3 +904,42 @@ begin
   return new;
 end $$;
 revoke execute on function public.tg_fidc_proposta_guarda() from authenticated, anon, public;
+
+-- ===== 20261006000008_fidc_fundos_custos.sql
+-- Custos de operação separados nas condições dos fundos (pedido do Renan em 06/10):
+-- tarifa_operacao = TED / tarifa fixa por borderô; tarifa_titulo = boleto / cobrança por título;
+-- custo_assinatura = assinatura eletrônica por borderô; custo_consulta = consulta Serasa por sacado novo no fundo.
+alter table public.fidc_fundos
+  add column if not exists custo_assinatura numeric(12,2) not null default 0,
+  add column if not exists custo_consulta numeric(12,2) not null default 0;
+comment on column public.fidc_fundos.tarifa_operacao is 'TED / tarifa fixa por borderô (R$)';
+comment on column public.fidc_fundos.tarifa_titulo is 'Boleto / cobrança por título (R$)';
+comment on column public.fidc_fundos.custo_assinatura is 'Assinatura eletrônica por borderô (R$)';
+comment on column public.fidc_fundos.custo_consulta is 'Consulta Serasa por sacado novo no fundo (R$)';
+-- Valores dos borderôs de set/2026: FS = TED 20 + assinatura 70 + boleto 4,50/título + Serasa 22;
+-- Negocial = 15 por borderô + 2,50 por título (despesas bancárias).
+update public.fidc_fundos set tarifa_operacao = 20, custo_assinatura = 70, tarifa_titulo = 4.50, custo_consulta = 22 where nome = 'FS';
+update public.fidc_fundos set tarifa_operacao = 15, tarifa_titulo = 2.50 where nome = 'Negocial';
+
+-- ===== 20261006000009_v_lancamentos_nf.sql
+-- v_lancamentos passa a expor NF-parcela (documento), emissão e a proposta FIDC do título
+create or replace view public.v_lancamentos with (security_invoker = on) as
+ SELECT l.id, l.empresa_id, l.data, l.plano_id, l.descricao, l.opc1, l.opc2, l.opc3, l.opc4, l.favorecido_id, l.centro_custo_id,
+    l.status, l.conta_id, l.valor, l.prioridade, l.origem, l.created_by, l.created_at, l.updated_at,
+    (EXTRACT(year FROM l.data))::integer AS ano,
+    (EXTRACT(month FROM l.data))::integer AS mes,
+    CASE WHEN (p.natureza = 'C'::bpchar) THEN l.valor ELSE (- l.valor) END AS valor_sinal,
+    p.codigo AS plano_codigo, p.nome AS plano_nome, p.tipo,
+    c1.id AS classe_id, c1.codigo AS classe_codigo, c1.nome AS classe_nome,
+    COALESCE(c1.prioridade, 'Negociável'::text) AS prioridade_classe,
+    COALESCE(l.prioridade, c1.prioridade, 'Negociável'::text) AS prioridade_efetiva,
+    f.nome AS favorecido_nome, f.sigla AS favorecido_sigla,
+    cc.nome AS centro_custo_nome, ct.nome AS conta_nome, ct.grupo_id, ct.disponibilidade, g.nome AS grupo_nome,
+    l.documento, l.emissao, l.fidc_proposta_id
+   FROM lancamentos l
+     JOIN plano_contas p ON p.id = l.plano_id
+     LEFT JOIN plano_contas c1 ON c1.id = p.pai_id
+     LEFT JOIN favorecidos f ON f.id = l.favorecido_id
+     LEFT JOIN centros_custo cc ON cc.id = l.centro_custo_id
+     LEFT JOIN contas ct ON ct.id = l.conta_id
+     LEFT JOIN grupos g ON g.id = ct.grupo_id;

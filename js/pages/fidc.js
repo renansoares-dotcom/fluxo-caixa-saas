@@ -57,7 +57,7 @@ export async function render(root) {
     ${card('conc', 'Conciliação borderôs × fluxo de caixa', 'Segue o filtro de mês e compara só meses com borderô. Fluxo de caixa = lançamentos pagos na conta do próprio fundo: transferências 3.02.01, juros 2.07.08, tarifas 2.07.32 + 2.07.05 e recompras 2.07.11. Diferença ≠ 0 = borderô não lançado, lançado em outra conta/classificação ou valor divergente. Clique num fundo para ver mês a mês.')}
     <div class="grid2">
       ${card('peso', 'Peso no faturamento', 'Só meses com receita de vendas (1.01) lançada e operação FIDC. Segue o filtro de mês.')}
-      ${card('fora', 'Custos fora do borderô', 'Tarifas dos fundos (2.07.32 / 2.07.05) pagas por outras contas e identificadas pelo nome do fundo na descrição. Entram no custo total com custos fora.')}
+      ${card('fora', 'Custos fora do borderô', 'Tarifas das contas VORTX dos fundos (2.07.32 / 2.07.05 / 2.07.07) e tarifas 2.07.32 / 2.07.05 pagas por outras contas com o nome do fundo na descrição. Assinatura, boleto e Serasa aparecem como custo da operação; o restante, como tarifa da conta. Entram no custo total com custos fora.')}
     </div>
     <div class="grid2">
       ${card('cal', 'Calendário de liquidação', 'Títulos cedidos a vencer por semana (próximas 12 semanas), por fundo. É o valor que os sacados devem pagar aos fundos; o que não for pago volta como recompra.')}
@@ -77,7 +77,7 @@ export async function render(root) {
   try {
     const e = state.empresa.id;
     let idx, recRows;
-    const codigos = ['3.02.01', '2.07.08', '2.07.32', '2.07.05', '2.07.11'];
+    const codigos = ['3.02.01', '2.07.08', '2.07.32', '2.07.05', '2.07.07', '2.07.11'];
     const planoIds = state.cad.plano.filter(p => codigos.includes(p.codigo)).map(p => p.id);
     [ops, tits, idx, lancF, recRows] = await Promise.all([
       fetchAll(() => sb.from('fidc_operacoes').select('*').eq('empresa_id', e).gte('data', `${state.ano}-01-01`).lte('data', `${state.ano}-12-31`).order('data')),
@@ -347,16 +347,26 @@ function simular(root) {
 // ---------- Conciliação, peso no faturamento, custos fora, calendário ----------
 const contaDoFundo = (fd) => state.cad.contas.find(c => (c.nome || '').trim().toUpperCase() === fd.trim().toUpperCase());
 const codigoDe = (planoId) => state.cad.planoById[planoId]?.codigo;
+// Custos ligados aos fundos pagos fora da conta do fundo:
+// - tarifas das contas VORTX-<FUNDO> (2.07.32 / 2.07.05 / 2.07.07) → tarifa da conta do fundo;
+// - 2.07.32 / 2.07.05 em outras contas com o nome do fundo na descrição.
+// Assinatura, boleto, Serasa/consulta, registro e cobrança são custo da operação; o resto, tarifa de conta.
+const RX_CUSTO_OP = /ASSINATURA|BOLETO|SERASA|CONSULTA|REGISTRO|COBRAN/i;
 function custosFora(fundos) {
   const contasFundo = new Set(fundos.map(contaDoFundo).filter(Boolean).map(c => c.id));
   const out = [];
+  const acha = (txt) => fundos.find(f => f.length > 2 && new RegExp(`\\b${f.toUpperCase()}\\b`).test(txt));
   for (const l of lancF) {
-    if (contasFundo.has(l.conta_id) || !['2.07.32', '2.07.05'].includes(codigoDe(l.plano_id))) continue;
+    const cod = codigoDe(l.plano_id);
+    if (contasFundo.has(l.conta_id) || !['2.07.32', '2.07.05', '2.07.07'].includes(cod)) continue;
+    const cn = (state.cad.contaById[l.conta_id]?.nome || '').toUpperCase();
     const d = (l.descricao || '').toUpperCase();
-    const fd = fundos.find(f => f.length > 2 && new RegExp(`\\b${f.toUpperCase()}\\b`).test(d));
-    if (fd) out.push({ ...l, fundo: fd });
+    let fd = null;
+    if (/VORTX|VORTEX/.test(cn)) fd = acha(cn);
+    else if (cod !== '2.07.07') fd = acha(d);
+    if (fd) out.push({ ...l, fundo: fd, tipo: RX_CUSTO_OP.test(d) ? 'Custo da operação' : 'Tarifa da conta' });
   }
-  return out;
+  return out.sort((x, y) => x.data.localeCompare(y.data));
 }
 let concDet = '';
 function blocoConciliacao(root, { fundos, mesOk, corFundo, hoje, aVencer, fundoOk }) {
@@ -400,10 +410,11 @@ function blocoConciliacao(root, { fundos, mesOk, corFundo, hoje, aVencer, fundoO
   // Custos fora do borderô
   const fora = custosFora(fundos).filter(l => (!f.mes || +l.data.slice(5, 7) === f.mes) && (!f.fundo || l.fundo === f.fundo));
   const I = ind(ops.filter(o => mesOk(o) && fundoOk(o))); const tf = fora.reduce((s, l) => s + +l.valor, 0);
-  $('#fora', root).innerHTML = `<table><thead><tr><th>Data</th><th>Fundo</th><th>Conta</th><th>Descrição</th><th class="num">Valor</th></tr></thead><tbody>
-    ${fora.map(l => `<tr><td>${dateBR(l.data)}</td><td>${esc(l.fundo)}</td><td>${esc(state.cad.contaById[l.conta_id]?.nome || '')}</td><td class="wrap small">${esc(l.descricao || '')}</td><td class="num">${money(l.valor)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum no período.</td></tr>'}
-    <tr class="row-total"><td colspan="4">Custo dos borderôs + custos fora</td><td class="num">${money0(I.custo + tf)}</td></tr>
-    <tr><td colspan="4" class="muted">Custo % da face com custos fora</td><td class="num">${pct(I.face ? (I.custo + tf) / I.face : 0, 2)}</td></tr></tbody></table>`;
+  $('#fora', root).innerHTML = `<table><thead><tr><th>Data</th><th>Fundo</th><th>Conta</th><th>Tipo</th><th>Descrição</th><th class="num">Valor</th></tr></thead><tbody>
+    ${fora.map(l => `<tr><td>${dateBR(l.data)}</td><td>${esc(l.fundo)}</td><td>${esc(state.cad.contaById[l.conta_id]?.nome || '')}</td><td class="small">${l.tipo}</td><td class="wrap small">${esc(l.descricao || '—')}</td><td class="num">${money(l.valor)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Nenhum no período.</td></tr>'}
+    ${['Custo da operação', 'Tarifa da conta'].map(t => { const v = fora.filter(l => l.tipo === t).reduce((s, l) => s + +l.valor, 0); return v ? `<tr><td colspan="5" class="muted">Subtotal — ${t.toLowerCase()}</td><td class="num">${money0(v)}</td></tr>` : ''; }).join('')}
+    <tr class="row-total"><td colspan="5">Custo dos borderôs + custos fora</td><td class="num">${money0(I.custo + tf)}</td></tr>
+    <tr><td colspan="5" class="muted">Custo % da face com custos fora</td><td class="num">${pct(I.face ? (I.custo + tf) / I.face : 0, 2)}</td></tr></tbody></table>`;
 
   // Calendário de liquidação (12 semanas, segunda a domingo)
   const d0 = new Date(hoje + 'T12:00:00'); const seg = new Date(d0); seg.setDate(d0.getDate() - ((d0.getDay() + 6) % 7));

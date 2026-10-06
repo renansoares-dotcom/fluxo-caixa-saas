@@ -52,6 +52,8 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
     <label>Centro de custo<select name="centro_custo_id">${options(c.cc, { empty: '—', selected: l.centro_custo_id })}</select></label>
     <label class="span2">Favorecido<input name="favorecido" list="dl-fav" value="${esc(fav)}" placeholder="Digite para buscar ou cadastrar">${favDatalist()}</label>
     <label>Prioridade (pagamentos)<select name="prioridade"><option value="">Padrão da classificação</option>${options([{ id: 'Obrigatório' }, { id: 'Negociável' }], { label: 'id', selected: l.prioridade })}</select></label>
+    <label>NF / documento<input name="documento" value="${esc(l.documento)}" placeholder="ex.: 36077-1"></label>
+    <label>Emissão<input type="date" name="emissao" value="${esc(l.emissao || '')}"></label>
     <label>Opcional 1<input name="opc1" value="${esc(l.opc1)}"></label>
     <label>Opcional 2<input name="opc2" value="${esc(l.opc2)}"></label>
     <label>Opcional 3<input name="opc3" value="${esc(l.opc3)}"></label>
@@ -60,7 +62,7 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
   const foot = ro ? '<button class="btn" data-close>Fechar</button>' :
     `${editando ? '<button class="btn danger" id="lf-del" style="margin-right:auto">Excluir</button><button class="btn" id="lf-dup">Duplicar</button>' : ''}
      <button class="btn" data-close>Cancelar</button><button class="btn primary" id="lf-save">Salvar</button>`;
-  const m = modal({ title: editando ? 'Editar lançamento' : 'Novo lançamento', body, foot });
+  const m = modal({ title: editando ? 'Editar lançamento' : 'Novo lançamento', body: (editando && l.fidc_proposta_id ? '<p class="small muted" style="margin-top:0">Título vinculado a uma proposta de borderô FIDC.</p>' : '') + body, foot });
   const form = $('#lanc-form', m.el);
   if (ro) form.querySelectorAll('input,select').forEach(i => i.disabled = true);
   if (ro) return;
@@ -75,6 +77,7 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
         plano_id: fd.plano_id, conta_id: fd.conta_id || null, descricao: fd.descricao || null,
         centro_custo_id: fd.centro_custo_id || null, prioridade: fd.prioridade || null,
         opc1: fd.opc1 || null, opc2: fd.opc2 || null, opc3: fd.opc3 || null, opc4: fd.opc4 || null,
+        documento: (fd.documento || '').trim() || null, emissao: fd.emissao || null,
         favorecido_id: await resolverFavorecido(fd.favorecido, plano),
       };
       if (!row.valor) throw new Error('Informe um valor maior que zero');

@@ -41,7 +41,7 @@ async function load(root) {
       if (f.conta) qy = qy.eq('conta_id', f.conta);
       return qy.order('data');
     });
-    if (f.busca) { const s = f.busca.toLowerCase(); rows = rows.filter(r => `${r.favorecido_nome} ${r.descricao} ${r.plano_nome}`.toLowerCase().includes(s)); }
+    if (f.busca) { const s = f.busca.toLowerCase(); rows = rows.filter(r => `${r.favorecido_nome} ${r.descricao} ${r.plano_nome} ${r.documento || ''}`.toLowerCase().includes(s)); }
     const hoje = today();
     const sum = (a) => a.reduce((s, x) => s + Math.abs(+x.valor_sinal), 0);
     const pag = rows.filter(r => r.tipo === 'S'), rec = rows.filter(r => r.tipo === 'E');
@@ -66,7 +66,7 @@ async function load(root) {
       ${lista.map(r => { const dias = Math.floor((new Date(hoje) - new Date(r.data)) / 864e5);
         return `<tr class="clickable" data-id="${r.id}">${podeEditar() ? `<td><input type="checkbox" class="sel" value="${r.id}"></td>` : ''}
         <td>${dateBR(r.data)}</td><td>${dias > 0 ? `<span class="badge vencido">${dias} d atraso</span>` : `<span class="muted small">em ${-dias} d</span>`}</td>
-        <td class="wrap">${esc(r.favorecido_nome || '')}</td><td class="wrap">${esc(r.descricao || '')}</td><td>${esc(r.plano_codigo + ' - ' + r.plano_nome)}</td>
+        <td class="wrap">${esc(r.favorecido_nome || '')}</td><td class="wrap">${esc(r.descricao || '')}${r.documento && !(r.descricao || '').includes(r.documento) ? `<div class="muted small">NF ${esc(r.documento)}</div>` : ''}</td><td>${esc(r.plano_codigo + ' - ' + r.plano_nome)}</td>
         <td>${esc(r.conta_nome || '—')}</td><td>${r.tipo === 'S' ? `<span class="badge ${r.prioridade_efetiva === 'Obrigatório' ? 'obrig' : 'negoc'}">${r.prioridade_efetiva}</span>` : ''}</td>
         <td class="num ${cls(r.valor_sinal)}">${money(r.valor_sinal)}</td></tr>`; }).join('')}
       <tr class="row-total">${podeEditar() ? '<td></td>' : ''}<td colspan="7">Total</td><td class="num">${money(lista.reduce((s, r) => s + +r.valor_sinal, 0))}</td></tr></tbody></table>`;
