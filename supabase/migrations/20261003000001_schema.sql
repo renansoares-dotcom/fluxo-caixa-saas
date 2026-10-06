@@ -325,13 +325,13 @@ alter table public.autorizacao_itens enable row level security;
 alter table public.fidc_operacoes    enable row level security;
 alter table public.fidc_titulos      enable row level security;
 
-create policy empresas_sel on public.empresas for select using (public.is_membro(id));
-create policy empresas_upd on public.empresas for update using (public.is_admin(id));
+create policy empresas_sel on public.empresas for select to authenticated using (public.is_membro(id));
+create policy empresas_upd on public.empresas for update to authenticated using (public.is_admin(id));
 
-create policy membros_sel on public.membros for select using (public.is_membro(empresa_id));
-create policy membros_ins on public.membros for insert with check (public.is_admin(empresa_id));
-create policy membros_upd on public.membros for update using (public.is_admin(empresa_id));
-create policy membros_del on public.membros for delete using (public.is_admin(empresa_id) and user_id <> auth.uid());
+create policy membros_sel on public.membros for select to authenticated using (public.is_membro(empresa_id));
+create policy membros_ins on public.membros for insert to authenticated with check (public.is_admin(empresa_id));
+create policy membros_upd on public.membros for update to authenticated using (public.is_admin(empresa_id));
+create policy membros_del on public.membros for delete to authenticated using (public.is_admin(empresa_id) and user_id <> (select auth.uid()));
 
 do $$
 declare t text;
@@ -339,22 +339,22 @@ begin
   foreach t in array array['grupos','centros_custo','plano_contas','favorecidos','contas',
                            'lancamentos','orcamentos','forecast_status','fidc_operacoes','fidc_titulos']
   loop
-    execute format('create policy %1$s_sel on public.%1$s for select using (public.is_membro(empresa_id))', t);
-    execute format('create policy %1$s_ins on public.%1$s for insert with check (public.pode_editar(empresa_id))', t);
-    execute format('create policy %1$s_upd on public.%1$s for update using (public.pode_editar(empresa_id)) with check (public.pode_editar(empresa_id))', t);
-    execute format('create policy %1$s_del on public.%1$s for delete using (public.pode_editar(empresa_id))', t);
+    execute format('create policy %1$s_sel on public.%1$s for select to authenticated using (public.is_membro(empresa_id))', t);
+    execute format('create policy %1$s_ins on public.%1$s for insert to authenticated with check (public.pode_editar(empresa_id))', t);
+    execute format('create policy %1$s_upd on public.%1$s for update to authenticated using (public.pode_editar(empresa_id)) with check (public.pode_editar(empresa_id))', t);
+    execute format('create policy %1$s_del on public.%1$s for delete to authenticated using (public.pode_editar(empresa_id))', t);
   end loop;
 end $$;
 
 -- Autorizações: financeiro cria; diretor também pode aprovar/rejeitar
-create policy autorizacoes_sel on public.autorizacoes for select using (public.is_membro(empresa_id));
-create policy autorizacoes_ins on public.autorizacoes for insert with check (public.pode_editar(empresa_id));
-create policy autorizacoes_upd on public.autorizacoes for update using (public.pode_autorizar(empresa_id));
-create policy autorizacoes_del on public.autorizacoes for delete using (public.is_admin(empresa_id));
-create policy autorizacao_itens_sel on public.autorizacao_itens for select using (public.is_membro(empresa_id));
-create policy autorizacao_itens_ins on public.autorizacao_itens for insert with check (public.pode_editar(empresa_id));
-create policy autorizacao_itens_upd on public.autorizacao_itens for update using (public.pode_autorizar(empresa_id));
-create policy autorizacao_itens_del on public.autorizacao_itens for delete using (public.pode_editar(empresa_id));
+create policy autorizacoes_sel on public.autorizacoes for select to authenticated using (public.is_membro(empresa_id));
+create policy autorizacoes_ins on public.autorizacoes for insert to authenticated with check (public.pode_editar(empresa_id));
+create policy autorizacoes_upd on public.autorizacoes for update to authenticated using (public.pode_autorizar(empresa_id));
+create policy autorizacoes_del on public.autorizacoes for delete to authenticated using (public.is_admin(empresa_id));
+create policy autorizacao_itens_sel on public.autorizacao_itens for select to authenticated using (public.is_membro(empresa_id));
+create policy autorizacao_itens_ins on public.autorizacao_itens for insert to authenticated with check (public.pode_editar(empresa_id));
+create policy autorizacao_itens_upd on public.autorizacao_itens for update to authenticated using (public.pode_autorizar(empresa_id));
+create policy autorizacao_itens_del on public.autorizacao_itens for delete to authenticated using (public.pode_editar(empresa_id));
 
 -- ---------------------------------------------------------------------
 -- View de lançamentos com nomes e valor com sinal (respeita RLS)
@@ -381,6 +381,7 @@ left join public.contas ct on ct.id = l.conta_id
 left join public.grupos g on g.id = ct.grupo_id;
 
 -- Permissões de tabela (o Supabase já concede por padrão; explícito por segurança — o RLS continua valendo)
-grant usage on schema public to anon, authenticated;
+revoke all on all tables in schema public from anon;
 grant select, insert, update, delete on all tables in schema public to authenticated;
-grant usage, select on all sequences in schema public to authenticated;
+revoke execute on function public.is_membro(uuid), public.pode_editar(uuid), public.is_admin(uuid), public.pode_autorizar(uuid) from anon, public;
+grant execute on function public.is_membro(uuid), public.pode_editar(uuid), public.is_admin(uuid), public.pode_autorizar(uuid) to authenticated;

@@ -179,5 +179,7 @@ begin
   return n;
 end $$;
 
+-- Somente usuários autenticados executam as funções
+revoke execute on all functions in schema public from public, anon;
 grant execute on all functions in schema public to authenticated;
-revoke execute on function public._lanc_filtrados(uuid,date,date,text[],uuid,uuid,uuid,uuid,text) from anon;
+revoke execute on function public.aplicar_plano_modelo(uuid) from authenticated;
