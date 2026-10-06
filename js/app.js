@@ -13,6 +13,7 @@ const routes = {
   'orcamento': () => import('./pages/orcamento.js'),
   'orcado-realizado': () => import('./pages/orcado-realizado.js'),
   'fidc': () => import('./pages/fidc.js'),
+  'fidc-propostas': () => import('./pages/fidc-propostas.js'),
   'cadastros/plano': () => import('./pages/cad-plano.js'),
   'cadastros/contas': () => import('./pages/cad-contas.js'),
   'cadastros/favorecidos': () => import('./pages/cad-favorecidos.js'),
