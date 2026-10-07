@@ -320,3 +320,14 @@ a.btn{text-decoration:none}
 tr.conc-ok>td{background:var(--pos-soft)!important}
 tr.conc-ok>td:first-child{box-shadow:inset 3px 0 0 var(--pos)}
 .conc-foot.ok{background:var(--pos-soft)}
+
+/* Menu em cascata */
+.nav-sec{margin-top:4px}
+.nav-sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;user-select:none}
+.nav-sec>summary::-webkit-details-marker{display:none}
+.nav-sec>summary::after{content:'';width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;margin-right:4px}
+.nav-sec[open]>summary::after{transform:rotate(45deg)}
+.nav-sec>summary:hover{background:var(--surface-2);color:var(--text)}
+.nav-sec:has(a.active)>summary{color:var(--primary)}
+.nav-itens{display:flex;flex-direction:column;gap:2px;padding:2px 0 6px 8px;margin-left:10px;border-left:1px solid var(--border)}
+@media (max-width:900px){.nav-sec>summary{padding:11px 12px;font-size:12px}}

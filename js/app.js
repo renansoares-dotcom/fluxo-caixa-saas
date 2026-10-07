@@ -111,6 +111,8 @@ async function entrarEmpresa(emp, papel) {
 }
 
 $('#ano-global').onchange = (e) => { state.ano = +e.target.value; render(); };
+// menu em cascata: um grupo aberto por vez
+$$('#nav details').forEach(d => d.addEventListener('toggle', () => { if (d.open) $$('#nav details').forEach(o => { if (o !== d) o.open = false; }); }));
 // menu lateral no celular: abre por cima do conteúdo, fecha no fundo escuro, no Esc ou ao navegar
 const menu = (abrir) => { $('#sidebar').classList.toggle('open', abrir); $('#sidebar-backdrop').hidden = !abrir; document.body.classList.toggle('menu-aberto', abrir); };
 $('#menu-btn').onclick = () => menu(!$('#sidebar').classList.contains('open'));
@@ -125,6 +127,8 @@ async function render() {
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'dashboard';
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
+  // menu em cascata: abre o grupo da página atual
+  const ativo = $(`#nav a[data-route="${route}"]`)?.closest('details'); if (ativo && !ativo.open) { $$('#nav details').forEach(d => { d.open = d === ativo; }); }
   $('#sidebar').classList.remove('open'); $('#sidebar-backdrop').hidden = true; document.body.classList.remove('menu-aberto');
   const old = $('#page'); const page = old.cloneNode(false); old.replaceWith(page); loading(page);
   const seq = ++renderSeq;

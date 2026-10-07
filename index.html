@@ -53,27 +53,31 @@
       <button class="empresa-switch" id="empresa-switch" title="Trocar empresa"></button>
       <nav id="nav">
         <a href="#/dashboard" data-route="dashboard">Dashboard</a>
-        <div class="nav-group">Movimento</div>
+        <details class="nav-sec"><summary>Movimento</summary><div class="nav-itens">
         <a href="#/lancamentos" data-route="lancamentos">Lançamentos</a>
         <a href="#/conciliacao" data-route="conciliacao">Conciliação Bancária</a>
         <a href="#/abertos" data-route="abertos">Contas A Pagar / Receber</a>
         <a href="#/autorizacao" data-route="autorizacao">Autorização De Pagamentos</a>
-        <div class="nav-group">Relatórios</div>
+        </div></details>
+        <details class="nav-sec"><summary>Relatórios</summary><div class="nav-itens">
         <a href="#/fluxo-mensal" data-route="fluxo-mensal">Fluxo De Caixa Mensal</a>
         <a href="#/fluxo-diario" data-route="fluxo-diario">Fluxo De Caixa Diário</a>
         <a href="#/dre" data-route="dre">DRE Gerencial</a>
-        <div class="nav-group">Planejamento</div>
+        </div></details>
+        <details class="nav-sec"><summary>Planejamento</summary><div class="nav-itens">
         <a href="#/orcamento" data-route="orcamento">Budget / Forecast</a>
         <a href="#/orcado-realizado" data-route="orcado-realizado">Orçado X Realizado</a>
         <a href="#/fidc" data-route="fidc">Análise FIDC</a>
         <a href="#/fidc-propostas" data-route="fidc-propostas">Propostas De Borderô</a>
         <a href="#/duplicatas" data-route="duplicatas">Duplicatas Para Endosso</a>
-        <div class="nav-group">Cadastros</div>
+        </div></details>
+        <details class="nav-sec"><summary>Cadastros</summary><div class="nav-itens">
         <a href="#/cadastros/plano" data-route="cadastros/plano">Plano De Contas</a>
         <a href="#/cadastros/contas" data-route="cadastros/contas">Contas Bancárias</a>
         <a href="#/cadastros/favorecidos" data-route="cadastros/favorecidos">Beneficiários</a>
         <a href="#/cadastros/centros" data-route="cadastros/centros">Centros De Custo E Grupos</a>
         <a href="#/config" data-route="config">Empresa E Usuários</a>
+        </div></details>
       </nav>
       <div class="sidebar-foot">
         <span id="user-email" class="muted small"></span>
