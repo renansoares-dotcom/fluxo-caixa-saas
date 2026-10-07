@@ -82,25 +82,39 @@ async function carregar(root) {
 }
 
 // Sugestões: 1) mesmo valor e data próxima (±3 dias); 2) vários lançamentos do mesmo dia somando o item; 3) título em aberto com mesmo valor (±7 dias) → baixa
+// palavras que identificam o movimento (descarta termos genéricos do banco)
+const GENERICAS = new Set(['enviado', 'recebido', 'transf', 'transferencia', 'dispon', 'eletron', 'pagto', 'pagamento', 'cobranca', 'tarifa', 'bancaria', 'dinheiro', 'banco', 'liquidacao', 'valor', 'disponivel', 'docto', 'ltda', 'remet', 'industria', 'comercio', 'servicos', 'entre', 'contas', 'code', 'dinamico']);
+const palavras = (t) => normTxt(t).replace(/[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !GENERICAS.has(w));
+const textoLanc = (l) => normTxt(`${state.cad.favById[l.favorecido_id]?.nome || ''} ${l.descricao || ''} ${state.cad.planoById[l.plano_id]?.nome || ''}`);
+// quantas palavras do histórico do banco aparecem no lançamento (favorecido, descrição, plano)
+const afinidade = (i, l) => { const t = textoLanc(l); return palavras(i.descricao).filter(w => t.includes(w)).length; };
+
+// Sugestões: 1) mesmo valor e data próxima (±3 dias), desempatando pelo texto; 2) vários lançamentos do mesmo dia somando o item;
+// 3) título em aberto com mesmo valor (±7 dias) → baixa. Quando há mais de um candidato de mesmo valor e o texto não
+// distingue, a sugestão fica marcada "conferir" e não entra no "Aceitar sugestões" por padrão.
 function sugerir() {
   const sug = {}; const usados = new Set(D.lancLig);
   const pend = D.itens.filter(i => i.status === 'pendente');
   const docOk = (i, l) => { const d = dig(l.documento).replace(/^0+/, ''); return d.length >= 3 && (dig(i.documento).replace(/^0+/, '') === d || dig(i.descricao).includes(d)); };
   const casar = (lista, maxDias, tipo) => {
-    const pares = [];
+    const pares = []; const cand = {};
     for (const i of pend) if (!sug[i.id]) for (const l of lista) {
       if (usados.has(l.id) || cent(sinal(l)) !== cent(i.valor)) continue;
       const dd = Math.abs(difDias(i.data, l.data)); if (dd > maxDias) continue;
-      pares.push({ i, l, s: dd * 10 - (docOk(i, l) ? 25 : 0) });
+      const af = afinidade(i, l) + (docOk(i, l) ? 2 : 0);
+      pares.push({ i, l, af, s: dd * 10 - af * 30 }); (cand[i.id] ||= []).push(af);
     }
     pares.sort((a, b) => a.s - b.s);
-    for (const p of pares) if (!sug[p.i.id] && !usados.has(p.l.id)) { sug[p.i.id] = { tipo, ids: [p.l.id] }; usados.add(p.l.id); }
+    for (const p of pares) if (!sug[p.i.id] && !usados.has(p.l.id)) {
+      const outros = cand[p.i.id].length > 1 || pend.some(o => o.id !== p.i.id && !sug[o.id] && cent(o.valor) === cent(p.i.valor) && Math.abs(difDias(o.data, p.l.data)) <= maxDias);
+      sug[p.i.id] = { tipo, ids: [p.l.id], conferir: outros && p.af === 0 }; usados.add(p.l.id);
+    }
   };
   casar(D.lancs, 3, 'exato');
   for (const i of pend) {
     if (sug[i.id]) continue;
     const mesmos = D.lancs.filter(l => !usados.has(l.id) && l.data === i.data && Math.sign(sinal(l)) === Math.sign(i.valor));
-    if (mesmos.length >= 2 && cent(mesmos.reduce((s, l) => s + sinal(l), 0)) === cent(i.valor)) { sug[i.id] = { tipo: 'grupo', ids: mesmos.map(l => l.id) }; mesmos.forEach(l => usados.add(l.id)); }
+    if (mesmos.length >= 2 && cent(mesmos.reduce((s, l) => s + sinal(l), 0)) === cent(i.valor)) { sug[i.id] = { tipo: 'grupo', ids: mesmos.map(l => l.id), conferir: false }; mesmos.forEach(l => usados.add(l.id)); }
   }
   casar(D.abertos, 7, 'baixa');
   return sug;
@@ -137,7 +151,7 @@ function pintarExtrato(root) {
         return `<tr class="clickable ${ui.sels.has(i.id) ? 'row-sel' : ''}" data-id="${i.id}"><td>${i.status === 'pendente' ? `<input type="checkbox" data-chk ${ui.sels.has(i.id) ? 'checked' : ''}>` : ''}</td><td>${dateBR(i.data)}</td>
         <td class="wrap">${esc(i.descricao || i.tipo || '')}${i.documento ? `<div class="small muted">doc. ${esc(i.documento)}</div>` : ''}${i.status === 'ignorado' && i.observacao ? `<div class="small muted">${esc(i.observacao)}</div>` : ''}</td>
         <td class="num ${cls(i.valor)}">${money(i.valor)}</td>
-        <td class="small">${i.status === 'conciliado' ? `<span class="badge pago">conciliado${i.grupo_id ? ' (grupo)' : ''}</span>` : i.status === 'ignorado' ? '<span class="badge">ignorado</span>' : s ? `<span class="badge aberto">${ROT_SUG[s.tipo]}</span>` : ''}</td></tr>`; }).join('')}
+        <td class="small">${i.status === 'conciliado' ? `<span class="badge pago">conciliado${i.grupo_id ? ' (grupo)' : ''}</span>` : i.status === 'ignorado' ? '<span class="badge">ignorado</span>' : s ? `<span class="badge ${s.conferir ? 'vencido' : 'aberto'}" title="${s.conferir ? 'Há outro lançamento de mesmo valor e o texto não confirma: confira antes' : ''}">${ROT_SUG[s.tipo]}${s.conferir ? ' · conferir' : ''}</span>` : ''}</td></tr>`; }).join('')}
       </tbody></table>` : `<div class="empty">${D.itens.length ? 'Nada neste filtro.' : 'Nenhum movimento importado para esta conta neste mês. Use “Importar extrato OFX”.'}</div>`}</div>`;
   $('#fx', c).onclick = (e) => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { ui.filtro = f; pintarExtrato(root); } };
   const mudou = () => {
@@ -300,7 +314,7 @@ function pintarSistema(root) {
   const cand = [...D.lancs.filter(l => !D.lancLig.has(l.id)), ...(ui.abertos ? D.abertos : [])];
   const lista = filtrarOrdenar(cand, item);
   c.innerHTML = `${cab}
-    ${s ? `<p class="small" style="margin:0 12px 8px"><span class="badge aberto">${ROT_SUG[s.tipo]}</span> ${s.tipo === 'baixa' ? 'Título em aberto com o mesmo valor: ao conciliar, ele é baixado como pago na data do extrato e nesta conta.' : s.tipo === 'grupo' ? 'Lançamentos do mesmo dia que somam o valor do extrato.' : 'Mesmo valor e data próxima.'}</p>` : ''}
+    ${s ? `<p class="small" style="margin:0 12px 8px"><span class="badge aberto">${ROT_SUG[s.tipo]}</span> ${s.tipo === 'baixa' ? 'Título em aberto com o mesmo valor: ao conciliar, ele é baixado como pago na data do extrato e nesta conta.' : s.tipo === 'grupo' ? 'Lançamentos do mesmo dia que somam o valor do extrato.' : 'Mesmo valor e data próxima.'}${s.conferir ? ' <strong class="neg">Há outro lançamento de mesmo valor: confira favorecido e descrição antes de conciliar.</strong>' : ''}</p>` : ''}
     ${filtrosHTML(item)}${resumo(lista)}
     <div class="table-wrap" style="max-height:44vh">${lista.length ? `<table><thead><tr>${thTodos(lista)}${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}<th></th></tr></thead><tbody>${lista.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum lançamento com esses filtros.</div>'}</div>
     <div class="conc-foot" id="cf"></div>`;
@@ -355,12 +369,16 @@ async function conciliarGrupo(itens, ids, root) {
 }
 
 function aceitarTodas(root) {
-  const g = Object.entries(D.sug).map(([id, s]) => ({ item: D.itens.find(i => i.id === id), ids: s.ids, tipo: s.tipo })).filter(x => x.item);
-  const nb = g.filter(x => x.tipo === 'baixa').length;
-  const m = modal({ title: 'Aceitar sugestões', body: `<p>Conciliar <strong>${g.length}</strong> movimento(s) do extrato com os lançamentos sugeridos?</p>
+  const g = Object.entries(D.sug).map(([id, s]) => ({ item: D.itens.find(i => i.id === id), ids: s.ids, tipo: s.tipo, conferir: s.conferir })).filter(x => x.item);
+  const nb = g.filter(x => x.tipo === 'baixa').length, nc = g.filter(x => x.conferir).length;
+  const m = modal({ title: 'Aceitar sugestões', body: `<p>Conciliar <strong>${g.length - nc}</strong> movimento(s) do extrato com os lançamentos sugeridos?</p>
+    ${nc ? `<p class="small">${nc} sugestão(ões) marcadas <strong>conferir</strong> ficam de fora: há outro lançamento de mesmo valor e o histórico do banco não confirma qual é (ex.: saques e PIX de mesmo valor no mesmo dia). Confira uma a uma.</p><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="sc"> Incluir mesmo assim as ${nc} a conferir</label>` : ''}
     ${nb ? `<p class="small">${nb} sugestão(ões) baixam títulos em aberto (status Pago, data do extrato e esta conta).</p><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="sb" checked> Incluir as baixas de títulos em aberto</label>` : ''}`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Conciliar</button>' });
-  $('#ok', m.el).onclick = () => { const inclui = $('#sb', m.el)?.checked !== false; m.close(); conciliar(g.filter(x => inclui || x.tipo !== 'baixa'), root); };
+  $('#ok', m.el).onclick = () => {
+    const baixas = $('#sb', m.el)?.checked !== false, conf = !!$('#sc', m.el)?.checked; m.close();
+    const sel = g.filter(x => (baixas || x.tipo !== 'baixa') && (conf || !x.conferir)); if (sel.length) conciliar(sel, root);
+  };
 }
 
 async function desfazer(item, root) {
