@@ -172,7 +172,6 @@ function htmlDuplicata(d) {
           <div>${esc(d.sacado.endereco || 'endereço não cadastrado')}${d.sacado.cidade ? ` — ${esc(d.sacado.cidade)}` : ''}${d.sacado.cep ? ` · CEP ${esc(d.sacado.cep)}` : ''}</div></div>
         <div class="dp-rodape">
           <div class="dp-emit"><strong>${esc(d.emitente.nome)}</strong><div>CNPJ/MF ${esc(d.emitente.cnpj)}${d.emitente.ie ? ` · IE ${esc(d.emitente.ie)}` : ''}</div><div>${esc(d.emitente.logradouro)}</div><div>${esc(d.emitente.cidade)}</div></div>
-          <div class="dp-ass"><div class="dp-lin"></div>Aceite do sacado — data ___/___/_____</div>
           <div class="dp-ass"><div class="dp-lin"></div>${esc(d.emitente.nome)}<br><span class="muted">emitente</span></div>
         </div>
       </div>
@@ -387,7 +386,6 @@ function desenharPdf(doc, d, pag, totPag, lote) {
   campoEmit(d.emitente.nome, 'EMITENTE', y); campoEmit(`${d.emitente.cnpj}${d.emitente.ie ? `   IE ${d.emitente.ie}` : ''}`, 'CNPJ/MF DO EMITENTE', y + 7.5);
   campoEmit(d.emitente.logradouro, 'LOGRADOURO DO EMITENTE', y + 15); campoEmit(d.emitente.cidade, 'MUNICÍPIO/UF DO EMITENTE', y + 22.5);
   const ass = (txt, sub, xa, ya) => { doc.setLineWidth(0.3); doc.line(xa, ya, xa + 62, ya); doc.setFont('courier', 'bold'); doc.setFontSize(8); doc.text(pdfTxt(txt).slice(0, 38), xa + 31, ya + 3.5, { align: 'center' }); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text(sub, xa + 31, ya + 6.5, { align: 'center' }); };
-  ass('ACEITE DO SACADO', 'reconhecemos a exatidão desta duplicata · data ___/___/____', R - 62, y + 6);
   ass(d.emitente.nome, 'EMITENTE', R - 62, y + 22);
   // endosso (verso)
   const yv = y0 + h + 14;

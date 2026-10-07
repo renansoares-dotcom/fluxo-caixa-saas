@@ -222,7 +222,7 @@ tr.row-sel>td{background:var(--primary-soft)}
 .dp-texto{margin:0;font-family:'Courier New',monospace;font-weight:700;line-height:1.45}
 .dp-extenso{border:1px solid #333;padding:4px 8px;font-family:'Courier New',monospace;font-weight:700;overflow:hidden;white-space:nowrap;text-overflow:clip}
 .dp-sacado{border:1px solid #bbb;padding:6px 8px;font-family:'Courier New',monospace;display:flex;flex-direction:column;gap:2px}
-.dp-rodape{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;align-items:end;font-size:10.5px}
+.dp-rodape{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;align-items:end;font-size:10.5px}
 .dp-emit{font-family:'Courier New',monospace}
 .dp-ass{text-align:center;font-size:10px}
 .dp-lin{border-top:1px solid #333;margin:22px 4px 3px}
