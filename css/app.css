@@ -5,7 +5,7 @@
   --brand-navy:#2a1f6f; --brand-blue:#2b5598; --brand-cyan:#0a8ed3;
   /* Paleta dos gráficos (ordem fixa; validada para daltonismo) */
   --c1:#0a8ed3; --c2:#eb6834; --c3:#4a3aa7; --c4:#1baf7a; --c5:#eda100; --c6:#e87ba4; --c7:#008300; --c8:#e34948;
-  --pos:#127a4a; --pos-soft:#e6f5ee; --neg:#c0352b; --neg-soft:#fdecea; --warn:#b26a00; --warn-soft:#fff4e0;
+  --pos:#127a4a; --pos-soft:#e6f5ee; --ok-row:#b7e4c9; --neg:#c0352b; --neg-soft:#fdecea; --warn:#b26a00; --warn-soft:#fff4e0;
   --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
   --radius:10px; --sidebar:250px;
   font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color-scheme:light;
@@ -14,13 +14,13 @@
   --bg:#0f141c; --surface:#161d28; --surface-2:#1c2533; --border:#2a3445; --text:#e6ebf2; --muted:#93a0b4;
   --primary:#6ea8ec; --primary-soft:#1a2a45; --brand-navy:#9d93f0; --brand-blue:#6ea8ec; --brand-cyan:#2aa3e6;
   --c1:#2a9be0; --c2:#d95926; --c3:#9085e9; --c4:#199e70; --c5:#c98500; --c6:#d55181; --c7:#008300; --c8:#e66767;
-   --pos:#3ccf8e; --pos-soft:#11291f; --neg:#ff6b5e; --neg-soft:#2e1614;
+   --pos:#3ccf8e; --pos-soft:#11291f; --ok-row:#1b4d34; --neg:#ff6b5e; --neg-soft:#2e1614;
   --warn:#f2b23e; --warn-soft:#2d2410; --shadow:none; color-scheme:dark;}}
 :root[data-theme="dark"]{
   --bg:#0f141c; --surface:#161d28; --surface-2:#1c2533; --border:#2a3445; --text:#e6ebf2; --muted:#93a0b4;
   --primary:#6ea8ec; --primary-soft:#1a2a45; --brand-navy:#9d93f0; --brand-blue:#6ea8ec; --brand-cyan:#2aa3e6;
   --c1:#2a9be0; --c2:#d95926; --c3:#9085e9; --c4:#199e70; --c5:#c98500; --c6:#d55181; --c7:#008300; --c8:#e66767;
-   --pos:#3ccf8e; --pos-soft:#11291f; --neg:#ff6b5e; --neg-soft:#2e1614;
+   --pos:#3ccf8e; --pos-soft:#11291f; --ok-row:#1b4d34; --neg:#ff6b5e; --neg-soft:#2e1614;
   --warn:#f2b23e; --warn-soft:#2d2410; --shadow:none; color-scheme:dark;}
 
 *{box-sizing:border-box}
@@ -317,9 +317,9 @@ a.btn{text-decoration:none}
 .conc-flt .par input[inputmode]{width:90px}
 .conc-flt .chk{flex-direction:row;align-items:center;gap:6px}
 .conc-flt .chk input{min-height:0}
-tr.conc-ok>td{background:var(--pos-soft)!important}
+tr.conc-ok>td{background:var(--ok-row)!important}
 tr.conc-ok>td:first-child{box-shadow:inset 3px 0 0 var(--pos)}
-.conc-foot.ok{background:var(--pos-soft)}
+.conc-foot.ok{background:var(--ok-row)}
 
 /* Menu em cascata */
 .nav-sec{margin-top:4px}
