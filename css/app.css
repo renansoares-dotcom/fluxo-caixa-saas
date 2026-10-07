@@ -308,3 +308,12 @@ a.btn{text-decoration:none}
 .conc-grid h2{font-size:15px;margin:0}
 .conc-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--border)}
 @media (max-width:1100px){.conc-grid{grid-template-columns:1fr}}
+.conc-flt{padding:0 12px 6px;display:flex;flex-direction:column;gap:6px}
+.conc-flt .toolbar{gap:8px}
+.conc-flt label{font-size:12px}
+.conc-flt input,.conc-flt select{min-height:32px;padding:4px 8px;font-size:13px}
+.conc-flt .par{display:flex;gap:4px}
+.conc-flt .par input{width:128px}
+.conc-flt .par input[inputmode]{width:90px}
+.conc-flt .chk{flex-direction:row;align-items:center;gap:6px}
+.conc-flt .chk input{min-height:0}

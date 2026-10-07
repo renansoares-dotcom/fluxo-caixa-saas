@@ -10,7 +10,7 @@ export const title = 'Conciliação bancária';
 
 const hoje = new Date();
 const mesAnt = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-const ui = { conta: '', mes: `${mesAnt.getFullYear()}-${String(mesAnt.getMonth() + 1).padStart(2, '0')}`, filtro: 'pendente', sel: null, marcados: new Set(), abertos: false, busca: '' };
+const ui = { conta: '', mes: `${mesAnt.getFullYear()}-${String(mesAnt.getMonth() + 1).padStart(2, '0')}`, filtro: 'pendente', sel: null, marcados: new Set(), abertos: false, busca: '', lf: { sinal: 'mesmo', classe: '', de: '', ate: '', vmin: '', vmax: '', ordem: 'prox' } };
 let D = null; // dados carregados
 
 const dig = (s) => String(s || '').replace(/\D/g, '');
@@ -133,6 +133,7 @@ function pintarExtrato(root) {
     const tr = e.target.closest('tr[data-id]'); if (!tr) return;
     ui.sel = ui.sel === tr.dataset.id ? null : tr.dataset.id;
     ui.marcados = new Set(D.sug[ui.sel]?.ids || []); ui.busca = '';
+    if (ui.sel) { ui.lf.sinal = 'mesmo'; ui.lf.ordem = 'prox'; }
     if (ui.sel && D.sug[ui.sel]?.tipo === 'baixa') ui.abertos = true;
     pintarExtrato(root); pintarSistema(root);
     if (ui.sel && window.innerWidth < 1100) $('#sis', root).scrollIntoView?.({ behavior: 'smooth', block: 'start' });
@@ -146,12 +147,79 @@ const linhaLanc = (l, { marcar = true, marcado = false } = {}) => {
     <td class="num ${cls(v)}">${money(v)}</td></tr>`;
 };
 
+// Filtros e ordem do painel de lançamentos (direita)
+const ORDENS = [['prox', 'Mais provável'], ['data', 'Data ↑'], ['data_desc', 'Data ↓'], ['valor', 'Valor ↑'], ['valor_desc', 'Valor ↓'], ['fav', 'Favorecido A–Z'], ['plano', 'Plano de contas']];
+const COL_ORDEM = { data: ['data', 'data_desc'], fav: ['fav', 'fav'], valor: ['valor_desc', 'valor'] };
+function filtrosHTML(item) {
+  const f = ui.lf; const classes = state.cad.classes || state.cad.plano.filter(p => p.nivel === 1);
+  const ativos = [f.classe, f.de || f.ate, f.vmin || f.vmax].filter(Boolean).length;
+  return `<div class="conc-flt" id="lf">
+    <div class="toolbar">
+      <label class="grow">Buscar<input name="busca" value="${esc(ui.busca)}" placeholder="favorecido, descrição, NF, valor"></label>
+      <label>Tipo<select name="sinal">${[['', 'Todos'], ...(item ? [['mesmo', item.valor < 0 ? 'Saídas (como o extrato)' : 'Entradas (como o extrato)']] : []), ['E', 'Entradas'], ['S', 'Saídas']].map(([k, t]) => `<option value="${k}" ${f.sinal === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>Ordem<select name="ordem">${ORDENS.filter(([k]) => item || k !== 'prox').map(([k, t]) => `<option value="${k}" ${f.ordem === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <button class="btn small" type="button" id="lf-mais">${ui.lfMais ? 'Menos filtros' : 'Mais filtros'}${ativos ? ` (${ativos})` : ''}</button>
+    </div>
+    <div class="toolbar" ${ui.lfMais ? '' : 'hidden'}>
+      <label>Classificação<select name="classe"><option value="">Todas</option>${classes.map(c => `<option value="${c.id}" ${f.classe === c.id ? 'selected' : ''}>${esc(c.codigo)} ${esc(c.nome)}</option>`).join('')}</select></label>
+      <label>Período<span class="par"><input type="date" name="de" value="${f.de}"><input type="date" name="ate" value="${f.ate}"></span></label>
+      <label>Valor entre<span class="par"><input name="vmin" inputmode="decimal" value="${esc(f.vmin)}" placeholder="mín."><input name="vmax" inputmode="decimal" value="${esc(f.vmax)}" placeholder="máx."></span></label>
+      <button class="btn small" type="button" id="lf-limpa">Limpar</button>
+    </div>
+    ${item ? `<label class="chk"><input type="checkbox" name="abertos" ${ui.abertos ? 'checked' : ''}> Incluir títulos em aberto</label>` : ''}
+  </div>`;
+}
+function filtrarOrdenar(cand, item) {
+  const f = ui.lf; const b = normTxt(ui.busca); const num = (x) => { const v = parseFloat(String(x).replace(/\./g, '').replace(',', '.')); return isFinite(v) ? v : null; };
+  const vmin = num(f.vmin), vmax = num(f.vmax);
+  const pai = (l) => state.cad.planoById[l.plano_id]?.pai_id;
+  const lista = cand.filter(l => {
+    if (ui.marcados.has(l.id)) return true;
+    const v = sinal(l);
+    if (f.sinal === 'mesmo' && item && Math.sign(v) !== Math.sign(item.valor)) return false;
+    if (f.sinal === 'E' && v < 0) return false; if (f.sinal === 'S' && v > 0) return false;
+    if (f.classe && pai(l) !== f.classe) return false;
+    if (f.de && l.data < f.de) return false; if (f.ate && l.data > f.ate) return false;
+    if (vmin != null && Math.abs(v) < vmin) return false; if (vmax != null && Math.abs(v) > vmax) return false;
+    return !b || normTxt(`${state.cad.favById[l.favorecido_id]?.nome || ''} ${l.descricao || ''} ${l.documento || ''} ${money(l.valor)}`).includes(b);
+  });
+  const fav = (l) => state.cad.favById[l.favorecido_id]?.nome || l.descricao || '';
+  const cod = (l) => state.cad.planoById[l.plano_id]?.codigo || '';
+  const cmp = {
+    prox: (x, y) => item ? (Math.abs(Math.abs(sinal(x)) - Math.abs(item.valor)) - Math.abs(Math.abs(sinal(y)) - Math.abs(item.valor))) || (Math.abs(difDias(x.data, item.data)) - Math.abs(difDias(y.data, item.data))) : x.data.localeCompare(y.data),
+    data: (x, y) => x.data.localeCompare(y.data) || Math.abs(sinal(y)) - Math.abs(sinal(x)), data_desc: (x, y) => y.data.localeCompare(x.data) || Math.abs(sinal(y)) - Math.abs(sinal(x)),
+    valor: (x, y) => Math.abs(sinal(x)) - Math.abs(sinal(y)), valor_desc: (x, y) => Math.abs(sinal(y)) - Math.abs(sinal(x)),
+    fav: (x, y) => fav(x).localeCompare(fav(y), 'pt-BR') || x.data.localeCompare(y.data), plano: (x, y) => cod(x).localeCompare(cod(y)) || x.data.localeCompare(y.data),
+  }[f.ordem] || ((x, y) => x.data.localeCompare(y.data));
+  return lista.sort((x, y) => (ui.marcados.has(y.id) - ui.marcados.has(x.id)) || cmp(x, y));
+}
+const thOrd = (k, t, extra = '') => { const on = (COL_ORDEM[k] || []).includes(ui.lf.ordem); const seta = on ? (ui.lf.ordem.endsWith('_desc') || (k === 'valor' && ui.lf.ordem === 'valor_desc') ? ' ↓' : ' ↑') : ''; return `<th class="${extra} sortable" data-ord="${k}" style="cursor:pointer" title="Ordenar">${t}${seta}</th>`; };
+function ligarFiltros(c, root, item) {
+  const lf = $('#lf', c); if (!lf) return;
+  let t;
+  lf.addEventListener('input', (e) => {
+    const n = e.target.name; if (!n) return;
+    if (n === 'abertos') ui.abertos = e.target.checked; else if (n === 'busca') ui.busca = e.target.value; else ui.lf[n] = e.target.value;
+    clearTimeout(t); t = setTimeout(() => { const foco = n; pintarSistema(root); const el = $(`#lf [name="${foco}"]`, c); if (el && el.type !== 'checkbox' && el.tagName === 'INPUT') { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch { /* date */ } } }, ['busca', 'vmin', 'vmax'].includes(n) ? 350 : 0);
+  });
+  $('#lf-mais', c).onclick = () => { ui.lfMais = !ui.lfMais; pintarSistema(root); };
+  $('#lf-limpa', c).onclick = () => { ui.busca = ''; Object.assign(ui.lf, { sinal: item ? 'mesmo' : '', classe: '', de: '', ate: '', vmin: '', vmax: '', ordem: item ? 'prox' : 'data' }); pintarSistema(root); };
+  c.querySelector('thead')?.addEventListener('click', (e) => {
+    const k = e.target.closest('[data-ord]')?.dataset.ord; if (!k) return;
+    const [a, d] = COL_ORDEM[k]; ui.lf.ordem = k === 'fav' ? 'fav' : ui.lf.ordem === a ? d : a; pintarSistema(root);
+  });
+}
+const resumo = (lista) => `<p class="small muted" style="margin:0 12px 6px">${lista.length} lançamento(s) · ${money(lista.reduce((s, l) => s + sinal(l), 0))}${lista.length > 300 ? ' · mostrando os 300 primeiros' : ''}</p>`;
+
 function pintarSistema(root) {
   const c = $('#sis', root); const item = D.itens.find(i => i.id === ui.sel);
   if (!item) {
-    const sem = D.lancs.filter(l => l.data >= D.ini && l.data <= D.fim && !D.lancLig.has(l.id));
+    if (ui.lf.sinal === 'mesmo') ui.lf.sinal = ''; if (ui.lf.ordem === 'prox') ui.lf.ordem = 'data';
+    const sem = filtrarOrdenar(D.lancs.filter(l => l.data >= D.ini && l.data <= D.fim && !D.lancLig.has(l.id)), null);
     c.innerHTML = `<div class="card-head"><div><h2>Lançamentos sem extrato</h2><p class="muted small">Pagos nesta conta no mês e ainda não conciliados. Clique num movimento do extrato para conciliar.</p></div></div>
-      <div class="table-wrap" style="max-height:62vh">${sem.length ? `<table><thead><tr><th>Data</th><th>Favorecido / plano</th><th class="num">Valor</th></tr></thead><tbody>${sem.map(l => linhaLanc(l, { marcar: false })).join('')}</tbody></table>` : '<div class="empty">Nenhum.</div>'}</div>`;
+      ${filtrosHTML(null)}${resumo(sem)}
+      <div class="table-wrap" style="max-height:56vh">${sem.length ? `<table><thead><tr>${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}</tr></thead><tbody>${sem.slice(0, 300).map(l => linhaLanc(l, { marcar: false })).join('')}</tbody></table>` : '<div class="empty">Nenhum.</div>'}</div>`;
+    ligarFiltros(c, root, null);
     return;
   }
   const cab = `<div class="card-head"><div><h2>${dateBR(item.data)} · <span class="${cls(item.valor)}">${money(item.valor)}</span></h2><p class="muted small">${esc(item.descricao || '')}</p></div></div>`;
@@ -166,15 +234,11 @@ function pintarSistema(root) {
   }
   const s = D.sug[item.id];
   const cand = [...D.lancs.filter(l => !D.lancLig.has(l.id)), ...(ui.abertos ? D.abertos : [])];
-  const b = normTxt(ui.busca);
-  const lista = cand.filter(l => ui.marcados.has(l.id) || !b || normTxt(`${state.cad.favById[l.favorecido_id]?.nome || ''} ${l.descricao || ''} ${l.documento || ''} ${money(l.valor)}`).includes(b))
-    .sort((x, y) => (ui.marcados.has(y.id) - ui.marcados.has(x.id)) || (Math.abs(Math.abs(sinal(x)) - Math.abs(item.valor)) - Math.abs(Math.abs(sinal(y)) - Math.abs(item.valor))) || (Math.abs(difDias(x.data, item.data)) - Math.abs(difDias(y.data, item.data))))
-    .slice(0, 200);
+  const lista = filtrarOrdenar(cand, item);
   c.innerHTML = `${cab}
     ${s ? `<p class="small" style="margin:0 12px 8px"><span class="badge aberto">${ROT_SUG[s.tipo]}</span> ${s.tipo === 'baixa' ? 'Título em aberto com o mesmo valor: ao conciliar, ele é baixado como pago na data do extrato e nesta conta.' : s.tipo === 'grupo' ? 'Lançamentos do mesmo dia que somam o valor do extrato.' : 'Mesmo valor e data próxima.'}</p>` : ''}
-    <div class="toolbar" style="padding:0 12px 8px"><label class="grow">Buscar<input id="bsc" value="${esc(ui.busca)}" placeholder="favorecido, descrição, NF, valor"></label>
-      <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="ab" ${ui.abertos ? 'checked' : ''}> Incluir títulos em aberto</label></div>
-    <div class="table-wrap" style="max-height:46vh">${lista.length ? `<table><thead><tr><th></th><th>Data</th><th>Favorecido / plano</th><th class="num">Valor</th></tr></thead><tbody>${lista.map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum lançamento candidato.</div>'}</div>
+    ${filtrosHTML(item)}${resumo(lista)}
+    <div class="table-wrap" style="max-height:44vh">${lista.length ? `<table><thead><tr><th></th>${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}</tr></thead><tbody>${lista.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum lançamento com esses filtros.</div>'}</div>
     <div class="conc-foot" id="cf"></div>`;
   const rodape = () => {
     const sel = [...ui.marcados].map(id => D.lancById[id]).filter(Boolean); const tot = sel.reduce((s, l) => s + sinal(l), 0); const dif = Math.round((item.valor - tot) * 100) / 100;
@@ -185,9 +249,8 @@ function pintarSistema(root) {
     $('#cria', c) && ($('#cria', c).onclick = () => criar(item, root));
   };
   rodape();
-  $('table', c)?.addEventListener('change', (e) => { const tr = e.target.closest('tr[data-l]'); if (!tr) return; e.target.checked ? ui.marcados.add(tr.dataset.l) : ui.marcados.delete(tr.dataset.l); rodape(); });
-  $('#ab', c).onchange = (e) => { ui.abertos = e.target.checked; pintarSistema(root); };
-  let t; $('#bsc', c).oninput = (e) => { clearTimeout(t); t = setTimeout(() => { ui.busca = e.target.value; pintarSistema(root); const i = $('#bsc', c); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
+  c.querySelector('tbody')?.addEventListener('change', (e) => { const tr = e.target.closest('tr[data-l]'); if (!tr) return; e.target.checked ? ui.marcados.add(tr.dataset.l) : ui.marcados.delete(tr.dataset.l); rodape(); });
+  ligarFiltros(c, root, item);
 }
 
 // grava uma ou mais conciliações: [{ item, ids }]
