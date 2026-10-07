@@ -5,6 +5,7 @@ import { SUPABASE_URL } from './config.js';
 const routes = {
   'dashboard': () => import('./pages/dashboard.js'),
   'lancamentos': () => import('./pages/lancamentos.js'),
+  'conciliacao': () => import('./pages/conciliacao.js'),
   'abertos': () => import('./pages/abertos.js'),
   'autorizacao': () => import('./pages/autorizacao.js'),
   'fluxo-mensal': () => import('./pages/fluxo-mensal.js'),

@@ -13,8 +13,9 @@ export async function render(root) {
     <div class="card">
       <div class="card-head">
         <div class="chips" id="meses">${['Ano', ...MESES_CURTO].map((m, i) => `<span class="chip ${f.mes === i ? 'on' : ''}" data-m="${i}">${m}</span>`).join('')}</div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="exp">Exportar Excel</button>
+          <a class="btn" href="#/conciliacao" title="Importar o extrato OFX do banco e conciliar com os lançamentos">Conciliação bancária (OFX)</a>
           ${podeEditar() ? '<button class="btn" id="lanc-nf" title="Títulos a receber por NF, com parcelas">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar XML das NFs</button><button class="btn primary" id="novo">+ Novo lançamento</button>' : ''}
         </div>
       </div>

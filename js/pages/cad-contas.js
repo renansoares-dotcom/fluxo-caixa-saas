@@ -27,6 +27,7 @@ export async function render(root) {
       { k: 'disponibilidade', t: 'Disponibilidade', type: 'select', req: true, value: 'id', label: 'id', def: 'Conta com recursos disponíveis',
         opts: () => [{ id: 'Conta com recursos disponíveis' }, { id: 'Conta com recursos bloqueados' }] },
       { k: 'instituicao', t: 'Instituição' }, { k: 'agencia', t: 'Agência' }, { k: 'numero', t: 'Número da conta' },
+      { k: 'ofx_banco', t: 'Banco no OFX (BANKID)' }, { k: 'ofx_conta', t: 'Conta no OFX (ACCTID)' },
       { k: 'saldo_inicial', t: 'Saldo inicial real', type: 'money', def: 0 },
       { k: 'saldo_inicial_aberto', t: 'Saldo inicial em aberto', type: 'money', def: 0 },
       { k: 'saldo_budget', t: 'Saldo inicial budget', type: 'money', def: 0 },

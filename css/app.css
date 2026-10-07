@@ -301,3 +301,10 @@ body.menu-aberto{overflow:hidden}
 .benef-form legend{font-weight:600;font-size:12px;padding:0 6px;color:var(--primary);text-transform:uppercase;letter-spacing:.03em}
 .pos{color:var(--pos)}
 .pend{margin-top:3px;display:flex;flex-wrap:wrap;gap:3px}
+
+/* Conciliação bancária */
+a.btn{text-decoration:none}
+.conc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.conc-grid h2{font-size:15px;margin:0}
+.conc-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--border)}
+@media (max-width:1100px){.conc-grid{grid-template-columns:1fr}}

@@ -81,9 +81,10 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
         favorecido_id: await resolverFavorecido(fd.favorecido, plano),
       };
       if (!row.valor) throw new Error('Informe um valor maior que zero');
-      if (editando) await q(sb.from('lancamentos').update(row).eq('id', l.id));
-      else await q(sb.from('lancamentos').insert(row));
-      toast('Lançamento salvo'); m.close(); onSaved();
+      let salvo;
+      if (editando) salvo = await q(sb.from('lancamentos').update(row).eq('id', l.id).select().single());
+      else salvo = await q(sb.from('lancamentos').insert(row).select().single());
+      toast('Lançamento salvo'); m.close(); onSaved(salvo);
     } catch (e) { fail(e); }
   };
   if (editando) {
