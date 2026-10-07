@@ -175,13 +175,13 @@ export function lerNFe(xml) {
   };
 }
 
-async function lerArquivos(files) {
+export async function lerArquivos(files) {
   const textos = [];
   for (const f of files) {
     if (/\.zip$/i.test(f.name)) {
       const Z = await carregarJSZip(); const zip = await Z.loadAsync(await f.arrayBuffer());
       for (const e of Object.values(zip.files)) if (!e.dir && /\.xml$/i.test(e.name)) textos.push({ nome: e.name.split('/').pop(), xml: await e.async('string') });
-    } else textos.push({ nome: f.name, xml: new TextDecoder('utf-8').decode(await f.arrayBuffer()) });
+    } else if (/\.xml$/i.test(f.name)) textos.push({ nome: f.name, xml: new TextDecoder('utf-8').decode(await f.arrayBuffer()) });
   }
   return textos;
 }

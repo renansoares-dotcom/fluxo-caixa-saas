@@ -3,6 +3,7 @@
 import { sb, state, q, podeEditar, loadCadastros } from '../lib/data.js';
 import { $, esc, money, options, fail, toast, modal, parseNum, exportXLSX } from '../lib/ui.js';
 import { analisaDocumento, somenteDoc } from '../lib/documentos.js';
+import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
 
 export const title = 'Beneficiários';
 
@@ -37,7 +38,7 @@ function pendencias(f, dupDocs) {
 export async function render(root) {
   root.innerHTML = `<div class="card"><div class="card-head" style="margin-bottom:0">
       <div class="chips" id="abas">${ABAS.map(a => `<span class="chip ${ui.aba === a.k ? 'on' : ''}" data-k="${a.k}">${a.nome} <span class="muted" data-n="${a.k}"></span></span>`).join('')}</div>
-      <div style="display:flex;gap:8px"><button class="btn" id="exp">Exportar Excel</button>${podeEditar() ? '<button class="btn primary" id="novo">+ Novo</button>' : ''}</div></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="exp">Exportar Excel</button>${podeEditar() ? '<button class="btn" id="xml">Cadastrar pelas NF-e (XML)</button><button class="btn primary" id="novo">+ Novo</button>' : ''}</div></div></div>
     <div id="corpo"></div>`;
   $('#abas', root).onclick = (e) => { const k = e.target.closest('[data-k]')?.dataset.k; if (k) { ui.aba = k; render(root); } };
   try {
@@ -50,6 +51,7 @@ export async function render(root) {
   for (const a of ABAS) { const n = a.fundos ? fundos.length : state.cad.favorecidos.filter(f => a.tipos.includes(f.tipo)).length; const el = root.querySelector(`[data-n="${a.k}"]`); if (el) el.textContent = n; }
   const aba = ABAS.find(a => a.k === ui.aba);
   $('#novo', root) && ($('#novo', root).onclick = () => aba.fundos ? editarFundo({ ativo: true }, root) : editar({ tipo: aba.novo, ativo: true, tipo_pessoa: 'PJ' }, root));
+  $('#xml', root) && ($('#xml', root).onclick = () => importarBeneficiariosNFe(() => render(root)));
   $('#exp', root).onclick = () => exportXLSX($('#corpo table', root), `beneficiarios_${aba.k}`);
   if (aba.fundos) return listaFundos($('#corpo', root), root);
   lista($('#corpo', root), aba, root);
