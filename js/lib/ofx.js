@@ -12,7 +12,13 @@ export function decodificarOFX(buf) {
   return u.includes('�') ? new TextDecoder('windows-1252').decode(bytes) : u;
 }
 
-const dataOFX = (s) => { const m = String(s || '').match(/^(\d{4})(\d{2})(\d{2})/); return m ? `${m[1]}-${m[2]}-${m[3]}` : null; };
+// datas inválidas (ex.: Bradesco manda DTASOF 00000000) viram null
+const dataOFX = (s) => {
+  const m = String(s || '').match(/^(\d{4})(\d{2})(\d{2})/); if (!m) return null;
+  const [a, mm, d] = [+m[1], +m[2], +m[3]];
+  if (a < 1990 || a > 2100 || mm < 1 || mm > 12 || d < 1 || d > new Date(Date.UTC(a, mm, 0)).getUTCDate()) return null;
+  return `${m[1]}-${m[2]}-${m[3]}`;
+};
 const numOFX = (s) => {
   let t = String(s || '').trim().replace(/\s/g, '');
   if (!t) return NaN;
@@ -47,13 +53,17 @@ export function lerOFX(texto) {
       if (!fitid) { const base = `gen:${data}|${valor}|${descricao}`; vistos[base] = (vistos[base] || 0) + 1; fitid = `${base}|${vistos[base]}`; }
       return { fitid, data, valor, tipo: tag(b, 'TRNTYPE') || null, descricao: descricao || null, documento: tag(b, 'CHECKNUM') || tag(b, 'REFNUM') || null };
     }).filter(i => i.data && isFinite(i.valor) && i.valor !== 0);
-    // FITID repetido no mesmo arquivo (alguns bancos reaproveitam): torna único
+    // O FITID de alguns bancos (ex.: Bradesco) é só uma sequência do arquivo e pode se repetir em outro extrato:
+    // a chave de duplicidade junta FITID + data + valor. Repetido no mesmo arquivo: torna único.
+    for (const i of itens) if (!i.fitid.startsWith('gen:')) i.fitid = `${i.fitid}|${i.data}|${i.valor.toFixed(2)}`;
     const cont = {}; for (const i of itens) { cont[i.fitid] = (cont[i.fitid] || 0) + 1; if (cont[i.fitid] > 1) i.fitid += `#${cont[i.fitid]}`; }
     const datas = itens.map(i => i.data).sort();
+    // período: pelos movimentos (o cabeçalho às vezes traz a data da exportação, não o período)
+    const ini = datas[0] || dataOFX(tag(lista, 'DTSTART')), fim = datas[datas.length - 1] || dataOFX(tag(lista, 'DTEND'));
     return {
       cartao, banco: tag(conta, 'BANKID') || null, agencia: tag(conta, 'BRANCHID') || null, conta: tag(conta, 'ACCTID') || null, tipoConta: tag(conta, 'ACCTTYPE') || null,
-      inicio: dataOFX(tag(lista, 'DTSTART')) || datas[0] || null, fim: dataOFX(tag(lista, 'DTEND')) || datas[datas.length - 1] || null,
-      saldo: bal ? numOFX(tag(bal, 'BALAMT')) : null, saldoData: bal ? dataOFX(tag(bal, 'DTASOF')) : null, itens,
+      inicio: ini || null, fim: fim || null,
+      saldo: bal && isFinite(numOFX(tag(bal, 'BALAMT'))) ? numOFX(tag(bal, 'BALAMT')) : null, saldoData: (bal && dataOFX(tag(bal, 'DTASOF'))) || fim || null, itens,
     };
   });
 }

@@ -254,10 +254,16 @@ async function criar(item, root) {
 // ---------------------------------------------------------------------------------------------
 // Importação do OFX
 // ---------------------------------------------------------------------------------------------
+const BANCOS = { 1: 'BRASIL', 4: 'NORDESTE', 33: 'SANTANDER', 104: 'CAIXA ECON', 136: 'UNICRED', 237: 'BRADESCO', 260: 'NU', 341: 'ITAU', 748: 'SICREDI', 756: 'SICOOB' };
 function contaDoOFX(st) {
-  const a = dig(st.conta); if (!a) return null;
-  const cs = state.cad.contas.filter(c => c.ativo !== false);
-  return cs.find(c => dig(c.ofx_conta) === a) || cs.find(c => { const n = dig(c.numero); return n && (n === a || n.replace(/^0+/, '') === a.replace(/^0+/, '') || (n.length >= 4 && (a.endsWith(n) || n.endsWith(a)))); }) || null;
+  const a = dig(st.conta).replace(/^0+/, ''); const cs = state.cad.contas.filter(c => c.ativo !== false);
+  const porOfx = a && cs.find(c => dig(c.ofx_conta).replace(/^0+/, '') === a); if (porOfx) return porOfx;
+  const banco = BANCOS[+dig(st.banco)]; const doBanco = (c) => banco && normTxt(`${c.nome} ${c.instituicao || ''}`).toUpperCase().includes(banco);
+  // número da conta com ou sem o dígito verificador (Bradesco manda ACCTID 39 para a conta 39-6)
+  const num = a ? cs.filter(c => { const n = dig(c.numero).replace(/^0+/, ''); return n && (n === a || n.slice(0, -1) === a || (n.length >= 4 && (a.endsWith(n) || n.endsWith(a)))); }) : [];
+  if (num.length) return num.find(doBanco) || num[0];
+  const pb = cs.filter(c => doBanco(c) && /corrente/i.test(c.tipo || ''));
+  return pb.length === 1 ? pb[0] : null;
 }
 
 function importar(root) {
@@ -284,9 +290,10 @@ function importar(root) {
     ok();
   };
   $('#ok', m.el).onclick = async () => {
-    const btn = $('#ok', m.el); btn.disabled = true; const e = state.empresa.id; let novos = 0, total = 0;
+    const btn = $('#ok', m.el); btn.disabled = true; const e = state.empresa.id; let novos = 0, total = 0, atual = '';
     try {
       for (const s of lidos) {
+        atual = s.arquivo;
         const imp = await q(sb.from('extrato_importacoes').insert({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: s.banco, agencia: s.agencia, conta_ofx: s.conta,
           dt_inicio: s.inicio, dt_fim: s.fim, saldo_final: s.saldo, saldo_data: s.saldoData || s.fim, qtd: s.itens.length }).select().single());
         let n = 0;
@@ -301,9 +308,12 @@ function importar(root) {
         if ($('#lembrar', m.el)?.checked && s.conta && dig(ct?.ofx_conta) !== dig(s.conta)) { await q(sb.from('contas').update({ ofx_banco: s.banco, ofx_conta: s.conta }).eq('id', s.contaId)); Object.assign(ct, { ofx_banco: s.banco, ofx_conta: s.conta }); }
       }
       toast(`${novos} movimento(s) novo(s) de ${total} lido(s)${total - novos ? ` · ${total - novos} já existiam` : ''}`);
-      const ult = lidos[lidos.length - 1]; ui.conta = ult.contaId; if (ult.fim) ui.mes = ult.fim.slice(0, 7);
+      const ult = lidos[lidos.length - 1]; ui.conta = ult.contaId;
+      // abre no mês com mais movimentos (o Bradesco acrescenta os lançamentos dos últimos dias ao extrato do período)
+      const pm = {}; for (const i of ult.itens) pm[i.data.slice(0, 7)] = (pm[i.data.slice(0, 7)] || 0) + 1;
+      const mm = Object.entries(pm).sort((a, b) => b[1] - a[1])[0]?.[0]; if (mm) ui.mes = mm;
       ui.sel = null; ui.filtro = 'pendente'; m.close(); render(root);
-    } catch (err) { fail(err); btn.disabled = false; }
+    } catch (err) { fail(new Error(`Falha ao importar ${atual}: ${err.message || err}`)); btn.disabled = false; }
   };
 }
 
