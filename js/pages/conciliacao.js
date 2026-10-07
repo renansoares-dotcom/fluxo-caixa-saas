@@ -10,7 +10,7 @@ export const title = 'Conciliação bancária';
 
 const hoje = new Date();
 const mesAnt = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-const ui = { conta: '', mes: `${mesAnt.getFullYear()}-${String(mesAnt.getMonth() + 1).padStart(2, '0')}`, filtro: 'pendente', sels: new Set(), marcados: new Set(), abertos: false, busca: '', lf: { sinal: 'mesmo', classe: '', de: '', ate: '', vmin: '', vmax: '', ordem: 'prox' } };
+const ui = { conta: '', mes: `${mesAnt.getFullYear()}-${String(mesAnt.getMonth() + 1).padStart(2, '0')}`, filtro: 'pendente', sels: new Set(), manual: false, marcados: new Set(), abertos: false, busca: '', lf: { sinal: 'mesmo', classe: '', de: '', ate: '', vmin: '', vmax: '', ordem: 'prox' } };
 let D = null; // dados carregados
 
 const dig = (s) => String(s || '').replace(/\D/g, '');
@@ -40,7 +40,7 @@ export async function render(root) {
       <div class="card flush" id="ext"></div>
       <div class="card flush" id="sis"></div>
     </div>`;
-  $('#flt', root).addEventListener('change', (e) => { ui[e.target.name] = e.target.value; ui.sels.clear(); ui.marcados.clear(); carregar(root); });
+  $('#flt', root).addEventListener('change', (e) => { ui[e.target.name] = e.target.value; ui.sels.clear(); ui.marcados.clear(); ui.manual = false; carregar(root); });
   $('#imp', root) && ($('#imp', root).onclick = () => importar(root));
   $('#hist', root).onclick = () => historico(root);
   $('#aceitar', root) && ($('#aceitar', root).onclick = () => aceitarTodas(root));
@@ -142,7 +142,8 @@ function pintarExtrato(root) {
   $('#fx', c).onclick = (e) => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { ui.filtro = f; pintarExtrato(root); } };
   const mudou = () => {
     const sel = [...ui.sels]; const um = sel.length === 1 ? sel[0] : null;
-    ui.marcados = new Set(um ? D.sug[um]?.ids || [] : []); ui.busca = '';
+    if (!ui.manual || !ui.marcados.size) { ui.manual = false; ui.marcados = new Set(um ? D.sug[um]?.ids || [] : []); }
+    ui.busca = '';
     if (sel.length) { ui.lf.sinal = 'mesmo'; ui.lf.ordem = 'prox'; }
     if (um && D.sug[um]?.tipo === 'baixa') ui.abertos = true;
     pintarExtrato(root); pintarSistema(root);
@@ -237,6 +238,18 @@ function ligarFiltros(c, root, item) {
 }
 const resumo = (lista) => `<p class="small muted" style="margin:0 12px 6px">${lista.length} lançamento(s) · ${money(lista.reduce((s, l) => s + sinal(l), 0))}${lista.length > 300 ? ' · mostrando os 300 primeiros' : ''}</p>`;
 
+// marcar/desmarcar lançamentos (linha a linha ou todos os visíveis)
+const thTodos = (lista) => { const vis = lista.slice(0, 300); const todos = vis.length && vis.every(l => ui.marcados.has(l.id)); return `<th style="width:28px"><input type="checkbox" id="l-todos" title="Selecionar todos os lançamentos visíveis" ${todos ? 'checked' : ''}></th>`; };
+function ligarMarcacao(c, lista, depois) {
+  c.querySelector('tbody')?.addEventListener('change', (e) => { const tr = e.target.closest('tr[data-l]'); if (!tr) return; e.target.checked ? ui.marcados.add(tr.dataset.l) : ui.marcados.delete(tr.dataset.l); ui.manual = true; depois(); });
+  const t = $('#l-todos', c); if (!t) return;
+  t.onchange = () => {
+    for (const l of lista.slice(0, 300)) t.checked ? ui.marcados.add(l.id) : ui.marcados.delete(l.id);
+    c.querySelectorAll('tr[data-l] input[type=checkbox]').forEach(cb => { cb.checked = ui.marcados.has(cb.closest('tr').dataset.l); });
+    ui.manual = true; depois();
+  };
+}
+
 function pintarSistema(root) {
   const c = $('#sis', root);
   const sels = [...ui.sels].map(id => D.itens.find(i => i.id === id)).filter(Boolean);
@@ -248,7 +261,15 @@ function pintarSistema(root) {
     const sem = filtrarOrdenar(D.lancs.filter(l => l.data >= D.ini && l.data <= D.fim && !D.lancLig.has(l.id)), null);
     c.innerHTML = `<div class="card-head"><div><h2>Lançamentos sem extrato</h2><p class="muted small">Pagos nesta conta no mês e ainda não conciliados. Clique num movimento do extrato para conciliar.</p></div></div>
       ${filtrosHTML(null)}${resumo(sem)}
-      <div class="table-wrap" style="max-height:56vh">${sem.length ? `<table><thead><tr>${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}</tr></thead><tbody>${sem.slice(0, 300).map(l => linhaLanc(l, { marcar: false })).join('')}</tbody></table>` : '<div class="empty">Nenhum.</div>'}</div>`;
+      <div class="table-wrap" style="max-height:52vh">${sem.length ? `<table><thead><tr>${thTodos(sem)}${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}</tr></thead><tbody>${sem.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum.</div>'}</div>
+      <div class="conc-foot" id="cf"></div>`;
+    const rod = () => {
+      const sel = [...ui.marcados].map(id => D.lancById[id]).filter(Boolean);
+      $('#cf', c).innerHTML = sel.length ? `<div class="small">Selecionado <strong>${money(sel.reduce((a, l) => a + sinal(l), 0))}</strong> (${sel.length}) · agora marque à esquerda os movimentos do extrato correspondentes</div><button class="btn small" id="lc">Limpar seleção</button>` : '<div class="small muted">Marque lançamentos aqui e os movimentos do extrato à esquerda para conciliar em qualquer ordem.</div>';
+      $('#lc', c) && ($('#lc', c).onclick = () => { ui.marcados.clear(); ui.manual = false; pintarSistema(root); });
+    };
+    rod();
+    ligarMarcacao(c, sem, rod);
     ligarFiltros(c, root, null);
     return;
   }
@@ -272,7 +293,7 @@ function pintarSistema(root) {
   c.innerHTML = `${cab}
     ${s ? `<p class="small" style="margin:0 12px 8px"><span class="badge aberto">${ROT_SUG[s.tipo]}</span> ${s.tipo === 'baixa' ? 'Título em aberto com o mesmo valor: ao conciliar, ele é baixado como pago na data do extrato e nesta conta.' : s.tipo === 'grupo' ? 'Lançamentos do mesmo dia que somam o valor do extrato.' : 'Mesmo valor e data próxima.'}</p>` : ''}
     ${filtrosHTML(item)}${resumo(lista)}
-    <div class="table-wrap" style="max-height:44vh">${lista.length ? `<table><thead><tr><th></th>${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}</tr></thead><tbody>${lista.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum lançamento com esses filtros.</div>'}</div>
+    <div class="table-wrap" style="max-height:44vh">${lista.length ? `<table><thead><tr>${thTodos(lista)}${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}</tr></thead><tbody>${lista.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum lançamento com esses filtros.</div>'}</div>
     <div class="conc-foot" id="cf"></div>`;
   const rodape = () => {
     const sel = [...ui.marcados].map(id => D.lancById[id]).filter(Boolean); const tot = sel.reduce((s, l) => s + sinal(l), 0); const dif = Math.round((item.valor - tot) * 100) / 100;
@@ -288,7 +309,7 @@ function pintarSistema(root) {
     $('#cria', c) && ($('#cria', c).onclick = () => criar(item, root));
   };
   rodape();
-  c.querySelector('tbody')?.addEventListener('change', (e) => { const tr = e.target.closest('tr[data-l]'); if (!tr) return; e.target.checked ? ui.marcados.add(tr.dataset.l) : ui.marcados.delete(tr.dataset.l); rodape(); });
+  ligarMarcacao(c, lista, rodape);
   ligarFiltros(c, root, item);
 }
 
@@ -305,7 +326,7 @@ async function conciliar(grupos, root) {
     const itens = grupos.map(g => g.item.id);
     for (let i = 0; i < itens.length; i += 200) await q(sb.from('extrato_itens').update({ status: 'conciliado', conciliado_em: agora, conciliado_por: uid }).in('id', itens.slice(i, i + 200)));
     toast(`${grupos.length} movimento(s) conciliado(s)`);
-    ui.sels.clear(); ui.marcados.clear(); await carregar(root);
+    ui.sels.clear(); ui.marcados.clear(); ui.manual = false; await carregar(root);
   } catch (e) { fail(String(e.message || e).includes('duplicate') ? new Error('Algum lançamento já estava conciliado com outro movimento. Atualize a página.') : e); }
 }
 
@@ -320,7 +341,7 @@ async function conciliarGrupo(itens, ids, root) {
     await q(sb.from('conciliacoes').insert(ids.map(id => ({ empresa_id: state.empresa.id, conta_id: ui.conta, extrato_id: ord[0].id, lancamento_id: id, grupo_id: g }))));
     await q(sb.from('extrato_itens').update({ status: 'conciliado', conciliado_em: agora, conciliado_por: uid, grupo_id: g }).in('id', itens.map(i => i.id)));
     toast(`${itens.length} movimento(s) conciliado(s) com ${ids.length} lançamento(s)`);
-    ui.sels.clear(); ui.marcados.clear(); await carregar(root);
+    ui.sels.clear(); ui.marcados.clear(); ui.manual = false; await carregar(root);
   } catch (e) { fail(String(e.message || e).includes('duplicate') ? new Error('Algum lançamento já estava conciliado com outro movimento. Atualize a página.') : e); }
 }
 
