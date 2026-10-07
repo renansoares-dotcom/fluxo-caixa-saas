@@ -110,7 +110,11 @@ async function entrarEmpresa(emp, papel) {
 }
 
 $('#ano-global').onchange = (e) => { state.ano = +e.target.value; render(); };
-$('#menu-btn').onclick = () => $('#sidebar').classList.toggle('open');
+// menu lateral no celular: abre por cima do conteúdo, fecha no fundo escuro, no Esc ou ao navegar
+const menu = (abrir) => { $('#sidebar').classList.toggle('open', abrir); $('#sidebar-backdrop').hidden = !abrir; document.body.classList.toggle('menu-aberto', abrir); };
+$('#menu-btn').onclick = () => menu(!$('#sidebar').classList.contains('open'));
+$('#sidebar-backdrop').onclick = () => menu(false);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#sidebar').classList.contains('open')) menu(false); });
 
 // ---------- Roteamento ----------
 let renderSeq = 0;
@@ -120,7 +124,7 @@ async function render() {
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'dashboard';
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
-  $('#sidebar').classList.remove('open');
+  $('#sidebar').classList.remove('open'); $('#sidebar-backdrop').hidden = true; document.body.classList.remove('menu-aberto');
   const old = $('#page'); const page = old.cloneNode(false); old.replaceWith(page); loading(page);
   const seq = ++renderSeq;
   try {
