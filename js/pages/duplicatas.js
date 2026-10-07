@@ -8,7 +8,7 @@ import { valorExtenso, dataExtenso } from '../lib/extenso.js';
 export const title = 'Duplicatas para endosso';
 
 const ui = { modalidade: '', referencia: '', sel: new Set(), benefId: '', dataEndosso: '', praca: '', busca: '', venDe: '', venAte: '', soSel: false, origem: '', vista: 0 };
-let titulos = [], benefs = [], emitidas = {}, propostas = [], itensProp = {}, fundos = [];
+let historico = [], titulos = [], benefs = [], emitidas = {}, propostas = [], itensProp = {}, fundos = [];
 
 const hojeISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
 const soDig = (s) => String(s || '').replace(/\D/g, '');
@@ -59,7 +59,7 @@ async function carregar() {
   [abertos, benefs, dups, propostas, itens, fundos] = await Promise.all([
     receitas.length ? fetchAll(() => sb.from('lancamentos').select(cols).eq('empresa_id', e).eq('status', 'Em aberto').in('plano_id', receitas).order('data')) : [],
     q(sb.from('beneficiarios_endosso').select('*').eq('empresa_id', e).order('nome')),
-    fetchAll(() => sb.from('duplicatas').select('lancamento_id,beneficiario_id,emitida_em,lote,modalidade').eq('empresa_id', e).order('emitida_em')),
+    fetchAll(() => sb.from('duplicatas').select('id,lancamento_id,beneficiario_id,emitida_em,lote,modalidade,referencia,numero,valor,vencimento,status,cancelada_em,motivo_cancelamento,dados').eq('empresa_id', e).order('emitida_em')),
     q(sb.from('fidc_propostas').select('id,numero,status,fundo_id,data_operacao').eq('empresa_id', e).in('status', ['Rascunho', 'Pendente', 'Aprovada']).order('numero', { ascending: false })),
     q(sb.from('fidc_proposta_itens').select('lancamento_id,proposta_id').eq('empresa_id', e)),
     q(sb.from('fidc_fundos').select('id,nome').eq('empresa_id', e)),
@@ -73,7 +73,8 @@ async function carregar() {
   for (let i = 0; i < faltam.length; i += 200) extras = extras.concat(await q(sb.from('lancamentos').select(cols).in('id', faltam.slice(i, i + 200))));
   titulos = [...abertos, ...extras].sort((a, b) => a.data.localeCompare(b.data));
   emitidas = {};
-  for (const d of dups || []) if (d.lancamento_id) (emitidas[d.lancamento_id] ||= []).push(d);
+  historico = dups || [];
+  for (const d of historico) if (d.lancamento_id && d.status !== 'cancelada') (emitidas[d.lancamento_id] ||= []).push(d);
   for (const id of [...ui.sel]) if (!titulos.some(t => t.id === id)) ui.sel.delete(id);
   if (ui.benefId && !benefs.some(b => b.id === ui.benefId)) ui.benefId = '';
 }
@@ -93,6 +94,7 @@ function desenhar(root) {
       <label>até<input type="date" name="venAte" value="${ui.venAte}"></label>
       <label>Proposta de borderô<select name="origem"><option value="">Todos os títulos</option>${propostas.map(p => `<option value="${p.id}" ${ui.origem === p.id ? 'selected' : ''}>nº ${p.numero} · ${esc(nomeFundo(p.fundo_id))} · ${p.status.toLowerCase()}</option>`).join('')}</select></label>
       <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="soSel" ${ui.soSel ? 'checked' : ''}> Só os marcados</label>
+      <span class="spacer"></span><button class="btn" id="hist" type="button">Endossos emitidos${historico.filter(d => d.status !== 'cancelada').length ? ` (${new Set(historico.filter(d => d.status !== 'cancelada').map(d => d.lote)).size} lote(s))` : ''}</button>
     </div></div>
     <div class="grid2 prop-grid">
       <div class="card flush"><div class="card-head"><div><h2>Títulos</h2><p class="muted small">Duplicatas a receber em aberto e títulos de propostas de borderô. Marque os que vão ser endossados.</p></div>
@@ -106,6 +108,7 @@ function desenhar(root) {
           </tbody></table>` : `<div class="empty">${titulos.length ? 'Nenhum título no filtro.' : 'Nenhum título em aberto.'}</div>`}</div></div>
       <div id="painel"></div>
     </div>`;
+  $('#hist', c).onclick = () => endossos(root);
   const fl = $('#flt', c);
   fl.addEventListener('change', (e) => {
     ui[e.target.name] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -249,6 +252,70 @@ function painel(el, root) {
     if (e.target.closest('#add-forn')) return addFornecedor(root);
     const x = e.target.closest('[data-b]'); if (!x) return; ui.benefId = x.dataset.b; ui.praca = ''; ui.modalidade = ''; painel(el, root);
   };
+}
+
+// ======================================================================
+// Endossos emitidos: histórico por lote e cancelamento (recusa do beneficiário ou desistência)
+// ======================================================================
+function endossos(root) {
+  const lotes = {};
+  for (const d of historico) (lotes[d.lote || d.emitida_em.slice(0, 16)] ||= []).push(d);
+  const ks = Object.keys(lotes).sort((a, b) => lotes[b][0].emitida_em.localeCompare(lotes[a][0].emitida_em));
+  const ed = podeEditar();
+  const m = modal({
+    title: 'Endossos emitidos', wide: true,
+    body: ks.length ? `<p class="small muted" style="margin-top:0">Cancelar um endosso libera os títulos para um novo endosso e fica registrado com o motivo. Se o PDF já foi assinado e entregue, gere o termo de cancelamento para o beneficiário assinar e devolver as duplicatas.</p>
+      <div class="table-wrap" style="max-height:480px"><table><thead><tr><th>Emitido em</th><th>Beneficiário</th><th>Modalidade</th><th class="num">Duplicatas</th><th class="num">Total</th><th>Situação</th><th></th></tr></thead><tbody>
+      ${ks.map(k => { const ds = lotes[k]; const at = ds.filter(d => d.status !== 'cancelada'); const b = benefs.find(x => x.id === ds[0].beneficiario_id);
+        return `<tr data-lote="${esc(k)}"><td>${dateBR(ds[0].emitida_em.slice(0, 10))}</td><td>${esc(b?.nome || ds[0].dados?.beneficiario?.curto || '—')}</td><td>${ds[0].modalidade === 'garantia' ? 'em garantia' : 'translativo'}${ds[0].referencia ? `<div class="small muted">${esc(ds[0].referencia)}</div>` : ''}</td>
+          <td class="num">${ds.length}</td><td class="num">${money(ds.reduce((s, d) => s + +d.valor, 0))}</td>
+          <td>${at.length === ds.length ? '<span class="badge pago">ativo</span>' : at.length ? `<span class="badge aberto">${ds.length - at.length} cancelada(s)</span>` : `<span class="badge vencido">cancelado</span><div class="small muted">${esc(ds[0].motivo_cancelamento || '')}</div>`}</td>
+          <td style="white-space:nowrap">${ed && at.length ? '<button class="btn small" data-a="ver">Duplicatas</button> <button class="btn small danger" data-a="cancelar">Cancelar lote</button>' : '<button class="btn small" data-a="ver">Duplicatas</button>'} ${ds.length > at.length ? '<button class="btn small" data-a="termo">Termo de cancelamento</button>' : ''}</td></tr>
+          <tr class="sub" data-det="${esc(k)}" hidden><td colspan="7"><table><tbody>${ds.map(d => `<tr><td>${esc(d.numero)}</td><td>venc. ${dateBR(d.vencimento)}</td><td class="num">${money(d.valor)}</td>
+            <td>${d.status === 'cancelada' ? `<span class="badge vencido">cancelada em ${dateBR((d.cancelada_em || '').slice(0, 10))}</span>` : '<span class="badge pago">ativa</span>'}</td>
+            <td>${ed && d.status !== 'cancelada' ? `<button class="btn small danger" data-cancelar="${d.id}">Cancelar</button>` : ''}</td></tr>`).join('')}</tbody></table></td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div class="empty">Nenhum endosso emitido ainda.</div>',
+    foot: '<button class="btn" data-close>Fechar</button>',
+  });
+  const cancelar = async (ids, rotulo) => {
+    const mot = prompt(`Cancelar ${rotulo}?\nOs títulos ficam livres para novo endosso; o registro continua no histórico.\n\nMotivo (ex.: recusado pelo beneficiário, desistência da IPLAMM):`, '');
+    if (mot === null) return; if (!mot.trim()) return toast('Informe o motivo', true);
+    try {
+      await q(sb.from('duplicatas').update({ status: 'cancelada', cancelada_em: new Date().toISOString(), motivo_cancelamento: mot.trim() }).in('id', ids));
+      toast(`${ids.length} endosso(s) cancelado(s)`); m.close(); await carregar(); desenhar(root); endossos(root);
+    } catch (e) { fail(e); }
+  };
+  m.el.querySelector('tbody')?.addEventListener('click', (e) => {
+    const bc = e.target.closest('[data-cancelar]'); if (bc) return cancelar([bc.dataset.cancelar], 'este endosso');
+    const bt = e.target.closest('[data-a]'); if (!bt) return;
+    const k = bt.closest('tr[data-lote]').dataset.lote; const ds = lotes[k];
+    if (bt.dataset.a === 'ver') { const det = m.el.querySelector(`tr[data-det="${CSS.escape(k)}"]`); det.hidden = !det.hidden; }
+    if (bt.dataset.a === 'cancelar') cancelar(ds.filter(d => d.status !== 'cancelada').map(d => d.id), `o lote inteiro (${ds.filter(d => d.status !== 'cancelada').length} duplicata(s))`);
+    if (bt.dataset.a === 'termo') termoCancelamento(ds.filter(d => d.status === 'cancelada'), benefs.find(x => x.id === ds[0].beneficiario_id));
+  });
+}
+
+// Termo de cancelamento de endosso / devolução das duplicatas, para o beneficiário assinar
+function termoCancelamento(ds, b0) {
+  if (!ds.length) return;
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const e = state.empresa; const b = dadosBenef(b0) || ds[0].dados?.beneficiario || {};
+  const nomeB = b.razao_social || b.nome || '', cnpjB = fmtDoc(b.cnpj || '');
+  const W = doc.internal.pageSize.getWidth(); let y = 22;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text('TERMO DE CANCELAMENTO DE ENDOSSO E DEVOLUÇÃO DE DUPLICATAS', W / 2, y, { align: 'center' }); y += 12;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  const par = (t) => { const l = doc.splitTextToSize(pdfTxt(t), W - 36); doc.text(l, 18, y); y += l.length * 5 + 3; };
+  par(`${nomeB}${cnpjB ? `, CNPJ/MF nº ${cnpjB}` : ''} (endossatário), e ${e.razao_social || e.nome}, CNPJ/MF nº ${fmtDoc(e.cnpj)} (endossante), declaram cancelado, para todos os fins, o endosso${ds[0].modalidade === 'garantia' ? ' em garantia' : ''} das duplicatas abaixo, que retornam ao endossante livres de qualquer ônus, comprometendo-se o endossatário a não cobrá-las, negociá-las ou protestá-las.`);
+  if (ds[0].motivo_cancelamento) par(`Motivo: ${ds[0].motivo_cancelamento}.`);
+  doc.autoTable({ startY: y, theme: 'grid', head: [['Duplicata', 'Sacado', 'Vencimento', 'Valor (R$)']], headStyles: { fillColor: [43, 85, 152] }, footStyles: { fillColor: [232, 238, 248], textColor: 20 }, styles: { fontSize: 9 },
+    body: ds.map(d => [d.numero, pdfTxt(d.dados?.sacado?.nome || ''), dateBR(d.vencimento), money(d.valor)]), foot: [['', '', 'Total', money(ds.reduce((s, d) => s + +d.valor, 0))]], margin: { left: 18, right: 18 } });
+  y = doc.lastAutoTable.finalY + 10;
+  par(`${[e.municipio, e.uf].filter(Boolean).join('/')}, ${dataExtenso(hojeISO())}.`);
+  y += 16;
+  const ass = (x, nome, sub) => { doc.line(x, y, x + 78, y); doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text(pdfTxt(nome).slice(0, 45), x + 39, y + 4.5, { align: 'center' }); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(sub, x + 39, y + 8.5, { align: 'center' }); };
+  ass(18, nomeB, 'ENDOSSATÁRIO'); ass(W - 96, e.razao_social || e.nome, 'ENDOSSANTE');
+  doc.setFontSize(7); doc.setTextColor(120); doc.text('Assinatura digital com certificado ICP-Brasil (MP 2.200-2/2001)', W / 2, y + 16, { align: 'center' });
+  doc.save(`termo_cancelamento_endosso_${(b0?.nome || 'beneficiario').replace(/\W+/g, '_')}_${hojeISO()}.pdf`);
 }
 
 // ======================================================================
