@@ -14,6 +14,10 @@ export async function render(root) {
           <label>CNPJ<input name="cnpj" value="${esc(e.cnpj || '')}" ${adm ? '' : 'disabled'}></label>
           <label>Ano de início do controle<input name="ano_inicio" type="number" value="${e.ano_inicio}" ${adm ? '' : 'disabled'}></label>
           <label class="span2">Elaborado por (nome no PDF de autorização)<input name="elaborado_por" value="${esc(e.elaborado_por || '')}" ${adm ? '' : 'disabled'}></label>
+          <div class="span2 small muted" style="margin-top:6px"><strong>Emitente das duplicatas</strong></div>
+          ${[['razao_social', 'Razão social', 1], ['ie', 'Inscrição estadual'], ['cep', 'CEP'], ['logradouro', 'Endereço', 1], ['municipio', 'Município'], ['uf', 'UF'],
+            ['responsavel_nome', 'Responsável legal'], ['responsavel_cpf', 'CPF do responsável'], ['avalista_nome', 'Avalista'], ['avalista_cpf', 'CPF do avalista']]
+            .map(([k, t, sp]) => `<label class="${sp ? 'span2' : ''}">${t}<input name="${k}" value="${esc(e[k] || '')}" ${adm ? '' : 'disabled'}></label>`).join('')}
         </form>
         ${adm ? '<div style="margin-top:12px"><button class="btn primary" id="esave">Salvar</button></div>' : ''}
       </div>
@@ -40,7 +44,7 @@ export async function render(root) {
   if (adm) $('#esave', root).onclick = async () => {
     const d = formData($('#ef', root));
     try {
-      const row = await q(sb.from('empresas').update({ nome: d.nome, cnpj: d.cnpj, ano_inicio: +d.ano_inicio, elaborado_por: d.elaborado_por }).eq('id', e.id).select().single());
+      const row = await q(sb.from('empresas').update({ nome: d.nome, cnpj: d.cnpj, ano_inicio: +d.ano_inicio, elaborado_por: d.elaborado_por, ...Object.fromEntries(['razao_social', 'ie', 'cep', 'logradouro', 'municipio', 'uf', 'responsavel_nome', 'responsavel_cpf', 'avalista_nome', 'avalista_cpf'].map(k => [k, (d[k] || '').trim() || null])) }).eq('id', e.id).select().single());
       Object.assign(state.empresa, row); document.querySelector('#empresa-switch').textContent = row.nome + ' ▾'; toast('Dados salvos');
     } catch (err) { fail(err); }
   };

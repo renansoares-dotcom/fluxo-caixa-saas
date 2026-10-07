@@ -14,6 +14,7 @@ const routes = {
   'orcado-realizado': () => import('./pages/orcado-realizado.js'),
   'fidc': () => import('./pages/fidc.js'),
   'fidc-propostas': () => import('./pages/fidc-propostas.js'),
+  'duplicatas': () => import('./pages/duplicatas.js'),
   'cadastros/plano': () => import('./pages/cad-plano.js'),
   'cadastros/contas': () => import('./pages/cad-contas.js'),
   'cadastros/favorecidos': () => import('./pages/cad-favorecidos.js'),

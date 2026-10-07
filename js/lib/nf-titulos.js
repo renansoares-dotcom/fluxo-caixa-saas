@@ -23,15 +23,23 @@ export async function gravarTitulos(regs, { contaId = null, ccId = null } = {}) 
   for (const x of regs) {
     x.cnpj = soDig(x.cnpj);
     const f = acha(x);
-    if (f) { if (x.cnpj && !soDig(f.documento) && f.id) completar.set(f.id, x.cnpj); continue; }
-    const n = { empresa_id: e, tipo: 'CLIENTES', sigla: 'CLI', nome: x.cliente.toUpperCase(), documento: x.cnpj || null, ativo: true };
+    if (f) {
+      if (!f.id) continue;
+      // completa CNPJ e endereço (vindos do XML) que o cadastro ainda não tem
+      const patch = { ...(completar.get(f.id) || {}) };
+      if (x.cnpj && !soDig(f.documento)) patch.documento = x.cnpj;
+      if (x.endereco && !f.logradouro) Object.assign(patch, x.endereco);
+      if (Object.keys(patch).length) completar.set(f.id, patch);
+      continue;
+    }
+    const n = { empresa_id: e, tipo: 'CLIENTES', sigla: 'CLI', nome: x.cliente.toUpperCase(), documento: x.cnpj || null, ativo: true, ...(x.endereco || {}) };
     novos.push(n); porNome[normTxt(n.nome)] = n; if (x.cnpj) porDoc[x.cnpj] = n;
   }
   if (novos.length) {
     const ins = await q(sb.from('favorecidos').insert(novos).select());
     for (const f of ins) { porNome[normTxt(f.nome)] = f; if (f.documento) porDoc[soDig(f.documento)] = f; }
   }
-  for (const [id, doc] of completar) await q(sb.from('favorecidos').update({ documento: doc }).eq('id', id));
+  for (const [id, patch] of completar) await q(sb.from('favorecidos').update(patch).eq('id', id));
   const docs = [...new Set(regs.map(x => x.documento))];
   const exist = new Set();
   for (let i = 0; i < docs.length; i += 300) {
@@ -160,6 +168,9 @@ export function lerNFe(xml) {
     tipo: 'nfe', chave: (inf.getAttribute('Id') || '').replace(/^NFe/, '') || tx(prot, 'chNFe'), numero, serie: tx(ide, 'serie'), emissao,
     tpNF: tx(ide, 'tpNF'), natOp: tx(ide, 'natOp'), cfops, emitCnpj: tx(emit, 'CNPJ'), emitNome: tx(emit, 'xNome'),
     cliente: tx(dest, 'xNome'), cnpj: tx(dest, 'CNPJ') || tx(dest, 'CPF'), valor: num(tx(tot, 'vNF')), dups,
+    endereco: (() => { const e = un(dest, 'enderDest'); if (!e) return null;
+      return { logradouro: tx(e, 'xLgr') || null, numero: tx(e, 'nro') || null, complemento: tx(e, 'xCpl') || null, bairro: tx(e, 'xBairro') || null,
+        municipio: tx(e, 'xMun') || null, uf: tx(e, 'UF') || null, cep: tx(e, 'CEP') || null, ie: tx(dest, 'IE') || null }; })(),
     autorizada: !prot || ['100', '150'].includes(tx(prot, 'cStat')), cStat: tx(prot, 'cStat'),
   };
 }
@@ -200,7 +211,7 @@ export function importarNFs(onDone = () => {}) {
   let lidas = [], lista = [], marcadas = new Set(), naoLidos = 0;
   const m = modal({
     title: 'Importar XML das notas fiscais', wide: true,
-    body: `<p class="small muted" style="margin-top:0">Selecione os XML das NF-e de venda (vários de uma vez) ou um .zip com eles. Cada duplicata da NF vira um título em aberto (receita 1.01.01) com data = vencimento e documento NF-parcela.
+    body: `<p class="small muted" style="margin-top:0">Selecione os XML das NF-e de venda (vários de uma vez) ou um .zip com eles. Cada duplicata da NF vira um título em aberto (receita 1.01.01) com data = vencimento e documento NF-parcela. O endereço do cliente (para as duplicatas de endosso) é gravado no cadastro.
       São ignoradas: NF de entrada, emitida por outro CNPJ, não autorizada, cancelada (se o XML do cancelamento vier junto) e parcelas já lançadas.</p>
       <div class="toolbar"><input type="file" id="arq-nf" accept=".xml,.zip" multiple>
         <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="avista"> Lançar NF sem duplicatas como 1 título com vencimento na emissão</label></div>
@@ -249,7 +260,7 @@ export function importarNFs(onDone = () => {}) {
   $('#imp-ok', m.el).onclick = async () => {
     const regs = [];
     for (const n of lista.filter(n => marcadas.has(n.chave)))
-      for (const p of n.parcelas) regs.push({ documento: `${n.numero}-${p.parcela}`, emissao: n.emissao, vencimento: p.vencimento, cliente: n.cliente, cnpj: n.cnpj, valor: p.valor, origem: `nfe:${n.chave}` });
+      for (const p of n.parcelas) regs.push({ documento: `${n.numero}-${p.parcela}`, emissao: n.emissao, vencimento: p.vencimento, cliente: n.cliente, cnpj: n.cnpj, endereco: n.endereco, valor: p.valor, origem: `nfe:${n.chave}` });
     $('#imp-ok', m.el).disabled = true;
     try { await gravarTitulos(regs, { contaId: $('#conta-nf', m.el).value || null, ccId: $('#cc-nf', m.el).value || null }); m.close(); await onDone(); }
     catch (err) { fail(err); $('#imp-ok', m.el).disabled = false; }

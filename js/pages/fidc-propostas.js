@@ -318,7 +318,7 @@ async function detalhe(p, root) {
       <h3 style="margin-top:14px">Títulos (${itens.length})</h3>
       <div class="table-wrap" style="max-height:300px"><table><thead><tr><th>Vencimento</th><th class="num">Prazo</th><th>Sacado</th><th>NF / parcela</th><th class="num">Valor</th><th class="num">Custo est.</th>${p.comparativo ? '<th>No borderô</th>' : ''}</tr></thead><tbody>
         ${itens.map(i => `<tr><td>${dateBR(i.vencimento)}</td><td class="num">${i.prazo ?? ''}</td><td class="wrap">${esc(i.sacado || '')}</td><td>${esc(i.documento || '')}</td><td class="num">${money(i.valor)}</td><td class="num">${money(i.custo_estimado)}</td>${p.comparativo ? `<td>${esc(i.situacao_bordero || '')}</td>` : ''}</tr>`).join('')}</tbody></table></div>`,
-    foot: `<button class="btn" id="pdfp" style="margin-right:auto">PDF para aprovação</button>${p.status === 'Aprovada' && ed ? '<button class="btn" id="cmpb">Comparar com borderô original</button>' : ''}${acoes.join('')}<button class="btn" data-close>Fechar</button>`,
+    foot: `<button class="btn" id="pdfp" style="margin-right:auto">PDF para aprovação</button>${p.status === 'Aprovada' && ed ? '<button class="btn" id="cmpb">Comparar com borderô original</button>' : ''}${ed && ['Pendente', 'Aprovada'].includes(p.status) ? '<button class="btn" id="dupl">Duplicatas para endosso</button>' : ''}${acoes.join('')}<button class="btn" data-close>Fechar</button>`,
   });
   const act = async (fn, msg) => { try { await fn(); toast(msg); m.close(); await carregar(); desenhar(root); } catch (e) { fail(e); } };
   $('#pdfp', m.el).onclick = () => pdfProposta(p, fu, itens);
@@ -335,6 +335,7 @@ async function detalhe(p, root) {
     for (const id of ui.sel) delete emProposta[id];
     m.close(); render(root);
   });
+  $('#dupl', m.el) && ($('#dupl', m.el).onclick = () => { m.close(); state.duplicataProp = p.id; location.hash = '#/duplicatas'; });
   $('#cmpb', m.el) && ($('#cmpb', m.el).onclick = () => { m.close(); compararBordero(p, fu, itens, root); });
 }
 
