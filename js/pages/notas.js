@@ -1,6 +1,6 @@
 // Notas fiscais: importação dos XML (notas completas, itens e impostos), consulta por mês, impostos por CFOP
 // e casamento das parcelas com os lançamentos de recebimento já existentes (vínculo só após aprovação).
-import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
+import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.js';
 import { $, esc, money, dateBR, fail, toast, modal, exportXLSX } from '../lib/ui.js';
 import { lerArquivos } from '../lib/nf-titulos.js';
 import { lerNFeCompleta, prepararNotas, casarNotas, CFOP_SEM_FINANCEIRO } from '../lib/nfe-fiscal.js';
@@ -200,7 +200,7 @@ function desenharCasamento(c, root) {
       <div class="table-wrap" style="max-height:${k === 'exata' ? 300 : 420}px"><table><thead><tr>${k !== 'pendente' ? '<th></th>' : ''}<th>NF / parcela</th><th>Cliente</th><th>Vencimento</th><th class="num">Valor nota</th><th>Recebimentos (data · valor · conta · descrição)</th><th class="num">Recebido</th></tr></thead><tbody>
       ${L.map(g => { const ps = g.parcelas || (g.parcela ? [g.parcela] : []); return `<tr data-g="${g.i}">${k !== 'pendente' ? `<td><input type="checkbox" ${marcados.has(g.i) ? 'checked' : ''}></td>` : ''}
         <td>${g.nota.numero}${ps.length ? ` / ${ps.map(p => p.a_vista ? 'à vista' : p.numero).join(', ')}` : ''}</td><td class="wrap small">${esc(g.nota.dest_nome || '')}</td><td class="small">${ps.map(p => dateBR(p.vencimento)).join(', ')}</td>
-        <td class="num">${money(g.valorNota)}</td><td class="small">${g.lancs.map(l => `${dateBR(l.data)} · ${money(l.valor)} · ${esc(conta(l.conta_id))} · ${esc(l.descricao || '')}`).join('<br>') || '<span class="muted">—</span>'}</td>
+        <td class="num">${money(g.valorNota)}</td><td class="small">${g.lancs.map(l => `${dateBR(l.data)} · ${money(l.valor)} · ${esc(conta(l.conta_id))} · ${esc(l.descricao || '')}`).join('<br>') || (g.possiveis?.length ? `<span class="muted">Possíveis do mesmo cliente (sem citar a nota):</span><br>${g.possiveis.map(l => `${dateBR(l.data)} · ${money(l.valor)} · ${esc(conta(l.conta_id))} · ${esc(l.descricao || '')}`).join('<br>')}` : '<span class="muted">nenhum lançamento do cliente perto do vencimento</span>')}</td>
         <td class="num ${k === 'pendente' ? '' : Math.abs(g.valorLanc - g.valorNota) < 0.01 ? 'pos' : 'neg'}">${k === 'pendente' ? '' : money(g.valorLanc)}</td></tr>`; }).join('')}
       </tbody></table></div></div>`; }).join('')}`;
   c.onchange = (e) => { const tr = e.target.closest('tr[data-g]'); if (!tr || e.target.type !== 'checkbox') return; e.target.checked ? marcados.add(+tr.dataset.g) : marcados.delete(+tr.dataset.g); const b = $('#grava', c); if (b) { b.disabled = !marcados.size; b.textContent = `Gravar ${marcados.size} vínculo(s) marcado(s)`; } };
@@ -214,6 +214,30 @@ function desenharCasamento(c, root) {
     try { for (const ch of chunks(rows, 300)) await q(sb.from('nfe_vinculos').insert(ch)); toast(`${rows.length} vínculo(s) gravado(s)`); await carregar(root); }
     catch (err) { fail(String(err.message || err).includes('duplicate') ? new Error('Algum lançamento já estava vinculado a outra nota. Recarregue a página.') : err); e.target.disabled = false; }
   };
+}
+
+// Localiza o cadastro (cliente/fornecedor) da nota: CNPJ completo, raiz do CNPJ (filial) e, por fim, nome
+const normN = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+function localizadorFav() {
+  const favs = state.cad.favorecidos; const d = (f) => String(f.documento || '').replace(/\D/g, '');
+  const CLI = ['CLIENTES', 'TERCEIROS - CLIENTES'];
+  const porDoc = new Map(), porRaiz = new Map(), porNome = new Map();
+  for (const f of favs) { const x = d(f); if (x) { porDoc.set(x, f); if (x.length === 14 && !porRaiz.has(x.slice(0, 8))) porRaiz.set(x.slice(0, 8), f); } const k = normN(f.nome); if (!porNome.has(k) || CLI.includes(f.tipo)) porNome.set(k, f); }
+  return (doc, nome, cliente) => {
+    const x = String(doc || '').replace(/\D/g, '');
+    const pref = (f) => f && (cliente ? CLI.includes(f.tipo) : f.tipo === 'FORNECEDORES') ? f : null;
+    return porDoc.get(x) || (x.length === 14 ? porRaiz.get(x.slice(0, 8)) : null) || pref(porNome.get(normN(nome))) || porNome.get(normN(nome)) || null;
+  };
+}
+// liga ao cadastro as notas ainda sem cliente/fornecedor (depois de atualizar os cadastros)
+async function ligarFavorecidos() {
+  await loadCadastros(true);
+  const acharFav = localizadorFav(); const e = state.empresa.id;
+  const sem = await fetchAll(() => sb.from('nfe_notas').select('id,tipo,finalidade,emissao_propria,dest_doc,dest_nome,emit_doc,emit_nome').eq('empresa_id', e).is('favorecido_id', null));
+  const grupos = new Map();
+  for (const n of sem) { const out = n.tipo === 'saida' || n.emissao_propria; const f = acharFav(out ? n.dest_doc : n.emit_doc, out ? n.dest_nome : n.emit_nome, n.tipo === 'saida' && n.finalidade !== '4'); if (f) (grupos.get(f.id) || grupos.set(f.id, []).get(f.id)).push(n.id); }
+  let k = 0; for (const [fid, ids] of grupos) for (const c of chunks(ids, 200)) { await q(sb.from('nfe_notas').update({ favorecido_id: fid }).in('id', c)); k += c.length; }
+  return k;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -255,12 +279,12 @@ function importar(root) {
   $('#ni-arq', m.el).onchange = (e) => ler([...e.target.files]);
   $('#ni-ok', m.el).onclick = async () => {
     const btn = $('#ni-ok', m.el); btn.disabled = true; const e = state.empresa.id; let feitas = 0;
-    const favPorDoc = new Map(state.cad.favorecidos.filter(f => f.documento).map(f => [String(f.documento).replace(/\D/g, ''), f]));
+    const acharFav = localizadorFav();
     try {
       for (const lote of chunks(prep.novas, 25)) {
         btn.textContent = `Gravando ${feitas}/${prep.novas.length}…`;
         const rows = lote.map(x => { const { tp_nf, ...n } = x.nota; const doc = String((n.tipo === 'saida' || n.emissao_propria ? n.dest_doc : n.emit_doc) || '').replace(/\D/g, '');
-          return { ...n, empresa_id: e, favorecido_id: favPorDoc.get(doc)?.id || null, arquivo: x.arquivo, xml: x.xml }; });
+          return { ...n, empresa_id: e, favorecido_id: acharFav(doc, n.tipo === 'saida' || n.emissao_propria ? n.dest_nome : n.emit_nome, n.tipo === 'saida' && n.finalidade !== '4')?.id || null, arquivo: x.arquivo, xml: x.xml }; });
         const ins = await q(sb.from('nfe_notas').insert(rows).select('id,chave'));
         const idPor = new Map(ins.map(r => [r.chave, r.id]));
         const itens = lote.flatMap(x => x.itens.map(i => ({ ...i, empresa_id: e, nota_id: idPor.get(x.nota.chave) })));
@@ -281,7 +305,8 @@ function importar(root) {
       const meses = [...new Set(prep.novas.map(n => n.nota.emissao.slice(0, 7)))].sort(); if (meses.length) ui.mes = meses[0];
       if (prep.novas.some(n => n.nota.tipo === 'saida')) ui.tipo = 'saida';
       await render(root);
-      if (confirm('Notas gravadas. Quer conferir agora o cadastro dos clientes/fornecedores dessas notas (novos e diferenças para aprovação)?')) importarBeneficiariosNFe(() => {}, { textos });
+      if (confirm('Notas gravadas. Quer conferir agora o cadastro dos clientes/fornecedores dessas notas (novos e diferenças para aprovação)?'))
+        importarBeneficiariosNFe(async () => { const n = await ligarFavorecidos(); if (n) toast(`${n} nota(s) ligadas ao cadastro do cliente/fornecedor`); carregar(root); }, { textos });
     } catch (err) { fail(new Error(`Parou após ${feitas} nota(s): ${err.message || err}. As já gravadas ficam; importe de novo para continuar (as repetidas são ignoradas).`)); btn.disabled = false; btn.textContent = 'Importar'; }
   };
 }

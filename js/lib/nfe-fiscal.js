@@ -5,6 +5,8 @@ const dig = (s) => String(s || '').replace(/\D/g, '');
 const n2 = (v) => { const x = parseFloat(v); return isFinite(x) ? Math.round(x * 100) / 100 : null; };
 const nn = (v) => { const x = parseFloat(v); return isFinite(x) ? x : null; };
 const cent = (v) => Math.round(+v * 100);
+// diferença de arredondamento aceita entre parcela e recebimento (ex.: 45,30 × 45,29)
+const perto = (a, b) => Math.abs(cent(a) - cent(b)) <= 5;
 
 // CFOP que não geram financeiro (remessas, bonificação, demonstração, comodato, industrialização, retorno…)
 export const CFOP_SEM_FINANCEIRO = new Set(['5901', '6901', '5902', '6902', '5903', '6903', '5905', '6905', '5908', '6908', '5909', '6909', '5910', '6910', '5911', '6911',
@@ -113,25 +115,33 @@ export function casarNotas(notas, lancs) {
     const st = new Map(n.parcelas.map(p => [p.id, null]));
     // 1) mesma parcela (ou sem parcela citada) e mesmo valor
     for (const p of n.parcelas) {
-      const l = livres().find(l => (l._parc === p.numero || l._parc == null) && cent(l.valor) === cent(p.valor))
-        || livres().find(l => cent(l.valor) === cent(p.valor) && n.parcelas.length === 1);
+      const l = livres().find(l => (l._parc === p.numero || l._parc == null) && perto(l.valor, p.valor))
+        || livres().find(l => perto(l.valor, p.valor) && n.parcelas.length === 1);
       if (l) { usados.add(l.id); st.set(p.id, 'ok'); grupos.push({ cat: 'exata', nota: n, parcela: p, lancs: [l] }); }
     }
     // 2) vários lançamentos da mesma parcela somando o valor
     for (const p of n.parcelas) {
       if (st.get(p.id)) continue;
       const ls = livres().filter(l => l._parc === p.numero);
-      if (ls.length > 1 && cent(ls.reduce((s, l) => s + +l.valor, 0)) === cent(p.valor)) { ls.forEach(l => usados.add(l.id)); st.set(p.id, 'ok'); grupos.push({ cat: 'soma', nota: n, parcela: p, lancs: ls }); }
+      if (ls.length > 1 && perto(ls.reduce((s, l) => s + +l.valor, 0), p.valor)) { ls.forEach(l => usados.add(l.id)); st.set(p.id, 'ok'); grupos.push({ cat: 'soma', nota: n, parcela: p, lancs: ls }); }
     }
     // 3) o que sobrou da nota: soma dos lançamentos × soma das parcelas
     const rp = n.parcelas.filter(p => !st.get(p.id)); const rl = livres();
     if (rp.length && rl.length) {
       const sp = rp.reduce((s, p) => s + +p.valor, 0), sl = rl.reduce((s, l) => s + +l.valor, 0);
-      const cat = cent(sp) === cent(sl) ? 'nota' : sl < sp ? 'parcial' : 'valor_diferente';
+      const cat = perto(sp, sl) ? 'nota' : sl < sp ? 'parcial' : 'valor_diferente';
       rl.forEach(l => usados.add(l.id)); rp.forEach(p => st.set(p.id, cat));
       grupos.push({ cat, nota: n, parcela: rp.length === 1 ? rp[0] : null, parcelas: rp, lancs: rl });
     }
     for (const p of n.parcelas) if (!st.get(p.id)) grupos.push({ cat: 'pendente', nota: n, parcela: p, lancs: [] });
+  }
+  // parcelas sem recebimento: possíveis lançamentos do mesmo cliente (sem citar a nota) perto do vencimento — só sugestão
+  const nome1 = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).find(w => w.length >= 3) || '';
+  const dias = (a, b) => Math.round((new Date(a + 'T12:00:00') - new Date(b + 'T12:00:00')) / 864e5);
+  for (const g of grupos.filter(g => g.cat === 'pendente')) {
+    const r = raiz(g.nota.dest_doc), n1 = nome1(g.nota.dest_nome), v = g.parcela?.vencimento || g.nota.emissao;
+    g.possiveis = lancs.filter(l => !usados.has(l.id) && l._nf == null && ((l.fav_doc && raiz(l.fav_doc) === r) || (!l.fav_doc && n1 && nome1(l.fav_nome) === n1))
+      && dias(l.data, v) >= -45 && dias(l.data, v) <= 150).sort((a, b) => Math.abs(+a.valor - +g.parcela.valor) - Math.abs(+b.valor - +g.parcela.valor)).slice(0, 4);
   }
   for (const g of grupos) { g.valorNota = g.parcelas ? g.parcelas.reduce((s, p) => s + +p.valor, 0) : +(g.parcela?.valor || 0); g.valorLanc = g.lancs.reduce((s, l) => s + +l.valor, 0); }
   return { grupos, semFinanceiro, cancelados, outroCliente };

@@ -88,16 +88,37 @@ export function analisarParticipantes(lidos, favorecidos) {
     const grupo = GRUPO[g.papel];
     const doMesmoGrupo = favorecidos.filter(f => grupo.includes(f.tipo));
     let fav = doMesmoGrupo.find(f => somenteDoc(f.documento) === d.documento), via = 'CNPJ/CPF';
+    // mesma empresa, outro estabelecimento (raiz do CNPJ igual): é o mesmo cadastro
+    if (!fav && d.tipo_pessoa === 'PJ') { fav = doMesmoGrupo.find(f => somenteDoc(f.documento).length === 14 && somenteDoc(f.documento).slice(0, 8) === d.documento.slice(0, 8)); via = 'filial (raiz do CNPJ)'; }
     if (!fav) { fav = doMesmoGrupo.find(f => sp(f.nome) === sp(d.nome)); via = 'nome'; }
+    if (!fav) { // nome parecido: as duas primeiras palavras iguais e um único cadastro assim
+      const ini = (t) => sp(t).split(' ').filter(w => w.length >= 3).slice(0, 2).join(' ');
+      const k = ini(d.nome); const L = k.includes(' ') ? doMesmoGrupo.filter(f => ini(f.nome) === k) : [];
+      if (L.length === 1) { fav = L[0]; via = 'nome parecido'; }
+    }
     const outros = favorecidos.filter(f => !grupo.includes(f.tipo) && somenteDoc(f.documento) === d.documento).map(f => f.tipo);
     const p = { chave: `${g.papel}|${d.documento}`, papel: g.papel, dados: d, nfs: g.nfs, meses, rec, fav: fav || null, via: fav ? via : null, outros, devol: g.nfs.every(n => n.devol) };
     p.difs = fav ? diferencas(fav, d) : [];
+    if (fav && via.startsWith('filial')) p.difs = p.difs.filter(x => x.completar && x.k !== 'documento');
     p.info = [];
     if (d.regime_normal && fav && !['Lucro Presumido', 'Lucro Real'].includes(fav.regime_tributario)) p.info.push('Emitente no regime normal (CRT 3): defina Lucro Presumido ou Real no cadastro');
     if (d.regime_normal && !fav) p.info.push('Regime normal (CRT 3): defina Lucro Presumido ou Real depois');
     if (!analisaDocumento(d.documento).valido) p.info.push('CNPJ/CPF do XML não confere o dígito');
     p.sit = !fav ? 'novo' : p.difs.length ? 'dif' : 'igual';
     out.push(p);
+  }
+  // vários CNPJ (filiais) caindo no mesmo cadastro, ou novos da mesma raiz: um só principal; os demais ficam como informação
+  const principal = (L) => L.find(p => p.fav && somenteDoc(p.fav.documento) === p.dados.documento) || L.find(p => p.dados.documento.slice(8, 12) === '0001') || [...L].sort((a, b) => b.nfs.length - a.nfs.length)[0];
+  const porChave = new Map();
+  for (const p of out) { const k = p.fav ? `f:${p.fav.id}` : p.dados.tipo_pessoa === 'PJ' ? `r:${p.papel}|${p.dados.documento.slice(0, 8)}` : `d:${p.chave}`; (porChave.get(k) || porChave.set(k, []).get(k)).push(p); }
+  for (const L of porChave.values()) {
+    if (L.length < 2) continue;
+    const pr = principal(L);
+    for (const p of L) if (p !== pr) {
+      p.sit = 'igual'; p.difs = []; p.filialDe = pr;
+      p.info.unshift(`Outro estabelecimento de ${pr.dados.nome} (${analisaDocumento(pr.dados.documento).formatado}) — usa o mesmo cadastro`);
+      if (!p.fav) p.fav = pr.fav || { nome: pr.dados.nome, tipo: pr.papel, id: null };
+    }
   }
   out.sort((a, b) => a.dados.nome.localeCompare(b.dados.nome));
   return { participantes: out, ignoradas: ign, nfs: vistas.size };
