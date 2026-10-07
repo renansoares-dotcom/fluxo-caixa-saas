@@ -10,7 +10,7 @@ export const title = 'Conciliação bancária';
 
 const hoje = new Date();
 const mesAnt = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-const ui = { conta: '', mes: `${mesAnt.getFullYear()}-${String(mesAnt.getMonth() + 1).padStart(2, '0')}`, filtro: 'pendente', sel: null, marcados: new Set(), abertos: false, busca: '', lf: { sinal: 'mesmo', classe: '', de: '', ate: '', vmin: '', vmax: '', ordem: 'prox' } };
+const ui = { conta: '', mes: `${mesAnt.getFullYear()}-${String(mesAnt.getMonth() + 1).padStart(2, '0')}`, filtro: 'pendente', sels: new Set(), marcados: new Set(), abertos: false, busca: '', lf: { sinal: 'mesmo', classe: '', de: '', ate: '', vmin: '', vmax: '', ordem: 'prox' } };
 let D = null; // dados carregados
 
 const dig = (s) => String(s || '').replace(/\D/g, '');
@@ -40,7 +40,7 @@ export async function render(root) {
       <div class="card flush" id="ext"></div>
       <div class="card flush" id="sis"></div>
     </div>`;
-  $('#flt', root).addEventListener('change', (e) => { ui[e.target.name] = e.target.value; ui.sel = null; ui.marcados.clear(); carregar(root); });
+  $('#flt', root).addEventListener('change', (e) => { ui[e.target.name] = e.target.value; ui.sels.clear(); ui.marcados.clear(); carregar(root); });
   $('#imp', root) && ($('#imp', root).onclick = () => importar(root));
   $('#hist', root).onclick = () => historico(root);
   $('#aceitar', root) && ($('#aceitar', root).onclick = () => aceitarTodas(root));
@@ -54,7 +54,7 @@ async function carregar(root) {
   try {
     const [itens, links, lancs, abertos, imps] = await Promise.all([
       fetchAll(() => sb.from('extrato_itens').select('*').eq('empresa_id', e).eq('conta_id', ui.conta).gte('data', ini).lte('data', fim).order('data').order('created_at')),
-      fetchAll(() => sb.from('conciliacoes').select('id,extrato_id,lancamento_id').eq('empresa_id', e).eq('conta_id', ui.conta)),
+      fetchAll(() => sb.from('conciliacoes').select('id,extrato_id,lancamento_id,grupo_id').eq('empresa_id', e).eq('conta_id', ui.conta)),
       fetchAll(() => sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,centro_custo_id,descricao,documento,conta_id').eq('empresa_id', e).eq('conta_id', ui.conta).eq('status', 'Pago').gte('data', addDias(ini, -10)).lte('data', addDias(fim, 10)).order('data')),
       fetchAll(() => sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,centro_custo_id,descricao,documento,conta_id').eq('empresa_id', e).eq('status', 'Em aberto').gte('data', addDias(ini, -20)).lte('data', addDias(fim, 20)).order('data')),
       q(sb.from('extrato_importacoes').select('*').eq('empresa_id', e).eq('conta_id', ui.conta).lte('saldo_data', fim).order('saldo_data', { ascending: false }).limit(1)),
@@ -68,6 +68,14 @@ async function carregar(root) {
     // lançamentos conciliados fora da janela carregada (para mostrar o vínculo)
     const faltam = links.filter(l => itens.some(i => i.id === l.extrato_id) && !D.lancById[l.lancamento_id]).map(l => l.lancamento_id);
     for (let i = 0; i < faltam.length; i += 150) for (const l of await q(sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,descricao,documento,conta_id').in('id', faltam.slice(i, i + 150)))) D.lancById[l.id] = l;
+    // vínculos órfãos (o movimento voltou a pendente porque um lançamento do grupo foi excluído): remove
+    const orfaos = links.filter(l => { const it = itens.find(i => i.id === l.extrato_id); return it && it.status !== 'conciliado'; });
+    if (orfaos.length && podeEditar()) {
+      for (let i = 0; i < orfaos.length; i += 200) await q(sb.from('conciliacoes').delete().in('id', orfaos.slice(i, i + 200).map(l => l.id)));
+      const fora = new Set(orfaos.map(l => l.lancamento_id)); D.links = links.filter(l => !fora.has(l.lancamento_id));
+      D.porItem = {}; D.lancLig = new Set(); for (const l of D.links) { (D.porItem[l.extrato_id] ||= []).push(l.lancamento_id); D.lancLig.add(l.lancamento_id); }
+      D.abertos = abertos.filter(a => !D.lancLig.has(a.id));
+    }
     D.sug = sugerir();
   } catch (err) { fail(err); $('#ext', root).innerHTML = '<div class="empty">Não foi possível carregar.</div>'; return; }
   pintar(root);
@@ -118,25 +126,43 @@ function pintar(root) {
 function pintarExtrato(root) {
   const lista = D.itens.filter(i => ui.filtro === 'todos' || i.status === ui.filtro);
   const tot = (s) => D.itens.filter(i => i.status === s).length;
+  const pendVis = lista.filter(i => i.status === 'pendente');
+  const todosMarc = pendVis.length && pendVis.every(i => ui.sels.has(i.id));
   const c = $('#ext', root);
-  c.innerHTML = `<div class="card-head"><div><h2>Extrato do banco</h2><p class="muted small">${D.itens.length} movimento(s) em ${dateBR(D.ini).slice(3)}</p></div>
+  const selPend = [...ui.sels].map(id => D.itens.find(i => i.id === id)).filter(i => i?.status === 'pendente');
+  c.innerHTML = `<div class="card-head"><div><h2>Extrato do banco</h2><p class="muted small">${D.itens.length} movimento(s) em ${dateBR(D.ini).slice(3)}${selPend.length > 1 ? ` · <strong>${selPend.length} selecionados = ${money(selPend.reduce((a, i) => a + +i.valor, 0))}</strong>` : ''}</p></div>
       <div class="chips" id="fx">${[['pendente', 'Pendentes'], ['conciliado', 'Conciliados'], ['ignorado', 'Ignorados'], ['todos', 'Todos']].map(([k, t]) => `<span class="chip ${ui.filtro === k ? 'on' : ''}" data-f="${k}">${t} <span class="muted">${k === 'todos' ? D.itens.length : tot(k)}</span></span>`).join('')}</div></div>
-    <div class="table-wrap" style="max-height:62vh">${lista.length ? `<table><thead><tr><th>Data</th><th>Histórico</th><th class="num">Valor</th><th></th></tr></thead><tbody>
+    <div class="table-wrap" style="max-height:62vh">${lista.length ? `<table><thead><tr><th style="width:28px">${pendVis.length ? `<input type="checkbox" id="ext-todos" title="Selecionar todos os pendentes visíveis" ${todosMarc ? 'checked' : ''}>` : ''}</th><th>Data</th><th>Histórico</th><th class="num">Valor</th><th></th></tr></thead><tbody>
       ${lista.map(i => { const s = D.sug[i.id];
-        return `<tr class="clickable ${ui.sel === i.id ? 'row-sel' : ''}" data-id="${i.id}"><td>${dateBR(i.data)}</td>
+        return `<tr class="clickable ${ui.sels.has(i.id) ? 'row-sel' : ''}" data-id="${i.id}"><td>${i.status === 'pendente' ? `<input type="checkbox" data-chk ${ui.sels.has(i.id) ? 'checked' : ''}>` : ''}</td><td>${dateBR(i.data)}</td>
         <td class="wrap">${esc(i.descricao || i.tipo || '')}${i.documento ? `<div class="small muted">doc. ${esc(i.documento)}</div>` : ''}${i.status === 'ignorado' && i.observacao ? `<div class="small muted">${esc(i.observacao)}</div>` : ''}</td>
         <td class="num ${cls(i.valor)}">${money(i.valor)}</td>
-        <td class="small">${i.status === 'conciliado' ? '<span class="badge pago">conciliado</span>' : i.status === 'ignorado' ? '<span class="badge">ignorado</span>' : s ? `<span class="badge aberto">${ROT_SUG[s.tipo]}</span>` : ''}</td></tr>`; }).join('')}
+        <td class="small">${i.status === 'conciliado' ? `<span class="badge pago">conciliado${i.grupo_id ? ' (grupo)' : ''}</span>` : i.status === 'ignorado' ? '<span class="badge">ignorado</span>' : s ? `<span class="badge aberto">${ROT_SUG[s.tipo]}</span>` : ''}</td></tr>`; }).join('')}
       </tbody></table>` : `<div class="empty">${D.itens.length ? 'Nada neste filtro.' : 'Nenhum movimento importado para esta conta neste mês. Use “Importar extrato OFX”.'}</div>`}</div>`;
   $('#fx', c).onclick = (e) => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { ui.filtro = f; pintarExtrato(root); } };
-  $('table', c)?.addEventListener('click', (e) => {
-    const tr = e.target.closest('tr[data-id]'); if (!tr) return;
-    ui.sel = ui.sel === tr.dataset.id ? null : tr.dataset.id;
-    ui.marcados = new Set(D.sug[ui.sel]?.ids || []); ui.busca = '';
-    if (ui.sel) { ui.lf.sinal = 'mesmo'; ui.lf.ordem = 'prox'; }
-    if (ui.sel && D.sug[ui.sel]?.tipo === 'baixa') ui.abertos = true;
+  const mudou = () => {
+    const sel = [...ui.sels]; const um = sel.length === 1 ? sel[0] : null;
+    ui.marcados = new Set(um ? D.sug[um]?.ids || [] : []); ui.busca = '';
+    if (sel.length) { ui.lf.sinal = 'mesmo'; ui.lf.ordem = 'prox'; }
+    if (um && D.sug[um]?.tipo === 'baixa') ui.abertos = true;
     pintarExtrato(root); pintarSistema(root);
-    if (ui.sel && window.innerWidth < 1100) $('#sis', root).scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  };
+  $('#ext-todos', c) && ($('#ext-todos', c).onchange = (e) => {
+    for (const k of [...ui.sels]) if (D.itens.find(i => i.id === k)?.status !== 'pendente') ui.sels.delete(k);
+    for (const i of pendVis) e.target.checked ? ui.sels.add(i.id) : ui.sels.delete(i.id);
+    mudou();
+  });
+  $('tbody', c)?.addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-id]'); if (!tr) return; const id = tr.dataset.id;
+    if (e.target.matches('[data-chk]')) {
+      // seleção múltipla: só movimentos pendentes
+      for (const k of [...ui.sels]) if (D.itens.find(i => i.id === k)?.status !== 'pendente') ui.sels.delete(k);
+      e.target.checked ? ui.sels.add(id) : ui.sels.delete(id);
+    } else {
+      const so = ui.sels.size === 1 && ui.sels.has(id); ui.sels.clear(); if (!so) ui.sels.add(id);
+    }
+    mudou();
+    if (ui.sels.size && !e.target.matches('[data-chk]') && window.innerWidth < 1100) $('#sis', root).scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   });
 }
 
@@ -212,7 +238,11 @@ function ligarFiltros(c, root, item) {
 const resumo = (lista) => `<p class="small muted" style="margin:0 12px 6px">${lista.length} lançamento(s) · ${money(lista.reduce((s, l) => s + sinal(l), 0))}${lista.length > 300 ? ' · mostrando os 300 primeiros' : ''}</p>`;
 
 function pintarSistema(root) {
-  const c = $('#sis', root); const item = D.itens.find(i => i.id === ui.sel);
+  const c = $('#sis', root);
+  const sels = [...ui.sels].map(id => D.itens.find(i => i.id === id)).filter(Boolean);
+  const multi = sels.length > 1;
+  // vários movimentos: o alvo é a soma deles (data do primeiro, para a proximidade)
+  const item = multi ? { multi: true, itens: sels, valor: Math.round(sels.reduce((a, i) => a + +i.valor, 0) * 100) / 100, data: sels.map(i => i.data).sort()[0], status: 'pendente' } : sels[0];
   if (!item) {
     if (ui.lf.sinal === 'mesmo') ui.lf.sinal = ''; if (ui.lf.ordem === 'prox') ui.lf.ordem = 'data';
     const sem = filtrarOrdenar(D.lancs.filter(l => l.data >= D.ini && l.data <= D.fim && !D.lancLig.has(l.id)), null);
@@ -222,17 +252,21 @@ function pintarSistema(root) {
     ligarFiltros(c, root, null);
     return;
   }
-  const cab = `<div class="card-head"><div><h2>${dateBR(item.data)} · <span class="${cls(item.valor)}">${money(item.valor)}</span></h2><p class="muted small">${esc(item.descricao || '')}</p></div></div>`;
+  const cab = multi
+    ? `<div class="card-head"><div><h2>${sels.length} movimentos · <span class="${cls(item.valor)}">${money(item.valor)}</span></h2><p class="muted small">${sels.slice(0, 6).map(i => `${dateBR(i.data).slice(0, 5)} ${esc((i.descricao || '').slice(0, 28))} ${money(i.valor)}`).join(' · ')}${sels.length > 6 ? ' …' : ''}</p></div></div>`
+    : `<div class="card-head"><div><h2>${dateBR(item.data)} · <span class="${cls(item.valor)}">${money(item.valor)}</span></h2><p class="muted small">${esc(item.descricao || '')}</p></div></div>`;
   if (item.status !== 'pendente') {
-    const ls = (D.porItem[item.id] || []).map(id => D.lancById[id]).filter(Boolean);
-    c.innerHTML = `${cab}<div style="padding:0 12px 12px">${item.status === 'conciliado' ? `<p class="small">Conciliado com:</p>
+    const lig = item.grupo_id ? D.links.filter(l => l.grupo_id === item.grupo_id).map(l => l.lancamento_id) : (D.porItem[item.id] || []);
+    const ls = lig.map(id => D.lancById[id]).filter(Boolean);
+    const outros = item.grupo_id ? D.itens.filter(i => i.grupo_id === item.grupo_id && i.id !== item.id) : [];
+    c.innerHTML = `${cab}<div style="padding:0 12px 12px">${item.status === 'conciliado' ? `${outros.length ? `<p class="small">Conciliado em grupo com mais ${outros.length} movimento(s) do extrato: ${outros.map(i => `${dateBR(i.data)} ${money(i.valor)}`).join(' · ')}</p>` : ''}<p class="small">Lançamentos (${ls.length} · ${money(ls.reduce((a, l) => a + sinal(l), 0))}):</p>
       <div class="table-wrap"><table><tbody>${ls.map(l => linhaLanc(l, { marcar: false })).join('') || '<tr><td class="muted">—</td></tr>'}</tbody></table></div>`
       : `<p class="small">Ignorado${item.observacao ? `: ${esc(item.observacao)}` : ''}.</p>`}
-      ${podeEditar() ? `<div class="toolbar" style="margin-top:10px"><button class="btn" id="desf">${item.status === 'conciliado' ? 'Desfazer conciliação' : 'Voltar para pendente'}</button></div>` : ''}</div>`;
+      ${podeEditar() ? `<div class="toolbar" style="margin-top:10px"><button class="btn" id="desf">${item.status === 'conciliado' ? (item.grupo_id ? 'Desfazer conciliação do grupo' : 'Desfazer conciliação') : 'Voltar para pendente'}</button></div>` : ''}</div>`;
     $('#desf', c) && ($('#desf', c).onclick = () => desfazer(item, root));
     return;
   }
-  const s = D.sug[item.id];
+  const s = multi ? null : D.sug[item.id];
   const cand = [...D.lancs.filter(l => !D.lancLig.has(l.id)), ...(ui.abertos ? D.abertos : [])];
   const lista = filtrarOrdenar(cand, item);
   c.innerHTML = `${cab}
@@ -243,9 +277,9 @@ function pintarSistema(root) {
   const rodape = () => {
     const sel = [...ui.marcados].map(id => D.lancById[id]).filter(Boolean); const tot = sel.reduce((s, l) => s + sinal(l), 0); const dif = Math.round((item.valor - tot) * 100) / 100;
     $('#cf', c).innerHTML = `<div class="small">Extrato <strong>${money(item.valor)}</strong> · Selecionado <strong>${money(tot)}</strong> (${sel.length}) · Diferença <strong class="${dif ? 'neg' : 'pos'}">${money(dif)}</strong>${sel.some(l => l.status === 'Em aberto') ? ' · <span class="neg">títulos em aberto serão baixados</span>' : ''}</div>
-      ${podeEditar() ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="ign">Ignorar</button><button class="btn small" id="cria">Criar lançamento</button><button class="btn small primary" id="conc" ${sel.length && !dif ? '' : 'disabled'}>Conciliar</button></div>` : ''}`;
-    $('#conc', c) && ($('#conc', c).onclick = () => conciliar([{ item, ids: [...ui.marcados] }], root));
-    $('#ign', c) && ($('#ign', c).onclick = () => ignorar(item, root));
+      ${podeEditar() ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="ign">Ignorar${multi ? ` (${sels.length})` : ''}</button>${multi ? '' : '<button class="btn small" id="cria">Criar lançamento</button>'}<button class="btn small primary" id="conc" ${sel.length && !dif ? '' : 'disabled'}>Conciliar${multi ? ` ${sels.length} × ${sel.length}` : ''}</button></div>` : ''}`;
+    $('#conc', c) && ($('#conc', c).onclick = () => multi ? conciliarGrupo(sels, [...ui.marcados], root) : conciliar([{ item, ids: [...ui.marcados] }], root));
+    $('#ign', c) && ($('#ign', c).onclick = () => ignorar(multi ? sels : [item], root));
     $('#cria', c) && ($('#cria', c).onclick = () => criar(item, root));
   };
   rodape();
@@ -266,7 +300,22 @@ async function conciliar(grupos, root) {
     const itens = grupos.map(g => g.item.id);
     for (let i = 0; i < itens.length; i += 200) await q(sb.from('extrato_itens').update({ status: 'conciliado', conciliado_em: agora, conciliado_por: uid }).in('id', itens.slice(i, i + 200)));
     toast(`${grupos.length} movimento(s) conciliado(s)`);
-    ui.sel = null; ui.marcados.clear(); await carregar(root);
+    ui.sels.clear(); ui.marcados.clear(); await carregar(root);
+  } catch (e) { fail(String(e.message || e).includes('duplicate') ? new Error('Algum lançamento já estava conciliado com outro movimento. Atualize a página.') : e); }
+}
+
+// vários movimentos ↔ vários lançamentos: mesmo grupo_id; vínculos no primeiro movimento
+async function conciliarGrupo(itens, ids, root) {
+  const agora = new Date().toISOString(), uid = state.user?.id || null;
+  const g = globalThis.crypto?.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => { const r = Math.random() * 16 | 0; return (ch === 'x' ? r : (r & 3 | 8)).toString(16); });
+  const ord = [...itens].sort((a, b) => a.data.localeCompare(b.data)); const ult = ord[ord.length - 1].data;
+  try {
+    const abertos = ids.filter(id => D.lancById[id]?.status === 'Em aberto');
+    if (abertos.length) await q(sb.from('lancamentos').update({ status: 'Pago', data: ult, conta_id: ui.conta }).in('id', abertos));
+    await q(sb.from('conciliacoes').insert(ids.map(id => ({ empresa_id: state.empresa.id, conta_id: ui.conta, extrato_id: ord[0].id, lancamento_id: id, grupo_id: g }))));
+    await q(sb.from('extrato_itens').update({ status: 'conciliado', conciliado_em: agora, conciliado_por: uid, grupo_id: g }).in('id', itens.map(i => i.id)));
+    toast(`${itens.length} movimento(s) conciliado(s) com ${ids.length} lançamento(s)`);
+    ui.sels.clear(); ui.marcados.clear(); await carregar(root);
   } catch (e) { fail(String(e.message || e).includes('duplicate') ? new Error('Algum lançamento já estava conciliado com outro movimento. Atualize a página.') : e); }
 }
 
@@ -281,18 +330,27 @@ function aceitarTodas(root) {
 
 async function desfazer(item, root) {
   try {
-    if (item.status === 'conciliado') await q(sb.from('conciliacoes').delete().eq('extrato_id', item.id));
-    await q(sb.from('extrato_itens').update({ status: 'pendente', conciliado_em: null, conciliado_por: null, observacao: null }).eq('id', item.id));
-    toast('Movimento voltou para pendente'); await carregar(root);
+    if (item.grupo_id) {
+      await q(sb.from('conciliacoes').delete().eq('grupo_id', item.grupo_id));
+      await q(sb.from('extrato_itens').update({ status: 'pendente', conciliado_em: null, conciliado_por: null, grupo_id: null }).eq('grupo_id', item.grupo_id));
+      toast('Conciliação do grupo desfeita: os movimentos voltaram para pendente');
+    } else {
+      if (item.status === 'conciliado') await q(sb.from('conciliacoes').delete().eq('extrato_id', item.id));
+      await q(sb.from('extrato_itens').update({ status: 'pendente', conciliado_em: null, conciliado_por: null, observacao: null }).eq('id', item.id));
+      toast('Movimento voltou para pendente');
+    }
+    ui.sels.clear(); await carregar(root);
   } catch (e) { fail(e); }
 }
 
-function ignorar(item, root) {
-  const m = modal({ title: 'Ignorar movimento', body: `<p class="small">${dateBR(item.data)} · ${esc(item.descricao || '')} · <strong>${money(item.valor)}</strong></p>
+function ignorar(itens, root) {
+  const tot = itens.reduce((a, i) => a + +i.valor, 0);
+  const m = modal({ title: itens.length > 1 ? `Ignorar ${itens.length} movimentos` : 'Ignorar movimento',
+    body: `<p class="small">${itens.length > 1 ? `${itens.length} movimentos · <strong>${money(tot)}</strong>` : `${dateBR(itens[0].data)} · ${esc(itens[0].descricao || '')} · <strong>${money(tot)}</strong>`}</p>
     <label>Motivo<input id="mot" placeholder="ex.: aplicação/resgate automático, estorno do próprio banco"></label>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Ignorar</button>' });
   $('#ok', m.el).onclick = async () => {
-    try { await q(sb.from('extrato_itens').update({ status: 'ignorado', observacao: $('#mot', m.el).value.trim() || null }).eq('id', item.id)); m.close(); ui.sel = null; await carregar(root); } catch (e) { fail(e); }
+    try { await q(sb.from('extrato_itens').update({ status: 'ignorado', observacao: $('#mot', m.el).value.trim() || null }).in('id', itens.map(i => i.id))); m.close(); ui.sels.clear(); await carregar(root); } catch (e) { fail(e); }
   };
 }
 
@@ -375,7 +433,7 @@ function importar(root) {
       // abre no mês com mais movimentos (o Bradesco acrescenta os lançamentos dos últimos dias ao extrato do período)
       const pm = {}; for (const i of ult.itens) pm[i.data.slice(0, 7)] = (pm[i.data.slice(0, 7)] || 0) + 1;
       const mm = Object.entries(pm).sort((a, b) => b[1] - a[1])[0]?.[0]; if (mm) ui.mes = mm;
-      ui.sel = null; ui.filtro = 'pendente'; m.close(); render(root);
+      ui.sels.clear(); ui.filtro = 'pendente'; m.close(); render(root);
     } catch (err) { fail(new Error(`Falha ao importar ${atual}: ${err.message || err}`)); btn.disabled = false; }
   };
 }
