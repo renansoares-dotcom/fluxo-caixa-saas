@@ -278,6 +278,11 @@ function pintarSistema(root) {
     const sel = [...ui.marcados].map(id => D.lancById[id]).filter(Boolean); const tot = sel.reduce((s, l) => s + sinal(l), 0); const dif = Math.round((item.valor - tot) * 100) / 100;
     $('#cf', c).innerHTML = `<div class="small">Extrato <strong>${money(item.valor)}</strong> · Selecionado <strong>${money(tot)}</strong> (${sel.length}) · Diferença <strong class="${dif ? 'neg' : 'pos'}">${money(dif)}</strong>${sel.some(l => l.status === 'Em aberto') ? ' · <span class="neg">títulos em aberto serão baixados</span>' : ''}</div>
       ${podeEditar() ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="ign">Ignorar${multi ? ` (${sels.length})` : ''}</button>${multi ? '' : '<button class="btn small" id="cria">Criar lançamento</button>'}<button class="btn small primary" id="conc" ${sel.length && !dif ? '' : 'disabled'}>Conciliar${multi ? ` ${sels.length} × ${sel.length}` : ''}</button></div>` : ''}`;
+    // seleção que bate: linhas verdes nos dois lados
+    const ok = sel.length > 0 && !dif;
+    root.querySelectorAll('#ext tr[data-id]').forEach(tr => tr.classList.toggle('conc-ok', ok && ui.sels.has(tr.dataset.id)));
+    c.querySelectorAll('tr[data-l]').forEach(tr => tr.classList.toggle('conc-ok', ok && ui.marcados.has(tr.dataset.l)));
+    $('#cf', c).classList.toggle('ok', ok);
     $('#conc', c) && ($('#conc', c).onclick = () => multi ? conciliarGrupo(sels, [...ui.marcados], root) : conciliar([{ item, ids: [...ui.marcados] }], root));
     $('#ign', c) && ($('#ign', c).onclick = () => ignorar(multi ? sels : [item], root));
     $('#cria', c) && ($('#cria', c).onclick = () => criar(item, root));

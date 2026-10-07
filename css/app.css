@@ -317,3 +317,6 @@ a.btn{text-decoration:none}
 .conc-flt .par input[inputmode]{width:90px}
 .conc-flt .chk{flex-direction:row;align-items:center;gap:6px}
 .conc-flt .chk input{min-height:0}
+tr.conc-ok>td{background:var(--pos-soft)!important}
+tr.conc-ok>td:first-child{box-shadow:inset 3px 0 0 var(--pos)}
+.conc-foot.ok{background:var(--pos-soft)}
