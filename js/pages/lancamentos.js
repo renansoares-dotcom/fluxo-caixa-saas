@@ -5,6 +5,7 @@ import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
 
 export const title = 'Lançamentos';
 const PAGE = 100;
+let conciliados = new Set();
 const f = { mes: new Date().getMonth() + 1, de: '', ate: '', status: '', classe: '', conta: '', cc: '', busca: '', page: 0 };
 
 export async function render(root) {
@@ -54,7 +55,9 @@ export async function render(root) {
       try { const n = await q(sb.rpc('baixar_lancamentos', { p_ids: ids })); toast(`${n} lançamento(s) marcados como pago`); load(root); } catch (e) { fail(e); }
     };
     $('#excluir', root).onclick = async () => {
-      const ids = selecionados(root); if (!ids.length || !confirm(`Excluir ${ids.length} lançamento(s)?`)) return;
+      const sel = selecionados(root); const ids = sel.filter(id => !conciliados.has(id)); const bloq = sel.length - ids.length;
+      if (bloq) toast(`${bloq} lançamento(s) conciliado(s) não podem ser excluídos (desfaça a conciliação antes)`, !ids.length);
+      if (!ids.length || !confirm(`Excluir ${ids.length} lançamento(s)?${bloq ? ` Os ${bloq} conciliado(s) ficam.` : ''}`)) return;
       try { await q(sb.from('lancamentos').delete().in('id', ids)); toast('Excluídos'); load(root); } catch (e) { fail(e); }
     };
   }
@@ -107,6 +110,9 @@ async function load(root) {
       <div class="kpi"><div class="k-label">Saídas</div><div class="k-value neg">${money(sai)}</div></div>
       <div class="kpi"><div class="k-label">Resultado</div><div class="k-value ${cls(ent + sai)}">${money(ent + sai)}</div><div class="k-sub">Transferências: ${money(trf)}</div></div>`;
     if (!data.length) { tbl.innerHTML = '<div class="empty">Nenhum lançamento encontrado.</div>'; $('#pager', root).innerHTML = ''; return; }
+    // conciliados com o extrato bancário (marcados na lista; não podem ser excluídos)
+    const conc = new Set((await q(sb.from('conciliacoes').select('lancamento_id').in('lancamento_id', data.map(l => l.id)))).map(c => c.lancamento_id));
+    conciliados = conc;
     tbl.innerHTML = `<table><thead><tr>${podeEditar() ? '<th><input type="checkbox" id="all"></th>' : ''}
       <th>Data</th><th>Plano de contas</th><th>Descrição</th><th>Favorecido</th><th>C. Custo</th><th>Conta</th><th>Status</th><th class="num">Valor</th></tr></thead>
       <tbody>${data.map(l => `<tr class="clickable" data-id="${l.id}">
@@ -115,7 +121,7 @@ async function load(root) {
         <td class="wrap">${esc(l.descricao || '')}${l.documento ? `<div class="muted small">NF ${esc(l.documento)}${l.emissao ? ` · emissão ${dateBR(l.emissao)}` : ''}${l.fidc_proposta_id ? ' · FIDC' : ''}</div>` : ''}${l.opc1 ? `<div class="muted small">${esc(l.opc1)}</div>` : ''}</td>
         <td class="wrap">${esc(l.favorecido_nome || '')}</td><td>${esc(l.centro_custo_nome || '')}</td>
         <td>${esc(l.conta_nome || '—')}</td>
-        <td><span class="badge ${l.status === 'Pago' ? 'pago' : 'aberto'}">${l.status}</span></td>
+        <td><span class="badge ${l.status === 'Pago' ? 'pago' : 'aberto'}">${l.status}</span>${conc.has(l.id) ? ' <span class="badge conc" title="Conciliado com o extrato bancário">✓ conciliado</span>' : ''}</td>
         <td class="num ${cls(l.valor_sinal)}">${money(l.valor_sinal)}</td></tr>`).join('')}</tbody></table>`;
     const pages = Math.ceil(count / PAGE);
     $('#pager', root).innerHTML = `<span class="muted small">Página ${f.page + 1} de ${pages}</span>

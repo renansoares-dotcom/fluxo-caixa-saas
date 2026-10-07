@@ -66,10 +66,29 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
   const form = $('#lanc-form', m.el);
   if (ro) form.querySelectorAll('input,select').forEach(i => i.disabled = true);
   if (ro) return;
+  // lançamento conciliado com o extrato: só descrição e opcionais; sem exclusão
+  const LIVRES = ['descricao', 'opc1', 'opc2', 'opc3', 'opc4'];
+  let conciliado = false;
+  if (editando) {
+    q(sb.from('conciliacoes').select('id').eq('lancamento_id', l.id).limit(1)).then((r) => {
+      if (!r?.length) return;
+      conciliado = true;
+      form.querySelectorAll('input,select').forEach(i => { if (!LIVRES.includes(i.name)) i.disabled = true; });
+      $('#lf-del', m.el)?.remove();
+      form.insertAdjacentHTML('beforebegin', '<p class="small" style="margin-top:0"><span class="badge pago">conciliado</span> Lançamento conciliado com o extrato bancário: só a descrição e os opcionais podem ser alterados. Para mudar valor, data, conta ou classificação, desfaça a conciliação em Conciliação Bancária.</p>');
+    }).catch(() => {});
+  }
 
   $('#lf-save', m.el).onclick = async () => {
     if (!form.reportValidity()) return;
     const fd = Object.fromEntries(new FormData(form).entries());
+    if (conciliado) {
+      try {
+        const salvo = await q(sb.from('lancamentos').update(Object.fromEntries(LIVRES.map(k => [k, (fd[k] || '').trim() || null]))).eq('id', l.id).select().single());
+        toast('Descrição salva'); m.close(); onSaved(salvo);
+      } catch (e) { fail(e); }
+      return;
+    }
     try {
       const plano = c.planoById[fd.plano_id];
       const row = {

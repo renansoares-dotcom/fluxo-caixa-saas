@@ -332,3 +332,4 @@ tr.conc-ok>td:first-child{box-shadow:inset 3px 0 0 var(--pos)}
 .nav-itens{display:flex;flex-direction:column;gap:2px;padding:2px 0 6px 8px;margin-left:10px;border-left:1px solid var(--border)}
 @media (max-width:900px){.nav-sec>summary{padding:11px 12px;font-size:12px}}
 .edt{width:34px;padding:0 4px!important;text-align:center}
+.badge.conc{background:var(--pos-soft);color:var(--pos);border:1px solid var(--pos)}
