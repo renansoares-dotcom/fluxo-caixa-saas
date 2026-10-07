@@ -327,7 +327,13 @@ function pintarSistema(root) {
     root.querySelectorAll('#ext tr[data-id]').forEach(tr => tr.classList.toggle('conc-ok', ok && ui.sels.has(tr.dataset.id)));
     c.querySelectorAll('tr[data-l]').forEach(tr => tr.classList.toggle('conc-ok', ok && ui.marcados.has(tr.dataset.l)));
     $('#cf', c).classList.toggle('ok', ok);
-    $('#conc', c) && ($('#conc', c).onclick = () => multi ? conciliarGrupo(sels, [...ui.marcados], root) : conciliar([{ item, ids: [...ui.marcados] }], root));
+    $('#conc', c) && ($('#conc', c).onclick = () => {
+      // aviso quando movimento e lançamento estão a mais de 2 dias um do outro (ex.: saques de um dia com o lançamento de outro)
+      const its = multi ? sels : [item];
+      const longe = Math.max(...its.flatMap(i => sel.map(l => Math.abs(difDias(i.data, l.data)))));
+      if (longe > 2 && !confirm(`Atenção: há ${longe} dias de diferença entre as datas do extrato (${[...new Set(its.map(i => dateBR(i.data)))].join(', ')}) e dos lançamentos (${[...new Set(sel.map(l => dateBR(l.data)))].join(', ')}).\n\nConciliar mesmo assim?`)) return;
+      multi ? conciliarGrupo(sels, [...ui.marcados], root) : conciliar([{ item, ids: [...ui.marcados] }], root);
+    });
     $('#ign', c) && ($('#ign', c).onclick = () => ignorar(multi ? sels : [item], root));
     $('#cria', c) && ($('#cria', c).onclick = () => criar(item, root));
   };
