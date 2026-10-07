@@ -1,4 +1,4 @@
-import { sb, state, q, isAdmin, podeEditar, loadCadastros } from '../lib/data.js';
+import { sb, state, q, fetchAll, isAdmin, podeEditar, loadCadastros } from '../lib/data.js';
 import { $, esc, options, formData, toast, fail, parseNum, dateBR, money, exportXLSX } from '../lib/ui.js';
 
 export const title = 'Empresa e usuários';
@@ -32,12 +32,12 @@ export async function render(root) {
     ${podeEditar() ? `<div class="card"><h2>Importar lançamentos (Excel ou CSV)</h2>
       <p class="muted small" style="margin-top:0">Colunas aceitas (cabeçalho na 1ª linha): <strong>Data</strong>, <strong>Plano de contas</strong> (código, ex. 2.05.09, ou "2.05.09 - NOME"),
       <strong>Valor</strong>, Descrição, Favorecido, Centro de Custo, Status (Pago / Em aberto), Conta, Opcional 1..4. É o mesmo layout das abas mensais da planilha
-      e do Excel exportado em Lançamentos. Favorecidos novos são cadastrados automaticamente.</p>
+      e do Excel exportado em Lançamentos. Beneficiários novos são cadastrados automaticamente.</p>
       <div class="toolbar"><input type="file" id="arq" accept=".xlsx,.xls,.xlsm,.csv"><button class="btn" id="modelo">Baixar modelo</button></div>
       <div id="prev" style="margin-top:12px"></div></div>` : ''}
     ${adm ? `<div class="card"><h2>Importar base completa (migração da planilha)</h2>
       <p class="muted small" style="margin-top:0">Carrega um arquivo <strong>.json</strong> gerado a partir da planilha Fluxo de Caixa (cadastros, lançamentos, budget/forecast e FIDC).
-      Só funciona em empresa <strong>sem lançamentos</strong>: o plano de contas modelo, contas, favorecidos e centros de custo atuais são substituídos pelos do arquivo.</p>
+      Só funciona em empresa <strong>sem lançamentos</strong>. Plano de contas, contas, centros de custo e grupos são atualizados pelo arquivo; os <strong>beneficiários já cadastrados são preservados</strong> (só o que estiver vazio é completado) e os novos são incluídos. Budget/forecast, base FIDC e autorizações são substituídos.</p>
       <div class="toolbar"><input type="file" id="arq-base" accept=".json"></div><div id="base-log" class="small" style="margin-top:10px"></div></div>` : ''}`;
   if (adm) $('#arq-base', root).onchange = (ev) => importarBase(ev.target.files[0], root);
 
@@ -127,7 +127,7 @@ async function importar(file, root) {
     const tot = ok.reduce((s, x) => s + x.valor, 0);
     prev.innerHTML = `<div class="kpis"><div class="kpi"><div class="k-label">Linhas válidas</div><div class="k-value">${ok.length}</div><div class="k-sub">soma ${money(tot)}</div></div>
       <div class="kpi"><div class="k-label">Com erro</div><div class="k-value ${erros.length ? 'neg' : ''}">${erros.length}</div></div>
-      <div class="kpi"><div class="k-label">Favorecidos novos</div><div class="k-value">${novosFav.size}</div></div></div>
+      <div class="kpi"><div class="k-label">Beneficiários novos</div><div class="k-value">${novosFav.size}</div></div></div>
       ${erros.length ? `<details style="margin-top:10px"><summary class="neg">Ver erros</summary><div class="small">${erros.slice(0, 200).map(esc).join('<br>')}</div></details>` : ''}
       ${ok.length ? `<p class="small muted">Período: ${dateBR(ok.map(x => x.data).sort()[0])} a ${dateBR(ok.map(x => x.data).sort().pop())}</p><button class="btn primary" id="imp">Importar ${ok.length} lançamentos</button>` : ''}`;
     if (ok.length) $('#imp', root).onclick = async () => {
@@ -166,11 +166,28 @@ async function importarBase(file, root) {
     if (count) throw new Error(`Esta empresa já tem ${count} lançamentos. Crie uma empresa nova para importar a base.`);
     if (!confirm(`Importar ${d.lancamentos.length.toLocaleString('pt-BR')} lançamentos, ${d.plano_contas.length} contas do plano, ${d.favorecidos.length} favorecidos e ${d.fidc_operacoes?.length || 0} borderôs FIDC em "${state.empresa.nome}"?`)) return;
     $('#arq-base', root).disabled = true;
-    say('Limpando cadastros modelo…');
+    say('Limpando budget, forecast, base FIDC e autorizações…');
     for (const t of ['orcamentos', 'forecast_status', 'fidc_titulos', 'fidc_operacoes', 'autorizacao_itens', 'autorizacoes']) await q(sb.from(t).delete().eq('empresa_id', e));
-    await q(sb.from('plano_contas').delete().eq('empresa_id', e).eq('nivel', 2));
-    for (const t of ['plano_contas', 'favorecidos', 'contas', 'centros_custo', 'grupos']) await q(sb.from(t).delete().eq('empresa_id', e));
     const map = new Map(); const nid = (old) => { if (!old) return null; if (!map.has(old)) map.set(old, crypto.randomUUID()); return map.get(old); };
+    // Cadastros são MESCLADOS (não apagados): o que já existe é reaproveitado pelo mesmo id, preservando o que foi
+    // cadastrado na plataforma (parâmetros dos beneficiários, endereços, fundos, beneficiários de endosso etc.).
+    //  - 'sobrescrever': a planilha manda (plano, contas, centros, grupos) — atualiza os campos que vierem preenchidos;
+    //  - 'completar': a plataforma manda (beneficiários) — só preenche o que estiver vazio.
+    const normN = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+    const mesclar = async (t, rows, chave, prep, modo, label) => {
+      const ex = await fetchAll(() => sb.from(t).select('*').eq('empresa_id', e));
+      const porChave = new Map(ex.map(r => [chave(r), r])); const lote = []; let nNovos = 0, nAtual = 0;
+      for (const r0 of rows) {
+        const r = prep(r0); const old = porChave.get(chave(r));
+        if (old) {
+          map.set(r0.id, old.id); const m = { ...old };
+          for (const [k, v] of Object.entries(r)) if (k !== 'id' && v != null && v !== '' && (modo === 'sobrescrever' || old[k] == null || old[k] === '')) m[k] = v;
+          lote.push(m); nAtual++;
+        } else { const n = { ...r, id: nid(r0.id) }; lote.push(n); porChave.set(chave(n), n); nNovos++; }
+      }
+      for (let i = 0; i < lote.length; i += 500) await q(sb.from(t).upsert(lote.slice(i, i + 500), { onConflict: 'id' }));
+      say(`✓ ${label || t}: ${nAtual} existente(s) mantido(s)/atualizado(s), ${nNovos} novo(s)`);
+    };
     const ins = async (t, rows, label) => {
       for (let i = 0; i < rows.length; i += 1000) {
         await q(sb.from(t).insert(rows.slice(i, i + 1000)));
@@ -178,12 +195,12 @@ async function importarBase(file, root) {
       say(`✓ ${label || t}: ${rows.length}`);
     };
     const E = (r) => ({ ...r, empresa_id: e });
-    await ins('grupos', d.grupos.map(r => E({ ...r, id: nid(r.id) })));
-    await ins('centros_custo', d.centros_custo.map(r => E({ ...r, id: nid(r.id) })), 'centros de custo');
-    await ins('plano_contas', d.plano_contas.filter(r => r.nivel === 1).map(r => E({ ...r, id: nid(r.id), pai_id: null })), 'classificações');
-    await ins('plano_contas', d.plano_contas.filter(r => r.nivel === 2).map(r => E({ ...r, id: nid(r.id), pai_id: nid(r.pai_id) })), 'contas do plano');
-    await ins('favorecidos', d.favorecidos.map(r => E({ ...r, id: nid(r.id) })));
-    await ins('contas', d.contas.map(r => E({ ...r, id: nid(r.id), grupo_id: nid(r.grupo_id) })), 'contas bancárias');
+    await mesclar('grupos', d.grupos, r => normN(r.nome), r => E({ ...r }), 'sobrescrever', 'grupos');
+    await mesclar('centros_custo', d.centros_custo, r => normN(r.nome), r => E({ ...r }), 'sobrescrever', 'centros de custo');
+    await mesclar('plano_contas', d.plano_contas.filter(r => r.nivel === 1), r => r.codigo, r => E({ ...r, pai_id: null }), 'sobrescrever', 'classificações');
+    await mesclar('plano_contas', d.plano_contas.filter(r => r.nivel === 2), r => r.codigo, r => E({ ...r, pai_id: nid(r.pai_id) }), 'sobrescrever', 'contas do plano');
+    await mesclar('favorecidos', d.favorecidos, r => `${r.tipo}|${normN(r.nome)}`, r => E({ ...r }), 'completar', 'beneficiários');
+    await mesclar('contas', d.contas, r => normN(r.nome), r => E({ ...r, grupo_id: nid(r.grupo_id) }), 'sobrescrever', 'contas bancárias');
     const prog = document.createElement('div'); log.appendChild(prog);
     const L = d.lancamentos.map(r => E({ ...r, plano_id: nid(r.plano_id), favorecido_id: nid(r.favorecido_id), centro_custo_id: nid(r.centro_custo_id), conta_id: nid(r.conta_id) }));
     for (let i = 0; i < L.length; i += 1000) {

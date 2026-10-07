@@ -21,7 +21,7 @@ const fatura = (doc) => String(doc || '').split(/[-\/]/)[0];
 // chave de acesso da NF-e (44 dígitos), gravada na importação do XML em origem = 'nfe:<chave>'
 const chaveNFe = (t) => { const m = String(t.origem || '').match(/^nfe:(\d{44})$/); return m ? m[1] : ''; };
 const fmtChave = (c) => c ? c.replace(/(\d{4})(?=\d)/g, '$1 ') : '';
-// beneficiário ligado a um favorecido (fornecedor): os dados vêm do cadastro de Favorecidos, o que faltar fica do beneficiário
+// beneficiário ligado a um favorecido (fornecedor): os dados vêm do cadastro de Beneficiários, o que faltar fica do beneficiário
 function dadosBenef(b) {
   if (!b) return null;
   const f = b.favorecido_id ? state.cad.favById[b.favorecido_id] : null;
@@ -196,14 +196,14 @@ function verificacoes(d, tits, b) {
   else {
     const bd = dadosBenef(b);
     const falta = [['razao_social', 'razão social'], ['cnpj', 'CNPJ'], ['logradouro', 'endereço'], ['municipio', 'município']].filter(([k]) => !bd[k]).map(([, n]) => n);
-    out.push([falta.length ? 'atencao' : 'ok', `Beneficiário — ${b.nome} (${TIPO_ROT[b.tipo] || 'FIDC'})`, falta.length ? `Falta no cadastro${b.favorecido_id ? ' do fornecedor (Favorecidos)' : ''}: ${falta.join(', ')}. Clique em “Gerenciar beneficiários” para completar.` : `${bd.razao_social} · CNPJ ${fmtDoc(bd.cnpj)} · ${[bd.municipio, bd.uf].filter(Boolean).join('/')}`]);
+    out.push([falta.length ? 'atencao' : 'ok', `Beneficiário — ${b.nome} (${TIPO_ROT[b.tipo] || 'FIDC'})`, falta.length ? `Falta no cadastro${b.favorecido_id ? ' do fornecedor (Beneficiários)' : ''}: ${falta.join(', ')}. Clique em “Gerenciar beneficiários” para completar.` : `${bd.razao_social} · CNPJ ${fmtDoc(bd.cnpj)} · ${[bd.municipio, bd.uf].filter(Boolean).join('/')}`]);
     if (d.modalidade === 'garantia' && !d.referencia) out.push(['info', 'Endosso em garantia', 'Informe o que está sendo garantido (ex.: pedido ou NF de compra de resina) para constar no endosso.']);
   }
   const e = state.empresa;
   const faltaE = [['razao_social', 'razão social'], ['cnpj', 'CNPJ'], ['logradouro', 'endereço'], ['municipio', 'município']].filter(([k]) => !e[k]).map(([, n]) => n);
   if (faltaE.length) out.push(['atencao', 'Emitente', `Falta em Empresa e usuários: ${faltaE.join(', ')}.`]);
   const semEnd = tits.filter(t => !fav(t).logradouro); const semDoc = tits.filter(t => !soDig(fav(t).documento));
-  if (semEnd.length || semDoc.length) out.push(['atencao', 'Sacados', `${semEnd.length ? `${semEnd.length} título(s) de cliente sem endereço` : ''}${semEnd.length && semDoc.length ? ' · ' : ''}${semDoc.length ? `${semDoc.length} sem CNPJ` : ''}. Importe de novo o XML da NF (completa o cadastro) ou edite em Favorecidos.`]);
+  if (semEnd.length || semDoc.length) out.push(['atencao', 'Sacados', `${semEnd.length ? `${semEnd.length} título(s) de cliente sem endereço` : ''}${semEnd.length && semDoc.length ? ' · ' : ''}${semDoc.length ? `${semDoc.length} sem CNPJ` : ''}. Importe de novo o XML da NF (completa o cadastro) ou edite em Beneficiários.`]);
   else out.push(['ok', 'Sacados', 'Todos com CNPJ e endereço.']);
   const ja = tits.filter(t => emitidas[t.id]?.length);
   if (ja.length) out.push(['atencao', 'Já endossadas', `${ja.length} título(s) já tiveram duplicata gerada antes; gerar de novo cria outro registro.`]);
@@ -387,7 +387,7 @@ function addFornecedor(root) {
   const lista = fornecedores();
   const m = modal({
     title: 'Endossar para um fornecedor', wide: true,
-    body: `<p class="small muted" style="margin-top:0">Escolha o fornecedor (ex.: de resina). Os dados vêm do cadastro de Favorecidos; complete o que faltar e eles ficam salvos no cadastro do fornecedor.</p>
+    body: `<p class="small muted" style="margin-top:0">Escolha o fornecedor (ex.: de resina). Os dados vêm do cadastro de Beneficiários; complete o que faltar e eles ficam salvos no cadastro do fornecedor.</p>
       <form id="ff" class="grid-form">
         <label class="span2">Fornecedor *<input name="fav" list="dl-forn2" required placeholder="digite para buscar"><datalist id="dl-forn2">${lista.map(f => `<option value="${esc(f.nome)}">`).join('')}</datalist></label>
         <label>CNPJ<input name="documento"></label><label>Inscrição estadual<input name="ie"></label>
@@ -418,14 +418,14 @@ function gerenciar(root) {
     ['logradouro', 'Endereço', 1], ['municipio', 'Município'], ['uf', 'UF'], ['cep', 'CEP']];
   const m = modal({
     title: 'Beneficiários do endosso', wide: true,
-    body: `<p class="small muted" style="margin-top:0">Fundos, fornecedores, bancos ou factorings que recebem as duplicatas por endosso. Beneficiário ligado a um fornecedor usa os dados do cadastro de Favorecidos (CNPJ, endereço); o que faltar lá pode ser preenchido aqui.</p>
+    body: `<p class="small muted" style="margin-top:0">Fundos, fornecedores, bancos ou factorings que recebem as duplicatas por endosso. Beneficiário ligado a um fornecedor usa os dados do cadastro de Beneficiários (CNPJ, endereço); o que faltar lá pode ser preenchido aqui.</p>
       <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Razão social</th><th>CNPJ</th><th>Cidade</th><th>Praça</th><th>Vínculo</th><th></th></tr></thead><tbody>
-      ${benefs.map(b0 => { const b = dadosBenef(b0); return `<tr class="clickable" data-id="${b.id}"><td><strong>${esc(b.nome)}</strong></td><td>${TIPO_ROT[b.tipo] || 'FIDC'}</td><td class="wrap small">${esc(b.razao_social || '—')}</td><td>${esc(fmtDoc(b.cnpj) || '—')}</td><td>${esc([b.municipio, b.uf].filter(Boolean).join('/'))}</td><td>${esc(b.praca_pagamento || '')}</td><td class="small">${esc(fundos.find(f => f.id === b.fundo_id)?.nome || (b.favorecido_id ? 'Favorecidos' : ''))}</td><td>${b.ativo ? '' : '<span class="badge vencido">inativo</span>'}</td></tr>`; }).join('')}
+      ${benefs.map(b0 => { const b = dadosBenef(b0); return `<tr class="clickable" data-id="${b.id}"><td><strong>${esc(b.nome)}</strong></td><td>${TIPO_ROT[b.tipo] || 'FIDC'}</td><td class="wrap small">${esc(b.razao_social || '—')}</td><td>${esc(fmtDoc(b.cnpj) || '—')}</td><td>${esc([b.municipio, b.uf].filter(Boolean).join('/'))}</td><td>${esc(b.praca_pagamento || '')}</td><td class="small">${esc(fundos.find(f => f.id === b.fundo_id)?.nome || (b.favorecido_id ? 'Beneficiários' : ''))}</td><td>${b.ativo ? '' : '<span class="badge vencido">inativo</span>'}</td></tr>`; }).join('')}
       </tbody></table></div>
       <form id="bf" class="grid-form" style="margin-top:14px"><input type="hidden" name="id">
         ${campos.map(([k, t, sp]) => `<label class="${sp ? 'span2' : ''}">${t}<input name="${k}" ${k === 'nome' ? 'required' : ''}></label>`).join('')}
         <label>Tipo<select name="tipo">${Object.keys(TIPO_ROT).map(k => `<option value="${k}">${k}</option>`).join('')}</select></label>
-        <label class="span2">Fornecedor do cadastro (puxa CNPJ e endereço)<input name="fav" list="dl-forn" placeholder="digite para buscar em Favorecidos"><datalist id="dl-forn">${fornecedores().map(f => `<option value="${esc(f.nome)}">`).join('')}</datalist></label>
+        <label class="span2">Fornecedor do cadastro (puxa CNPJ e endereço)<input name="fav" list="dl-forn" placeholder="digite para buscar em Beneficiários"><datalist id="dl-forn">${fornecedores().map(f => `<option value="${esc(f.nome)}">`).join('')}</datalist></label>
         <label>Fundo vinculado<select name="fundo_id"><option value="">—</option>${fundos.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join('')}</select></label>
         <label>Ativo<select name="ativo"><option value="1">sim</option><option value="0">não</option></select></label>
       </form>`,
@@ -443,7 +443,7 @@ function gerenciar(root) {
     if (!f.reportValidity()) return;
     const d = formData(f);
     const fv = d.fav ? fornecedores().find(x => x.nome === String(d.fav).trim()) : null;
-    if (d.fav && !fv) return toast('Fornecedor não encontrado em Favorecidos', true);
+    if (d.fav && !fv) return toast('Fornecedor não encontrado em Beneficiários', true);
     const row = { empresa_id: state.empresa.id, fundo_id: d.fundo_id || null, ativo: d.ativo !== '0', tipo: d.tipo || 'FIDC', favorecido_id: fv?.id || null, updated_at: new Date().toISOString() };
     for (const [k] of campos) row[k] = String(d[k] || '').trim() || null;
     if (row.uf) row.uf = row.uf.toUpperCase();
