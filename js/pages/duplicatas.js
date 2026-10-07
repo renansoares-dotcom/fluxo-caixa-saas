@@ -18,6 +18,9 @@ const fav = (t) => state.cad.favById[t.favorecido_id] || {};
 const enderecoFav = (f) => [f.logradouro, f.numero, f.complemento, f.bairro].filter(Boolean).join(', ');
 const cidadeFav = (f) => [f.municipio, f.uf].filter(Boolean).join('/');
 const fatura = (doc) => String(doc || '').split(/[-\/]/)[0];
+// chave de acesso da NF-e (44 dígitos), gravada na importação do XML em origem = 'nfe:<chave>'
+const chaveNFe = (t) => { const m = String(t.origem || '').match(/^nfe:(\d{44})$/); return m ? m[1] : ''; };
+const fmtChave = (c) => c ? c.replace(/(\d{4})(?=\d)/g, '$1 ') : '';
 // beneficiário ligado a um favorecido (fornecedor): os dados vêm do cadastro de Favorecidos, o que faltar fica do beneficiário
 function dadosBenef(b) {
   if (!b) return null;
@@ -54,7 +57,7 @@ async function carregar() {
   await loadCadastros();
   const e = state.empresa.id;
   const receitas = state.cad.plano.filter(p => p.nivel === 2 && p.codigo.startsWith('1.01')).map(p => p.id);
-  const cols = 'id,data,emissao,documento,descricao,favorecido_id,valor,status,fidc_proposta_id';
+  const cols = 'id,data,emissao,documento,descricao,favorecido_id,valor,status,fidc_proposta_id,origem';
   let abertos, dups, itens;
   [abertos, benefs, dups, propostas, itens, fundos] = await Promise.all([
     receitas.length ? fetchAll(() => sb.from('lancamentos').select(cols).eq('empresa_id', e).eq('status', 'Em aberto').in('plano_id', receitas).order('data')) : [],
@@ -140,7 +143,7 @@ function dadosDuplicata(t, b0) {
     numero: t.documento || t.id.slice(0, 8), fatura: fatura(t.documento) || '', emissao: t.emissao || ui.dataEndosso, vencimento: t.data, valor: +t.valor,
     emitente: { nome: e.razao_social || e.nome, cnpj: fmtDoc(e.cnpj), ie: e.ie || '', logradouro: e.logradouro || '', cidade: [e.municipio, e.uf].filter(Boolean).join('/'), cep: fmtCep(e.cep),
       responsavel: e.responsavel_nome || '', responsavel_cpf: e.responsavel_cpf || '', avalista: e.avalista_nome || '', avalista_cpf: e.avalista_cpf || '' },
-    sacado: { id: f.id, nome: f.nome || t.descricao || '', cnpj: fmtDoc(f.documento), ie: f.ie || '', endereco: enderecoFav(f), cidade: cidadeFav(f), cep: fmtCep(f.cep) },
+    sacado: { id: f.id, nome: f.nome || t.descricao || '', cnpj: fmtDoc(f.documento), ie: f.ie || '', endereco: enderecoFav(f), cidade: cidadeFav(f), cep: fmtCep(f.cep), chave: fmtChave(chaveNFe(t)) },
     beneficiario: b ? { id: b.id, nome: b.razao_social || b.nome, curto: b.nome, cnpj: fmtDoc(b.cnpj), endereco: b.logradouro || '', cidade: [b.municipio, b.uf].filter(Boolean).join('/') } : null,
     praca: ui.praca || b?.praca_pagamento || [state.empresa.municipio, state.empresa.uf].filter(Boolean).join('/'),
     local: [state.empresa.municipio, state.empresa.uf].filter(Boolean).join('/'), dataEndosso: ui.dataEndosso,
@@ -172,7 +175,8 @@ function htmlDuplicata(d) {
         <div class="dp-linha">${L('Pagável em', d.praca)}${L('Emitida em', `${d.local}, ${dateBR(d.emissao)}`)}</div>
         <div class="dp-sacado"><span>SACADO</span><strong>${esc(d.sacado.nome)}</strong>
           <div>CNPJ/CPF ${esc(d.sacado.cnpj || '—')}${d.sacado.ie ? ` · IE ${esc(d.sacado.ie)}` : ''}</div>
-          <div>${esc(d.sacado.endereco || 'endereço não cadastrado')}${d.sacado.cidade ? ` — ${esc(d.sacado.cidade)}` : ''}${d.sacado.cep ? ` · CEP ${esc(d.sacado.cep)}` : ''}</div></div>
+          <div>${esc(d.sacado.endereco || 'endereço não cadastrado')}${d.sacado.cidade ? ` — ${esc(d.sacado.cidade)}` : ''}${d.sacado.cep ? ` · CEP ${esc(d.sacado.cep)}` : ''}</div>
+          <div>Chave da NF-e: ${d.sacado.chave ? esc(d.sacado.chave) : '<span class="neg">não informada (NF sem XML importado)</span>'}</div></div>
         <div class="dp-rodape">
           <div class="dp-emit"><strong>${esc(d.emitente.nome)}</strong><div>CNPJ/MF ${esc(d.emitente.cnpj)}${d.emitente.ie ? ` · IE ${esc(d.emitente.ie)}` : ''}</div><div>${esc(d.emitente.logradouro)}</div><div>${esc(d.emitente.cidade)}</div></div>
           <div class="dp-ass"><div class="dp-lin"></div>${esc(d.emitente.nome)}<br><span class="muted">emitente</span></div>
@@ -491,15 +495,16 @@ function desenharPdf(doc, d, pag, totPag, lote) {
   doc.setFontSize(9); doc.text('Pagável em', X, y + 4); doc.setFont('courier', 'bold'); doc.text(pdfTxt(d.praca || '-'), X + 19, y + 4);
   doc.text(pdfTxt(`${d.local || ''}, ${dataExtenso(d.emissao)}`.toUpperCase()), R, y + 9, { align: 'right' });
   // sacado
-  y += 13; doc.setLineWidth(0.2); doc.rect(X, y, R - X, 20);
+  y += 13; doc.setLineWidth(0.2); doc.rect(X, y, R - X, 24);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text('SACADO', X + 2, y + 3.5);
   doc.setFont('courier', 'bold'); doc.setFontSize(9);
   doc.text(pdfTxt(d.sacado.nome).slice(0, 80), X + 2, y + 8);
   doc.setFont('courier', 'normal'); doc.setFontSize(8.5);
   doc.text(pdfTxt(`CNPJ/CPF: ${d.sacado.cnpj || '-'}${d.sacado.ie ? `   IE: ${d.sacado.ie}` : ''}`), X + 2, y + 12);
   doc.text(pdfTxt(`${d.sacado.endereco || 'ENDEREÇO NÃO CADASTRADO'}${d.sacado.cidade ? ` - ${d.sacado.cidade}` : ''}${d.sacado.cep ? `  CEP ${d.sacado.cep}` : ''}`).slice(0, 95), X + 2, y + 16);
+  doc.setFont('courier', 'normal'); doc.setFontSize(8.3); doc.text(pdfTxt(`CHAVE NF-e: ${d.sacado.chave || '-'}`), X + 2, y + 20.5);
   // emitente + assinaturas
-  y += 24;
+  y += 28;
   const maxW = R - 66 - X; const campoEmit = (val, rot, yy) => { doc.setFont('courier', 'bold'); let fs = 9; doc.setFontSize(fs); const tv = pdfTxt(val); while (fs > 6.5 && doc.getTextWidth(tv) > maxW) doc.setFontSize(fs -= 0.5); doc.text(tv, X, yy); doc.setLineWidth(0.2); doc.line(X, yy + 1, X + maxW, yy + 1); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text(rot, X, yy + 3.6); };
   campoEmit(d.emitente.nome, 'EMITENTE', y); campoEmit(`${d.emitente.cnpj}${d.emitente.ie ? `   IE ${d.emitente.ie}` : ''}`, 'CNPJ/MF DO EMITENTE', y + 7.5);
   campoEmit(d.emitente.logradouro, 'LOGRADOURO DO EMITENTE', y + 15); campoEmit(d.emitente.cidade, 'MUNICÍPIO/UF DO EMITENTE', y + 22.5);
