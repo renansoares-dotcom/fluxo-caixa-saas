@@ -1034,3 +1034,13 @@ create policy dup_ins on public.duplicatas for insert to authenticated with chec
 create policy dup_del on public.duplicatas for delete to authenticated using (public.pode_editar(empresa_id));
 revoke all on public.beneficiarios_endosso, public.duplicatas from anon;
 grant select, insert, update, delete on public.beneficiarios_endosso, public.duplicatas to authenticated;
+
+-- ===== 20261006000012_endosso_fornecedor.sql
+-- Endosso para fornecedores (06/10): beneficiário pode ser fornecedor do cadastro de favorecidos;
+-- modalidade do endosso (translativo ou em garantia) e referência da garantia registradas na duplicata.
+alter table public.beneficiarios_endosso
+  add column if not exists tipo text not null default 'FIDC' check (tipo in ('FIDC', 'Fornecedor', 'Banco', 'Outro')),
+  add column if not exists favorecido_id uuid references public.favorecidos(id) on delete set null;
+alter table public.duplicatas
+  add column if not exists modalidade text not null default 'translativo' check (modalidade in ('translativo', 'garantia')),
+  add column if not exists referencia text;
