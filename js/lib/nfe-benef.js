@@ -122,7 +122,7 @@ const fmt = (k, v) => {
   return esc(v);
 };
 
-export function importarBeneficiariosNFe(onDone = () => {}) {
+export function importarBeneficiariosNFe(onDone = () => {}, { textos: pre = null } = {}) {
   let lidos = [], res = null, naoLidos = 0, aba = 'novo';
   const aprov = new Set(); // 'n|<chave>' para novos; 'd|<chave>|<campo>' para diferenças
   const tipoNovo = new Map();
@@ -229,6 +229,8 @@ export function importarBeneficiariosNFe(onDone = () => {}) {
   };
   $('#arq-pasta', m.el).onchange = (e) => ler([...e.target.files]);
   $('#arq-xml', m.el).onchange = (e) => ler([...e.target.files]);
+  // XML já lidos em outra tela (ex.: importação das notas fiscais): processa direto
+  if (pre?.length) { lidos = []; naoLidos = 0; for (const t of pre) { const r = participanteNFe(t.xml, cnpjEmp); if (r) lidos.push(r); else naoLidos++; } processar(); }
 
   $('#nb-ok', m.el).onclick = async () => {
     const ok = $('#nb-ok', m.el); ok.disabled = true;

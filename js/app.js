@@ -6,6 +6,7 @@ const routes = {
   'dashboard': () => import('./pages/dashboard.js'),
   'lancamentos': () => import('./pages/lancamentos.js'),
   'conciliacao': () => import('./pages/conciliacao.js'),
+  'notas': () => import('./pages/notas.js'),
   'abertos': () => import('./pages/abertos.js'),
   'autorizacao': () => import('./pages/autorizacao.js'),
   'fluxo-mensal': () => import('./pages/fluxo-mensal.js'),
