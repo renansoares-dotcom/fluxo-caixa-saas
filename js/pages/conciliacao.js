@@ -171,8 +171,16 @@ const linhaLanc = (l, { marcar = true, marcado = false } = {}) => {
   const p = state.cad.planoById[l.plano_id]; const f = state.cad.favById[l.favorecido_id]; const v = sinal(l);
   return `<tr data-l="${l.id}">${marcar ? `<td><input type="checkbox" ${marcado ? 'checked' : ''}></td>` : ''}<td>${dateBR(l.data)}</td>
     <td class="wrap">${esc(f?.nome || l.descricao || '')}<div class="small muted">${esc(p ? `${p.codigo} ${p.nome}` : '')}${l.documento ? ` · NF ${esc(l.documento)}` : ''}${l.status === 'Em aberto' ? ' · <span class="neg">em aberto</span>' : ''}${l.conta_id && l.conta_id !== ui.conta ? ` · ${esc(state.cad.contaById[l.conta_id]?.nome || '')}` : ''}</div></td>
-    <td class="num ${cls(v)}">${money(v)}</td></tr>`;
+    <td class="num ${cls(v)}">${money(v)}</td><td class="edt"><button class="btn ghost icon small" data-edit="${l.id}" title="Abrir o lançamento para edição">✎</button></td></tr>`;
 };
+
+// abre o lançamento no formulário de edição; ao salvar ou excluir, recarrega a conciliação
+async function editarLanc(id, root) {
+  try {
+    const l = await q(sb.from('lancamentos').select('*').eq('id', id).single());
+    abrirLancamento(l, () => carregar(root));
+  } catch (e) { fail(e); }
+}
 
 // Filtros e ordem do painel de lançamentos (direita)
 const ORDENS = [['prox', 'Mais provável'], ['data', 'Data ↑'], ['data_desc', 'Data ↓'], ['valor', 'Valor ↑'], ['valor_desc', 'Valor ↓'], ['fav', 'Favorecido A–Z'], ['plano', 'Plano de contas']];
@@ -252,6 +260,7 @@ function ligarMarcacao(c, lista, depois) {
 
 function pintarSistema(root) {
   const c = $('#sis', root);
+  c.onclick = (e) => { const id = e.target.closest('[data-edit]')?.dataset.edit; if (id) { e.preventDefault(); editarLanc(id, root); } };
   const sels = [...ui.sels].map(id => D.itens.find(i => i.id === id)).filter(Boolean);
   const multi = sels.length > 1;
   // vários movimentos: o alvo é a soma deles (data do primeiro, para a proximidade)
@@ -261,7 +270,7 @@ function pintarSistema(root) {
     const sem = filtrarOrdenar(D.lancs.filter(l => l.data >= D.ini && l.data <= D.fim && !D.lancLig.has(l.id)), null);
     c.innerHTML = `<div class="card-head"><div><h2>Lançamentos sem extrato</h2><p class="muted small">Pagos nesta conta no mês e ainda não conciliados. Clique num movimento do extrato para conciliar.</p></div></div>
       ${filtrosHTML(null)}${resumo(sem)}
-      <div class="table-wrap" style="max-height:52vh">${sem.length ? `<table><thead><tr>${thTodos(sem)}${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}</tr></thead><tbody>${sem.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum.</div>'}</div>
+      <div class="table-wrap" style="max-height:52vh">${sem.length ? `<table><thead><tr>${thTodos(sem)}${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}<th></th></tr></thead><tbody>${sem.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum.</div>'}</div>
       <div class="conc-foot" id="cf"></div>`;
     const rod = () => {
       const sel = [...ui.marcados].map(id => D.lancById[id]).filter(Boolean);
@@ -293,7 +302,7 @@ function pintarSistema(root) {
   c.innerHTML = `${cab}
     ${s ? `<p class="small" style="margin:0 12px 8px"><span class="badge aberto">${ROT_SUG[s.tipo]}</span> ${s.tipo === 'baixa' ? 'Título em aberto com o mesmo valor: ao conciliar, ele é baixado como pago na data do extrato e nesta conta.' : s.tipo === 'grupo' ? 'Lançamentos do mesmo dia que somam o valor do extrato.' : 'Mesmo valor e data próxima.'}</p>` : ''}
     ${filtrosHTML(item)}${resumo(lista)}
-    <div class="table-wrap" style="max-height:44vh">${lista.length ? `<table><thead><tr>${thTodos(lista)}${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}</tr></thead><tbody>${lista.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum lançamento com esses filtros.</div>'}</div>
+    <div class="table-wrap" style="max-height:44vh">${lista.length ? `<table><thead><tr>${thTodos(lista)}${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}<th></th></tr></thead><tbody>${lista.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum lançamento com esses filtros.</div>'}</div>
     <div class="conc-foot" id="cf"></div>`;
   const rodape = () => {
     const sel = [...ui.marcados].map(id => D.lancById[id]).filter(Boolean); const tot = sel.reduce((s, l) => s + sinal(l), 0); const dif = Math.round((item.valor - tot) * 100) / 100;
