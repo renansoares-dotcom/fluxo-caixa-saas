@@ -5,14 +5,14 @@ import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
 
 export const title = 'Lançamentos';
 const PAGE = 100;
-const f = { mes: new Date().getMonth() + 1, status: '', classe: '', conta: '', cc: '', busca: '', page: 0 };
+const f = { mes: new Date().getMonth() + 1, de: '', ate: '', status: '', classe: '', conta: '', cc: '', busca: '', page: 0 };
 
 export async function render(root) {
   const c = state.cad;
   root.innerHTML = `
     <div class="card">
       <div class="card-head">
-        <div class="chips" id="meses">${['Ano', ...MESES_CURTO].map((m, i) => `<span class="chip ${f.mes === i ? 'on' : ''}" data-m="${i}">${m}</span>`).join('')}</div>
+        <div class="chips" id="meses">${['Ano', ...MESES_CURTO].map((m, i) => `<span class="chip ${!periodo() && f.mes === i ? 'on' : ''}" data-m="${i}">${m}</span>`).join('')}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="exp">Exportar Excel</button>
           <a class="btn" href="#/conciliacao" title="Importar o extrato OFX do banco e conciliar com os lançamentos">Conciliação bancária (OFX)</a>
@@ -21,6 +21,9 @@ export async function render(root) {
       </div>
       <div class="toolbar" id="flt">
         <label class="grow">Buscar<input name="busca" placeholder="Descrição, favorecido, NF, opcional…" value="${esc(f.busca)}"></label>
+        <label>Data de<input type="date" name="de" value="${f.de}"></label>
+        <label>até<input type="date" name="ate" value="${f.ate}"></label>
+        ${periodo() ? '<button class="btn small" type="button" id="lp" title="Voltar ao filtro por mês">Limpar datas</button>' : ''}
         <label>Status<select name="status">${options([{ id: 'Pago' }, { id: 'Em aberto' }], { label: 'id', empty: 'Todos', selected: f.status })}</select></label>
         <label>Classificação<select name="classe">${options(c.classes, { label: 'label', empty: 'Todas', selected: f.classe })}</select></label>
         <label>Conta<select name="conta">${options(c.contas, { empty: 'Todas', selected: f.conta })}<option value="none" ${f.conta === 'none' ? 'selected' : ''}>(sem conta)</option></select></label>
@@ -36,8 +39,11 @@ export async function render(root) {
       <div class="pager" id="pager"></div>
     </div>`;
 
-  $('#meses', root).onclick = (e) => { const m = e.target.dataset.m; if (m == null) return; f.mes = +m; f.page = 0; render(root); };
-  $('#flt', root).addEventListener('input', debounce((e) => { f[e.target.name] = e.target.value; f.page = 0; load(root); }, 350));
+  $('#meses', root).onclick = (e) => { const m = e.target.dataset.m; if (m == null) return; f.mes = +m; f.de = f.ate = ''; f.page = 0; render(root); };
+  $('#lp', root) && ($('#lp', root).onclick = () => { f.de = f.ate = ''; f.page = 0; render(root); });
+  // datas: o período escolhido substitui o filtro por mês
+  $('#flt', root).addEventListener('change', (e) => { if (['de', 'ate'].includes(e.target.name)) { f[e.target.name] = e.target.value; f.page = 0; render(root); } });
+  $('#flt', root).addEventListener('input', debounce((e) => { if (['de', 'ate'].includes(e.target.name)) return; f[e.target.name] = e.target.value; f.page = 0; load(root); }, 350));
   $('#novo', root) && ($('#novo', root).onclick = () => abrirLancamento({ data: defaultDate() }, () => load(root)));
   $('#exp', root).onclick = () => exportar();
   $('#lanc-nf', root) && ($('#lanc-nf', root).onclick = () => lancarNFs(() => load(root)));
@@ -61,9 +67,14 @@ function defaultDate() {
   return `${state.ano}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+const periodo = () => !!(f.de || f.ate);
+
 function base(sel = '*', opts) {
   let qy = sb.from('v_lancamentos').select(sel, opts).eq('empresa_id', state.empresa.id);
-  if (f.mes) {
+  if (periodo()) {
+    if (f.de) qy = qy.gte('data', f.de);
+    if (f.ate) qy = qy.lte('data', f.ate);
+  } else if (f.mes) {
     const ini = `${state.ano}-${String(f.mes).padStart(2, '0')}-01`;
     const fim = new Date(state.ano, f.mes, 0).getDate();
     qy = qy.gte('data', ini).lte('data', `${state.ano}-${String(f.mes).padStart(2, '0')}-${fim}`);
@@ -138,6 +149,6 @@ async function exportar() {
       ['Data', 'Classificação', 'Plano de contas', 'Descrição', 'NF / documento', 'Emissão', 'Opcional 1', 'Opcional 2', 'Opcional 3', 'Opcional 4', 'Favorecido', 'Centro de custo', 'Status', 'Conta', 'Valor', 'Grupo', 'Disponibilidade'],
       ...rows.map(l => [l.data, `${l.classe_codigo} - ${l.classe_nome}`, `${l.plano_codigo} - ${l.plano_nome}`, l.descricao, l.documento, l.emissao, l.opc1, l.opc2, l.opc3, l.opc4,
         l.favorecido_nome, l.centro_custo_nome, l.status, l.conta_nome, +l.valor_sinal, l.grupo_nome, l.disponibilidade])
-    ], `lancamentos_${state.ano}${f.mes ? '_' + String(f.mes).padStart(2, '0') : ''}`);
+    ], periodo() ? `lancamentos_${f.de || 'inicio'}_a_${f.ate || 'fim'}` : `lancamentos_${state.ano}${f.mes ? '_' + String(f.mes).padStart(2, '0') : ''}`);
   } catch (e) { fail(e); }
 }
