@@ -223,8 +223,10 @@ async function aceitar(c, root, onMudou) {
 // já ligado à parcela (tipo 'titulo'). Se já existe um lançamento da mesma NF/parcela e valor ainda sem nota,
 // ele é ligado em vez de criar outro.
 // ---------------------------------------------------------------------------------------------
-export function gerarContasReceber(mesPadrao, onDone) {
-  const ini = `${mesPadrao}-01`, fim = new Date(Date.UTC(+mesPadrao.slice(0, 4), +mesPadrao.slice(5, 7), 0)).toISOString().slice(0, 10);
+// periodo: 'AAAA-MM' (mês) ou { de, ate } (datas de emissão)
+export function gerarContasReceber(periodo, onDone) {
+  const ini = typeof periodo === 'string' ? `${periodo}-01` : periodo.de;
+  const fim = typeof periodo === 'string' ? new Date(Date.UTC(+periodo.slice(0, 4), +periodo.slice(5, 7), 0)).toISOString().slice(0, 10) : periodo.ate;
   const contaPad = state.cad.contas.find(c => c.nome === 'BRADESCO'), ccPad = (state.cad.cc || []).find(c => c.nome === 'VENDAS');
   let itens = []; const marc = new Set();
   const m = modal({ title: 'Lançar contas a receber das notas', wide: true, body: `
@@ -348,4 +350,14 @@ export async function desfazerCancelamento(n, onDone) {
     await q(sb.from('nfe_notas').update({ situacao: 'autorizada', eventos: ev }).eq('id', n.id));
     toast('Cancelamento desfeito'); onDone && onDone();
   } catch (err) { fail(err); }
+}
+
+// Notas de venda recentes (últimos `dias` dias) com parcelas ainda sem título/recebimento
+export async function notasSemTitulo(dias = 60) {
+  const e = state.empresa.id, de = addDias(hojeISO(), -dias);
+  const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,valor,n:nfe_notas!inner(emissao,tipo,situacao,finalidade),v:nfe_vinculos(id)').eq('empresa_id', e)
+    .eq('n.tipo', 'saida').eq('n.situacao', 'autorizada').eq('n.finalidade', '1').gte('n.emissao', de));
+  const sem = ps.filter(p => !p.v?.length);
+  const ems = sem.map(p => p.n.emissao).sort();
+  return { parcelas: sem.length, notas: new Set(sem.map(p => p.nota_id)).size, valor: sem.reduce((s, p) => s + +p.valor, 0), de: ems[0] || null, ate: ems.at(-1) || null };
 }

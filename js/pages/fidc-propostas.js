@@ -2,6 +2,7 @@
 // O borderô original do fundo entra depois só para comparação (tela de comparação, na mesma página).
 import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.js';
 import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
+import { notasSemTitulo, gerarContasReceber } from '../lib/nfe-receb.js';
 import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formData, parseNum, exportXLSX, loading, MESES_CURTO, logoPNG } from '../lib/ui.js';
 
 export const title = 'Propostas de borderô';
@@ -141,7 +142,7 @@ function abaTitulos(c, root) {
   const filt = titulos.filter(t => (!ui.busca || (sacadoDe(t) + ' ' + (t.documento || '')).toUpperCase().includes(ui.busca.toUpperCase()))
     && (() => { const d = ui.campoData === 'emissao' ? t.emissao : t.data; return (!ui.venDe || (d && d >= ui.venDe)) && (!ui.venAte || (d && d <= ui.venAte)); })() && (!ui.soSel || ui.sel.has(t.id)));
   const livres = filt.filter(t => !emProposta[t.id]);
-  c.innerHTML = `
+  c.innerHTML = `<div id="semtit"></div>
     <div class="card"><div class="toolbar" id="flt-t">
       <label>Buscar cliente / NF<input name="busca" value="${esc(ui.busca)}" placeholder="nome ou número"></label>
       <label>Filtrar por<select name="campoData"><option value="emissao">Emissão da NF</option><option value="vencimento" ${ui.campoData === 'vencimento' ? 'selected' : ''}>Vencimento</option></select></label>
@@ -173,6 +174,13 @@ function abaTitulos(c, root) {
     $('#sel-nenhum', c).onclick = () => { ui.sel.clear(); abaTitulos(c, root); };
   }
   painel($('#painel', c), root);
+  // notas importadas (últimos 60 dias) que ainda não viraram título em aberto
+  if (ed) notasSemTitulo(60).then(r => {
+    const el = $('#semtit', c); if (!el || !r.parcelas) return;
+    el.innerHTML = `<div class="card alert-row atencao" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div><strong>${r.notas} nota(s) importada(s) ainda sem título a receber</strong> — ${r.parcelas} parcela(s), ${money0(r.valor)} (emissão ${dateBR(r.de)} a ${dateBR(r.ate)}). Lance as contas a receber para que entrem aqui.</div>
+      <button class="btn primary" id="lanc-tit">Lançar contas a receber</button></div>`;
+    $('#lanc-tit', el).onclick = () => gerarContasReceber({ de: r.de, ate: r.ate }, async () => { await carregar(); desenhar(root); });
+  }).catch(() => {});
 }
 
 function painel(el, root) {

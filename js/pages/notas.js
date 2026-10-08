@@ -4,7 +4,7 @@ import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.j
 import { $, esc, money, dateBR, fail, toast, modal, exportXLSX } from '../lib/ui.js';
 import { lerArquivos } from '../lib/nf-titulos.js';
 import { lerNFeCompleta, prepararNotas, casarBorderos, CFOP_SEM_FINANCEIRO } from '../lib/nfe-fiscal.js';
-import { pintarRecebimentos, autoVincular, marcarCancelada, desfazerCancelamento } from '../lib/nfe-receb.js';
+import { pintarRecebimentos, autoVincular, marcarCancelada, desfazerCancelamento, gerarContasReceber } from '../lib/nfe-receb.js';
 import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
 
 export const title = 'Notas fiscais';
@@ -364,8 +364,13 @@ function importar(root) {
       const meses = [...new Set(todas.map(n => n.nota.emissao.slice(0, 7)))].sort(); if (meses.length) { ui.mes = meses[0]; ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); }
       if (todas.some(n => n.nota.tipo === 'saida')) ui.tipo = 'saida';
       await render(root);
+      // notas recentes: abre o lançamento das contas a receber (títulos em aberto para borderô/cobrança)
+      const hoje = new Date().toISOString().slice(0, 10), lim = new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10);
+      const emSaida = todas.filter(n => n.nota.tipo === 'saida' && n.nota.situacao === 'autorizada').map(n => n.nota.emissao).sort();
+      const contasReceber = () => { if (emSaida.length && emSaida.at(-1) >= lim) gerarContasReceber({ de: emSaida[0] > lim ? emSaida[0] : lim, ate: emSaida.at(-1) > hoje ? emSaida.at(-1) : hoje }, () => carregar(root)); };
       if (confirm('Notas gravadas. Quer conferir agora o cadastro dos clientes/fornecedores dessas notas (novos e diferenças para aprovação)?'))
-        importarBeneficiariosNFe(async () => { const n = await ligarFavorecidos(); if (n) toast(`${n} nota(s) ligadas ao cadastro do cliente/fornecedor`); carregar(root); }, { textos });
+        importarBeneficiariosNFe(async () => { const n = await ligarFavorecidos(); if (n) toast(`${n} nota(s) ligadas ao cadastro do cliente/fornecedor`); carregar(root); contasReceber(); }, { textos });
+      else contasReceber();
     } catch (err) { fail(new Error(`Parou em ${feitas}/${todas.length}: ${err.message || err}. O que já foi gravado fica; clique em Importar de novo para completar (nada é duplicado).`)); btn.disabled = false; btn.textContent = 'Importar'; }
   };
 }
