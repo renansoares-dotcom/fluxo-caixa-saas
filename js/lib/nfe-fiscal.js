@@ -146,3 +146,45 @@ export function casarNotas(notas, lancs) {
   for (const g of grupos) { g.valorNota = g.parcelas ? g.parcelas.reduce((s, p) => s + +p.valor, 0) : +(g.parcela?.valor || 0); g.valorLanc = g.lancs.reduce((s, l) => s + +l.valor, 0); }
   return { grupos, semFinanceiro, cancelados, outroCliente };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Borderôs FIDC × notas: o título da base FIDC traz o nº da nota e, quase sempre, a parcela
+// ("33775-001" na FS/Negocial; só "33695" na Contato). Liga cada título à parcela da nota.
+//   exata          → mesma nota, parcela e valor (±5 centavos)
+//   valor_diferente→ achou a parcela, mas o valor do título difere (título parcial, nota alterada…)
+//   outro_sacado   → CNPJ do sacado no borderô é de outra empresa (raiz diferente) — conferir
+//   sem_parcela    → cita uma nota do mês mas não foi possível dizer qual parcela
+// `ocupadas` = ids de parcelas que já têm título vinculado (não recebem outro automaticamente).
+// ---------------------------------------------------------------------------------------------
+export function tituloNF(titulo) {
+  const m = String(titulo || '').trim().match(/^0*(\d{3,7})(?:\s*[-/.]\s*0*(\d{1,3}))?$/);
+  return m ? { nf: +m[1], parc: m[2] != null ? +m[2] : null } : null;
+}
+export function casarBorderos(notas, titulos, ocupadas = new Set()) {
+  const porNum = new Map();
+  for (const n of notas) (porNum.get(n.numero) || porNum.set(n.numero, []).get(n.numero)).push(n);
+  const usadas = new Set(ocupadas), grupos = [];
+  const raiz = (d) => String(d || '').replace(/\D/g, '').slice(0, 8);
+  const ord = [...titulos].sort((a, b) => (tituloNF(a.titulo)?.parc == null) - (tituloNF(b.titulo)?.parc == null)); // com parcela primeiro
+  for (const t of ord) {
+    const k = tituloNF(t.titulo); if (!k) continue;
+    let cands = porNum.get(k.nf); if (!cands?.length) continue;
+    if (cands.length > 1 && t.cnpj_sacado) cands = cands.filter(n => raiz(n.dest_doc) === raiz(t.cnpj_sacado)).concat(cands.filter(n => raiz(n.dest_doc) !== raiz(t.cnpj_sacado)));
+    const nota = cands[0]; const ps = nota.parcelas || [];
+    const livres = ps.filter(p => !usadas.has(p.id));
+    let p = null;
+    if (k.parc != null) p = ps.find(p => p.numero === k.parc) || null;
+    else if (ps.length === 1) p = ps[0];
+    else p = livres.find(p => Math.abs(+p.valor - +t.valor) <= 0.05) || null;
+    let cat;
+    if (t.cnpj_sacado && nota.dest_doc && raiz(t.cnpj_sacado) !== raiz(nota.dest_doc)) cat = 'outro_sacado';
+    else if (!p || usadas.has(p.id)) cat = 'sem_parcela';
+    else cat = Math.abs(+p.valor - +t.valor) <= 0.05 ? 'exata' : 'valor_diferente';
+    if (p && cat !== 'sem_parcela') usadas.add(p.id);
+    grupos.push({ cat, titulo: t, nota, parcela: cat === 'sem_parcela' ? null : p, ocupada: !!(p && ocupadas.has(p.id)) });
+  }
+  // parcelas a prazo das notas que não entraram em borderô (cobrança própria / carteira)
+  const fora = [];
+  for (const n of notas) for (const p of n.parcelas || []) if (!p.a_vista && !usadas.has(p.id)) fora.push({ nota: n, parcela: p });
+  return { grupos, fora };
+}

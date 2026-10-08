@@ -3,7 +3,7 @@
 import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.js';
 import { $, esc, money, dateBR, fail, toast, modal, exportXLSX } from '../lib/ui.js';
 import { lerArquivos } from '../lib/nf-titulos.js';
-import { lerNFeCompleta, prepararNotas, casarNotas, CFOP_SEM_FINANCEIRO } from '../lib/nfe-fiscal.js';
+import { lerNFeCompleta, prepararNotas, casarNotas, casarBorderos, CFOP_SEM_FINANCEIRO } from '../lib/nfe-fiscal.js';
 import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
 
 export const title = 'Notas fiscais';
@@ -32,7 +32,7 @@ export async function render(root) {
         <button class="btn" id="exp">Exportar Excel</button>
         ${podeEditar() ? '<button class="btn primary" id="imp">Importar XML</button>' : ''}
       </div></div>
-      <div class="chips" id="abas" style="margin-top:12px">${[['notas', 'Notas'], ['impostos', 'Impostos por CFOP'], ['casamento', 'Casamento com lançamentos']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
+      <div class="chips" id="abas" style="margin-top:12px">${[['notas', 'Notas'], ['impostos', 'Impostos por CFOP'], ['casamento', 'Casamento com lançamentos'], ['borderos', 'Borderôs FIDC']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div class="kpis" id="kpis"></div>
     <div id="corpo"></div>`;
   $('#flt', root).addEventListener('change', (e) => { if (e.target.name !== 'busca') { ui[e.target.name] = e.target.value; carregar(root); } });
@@ -48,14 +48,15 @@ async function carregar(root) {
   $('#corpo', root).innerHTML = '<div class="loading">Carregando…</div>';
   try {
     const notas = await fetchAll(() => sb.from('nfe_notas').select(COLS).eq('empresa_id', e).eq('tipo', ui.tipo).gte('emissao', ini).lte('emissao', fim).order('numero'));
-    const ids = notas.map(n => n.id); const parcelas = [], vinc = [];
+    const ids = notas.map(n => n.id); const parcelas = [], vinc = [], fv = [];
     for (const c of chunks(ids)) {
-      const [p, v] = await Promise.all([q(sb.from('nfe_parcelas').select('*').in('nota_id', c)), q(sb.from('nfe_vinculos').select('id,nota_id,parcela_id,lancamento_id,tipo').in('nota_id', c))]);
-      parcelas.push(...p); vinc.push(...v);
+      const [p, v, f] = await Promise.all([q(sb.from('nfe_parcelas').select('*').in('nota_id', c)), q(sb.from('nfe_vinculos').select('id,nota_id,parcela_id,lancamento_id,tipo').in('nota_id', c)),
+        q(sb.from('nfe_fidc_vinculos').select('id,nota_id,parcela_id,tipo,t:fidc_titulos(id,fundo,bordero,data_operacao,titulo,vencimento,valor)').in('nota_id', c))]);
+      parcelas.push(...p); vinc.push(...v); fv.push(...f);
     }
     const lv = new Map();
     for (const c of chunks([...new Set(vinc.map(v => v.lancamento_id))])) for (const l of await q(sb.from('lancamentos').select('id,data,valor,descricao,conta_id,status').in('id', c))) lv.set(l.id, l);
-    for (const n of notas) { n.parcelas = parcelas.filter(p => p.nota_id === n.id).sort((a, b) => a.numero - b.numero); n.vinc = vinc.filter(v => v.nota_id === n.id).map(v => ({ ...v, l: lv.get(v.lancamento_id) })); }
+    for (const n of notas) { n.parcelas = parcelas.filter(p => p.nota_id === n.id).sort((a, b) => a.numero - b.numero); n.vinc = vinc.filter(v => v.nota_id === n.id).map(v => ({ ...v, l: lv.get(v.lancamento_id) })); n.fidc = fv.filter(v => v.nota_id === n.id); }
     D = { notas, ini, fim };
   } catch (err) { fail(err); $('#corpo', root).innerHTML = '<div class="empty">Não foi possível carregar. A estrutura de notas fiscais foi criada?</div>'; return; }
   pintar(root);
@@ -86,16 +87,18 @@ function pintar(root) {
     <div class="kpi"><div class="k-label">ICMS · IPI</div><div class="k-value">${money(soma(aut, 'v_icms'))}</div><div class="k-sub">IPI ${money(soma(aut, 'v_ipi'))}${soma(aut, 'v_st') ? ` · ST ${money(soma(aut, 'v_st'))}` : ''}</div></div>
     <div class="kpi"><div class="k-label">PIS · COFINS</div><div class="k-value">${money(soma(aut, 'v_pis') + soma(aut, 'v_cofins'))}</div><div class="k-sub">PIS ${money(soma(aut, 'v_pis'))} · COFINS ${money(soma(aut, 'v_cofins'))}</div></div>
     <div class="kpi"><div class="k-label">IBS · CBS (teste 2026)</div><div class="k-value">${money(soma(aut, 'v_ibs') + soma(aut, 'v_cbs'))}</div><div class="k-sub">IBS ${money(soma(aut, 'v_ibs'))} · CBS ${money(soma(aut, 'v_cbs'))}</div></div>
-    ${ui.tipo === 'saida' ? `<div class="kpi"><div class="k-label">Parcelas com recebimento vinculado</div><div class="k-value">${totParc ? Math.round(rec / totParc * 100) : 0}%</div><div class="k-sub">${money(rec)} de ${money(totParc)}</div></div>` : ''}`;
+    ${ui.tipo === 'saida' ? `<div class="kpi"><div class="k-label">Parcelas com recebimento vinculado</div><div class="k-value">${totParc ? Math.round(rec / totParc * 100) : 0}%</div><div class="k-sub">${money(rec)} de ${money(totParc)}</div></div>` : ''}
+    ${ui.tipo === 'saida' ? (() => { const F = comFin.flatMap(n => n.fidc), vF = F.reduce((s, v) => s + (+v.t?.valor || 0), 0); return `<div class="kpi"><div class="k-label">Em borderô FIDC</div><div class="k-value">${totParc ? Math.round(vF / totParc * 100) : 0}%</div><div class="k-sub">${F.length} título(s) · ${money(vF)}</div></div>`; })() : ''}`;
   const c = $('#corpo', root);
   if (!D.notas.length) { c.innerHTML = `<div class="card"><div class="empty">Nenhuma nota ${ui.tipo === 'saida' ? 'de saída' : 'de entrada'} importada com emissão em ${dateBR(D.ini).slice(3)}. Use “Importar XML”.</div></div>`; return; }
   if (ui.aba === 'impostos') return pintarImpostos(c, N);
   if (ui.aba === 'casamento') return pintarCasamento(c, root);
+  if (ui.aba === 'borderos') return pintarBorderos(c, root);
   c.innerHTML = `<div class="card flush"><div class="table-wrap" style="max-height:66vh"><table><thead><tr><th>Nº</th><th>Emissão</th><th>${ui.tipo === 'saida' ? 'Cliente' : 'Emitente / destinatário'}</th><th>CFOP</th><th class="num">Valor</th><th class="num">ICMS</th><th class="num">IPI</th><th class="num">PIS+COFINS</th><th>Parcelas</th><th>Financeiro</th></tr></thead><tbody>
     ${N.map(n => `<tr class="clickable ${n.situacao === 'cancelada' ? 'muted' : ''}" data-id="${n.id}"><td>${n.numero}${n.serie !== '1' ? `<span class="muted small"> s.${esc(n.serie)}</span>` : ''}</td><td>${dateBR(n.emissao)}</td>
       <td class="wrap">${esc(parte(n))}<div class="small muted">${esc(n.natureza || '')}${n.finalidade === '4' ? ' · devolução' : ''}${(n.eventos || []).some(e => e.tipo === '110110') ? ' · carta de correção' : ''}</div></td>
       <td class="small">${esc((n.cfops || []).join(', '))}</td><td class="num">${money(n.v_nf)}</td><td class="num">${money(n.v_icms)}</td><td class="num">${money(n.v_ipi)}</td><td class="num">${money(+n.v_pis + +n.v_cofins)}</td>
-      <td class="small">${n.parcelas.length ? `${n.parcelas.length}${n.parcelas[0].a_vista ? ' (à vista)' : ''}` : '—'}</td><td>${statusFin(n)}</td></tr>`).join('')}
+      <td class="small">${n.parcelas.length ? `${n.parcelas.length}${n.parcelas[0].a_vista ? ' (à vista)' : ''}` : '—'}${n.fidc.length ? `<div class="muted">${[...new Set(n.fidc.map(v => `${v.t?.fundo} ${v.t?.bordero}`))].map(esc).join(', ')}</div>` : ''}</td><td>${statusFin(n)}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   $('tbody', c).onclick = (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) detalhe(D.notas.find(n => n.id === tr.dataset.id), root); };
 }
@@ -133,18 +136,24 @@ async function detalhe(n, root) {
     <div class="table-wrap" style="max-height:260px"><table><thead><tr><th>#</th><th>Produto</th><th>NCM</th><th>CFOP</th><th class="num">Qtde</th><th class="num">Valor</th><th>CST ICMS</th><th class="num">ICMS</th><th class="num">IPI</th><th class="num">PIS</th><th class="num">COFINS</th><th class="num">IBS+CBS</th></tr></thead><tbody>
     ${itens.map(i => `<tr><td>${i.n_item}</td><td class="wrap small">${esc(i.xprod)}<div class="muted">${esc(i.cprod || '')}</div></td><td>${esc(i.ncm || '')}</td><td>${esc(i.cfop || '')}</td><td class="num">${(+i.qcom).toLocaleString('pt-BR')} ${esc(i.ucom || '')}</td><td class="num">${money(i.vprod)}</td>
       <td>${esc(i.cst_icms || '')}${i.p_icms ? `<div class="small muted">${String(+i.p_icms).replace('.', ',')}%</div>` : ''}</td><td class="num">${money(i.v_icms)}</td><td class="num">${money(i.v_ipi)}</td><td class="num">${money(i.v_pis)}</td><td class="num">${money(i.v_cofins)}</td><td class="num">${money(+i.v_ibs + +i.v_cbs)}</td></tr>`).join('')}</tbody></table></div>
-    <h3 style="margin:14px 0 8px">Parcelas e recebimentos vinculados</h3>
-    ${n.parcelas.length ? `<div class="table-wrap"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th class="num">Valor</th><th>Recebimentos (data · valor · conta · descrição)</th></tr></thead><tbody>
-      ${n.parcelas.map(p => { const vs = n.vinc.filter(v => v.parcela_id === p.id); return `<tr><td>${p.numero}${p.a_vista ? ' (à vista)' : ''}</td><td>${dateBR(p.vencimento)}</td><td class="num">${money(p.valor)}</td><td class="small">${vs.map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`; }).join('')}
-      ${n.vinc.filter(v => !v.parcela_id).length ? `<tr><td colspan="3" class="small">Vinculados à nota (sem parcela definida)</td><td class="small">${n.vinc.filter(v => !v.parcela_id).map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')} <span class="badge">${v.tipo}</span>`).join('<br>')}</td></tr>` : ''}
+    <h3 style="margin:14px 0 8px">Parcelas, borderôs e recebimentos vinculados</h3>
+    ${n.parcelas.length ? `<div class="table-wrap"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th class="num">Valor</th><th>Borderô FIDC (fundo · nº · data · título · valor)</th><th>Recebimentos (data · valor · conta · descrição)</th></tr></thead><tbody>
+      ${n.parcelas.map(p => { const vs = n.vinc.filter(v => v.parcela_id === p.id), fs = n.fidc.filter(v => v.parcela_id === p.id); return `<tr><td>${p.numero}${p.a_vista ? ' (à vista)' : ''}</td><td>${dateBR(p.vencimento)}</td><td class="num">${money(p.valor)}</td>
+        <td class="small">${fs.map(v => `${esc(v.t?.fundo)} · ${esc(v.t?.bordero)} · ${dateBR(v.t?.data_operacao)} · ${esc(v.t?.titulo)} · <span class="${Math.abs(+v.t?.valor - +p.valor) <= 0.05 ? '' : 'neg'}">${money(v.t?.valor)}</span>`).join('<br>') || '<span class="muted">—</span>'}</td>
+        <td class="small">${vs.map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`; }).join('')}
+      ${n.vinc.filter(v => !v.parcela_id).length ? `<tr><td colspan="4" class="small">Vinculados à nota (sem parcela definida)</td><td class="small">${n.vinc.filter(v => !v.parcela_id).map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')} <span class="badge">${v.tipo}</span>`).join('<br>')}</td></tr>` : ''}
       </tbody></table></div>` : '<p class="small muted">Nota sem parcelas (sem financeiro).</p>'}`,
-    foot: `${podeEditar() && n.vinc.length ? '<button class="btn danger" id="desv" style="margin-right:auto">Desfazer vínculos desta nota</button>' : ''}<button class="btn" id="xml">Baixar XML</button><button class="btn" data-close>Fechar</button>` });
+    foot: `<span style="margin-right:auto;display:flex;gap:6px">${podeEditar() && n.vinc.length ? '<button class="btn danger" id="desv">Desfazer vínculos de recebimento</button>' : ''}${podeEditar() && n.fidc.length ? '<button class="btn danger" id="desf">Desfazer ligação com borderô</button>' : ''}</span><button class="btn" id="xml">Baixar XML</button><button class="btn" data-close>Fechar</button>` });
   $('#xml', m.el).onclick = async () => {
     try { const r = await q(sb.from('nfe_notas').select('xml').eq('id', n.id).single()); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.xml || ''], { type: 'application/xml' })); a.download = `${n.chave}.xml`; a.click(); } catch (e) { fail(e); }
   };
   $('#desv', m.el) && ($('#desv', m.el).onclick = async () => {
     if (!confirm(`Desfazer os ${n.vinc.length} vínculo(s) desta nota com lançamentos? Os lançamentos não são alterados.`)) return;
     try { await q(sb.from('nfe_vinculos').delete().eq('nota_id', n.id)); toast('Vínculos desfeitos'); m.close(); carregar(root); } catch (e) { fail(e); }
+  });
+  $('#desf', m.el) && ($('#desf', m.el).onclick = async () => {
+    if (!confirm(`Desfazer a ligação desta nota com ${n.fidc.length} título(s) de borderô? O borderô e os títulos da base FIDC não são alterados.`)) return;
+    try { await q(sb.from('nfe_fidc_vinculos').delete().eq('nota_id', n.id)); toast('Ligação com borderô desfeita'); m.close(); carregar(root); } catch (e) { fail(e); }
   });
 }
 
@@ -213,6 +222,71 @@ function desenharCasamento(c, root) {
     e.target.disabled = true;
     try { for (const ch of chunks(rows, 300)) await q(sb.from('nfe_vinculos').insert(ch)); toast(`${rows.length} vínculo(s) gravado(s)`); await carregar(root); }
     catch (err) { fail(String(err.message || err).includes('duplicate') ? new Error('Algum lançamento já estava vinculado a outra nota. Recarregue a página.') : err); e.target.disabled = false; }
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Borderôs FIDC: liga cada título da base FIDC à parcela da nota (nada nos borderôs é alterado)
+// ---------------------------------------------------------------------------------------------
+const CATB = {
+  exata: ['Título = parcela', 'pago', true, 'O título do borderô cita a nota e a parcela, e o valor é o mesmo.'],
+  valor_diferente: ['Valor do título diferente', 'aberto', false, 'Achou a parcela, mas o título foi descontado por outro valor (título parcial, nota alterada…). Confira antes de ligar.'],
+  outro_sacado: ['Sacado ≠ cliente da nota', 'vencido', false, 'O CNPJ do sacado no borderô é de outra empresa. Provavelmente é outra nota com o mesmo número — confira.'],
+  sem_parcela: ['Parcela não identificada', 'vencido', false, 'O título cita a nota, mas não dá para saber a parcela (sem nº e com valor diferente, ou parcela já ligada). Se marcar, liga só à nota.'],
+};
+let BOR = null; const marcB = new Set();
+
+async function pintarBorderos(c, root) {
+  if (ui.tipo !== 'saida') { c.innerHTML = '<div class="card"><div class="empty">Borderôs valem para as notas de saída.</div></div>'; return; }
+  c.innerHTML = '<div class="loading">Procurando os títulos das notas nos borderôs…</div>';
+  try {
+    const notas = D.notas.filter(n => n.tipo === 'saida' && n.situacao === 'autorizada');
+    const maxV = notas.flatMap(n => n.parcelas.map(p => p.vencimento)).filter(Boolean).sort().pop() || D.fim;
+    const tits = await fetchAll(() => sb.from('fidc_titulos').select('id,fundo,bordero,data_operacao,titulo,vencimento,valor,cnpj_sacado,sacado,v:nfe_fidc_vinculos(id)')
+      .eq('empresa_id', state.empresa.id).gte('data_operacao', D.ini).lte('data_operacao', maxV).order('data_operacao'));
+    const livres = tits.filter(t => !t.v?.length);
+    const ocupadas = new Set(notas.flatMap(n => n.fidc.map(v => v.parcela_id).filter(Boolean)));
+    BOR = casarBorderos(notas, livres, ocupadas);
+    marcB.clear(); BOR.grupos.forEach((g, i) => { g.i = i; if (CATB[g.cat][2]) marcB.add(i); });
+  } catch (err) { fail(err); c.innerHTML = ''; return; }
+  desenharBorderos(c, root);
+}
+
+function desenharBorderos(c, root) {
+  const G = BOR.grupos, por = (k) => G.filter(g => g.cat === k), vt = (L) => L.reduce((s, g) => s + +g.titulo.valor, 0);
+  const ligados = D.notas.flatMap(n => n.fidc);
+  const venc = (g) => g.parcela && g.titulo.vencimento && g.titulo.vencimento !== g.parcela.vencimento ? ` <span class="small muted">(borderô ${dateBR(g.titulo.vencimento)})</span>` : '';
+  c.innerHTML = `<div class="card"><p class="small" style="margin-top:0">Liga cada título dos borderôs (base FIDC) à parcela da nota de onde ele veio. Borderôs, títulos, lançamentos e notas <strong>não são alterados</strong>.
+      Os casos verdes vêm marcados; os amarelos e vermelhos ficam para você conferir.</p>
+    <div class="kpis" style="margin:0">
+      <div class="kpi"><div class="k-label"><span class="badge pago">Já ligados</span></div><div class="k-value">${ligados.length}</div><div class="k-sub">${money(ligados.reduce((s, v) => s + (+v.t?.valor || 0), 0))}</div></div>
+      ${Object.entries(CATB).map(([k, [t, cor]]) => `<div class="kpi"><div class="k-label"><span class="badge ${cor}">${t}</span></div><div class="k-value">${por(k).length}</div><div class="k-sub">${money(vt(por(k)))}</div></div>`).join('')}
+      <div class="kpi"><div class="k-label"><span class="badge">Parcelas fora de borderô</span></div><div class="k-value">${BOR.fora.length}</div><div class="k-sub">${money(BOR.fora.reduce((s, x) => s + +x.parcela.valor, 0))} · a prazo</div></div></div>
+    ${podeEditar() ? `<div class="toolbar" style="margin-top:8px"><button class="btn primary" id="gravab" ${marcB.size ? '' : 'disabled'}>Ligar ${marcB.size} título(s) marcado(s)</button></div>` : ''}</div>
+    ${Object.entries(CATB).map(([k, [t, cor, , dica]]) => { const L = por(k); if (!L.length) return ''; return `<div class="card flush"><div class="card-head" style="padding:12px 12px 0"><div><h2><span class="badge ${cor}">${t}</span> ${L.length}</h2><p class="muted small">${dica}</p></div>
+      ${podeEditar() ? `<div style="display:flex;gap:6px"><button class="btn small" data-todos="${k}" data-v="1">Marcar todos</button><button class="btn small" data-todos="${k}" data-v="0">Desmarcar</button></div>` : ''}</div>
+      <div class="table-wrap" style="max-height:${k === 'exata' ? 320 : 420}px"><table><thead><tr><th></th><th>Fundo · borderô</th><th>Data</th><th>Título</th><th>Sacado (borderô)</th><th class="num">Valor título</th><th>NF / parcela</th><th>Cliente da nota</th><th>Vencimento</th><th class="num">Valor parcela</th></tr></thead><tbody>
+      ${L.map(g => `<tr data-g="${g.i}"><td><input type="checkbox" ${marcB.has(g.i) ? 'checked' : ''}></td><td>${esc(g.titulo.fundo)} · ${esc(g.titulo.bordero)}</td><td>${dateBR(g.titulo.data_operacao)}</td><td>${esc(g.titulo.titulo)}</td>
+        <td class="wrap small">${esc(g.titulo.sacado || '')}${g.titulo.cnpj_sacado ? `<div class="muted">${esc(g.titulo.cnpj_sacado)}</div>` : ''}</td><td class="num">${money(g.titulo.valor)}</td>
+        <td>${g.nota.numero}${g.parcela ? ` / ${g.parcela.a_vista ? 'à vista' : g.parcela.numero}` : ` <span class="small muted">(${g.nota.parcelas.length} parcela(s))</span>`}</td><td class="wrap small">${esc(g.nota.dest_nome || '')}</td>
+        <td class="small">${g.parcela ? dateBR(g.parcela.vencimento) + venc(g) : ''}</td>
+        <td class="num ${g.parcela && Math.abs(+g.parcela.valor - +g.titulo.valor) > 0.05 ? 'neg' : ''}">${g.parcela ? money(g.parcela.valor) : money(g.nota.parcelas.reduce((s, p) => s + +p.valor, 0))}</td></tr>`).join('')}
+      </tbody></table></div></div>`; }).join('')}
+    ${BOR.fora.length ? `<div class="card flush"><div class="card-head" style="padding:12px 12px 0"><div><h2><span class="badge">Parcelas a prazo fora de borderô</span> ${BOR.fora.length}</h2><p class="muted small">Nenhum título de borderô cita estas parcelas: ficaram em carteira / cobrança própria. Só para consulta.</p></div></div>
+      <div class="table-wrap" style="max-height:360px"><table><thead><tr><th>NF / parcela</th><th>Cliente</th><th>Vencimento</th><th class="num">Valor</th><th>Recebimento vinculado</th></tr></thead><tbody>
+      ${BOR.fora.map(x => { const vs = x.nota.vinc.filter(v => v.parcela_id === x.parcela.id); return `<tr><td>${x.nota.numero} / ${x.parcela.numero}</td><td class="wrap small">${esc(x.nota.dest_nome || '')}</td><td>${dateBR(x.parcela.vencimento)}</td><td class="num">${money(x.parcela.valor)}</td>
+        <td class="small">${vs.map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(state.cad.contaById[v.l?.conta_id]?.nome || '—')}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`; }).join('')}
+      </tbody></table></div></div>` : ''}`;
+  c.onchange = (e) => { const tr = e.target.closest('tr[data-g]'); if (!tr || e.target.type !== 'checkbox') return; e.target.checked ? marcB.add(+tr.dataset.g) : marcB.delete(+tr.dataset.g); const b = $('#gravab', c); if (b) { b.disabled = !marcB.size; b.textContent = `Ligar ${marcB.size} título(s) marcado(s)`; } };
+  c.onclick = async (e) => {
+    const t = e.target.closest('[data-todos]'); if (t) { for (const g of G.filter(g => g.cat === t.dataset.todos)) t.dataset.v === '1' ? marcB.add(g.i) : marcB.delete(g.i); return desenharBorderos(c, root); }
+    if (e.target.id !== 'gravab') return;
+    const sel = G.filter(g => marcB.has(g.i));
+    const rows = sel.map(g => ({ empresa_id: state.empresa.id, nota_id: g.nota.id, parcela_id: g.parcela?.id || null, fidc_titulo_id: g.titulo.id, tipo: g.cat === 'exata' || g.cat === 'valor_diferente' ? g.cat : 'manual' }));
+    if (!rows.length || !confirm(`Ligar ${rows.length} título(s) de borderô às notas? Borderôs, títulos e lançamentos não serão alterados.`)) return;
+    e.target.disabled = true;
+    try { for (const ch of chunks(rows, 300)) await q(sb.from('nfe_fidc_vinculos').insert(ch)); toast(`${rows.length} título(s) ligado(s)`); await carregar(root); }
+    catch (err) { fail(String(err.message || err).includes('duplicate') ? new Error('Algum título já estava ligado a outra nota. Recarregue a página.') : err); e.target.disabled = false; }
   };
 }
 
