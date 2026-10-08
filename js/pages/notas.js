@@ -26,6 +26,8 @@ export async function render(root) {
     <div class="card"><div class="card-head" style="margin-bottom:0">
       <div class="toolbar" id="flt">
         <label>Mês de emissão<input type="month" name="mes" value="${ui.mes}"></label>
+        <label>Emissão de<input type="date" name="de" value="${ui.de || `${ui.mes}-01`}"></label>
+        <label>até<input type="date" name="ate" value="${ui.ate || fimMes(ui.mes)}"></label>
         <label>Tipo<select name="tipo"><option value="saida" ${ui.tipo === 'saida' ? 'selected' : ''}>Saídas (vendas)</option><option value="entrada" ${ui.tipo === 'entrada' ? 'selected' : ''}>Entradas</option></select></label>
         <label class="grow">Buscar<input name="busca" value="${esc(ui.busca)}" placeholder="nº, cliente, CNPJ, natureza"></label>
       </div>
@@ -36,11 +38,17 @@ export async function render(root) {
       <div class="chips" id="abas" style="margin-top:12px">${[['notas', 'Notas'], ['impostos', 'Impostos por CFOP'], ['recebimentos', 'Recebimentos × Notas'], ['borderos', 'Borderôs FIDC']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div class="kpis" id="kpis"></div>
     <div id="corpo"></div>`;
-  $('#flt', root).addEventListener('change', (e) => { if (e.target.name !== 'busca') { ui[e.target.name] = e.target.value; carregar(root); } });
+  $('#flt', root).addEventListener('change', (e) => {
+    const nm = e.target.name; if (!nm || nm === 'busca') return;
+    ui[nm] = e.target.value;
+    if (nm === 'mes' && ui.mes) { ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); $('#flt [name=de]', root).value = ui.de; $('#flt [name=ate]', root).value = ui.ate; }
+    if ((nm === 'de' || nm === 'ate') && ui.de && ui.ate && ui.de > ui.ate) { toast('A data inicial é depois da final', true); return; }
+    carregar(root);
+  });
   let t; $('#flt [name=busca]', root).oninput = (e) => { clearTimeout(t); t = setTimeout(() => { ui.busca = e.target.value; pintar(root); }, 300); };
   $('#abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; root.querySelectorAll('#abas .chip').forEach(c => c.classList.toggle('on', c.dataset.a === a)); pintar(root); } };
   $('#imp', root) && ($('#imp', root).onclick = () => importar(root));
-  $('#exp', root).onclick = () => exportXLSX($('#corpo table', root), `notas_${ui.tipo}_${ui.mes}`);
+  $('#exp', root).onclick = () => exportXLSX($('#corpo table', root), `notas_${ui.tipo}_${D?.ini || ui.mes}_${D?.fim || ''}`);
   await carregar(root);
 }
 
@@ -50,7 +58,7 @@ async function carregar(root) {
   pintar(root);
 }
 async function carregarDados() {
-  const e = state.empresa.id, ini = `${ui.mes}-01`, fim = fimMes(ui.mes);
+  const e = state.empresa.id, ini = ui.de || `${ui.mes}-01`, fim = ui.ate || fimMes(ui.mes);
   {
     const notas = await fetchAll(() => sb.from('nfe_notas').select(COLS).eq('empresa_id', e).eq('tipo', ui.tipo).gte('emissao', ini).lte('emissao', fim).order('numero'));
     const ids = notas.map(n => n.id); const parcelas = [], vinc = [], fv = [];
@@ -92,7 +100,7 @@ function pintarKpis(root) {
   const N = filtradas(), V = N.filter(venda), aut = N.filter(n => n.situacao === 'autorizada');
   const comFin = V.filter(n => n.parcelas.length), totParc = comFin.reduce((s, n) => s + soma(n.parcelas, 'valor'), 0), rec = comFin.reduce((s, n) => s + Math.min(recebido(n), soma(n.parcelas, 'valor')), 0);
   $('#kpis', root).innerHTML = `
-    <div class="kpi"><div class="k-label">Notas no mês</div><div class="k-value">${aut.length}</div><div class="k-sub">${N.length - aut.length ? `${N.length - aut.length} cancelada(s) · ` : ''}${N.filter(n => n.finalidade === '4').length} devolução(ões)</div></div>
+    <div class="kpi"><div class="k-label">Notas no período</div><div class="k-value">${aut.length}</div><div class="k-sub">${N.length - aut.length ? `${N.length - aut.length} cancelada(s) · ` : ''}${N.filter(n => n.finalidade === '4').length} devolução(ões)</div></div>
     <div class="kpi"><div class="k-label">${ui.tipo === 'saida' ? 'Faturamento (vendas)' : 'Valor das notas'}</div><div class="k-value">${money(soma(ui.tipo === 'saida' ? V : aut, 'v_nf'))}</div><div class="k-sub">produtos ${money(soma(ui.tipo === 'saida' ? V : aut, 'v_prod'))}</div></div>
     <div class="kpi"><div class="k-label">ICMS · IPI</div><div class="k-value">${money(soma(aut, 'v_icms'))}</div><div class="k-sub">IPI ${money(soma(aut, 'v_ipi'))}${soma(aut, 'v_st') ? ` · ST ${money(soma(aut, 'v_st'))}` : ''}</div></div>
     <div class="kpi"><div class="k-label">PIS · COFINS</div><div class="k-value">${money(soma(aut, 'v_pis') + soma(aut, 'v_cofins'))}</div><div class="k-sub">PIS ${money(soma(aut, 'v_pis'))} · COFINS ${money(soma(aut, 'v_cofins'))}</div></div>
@@ -107,7 +115,7 @@ function pintar(root) {
   const N = filtradas();
   const c = $('#corpo', root);
   if (ui.aba === 'recebimentos') return ui.tipo === 'saida' ? pintarRecebimentos(c, root, () => carregarSilencioso(), ui.mes) : (c.innerHTML = '<div class="card"><div class="empty">Recebimentos × Notas vale para as notas de saída.</div></div>');
-  if (!D.notas.length) { c.innerHTML = `<div class="card"><div class="empty">Nenhuma nota ${ui.tipo === 'saida' ? 'de saída' : 'de entrada'} importada com emissão em ${dateBR(D.ini).slice(3)}. Use “Importar XML”.</div></div>`; return; }
+  if (!D.notas.length) { c.innerHTML = `<div class="card"><div class="empty">Nenhuma nota ${ui.tipo === 'saida' ? 'de saída' : 'de entrada'} importada com emissão de ${dateBR(D.ini)} a ${dateBR(D.fim)}. Use “Importar XML”.</div></div>`; return; }
   if (ui.aba === 'impostos') return pintarImpostos(c, N);
   if (ui.aba === 'borderos') return pintarBorderos(c, root);
   c.innerHTML = `<div class="card flush"><div class="table-wrap" style="max-height:66vh"><table><thead><tr><th>Nº</th><th>Emissão</th><th>${ui.tipo === 'saida' ? 'Cliente' : 'Emitente / destinatário'}</th><th>CFOP</th><th class="num">Valor</th><th class="num">ICMS</th><th class="num">IPI</th><th class="num">PIS+COFINS</th><th>Parcelas</th><th>Financeiro</th></tr></thead><tbody>
@@ -353,7 +361,7 @@ function importar(root) {
       try { const ids = []; for (const lote of chunks(todas.filter(x => x.nota.tipo === 'saida').map(x => x.nota.chave), 100)) for (const r of await q(sb.from('nfe_notas').select('id').eq('empresa_id', e).in('chave', lote))) ids.push(r.id); auto = await autoVincular(ids); }
       catch (err) { console.warn('vínculo automático', err); }
       toast(`${novas} nota(s) importada(s)${completadas ? ` · ${completadas} completada(s)` : ''}${auto ? ` · ${auto} recebimento(s) vinculado(s) automaticamente` : ''}`); m.close();
-      const meses = [...new Set(todas.map(n => n.nota.emissao.slice(0, 7)))].sort(); if (meses.length) ui.mes = meses[0];
+      const meses = [...new Set(todas.map(n => n.nota.emissao.slice(0, 7)))].sort(); if (meses.length) { ui.mes = meses[0]; ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); }
       if (todas.some(n => n.nota.tipo === 'saida')) ui.tipo = 'saida';
       await render(root);
       if (confirm('Notas gravadas. Quer conferir agora o cadastro dos clientes/fornecedores dessas notas (novos e diferenças para aprovação)?'))
