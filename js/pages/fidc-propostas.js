@@ -6,7 +6,7 @@ import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formDa
 
 export const title = 'Propostas de borderô';
 
-const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', propostaEdit: null, pf: { status: '', fundo: '', mes: '', busca: '' } };
+const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', campoData: 'emissao', propostaEdit: null, pf: { status: '', fundo: '', mes: '', busca: '' } };
 let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [];
 // sacado: raiz do CNPJ (8 dígitos) quando houver; senão o nome normalizado (os borderôs cortam o nome em ~40 letras)
 const chaveSac = (cnpj, nome) => { const d = String(cnpj || '').replace(/\D/g, ''); return d.length >= 8 ? 'c' + d.slice(0, 8) : 'n' + String(nome || '').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 25); };
@@ -139,12 +139,13 @@ function abaTitulos(c, root) {
   const ativos = fundos.filter(f => f.ativo);
   if (ui.fundoId && !ativos.some(f => f.id === ui.fundoId)) ui.fundoId = '';
   const filt = titulos.filter(t => (!ui.busca || (sacadoDe(t) + ' ' + (t.documento || '')).toUpperCase().includes(ui.busca.toUpperCase()))
-    && (!ui.venDe || t.data >= ui.venDe) && (!ui.venAte || t.data <= ui.venAte) && (!ui.soSel || ui.sel.has(t.id)));
+    && (() => { const d = ui.campoData === 'emissao' ? t.emissao : t.data; return (!ui.venDe || (d && d >= ui.venDe)) && (!ui.venAte || (d && d <= ui.venAte)); })() && (!ui.soSel || ui.sel.has(t.id)));
   const livres = filt.filter(t => !emProposta[t.id]);
   c.innerHTML = `
     <div class="card"><div class="toolbar" id="flt-t">
       <label>Buscar cliente / NF<input name="busca" value="${esc(ui.busca)}" placeholder="nome ou número"></label>
-      <label>Vencimento de<input type="date" name="venDe" value="${ui.venDe}"></label>
+      <label>Filtrar por<select name="campoData"><option value="emissao">Emissão da NF</option><option value="vencimento" ${ui.campoData === 'vencimento' ? 'selected' : ''}>Vencimento</option></select></label>
+      <label>${ui.campoData === 'emissao' ? 'Emissão' : 'Vencimento'} de<input type="date" name="venDe" value="${ui.venDe}"></label>
       <label>até<input type="date" name="venAte" value="${ui.venAte}"></label>
       <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="soSel" ${ui.soSel ? 'checked' : ''}> Só os marcados</label>
       <span class="spacer"></span>
@@ -152,10 +153,10 @@ function abaTitulos(c, root) {
     <div class="grid2 prop-grid">
       <div class="card flush"><div class="card-head"><div><h2>Títulos disponíveis</h2><p class="muted small">Duplicatas em aberto (receita 1.01). Marque os títulos que vão para o borderô.</p></div>
         ${ed ? `<div class="toolbar"><button class="btn small" id="sel-todos">Marcar filtrados</button><button class="btn small" id="sel-nenhum">Limpar</button></div>` : ''}</div>
-        <div class="table-wrap" style="max-height:560px">${filt.length ? `<table><thead><tr><th></th><th>Vencimento</th><th class="num">Prazo</th><th>Cliente (sacado)</th><th>NF / parcela</th><th class="num">Valor</th></tr></thead><tbody>
+        <div class="table-wrap" style="max-height:560px">${filt.length ? `<table><thead><tr><th></th><th>Emissão</th><th>Vencimento</th><th class="num">Prazo</th><th>Cliente (sacado)</th><th>NF / parcela</th><th class="num">Valor</th></tr></thead><tbody>
           ${filt.map(t => { const ep = emProposta[t.id]; const pz = dias(ui.dataOp, t.data); return `<tr class="${ep ? 'muted' : 'clickable'}" data-id="${t.id}">
             <td>${ep ? `<span class="badge ${STATUS_CLS[ep.status]}" title="Já está na proposta nº ${ep.numero}">nº ${ep.numero}</span>` : `<input type="checkbox" ${ui.sel.has(t.id) ? 'checked' : ''} ${ed ? '' : 'disabled'} aria-label="Selecionar">`}</td>
-            <td>${dateBR(t.data)}</td><td class="num${pz < 7 ? ' neg' : ''}">${pz}</td><td class="wrap">${esc(sacadoDe(t))}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td></tr>`; }).join('')}
+            <td>${dateBR(t.emissao)}</td><td>${dateBR(t.data)}</td><td class="num${pz < 7 ? ' neg' : ''}">${pz}</td><td class="wrap">${esc(sacadoDe(t))}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td></tr>`; }).join('')}
           </tbody></table>` : `<div class="empty">${titulos.length ? 'Nenhum título no filtro.' : 'Nenhum título em aberto. Use “Importar XML das NFs”.'}</div>`}</div></div>
       <div id="painel"></div>
     </div>`;
