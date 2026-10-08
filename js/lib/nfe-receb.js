@@ -1,0 +1,206 @@
+// Recebimentos × Notas: liga parcelas das notas de saída aos lançamentos de recebimento já existentes,
+// no mesmo modelo da conciliação bancária (duas colunas, seleção dos dois lados, linhas verdes quando o total bate).
+// Nenhum lançamento é alterado: o vínculo fica em nfe_vinculos.
+import { sb, state, q, fetchAll, podeEditar } from './data.js';
+import { $, esc, money, dateBR, fail, toast } from './ui.js';
+import { casarNotas, nfDoLancamento } from './nfe-fiscal.js';
+
+const R = { de: '', ate: '', lde: '', late: '', bp: '', bl: '', soSug: false, outrasNF: false, selP: new Set(), selL: new Set() };
+let P = [], L = [], SUG = [], NFS = new Set();
+const chunks = (arr, k = 150) => { const o = []; for (let i = 0; i < arr.length; i += k) o.push(arr.slice(i, i + k)); return o; };
+const addDias = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const hojeISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+const dig = (s) => String(s || '').replace(/\D/g, '');
+const raiz = (s) => dig(s).slice(0, 8);
+const dias = (a, b) => Math.round((Date.parse(a + 'T12:00:00') - Date.parse(b + 'T12:00:00')) / 864e5);
+const perto = (a, b) => Math.abs(+a - +b) <= 0.05;
+const nome1 = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 3 && !['LTDA', 'EIRELI', 'IND', 'INDUSTRIA', 'COMERCIO', 'COM', 'DOS', 'DAS', 'DE'].includes(w)).slice(0, 2).join(' ');
+const receitas = () => state.cad.contasPlano.filter(p => p.codigo.startsWith('1.01')).map(p => p.id);
+
+// ---------------------------------------------------------------------------------------------
+// Dados
+// ---------------------------------------------------------------------------------------------
+// Parcelas das notas de venda com o que já foi recebido (vínculos) e o que falta
+async function parcelasPendentes(e, de, ate) {
+  const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor,a_vista,n:nfe_notas!inner(id,numero,emissao,dest_doc,dest_nome,favorecido_id,situacao,finalidade,tipo)')
+    .eq('empresa_id', e).gte('vencimento', de).lte('vencimento', ate).eq('n.tipo', 'saida').eq('n.situacao', 'autorizada').eq('n.finalidade', '1').order('vencimento'));
+  const notaIds = [...new Set(ps.map(p => p.nota_id))];
+  const vinc = [], fidc = [], todasParc = [];
+  for (const c of chunks(notaIds)) {
+    const [v, f, tp] = await Promise.all([q(sb.from('nfe_vinculos').select('id,nota_id,parcela_id,l:lancamentos(valor)').in('nota_id', c)),
+      q(sb.from('nfe_fidc_vinculos').select('parcela_id,t:fidc_titulos(fundo,bordero)').in('nota_id', c)),
+      q(sb.from('nfe_parcelas').select('id,nota_id,numero,valor').in('nota_id', c))]);
+    vinc.push(...v); fidc.push(...f); todasParc.push(...tp);
+  }
+  // recebido por parcela; vínculos "pela nota" (sem parcela) cobrem as parcelas em ordem
+  const rec = new Map();
+  for (const v of vinc) if (v.parcela_id) rec.set(v.parcela_id, (rec.get(v.parcela_id) || 0) + +(v.l?.valor || 0));
+  for (const nid of notaIds) {
+    let solto = vinc.filter(v => v.nota_id === nid && !v.parcela_id).reduce((s, v) => s + +(v.l?.valor || 0), 0); if (!solto) continue;
+    for (const p of todasParc.filter(p => p.nota_id === nid).sort((a, b) => a.numero - b.numero)) { const falta = +p.valor - (rec.get(p.id) || 0); if (falta <= 0) continue; const u = Math.min(falta, solto); rec.set(p.id, (rec.get(p.id) || 0) + u); solto -= u; if (solto <= 0) break; }
+  }
+  return ps.map(p => ({ ...p, recebido: rec.get(p.id) || 0, falta: +(+p.valor - (rec.get(p.id) || 0)).toFixed(2), fidc: fidc.find(f => f.parcela_id === p.id)?.t || null }))
+    .filter(p => p.falta > 0.05);
+}
+
+// Lançamentos de recebimento (pagos) ainda sem nota
+async function recebimentosLivres(e, de, ate) {
+  const ids = receitas(); if (!ids.length) return [];
+  const ls = await fetchAll(() => sb.from('lancamentos').select('id,data,valor,descricao,documento,favorecido_id,conta_id,status,v:nfe_vinculos(id)')
+    .eq('empresa_id', e).eq('status', 'Pago').in('plano_id', ids).gte('data', de).lte('data', ate).order('data'));
+  const fav = state.cad.favById;
+  return ls.filter(l => !l.v?.length).map(l => ({ ...l, fav_doc: fav[l.favorecido_id]?.documento || null, fav_nome: fav[l.favorecido_id]?.nome || '', nf: nfDoLancamento(l) }));
+}
+
+// Sugestões seguras (mesma NF citada: parcela + valor, vários somando a parcela, ou o restante exato da nota)
+function sugerir(parcelas, lancs) {
+  const porNota = new Map();
+  for (const p of parcelas) { const n = porNota.get(p.nota_id) || porNota.set(p.nota_id, { ...p.n, parcelas: [] }).get(p.nota_id); n.parcelas.push({ ...p, valor: p.falta }); }
+  const r = casarNotas([...porNota.values()], lancs.map(l => ({ ...l })));
+  return r.grupos.filter(g => ['exata', 'soma', 'nota'].includes(g.cat) && g.lancs.length);
+}
+const linhasDe = (gs) => gs.flatMap(g => g.lancs.map(l => ({ empresa_id: state.empresa.id, nota_id: g.nota.id, parcela_id: g.parcela && !(g.parcelas?.length > 1) ? g.parcela.id : (g.parcelas?.length === 1 ? g.parcelas[0].id : null), lancamento_id: l.id, tipo: g.cat })));
+
+// Vínculo automático após importar: só o que é certo (NF citada + parcela/valor)
+export async function autoVincular(notaIds) {
+  if (!notaIds?.length) return 0;
+  const e = state.empresa.id; const parcelas = [];
+  for (const c of chunks(notaIds)) {
+    const ps = await q(sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor,a_vista,n:nfe_notas!inner(id,numero,emissao,dest_doc,dest_nome,favorecido_id,situacao,finalidade,tipo)').in('nota_id', c).eq('n.tipo', 'saida').eq('n.situacao', 'autorizada').eq('n.finalidade', '1'));
+    parcelas.push(...ps);
+  }
+  if (!parcelas.length) return 0;
+  const vs = new Set(); for (const c of chunks(notaIds)) for (const v of await q(sb.from('nfe_vinculos').select('parcela_id').in('nota_id', c))) vs.add(v.parcela_id);
+  const pend = parcelas.filter(p => !vs.has(p.id)).map(p => ({ ...p, falta: +p.valor }));
+  if (!pend.length) return 0;
+  const emis = pend.map(p => p.n.emissao).sort()[0], venc = pend.map(p => p.vencimento).filter(Boolean).sort().pop() || emis;
+  const lancs = await recebimentosLivres(e, addDias(emis, -20), addDias(venc, 120));
+  const rows = linhasDe(sugerir(pend, lancs));
+  for (const ch of chunks(rows, 300)) await q(sb.from('nfe_vinculos').insert(ch));
+  return rows.length;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Tela
+// ---------------------------------------------------------------------------------------------
+export async function pintarRecebimentos(c, root, onMudou) {
+  const e = state.empresa.id;
+  if (!R.de) {
+    const r = await q(sb.from('nfe_notas').select('emissao').eq('empresa_id', e).eq('tipo', 'saida').order('emissao').limit(1));
+    R.de = r[0] ? r[0].emissao.slice(0, 8) + '01' : `${new Date().getFullYear()}-01-01`; R.ate = addDias(hojeISO(), 60);
+    R.lde = addDias(R.de, -15); R.late = hojeISO();
+  }
+  c.innerHTML = `<div class="card"><div class="toolbar" id="rflt">
+      <label>Vencimento das parcelas<span class="par" style="display:flex;gap:4px"><input type="date" name="de" value="${R.de}"><input type="date" name="ate" value="${R.ate}"></span></label>
+      <label>Data dos recebimentos<span class="par" style="display:flex;gap:4px"><input type="date" name="lde" value="${R.lde}"><input type="date" name="late" value="${R.late}"></span></label>
+      <span class="spacer" style="flex:1"></span>
+      ${podeEditar() ? '<button class="btn primary" id="rsug" disabled>Aceitar sugestões</button>' : ''}</div>
+    <p class="small muted" style="margin:8px 0 0">Marque a(s) parcela(s) à esquerda e o(s) recebimento(s) à direita: quando os totais batem as linhas ficam verdes e é só <strong>Vincular</strong>. Ao marcar uma parcela, os recebimentos mais prováveis (mesma NF citada, mesmo cliente, valor e data próximos) sobem para o topo. Os lançamentos não são alterados.</p></div>
+    <div class="kpis" id="rkpi"></div>
+    <div class="conc-grid"><div class="card flush" id="rpar"><div class="loading">Carregando…</div></div><div class="card flush" id="rlan"></div></div>
+    <div class="card flush" id="rfoot" style="position:sticky;bottom:0;z-index:2"></div>`;
+  $('#rflt', c).onchange = (ev) => { if (ev.target.name) { R[ev.target.name] = ev.target.value; R.selP.clear(); R.selL.clear(); carregarDados(c, root, onMudou); } };
+  await carregarDados(c, root, onMudou);
+}
+
+async function carregarDados(c, root, onMudou) {
+  const e = state.empresa.id;
+  try {
+    let nums; [P, L, nums] = await Promise.all([parcelasPendentes(e, R.de, R.ate), recebimentosLivres(e, R.lde, R.late),
+      fetchAll(() => sb.from('nfe_notas').select('numero').eq('empresa_id', e).eq('tipo', 'saida'))]);
+    NFS = new Set(nums.map(n => n.numero));
+  }
+  catch (err) { fail(err); $('#rpar', c).innerHTML = ''; return; }
+  SUG = sugerir(P, L);
+  const b = $('#rsug', c); if (b) { b.disabled = !SUG.length; b.textContent = `Aceitar sugestões (${SUG.reduce((s, g) => s + g.lancs.length, 0)})`; b.onclick = () => aceitar(c, root, onMudou); }
+  desenhar(c, root, onMudou);
+}
+
+// pontuação de um recebimento para as parcelas marcadas
+function pontos(l, selP) {
+  if (!selP.length) return { s: 0, tags: [] };
+  const nums = new Set(selP.map(p => p.n.numero)), raizes = new Set(selP.map(p => raiz(p.n.dest_doc)).filter(Boolean)), favs = new Set(selP.map(p => p.n.favorecido_id).filter(Boolean));
+  const tot = selP.reduce((s, p) => s + p.falta, 0); const tags = []; let s = 0;
+  if (l.nf.nf != null && nums.has(l.nf.nf)) { s += 100; tags.push('NF citada'); }
+  else if (l.nf.nf != null) { s -= 50; tags.push(`cita NF ${l.nf.nf}`); }
+  if (favs.has(l.favorecido_id) || (l.fav_doc && raizes.has(raiz(l.fav_doc)))) { s += 40; tags.push('mesmo cliente'); }
+  else { const nm = new Set(selP.map(p => nome1(p.n.dest_nome)).filter(Boolean)); if (nm.has(nome1(l.fav_nome))) { s += 25; tags.push('cliente parecido'); } }
+  if (perto(l.valor, tot) || selP.some(p => perto(l.valor, p.falta))) { s += 30; tags.push('mesmo valor'); }
+  const ref = selP[0].vencimento || selP[0].n.emissao; s -= Math.min(Math.abs(dias(l.data, ref)) / 10, 20);
+  return { s, tags };
+}
+
+function desenhar(c, root, onMudou) {
+  const bp = R.bp.trim().toLowerCase(), bl = R.bl.trim().toLowerCase();
+  const selP = P.filter(p => R.selP.has(p.id)), selL = L.filter(l => R.selL.has(l.id));
+  const tp = selP.reduce((s, p) => s + p.falta, 0), tl = selL.reduce((s, l) => s + +l.valor, 0), ok = selP.length && selL.length && perto(tp, tl);
+  $('#rkpi', c).innerHTML = `
+    <div class="kpi"><div class="k-label">Parcelas sem recebimento</div><div class="k-value">${P.length}</div><div class="k-sub">${money(P.reduce((s, p) => s + p.falta, 0))} · vencimento ${dateBR(R.de)} a ${dateBR(R.ate)}</div></div>
+    <div class="kpi"><div class="k-label">Recebimentos sem nota</div><div class="k-value">${L.filter(l => l.nf.nf == null || NFS.has(l.nf.nf)).length}</div><div class="k-sub">${dateBR(R.lde)} a ${dateBR(R.late)} · fora os que citam NF ainda não importada</div></div>
+    <div class="kpi"><div class="k-label">Sugestões seguras</div><div class="k-value">${SUG.length}</div><div class="k-sub">NF citada no lançamento e valor que fecha</div></div>`;
+  const PP = P.filter(p => !bp || `${p.n.numero} ${p.n.dest_nome} ${p.n.dest_doc} ${String(p.falta).replace('.', ',')}`.toLowerCase().includes(bp));
+  const pts = new Map(L.map(l => [l.id, pontos(l, selP)]));
+  const deFora = (l) => l.nf.nf != null && !NFS.has(l.nf.nf);
+  const nFora = L.filter(deFora).length;
+  let LL = L.filter(l => (R.outrasNF || !deFora(l)) && (!bl || `${l.descricao || ''} ${l.documento || ''} ${l.fav_nome} ${String(l.valor).replace('.', ',')}`.toLowerCase().includes(bl)));
+  if (selP.length) { LL = LL.slice().sort((a, b) => pts.get(b.id).s - pts.get(a.id).s || a.data.localeCompare(b.data)); if (R.soSug) LL = LL.filter(l => pts.get(l.id).tags.length); }
+  const conta = (id) => state.cad.contaById[id]?.nome || '—';
+  const MAX = 400;
+  $('#rpar', c).innerHTML = `<div class="card-head" style="padding:12px 12px 6px"><h2>Parcelas das notas (${PP.length})</h2></div>
+    <div class="conc-flt"><input name="bp" placeholder="Buscar NF, cliente, CNPJ ou valor" value="${esc(R.bp)}"></div>
+    <div class="table-wrap" style="max-height:62vh"><table><thead><tr><th></th><th>NF / parc.</th><th>Cliente</th><th>Vencimento</th><th class="num">Falta receber</th></tr></thead><tbody>
+    ${PP.slice(0, MAX).map(p => `<tr data-p="${p.id}" class="clickable ${R.selP.has(p.id) && ok ? 'conc-ok' : ''}"><td><input type="checkbox" ${R.selP.has(p.id) ? 'checked' : ''}></td>
+      <td>${p.n.numero} / ${p.a_vista ? 'à vista' : p.numero}${p.fidc ? ` <span class="badge" title="Antecipada no borderô ${esc(p.fidc.fundo)} ${esc(p.fidc.bordero)}">FIDC</span>` : ''}</td>
+      <td class="wrap small">${esc(p.n.dest_nome || '')}</td><td>${dateBR(p.vencimento)}</td>
+      <td class="num">${money(p.falta)}${p.recebido > 0.005 ? `<div class="small muted">de ${money(p.valor)}</div>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhuma parcela pendente no período.</td></tr>'}
+    ${PP.length > MAX ? `<tr><td colspan="5" class="small muted">Mostrando ${MAX} de ${PP.length} — use a busca ou o período.</td></tr>` : ''}</tbody></table></div>`;
+  $('#rlan', c).innerHTML = `<div class="card-head" style="padding:12px 12px 6px"><h2>Recebimentos sem nota (${LL.length})</h2>
+      ${selP.length ? `<label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="sosug" ${R.soSug ? 'checked' : ''}> só os prováveis</label>` : ''}</div>
+    <div class="conc-flt"><input name="bl" placeholder="Buscar descrição, cliente ou valor" value="${esc(R.bl)}">
+      ${nFora ? `<label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="outrasnf" ${R.outrasNF ? 'checked' : ''}> mostrar também os ${nFora} que citam NF ainda não importada</label>` : ''}</div>
+    <div class="table-wrap" style="max-height:62vh"><table><thead><tr><th></th><th>Data</th><th>Cliente / descrição</th><th>Conta</th><th class="num">Valor</th></tr></thead><tbody>
+    ${LL.slice(0, MAX).map(l => { const t = pts.get(l.id); return `<tr data-l="${l.id}" class="clickable ${R.selL.has(l.id) && ok ? 'conc-ok' : ''}"><td><input type="checkbox" ${R.selL.has(l.id) ? 'checked' : ''}></td><td>${dateBR(l.data)}</td>
+      <td class="wrap small">${esc(l.fav_nome || '')}<div class="muted">${esc(l.descricao || '')}${l.documento ? ' · ' + esc(l.documento) : ''}</div>${t.tags.map(x => `<span class="badge ${x === 'NF citada' ? 'pago' : x.startsWith('cita NF') ? 'vencido' : 'aberto'}" style="margin-right:4px">${x}</span>`).join('')}</td>
+      <td class="small">${esc(conta(l.conta_id))}</td><td class="num">${money(l.valor)}</td></tr>`; }).join('') || '<tr><td colspan="5" class="muted">Nenhum recebimento sem nota no período.</td></tr>'}
+    ${LL.length > MAX ? `<tr><td colspan="5" class="small muted">Mostrando ${MAX} de ${LL.length} — marque uma parcela (os prováveis sobem) ou use a busca.</td></tr>` : ''}</tbody></table></div>`;
+  const dif = tl - tp;
+  $('#rfoot', c).innerHTML = `<div class="conc-foot ${ok ? 'ok' : ''}"><div><strong>${selP.length}</strong> parcela(s) ${money(tp)} · <strong>${selL.length}</strong> recebimento(s) ${money(tl)}
+      ${selP.length && selL.length ? (ok ? ' · <span class="pos">totais batem</span>' : ` · diferença <span class="neg">${money(dif)}</span>${dif < 0 ? ' (parcela fica parcial)' : ''}`) : ''}</div>
+    <div style="display:flex;gap:8px">${selP.length || selL.length ? '<button class="btn" id="rlimpa">Limpar seleção</button>' : ''}${podeEditar() ? `<button class="btn primary" id="rvinc" ${selP.length && selL.length ? '' : 'disabled'}>Vincular</button>` : ''}</div></div>`;
+  // eventos
+  for (const [sel, nm] of [['#rpar', 'bp'], ['#rlan', 'bl']]) { let t; const inp = $(`${sel} [name=${nm}]`, c); inp.oninput = (ev) => { clearTimeout(t); t = setTimeout(() => { R[nm] = ev.target.value; desenhar(c, root, onMudou); const i = $(`${sel} [name=${nm}]`, c); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); }; }
+  $('#rpar tbody', c).onclick = (ev) => { const tr = ev.target.closest('tr[data-p]'); if (!tr) return; const id = tr.dataset.p; R.selP.has(id) ? R.selP.delete(id) : R.selP.add(id); desenhar(c, root, onMudou); };
+  $('#rlan tbody', c).onclick = (ev) => { const tr = ev.target.closest('tr[data-l]'); if (!tr) return; const id = tr.dataset.l; R.selL.has(id) ? R.selL.delete(id) : R.selL.add(id); desenhar(c, root, onMudou); };
+  $('#outrasnf', c) && ($('#outrasnf', c).onchange = (ev) => { R.outrasNF = ev.target.checked; desenhar(c, root, onMudou); });
+  $('#sosug', c) && ($('#sosug', c).onchange = (ev) => { R.soSug = ev.target.checked; desenhar(c, root, onMudou); });
+  $('#rlimpa', c) && ($('#rlimpa', c).onclick = () => { R.selP.clear(); R.selL.clear(); desenhar(c, root, onMudou); });
+  $('#rvinc', c) && ($('#rvinc', c).onclick = () => vincular(selP, selL, c, root, onMudou));
+}
+
+// Distribui os recebimentos nas parcelas marcadas (por vencimento / data) e grava os vínculos
+async function vincular(selP, selL, c, root, onMudou) {
+  const tp = selP.reduce((s, p) => s + p.falta, 0), tl = selL.reduce((s, l) => s + +l.valor, 0);
+  if (!perto(tp, tl) && !confirm(tl < tp ? `Os recebimentos somam ${money(tl)} e as parcelas ${money(tp)}. Vincular assim? A parcela fica parcial (falta ${money(tp - tl)}).`
+    : `Os recebimentos somam ${money(tl)}, ${money(tl - tp)} a mais que as parcelas (${money(tp)}). Vincular assim?`)) return;
+  const nomes = new Set(selP.map(p => p.n.dest_nome)); const nfs = selL.filter(l => l.nf.nf != null && !selP.some(p => p.n.numero === l.nf.nf));
+  if (nfs.length && !confirm(`${nfs.length} recebimento(s) citam outra NF (${[...new Set(nfs.map(l => l.nf.nf))].join(', ')}). Vincular mesmo assim?`)) return;
+  const ps = selP.slice().sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || '') || a.n.numero - b.n.numero).map(p => ({ p, resta: p.falta }));
+  const rows = []; let i = 0;
+  for (const l of selL.slice().sort((a, b) => a.data.localeCompare(b.data))) {
+    while (i < ps.length - 1 && ps[i].resta <= 0.05) i++;
+    const alvo = ps[i]; alvo.resta -= +l.valor;
+    rows.push({ empresa_id: state.empresa.id, nota_id: alvo.p.nota_id, parcela_id: alvo.p.id, lancamento_id: l.id, tipo: perto(tp, tl) ? (selL.length > 1 && selP.length === 1 ? 'soma' : 'manual') : 'parcial' });
+  }
+  try {
+    await q(sb.from('nfe_vinculos').insert(rows));
+    toast(`${rows.length} recebimento(s) vinculado(s)${nomes.size === 1 ? ' — ' + [...nomes][0] : ''}`);
+    R.selP.clear(); R.selL.clear(); await carregarDados(c, root, onMudou); onMudou && onMudou();
+  } catch (err) { fail(String(err.message || err).includes('duplicate') ? new Error('Algum recebimento já estava vinculado a outra nota. Recarregue.') : err); }
+}
+
+async function aceitar(c, root, onMudou) {
+  const rows = linhasDe(SUG);
+  if (!rows.length || !confirm(`Vincular ${rows.length} recebimento(s) a ${SUG.length} parcela(s)/nota(s)? São os casos em que o lançamento cita a NF e o valor fecha com a parcela (ou com o que falta da nota).`)) return;
+  try { for (const ch of chunks(rows, 300)) await q(sb.from('nfe_vinculos').insert(ch)); toast(`${rows.length} recebimento(s) vinculado(s)`); R.selP.clear(); R.selL.clear(); await carregarDados(c, root, onMudou); onMudou && onMudou(); }
+  catch (err) { fail(err); }
+}
