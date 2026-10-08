@@ -4,7 +4,7 @@ import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.j
 import { $, esc, money, dateBR, fail, toast, modal, exportXLSX } from '../lib/ui.js';
 import { lerArquivos } from '../lib/nf-titulos.js';
 import { lerNFeCompleta, prepararNotas, casarBorderos, CFOP_SEM_FINANCEIRO } from '../lib/nfe-fiscal.js';
-import { pintarRecebimentos, autoVincular } from '../lib/nfe-receb.js';
+import { pintarRecebimentos, autoVincular, marcarCancelada, desfazerCancelamento } from '../lib/nfe-receb.js';
 import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
 
 export const title = 'Notas fiscais';
@@ -159,7 +159,7 @@ async function detalhe(n, root) {
         <td class="small">${vs.map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${v.l && v.l.status !== 'Pago' ? ' <span class="badge aberto">título em aberto</span>' : ''}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`; }).join('')}
       ${n.vinc.filter(v => !v.parcela_id).length ? `<tr><td colspan="4" class="small">Vinculados à nota (sem parcela definida)</td><td class="small">${n.vinc.filter(v => !v.parcela_id).map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${v.l && v.l.status !== 'Pago' ? ' <span class="badge aberto">título em aberto</span>' : ''}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>')}</td></tr>` : ''}
       </tbody></table></div>` : '<p class="small muted">Nota sem parcelas (sem financeiro).</p>'}`,
-    foot: `<span style="margin-right:auto;display:flex;gap:6px">${podeEditar() && n.vinc.length ? '<button class="btn danger" id="desv">Desfazer vínculos de recebimento</button>' : ''}${podeEditar() && n.fidc.length ? '<button class="btn danger" id="desf">Desfazer ligação com borderô</button>' : ''}</span><button class="btn" id="xml">Baixar XML</button><button class="btn" data-close>Fechar</button>` });
+    foot: `<span style="margin-right:auto;display:flex;gap:6px">${podeEditar() && n.tipo === 'saida' && n.situacao === 'autorizada' ? '<button class="btn" id="mcanc">Marcar como cancelada</button>' : ''}${podeEditar() && (n.eventos || []).some(x => x.tipo === 'cancelamento_manual') && n.situacao === 'cancelada' ? '<button class="btn" id="dcanc">Desfazer cancelamento informado</button>' : ''}${podeEditar() && n.vinc.length ? '<button class="btn danger" id="desv">Desfazer vínculos de recebimento</button>' : ''}${podeEditar() && n.fidc.length ? '<button class="btn danger" id="desf">Desfazer ligação com borderô</button>' : ''}</span><button class="btn" id="xml">Baixar XML</button><button class="btn" data-close>Fechar</button>` });
   $('#xml', m.el).onclick = async () => {
     try { const r = await q(sb.from('nfe_notas').select('xml').eq('id', n.id).single()); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.xml || ''], { type: 'application/xml' })); a.download = `${n.chave}.xml`; a.click(); } catch (e) { fail(e); }
   };
@@ -167,6 +167,8 @@ async function detalhe(n, root) {
     if (!confirm(`Desfazer os ${n.vinc.length} vínculo(s) desta nota com lançamentos? Os lançamentos não são alterados.`)) return;
     try { await q(sb.from('nfe_vinculos').delete().eq('nota_id', n.id)); toast('Vínculos desfeitos'); m.close(); carregar(root); } catch (e) { fail(e); }
   });
+  $('#mcanc', m.el) && ($('#mcanc', m.el).onclick = () => { m.close(); marcarCancelada(n.id, '', () => carregar(root)); });
+  $('#dcanc', m.el) && ($('#dcanc', m.el).onclick = () => { m.close(); desfazerCancelamento(n, () => carregar(root)); });
   m.el.addEventListener('click', async (ev) => {
     const b = ev.target.closest('[data-dv]'); if (!b) return;
     const v = n.vinc.find(x => x.id === b.dataset.dv);

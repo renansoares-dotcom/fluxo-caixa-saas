@@ -22,7 +22,7 @@ const receitas = () => state.cad.contasPlano.filter(p => p.codigo.startsWith('1.
 // ---------------------------------------------------------------------------------------------
 // Parcelas das notas de venda com o que já foi recebido (vínculos) e o que falta
 async function parcelasPendentes(e, de, ate) {
-  const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor,a_vista,n:nfe_notas!inner(id,numero,emissao,dest_doc,dest_nome,favorecido_id,situacao,finalidade,tipo)')
+  const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor,a_vista,n:nfe_notas!inner(id,numero,emissao,dest_doc,dest_nome,favorecido_id,situacao,finalidade,tipo,v_nf)')
     .eq('empresa_id', e).gte('vencimento', de).lte('vencimento', ate).eq('n.tipo', 'saida').eq('n.situacao', 'autorizada').eq('n.finalidade', '1').order('vencimento'));
   const notaIds = [...new Set(ps.map(p => p.nota_id))];
   const vinc = [], fidc = [], todasParc = [];
@@ -39,7 +39,18 @@ async function parcelasPendentes(e, de, ate) {
     let solto = vinc.filter(v => v.nota_id === nid && !v.parcela_id).reduce((s, v) => s + +(v.l?.valor || 0), 0); if (!solto) continue;
     for (const p of todasParc.filter(p => p.nota_id === nid).sort((a, b) => a.numero - b.numero)) { const falta = +p.valor - (rec.get(p.id) || 0); if (falta <= 0) continue; const u = Math.min(falta, solto); rec.set(p.id, (rec.get(p.id) || 0) + u); solto -= u; if (solto <= 0) break; }
   }
-  return ps.map(p => ({ ...p, recebido: rec.get(p.id) || 0, falta: +(+p.valor - (rec.get(p.id) || 0)).toFixed(2), fidc: fidc.find(f => f.parcela_id === p.id)?.t || null }))
+  // "nota gêmea": mesmo cliente e valor, emitida até 3 dias depois com número até 5 à frente e já recebida/em borderô → provável cancelada e reemitida
+  const gem = new Map();
+  if (ps.length) {
+    const ems = ps.map(p => p.n.emissao).sort();
+    const outras = await fetchAll(() => sb.from('nfe_notas').select('id,numero,emissao,dest_doc,v_nf,v:nfe_vinculos(id),f:nfe_fidc_vinculos(id)').eq('empresa_id', e).eq('tipo', 'saida').eq('situacao', 'autorizada').gte('emissao', ems[0]).lte('emissao', addDias(ems.at(-1), 3)));
+    for (const p of ps) {
+      if (rec.get(p.id)) continue;
+      const t = outras.find(o => o.id !== p.nota_id && o.dest_doc === p.n.dest_doc && o.numero > p.n.numero && o.numero - p.n.numero <= 5 && Math.abs(dias(o.emissao, p.n.emissao)) <= 3 && perto(o.v_nf, p.n.v_nf) && (o.v?.length || o.f?.length));
+      if (t) gem.set(p.id, t.numero);
+    }
+  }
+  return ps.map(p => ({ ...p, gemea: gem.get(p.id) || null, recebido: rec.get(p.id) || 0, falta: +(+p.valor - (rec.get(p.id) || 0)).toFixed(2), fidc: fidc.find(f => f.parcela_id === p.id)?.t || null }))
     .filter(p => p.falta > 0.05);
 }
 
@@ -153,7 +164,7 @@ function desenhar(c, root, onMudou) {
     <div class="table-wrap" style="max-height:62vh"><table><thead><tr><th></th><th>NF / parc.</th><th>Cliente</th><th>Vencimento</th><th class="num">Falta receber</th></tr></thead><tbody>
     ${PP.slice(0, MAX).map(p => `<tr data-p="${p.id}" class="clickable ${R.selP.has(p.id) && ok ? 'conc-ok' : ''}"><td><input type="checkbox" ${R.selP.has(p.id) ? 'checked' : ''}></td>
       <td>${p.n.numero} / ${p.a_vista ? 'à vista' : p.numero}${p.fidc ? ` <span class="badge" title="Antecipada no borderô ${esc(p.fidc.fundo)} ${esc(p.fidc.bordero)}">FIDC</span>` : ''}</td>
-      <td class="wrap small">${esc(p.n.dest_nome || '')}</td><td>${dateBR(p.vencimento)}</td>
+      <td class="wrap small">${esc(p.n.dest_nome || '')}${p.gemea ? `<div><span class="badge vencido" title="Mesmo cliente e valor, emitida logo depois e já recebida">provável cancelada → NF ${p.gemea}</span>${podeEditar() ? ` <a href="#" data-canc="${p.nota_id}" data-sub="${p.gemea}">marcar cancelada</a>` : ''}</div>` : ''}</td><td>${dateBR(p.vencimento)}</td>
       <td class="num">${money(p.falta)}${p.recebido > 0.005 ? `<div class="small muted">de ${money(p.valor)}</div>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhuma parcela pendente no período.</td></tr>'}
     ${PP.length > MAX ? `<tr><td colspan="5" class="small muted">Mostrando ${MAX} de ${PP.length} — use a busca ou o período.</td></tr>` : ''}</tbody></table></div>`;
   $('#rlan', c).innerHTML = `<div class="card-head" style="padding:12px 12px 6px"><h2>Recebimentos sem nota (${LL.length})</h2>
@@ -171,7 +182,7 @@ function desenhar(c, root, onMudou) {
     <div style="display:flex;gap:8px">${selP.length || selL.length ? '<button class="btn" id="rlimpa">Limpar seleção</button>' : ''}${podeEditar() ? `<button class="btn primary" id="rvinc" ${selP.length && selL.length ? '' : 'disabled'}>Vincular</button>` : ''}</div></div>`;
   // eventos
   for (const [sel, nm] of [['#rpar', 'bp'], ['#rlan', 'bl']]) { let t; const inp = $(`${sel} [name=${nm}]`, c); inp.oninput = (ev) => { clearTimeout(t); t = setTimeout(() => { R[nm] = ev.target.value; desenhar(c, root, onMudou); const i = $(`${sel} [name=${nm}]`, c); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); }; }
-  $('#rpar tbody', c).onclick = (ev) => { const tr = ev.target.closest('tr[data-p]'); if (!tr) return; const id = tr.dataset.p; R.selP.has(id) ? R.selP.delete(id) : R.selP.add(id); desenhar(c, root, onMudou); };
+  $('#rpar tbody', c).onclick = (ev) => { const ca = ev.target.closest('[data-canc]'); if (ca) { ev.preventDefault(); ev.stopPropagation(); return marcarCancelada(ca.dataset.canc, ca.dataset.sub, async () => { await carregarDados(c, root, onMudou); onMudou && onMudou(); }); } const tr = ev.target.closest('tr[data-p]'); if (!tr) return; const id = tr.dataset.p; R.selP.has(id) ? R.selP.delete(id) : R.selP.add(id); desenhar(c, root, onMudou); };
   $('#rlan tbody', c).onclick = (ev) => { const tr = ev.target.closest('tr[data-l]'); if (!tr) return; const id = tr.dataset.l; R.selL.has(id) ? R.selL.delete(id) : R.selL.add(id); desenhar(c, root, onMudou); };
   $('#outrasnf', c) && ($('#outrasnf', c).onchange = (ev) => { R.outrasNF = ev.target.checked; desenhar(c, root, onMudou); });
   $('#sosug', c) && ($('#sosug', c).onchange = (ev) => { R.soSug = ev.target.checked; desenhar(c, root, onMudou); });
@@ -286,4 +297,55 @@ export function gerarContasReceber(mesPadrao, onDone) {
     } catch (err) { fail(err); $('#gok', m.el).disabled = false; }
   };
   buscar();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Cancelamento informado pelo usuário (quando o XML do evento não veio ou a nota foi cancelada depois de importada)
+// ---------------------------------------------------------------------------------------------
+export async function marcarCancelada(notaId, substSugerida, onDone) {
+  const e = state.empresa.id;
+  let n, parc, vinc, fidc;
+  try {
+    n = (await q(sb.from('nfe_notas').select('id,numero,emissao,dest_nome,dest_doc,v_nf,situacao,eventos').eq('id', notaId)))[0];
+    [parc, vinc, fidc] = await Promise.all([q(sb.from('nfe_parcelas').select('id,numero,valor').eq('nota_id', notaId)),
+      q(sb.from('nfe_vinculos').select('id,tipo,lancamento_id,l:lancamentos(id,data,valor,status,descricao,fidc_proposta_id)').eq('nota_id', notaId)),
+      q(sb.from('nfe_fidc_vinculos').select('id').eq('nota_id', notaId))]);
+  } catch (err) { return fail(err); }
+  if (!n) return;
+  const titulosAbertos = vinc.filter(v => v.tipo === 'titulo' && v.l?.status === 'Em aberto' && !v.l.fidc_proposta_id);
+  const recebidos = vinc.filter(v => !titulosAbertos.includes(v));
+  const m = modal({ title: `Marcar a NF ${n.numero} como cancelada`, body: `
+    <p class="small" style="margin-top:0">${esc(n.dest_nome || '')} · emissão ${dateBR(n.emissao)} · ${money(n.v_nf)}. A nota sai do faturamento, dos impostos e das contas a receber; o XML continua guardado e dá para desfazer.
+      Se depois o XML do evento de cancelamento for importado, ele é aplicado normalmente.</p>
+    <div class="toolbar"><label>Substituída pela NF (opcional)<input id="cs" inputmode="numeric" value="${esc(substSugerida || '')}" style="width:120px"></label>
+      <label class="grow">Observação<input id="cm" placeholder="ex.: reemitida com duplicata"></label></div>
+    ${titulosAbertos.length ? `<label class="small" style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="cx" checked> Excluir ${titulosAbertos.length} título(s) em aberto gerado(s) desta nota (${money(titulosAbertos.reduce((s, v) => s + +v.l.valor, 0))})</label>` : ''}
+    ${recebidos.length ? `<p class="small neg">Há ${recebidos.length} recebimento(s) ligado(s) a esta nota (${money(recebidos.reduce((s, v) => s + +(v.l?.valor || 0), 0))}). O vínculo será desfeito (o lançamento não muda); se informar a NF substituta, o sistema tenta ligá-lo a ela.</p>` : ''}
+    ${fidc.length ? `<p class="small neg">Esta nota tem ${fidc.length} título(s) ligado(s) a borderô FIDC: a ligação será desfeita (o borderô não muda).</p>` : ''}`,
+    foot: '<button class="btn" data-close>Voltar</button><button class="btn danger" id="cok">Marcar como cancelada</button>' });
+  $('#cok', m.el).onclick = async () => {
+    const sub = +($('#cs', m.el).value || '').replace(/\D/g, '') || null; let subst = null;
+    try {
+      if (sub) { subst = (await q(sb.from('nfe_notas').select('id,numero,situacao').eq('empresa_id', e).eq('tipo', 'saida').eq('numero', sub)))[0]; if (!subst) return toast(`NF ${sub} não está importada`, true); }
+      $('#cok', m.el).disabled = true;
+      const ev = { tipo: 'cancelamento_manual', data: hojeISO(), substituta: sub, descricao: `Cancelada (informado${state.user?.email ? ' por ' + state.user.email : ''} em ${dateBR(hojeISO())})${sub ? ` — substituída pela NF ${sub}` : ''}${$('#cm', m.el).value.trim() ? ` · ${$('#cm', m.el).value.trim()}` : ''}`, usuario: state.user?.email || null };
+      const excluir = $('#cx', m.el)?.checked ? titulosAbertos : [];
+      if (vinc.length) await q(sb.from('nfe_vinculos').delete().eq('nota_id', n.id));
+      if (fidc.length) await q(sb.from('nfe_fidc_vinculos').delete().eq('nota_id', n.id));
+      for (const ch of chunks(excluir.map(v => v.lancamento_id), 100)) await q(sb.from('lancamentos').delete().in('id', ch).eq('status', 'Em aberto'));
+      await q(sb.from('nfe_notas').update({ situacao: 'cancelada', eventos: [...(n.eventos || []), ev] }).eq('id', n.id));
+      let lig = 0; if (subst && recebidos.length) { try { lig = await autoVincular([subst.id]); } catch {} }
+      toast(`NF ${n.numero} marcada como cancelada${excluir.length ? ` · ${excluir.length} título(s) excluído(s)` : ''}${lig ? ` · ${lig} recebimento(s) ligado(s) à NF ${sub}` : ''}`);
+      m.close(); onDone && onDone();
+    } catch (err) { fail(err); $('#cok', m.el).disabled = false; }
+  };
+}
+
+export async function desfazerCancelamento(n, onDone) {
+  if (!confirm(`Desfazer o cancelamento informado da NF ${n.numero}? Ela volta a autorizada (títulos excluídos não voltam; gere de novo se precisar).`)) return;
+  try {
+    const ev = (n.eventos || []).filter(x => x.tipo !== 'cancelamento_manual');
+    await q(sb.from('nfe_notas').update({ situacao: 'autorizada', eventos: ev }).eq('id', n.id));
+    toast('Cancelamento desfeito'); onDone && onDone();
+  } catch (err) { fail(err); }
 }
