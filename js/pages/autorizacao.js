@@ -1,11 +1,33 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
-import { $, $$, esc, money, cls, dateBR, today, options, fail, toast, parseNum, loading, logoPNG } from '../lib/ui.js';
+import { $, $$, esc, money, cls, dateBR, today, options, fail, toast, parseNum, loading, logoPNG, modal, MESES_CURTO } from '../lib/ui.js';
 
 export const title = 'Autorização de pagamentos';
 const f = { de: '', ate: '', conta: '', grupo: '', cc: '', favorecido: '', situacao: '', prioridade: '' };
 let itens = [];      // títulos listados
 let marc = {};       // id -> {autoriza, valor, obs}
 let saldoBancos = 0;
+let orcInfo = {};    // `${plano}|${ano}|${mes}` -> { orcAc, usado } (orçado × realizado + em aberto acumulados até o mês do vencimento)
+
+// Orçamento das contas dos títulos listados: com o que já foi pago e o que está em aberto até o mês do vencimento,
+// a conta passa do budget acumulado? (aviso; o pagamento não é bloqueado, mas pede justificativa ao autorizar)
+async function carregarOrcamento(rows) {
+  orcInfo = {};
+  const e = state.empresa.id, anos = [...new Set(rows.map(r => +r.data.slice(0, 4)))];
+  for (const ano of anos) {
+    const planos = new Set(rows.filter(r => +r.data.slice(0, 4) === ano).map(r => r.plano_id));
+    const [mov, orc] = await Promise.all([q(sb.rpc('orcamento_movimento', { p_empresa: e, p_ano: ano })),
+      fetchAll(() => sb.from('orcamentos').select('plano_id,mes,valor').eq('empresa_id', e).eq('ano', ano).eq('cenario', 'budget'))]);
+    const A = {}; const arr = (pid) => A[pid] ||= { orc: Array(12).fill(0), usado: Array(12).fill(0) };
+    for (const o of orc) if (planos.has(o.plano_id)) arr(o.plano_id).orc[o.mes - 1] += +o.valor;
+    for (const m of mov) if (planos.has(m.plano_id)) arr(m.plano_id).usado[m.mes - 1] += +m.total;
+    for (const [pid, a] of Object.entries(A)) {
+      let oa = 0, ua = 0;
+      for (let i = 0; i < 12; i++) { oa += a.orc[i]; ua += a.usado[i]; orcInfo[`${pid}|${ano}|${i + 1}`] = { orcAc: oa, usado: ua, mes: i + 1, ano }; }
+    }
+  }
+}
+const infoOrc = (it) => orcInfo[`${it.plano_id}|${+it.data.slice(0, 4)}|${+it.data.slice(5, 7)}`];
+const acimaOrc = (it) => { const o = infoOrc(it); return o && o.usado - o.orcAc > 0.005 ? o : null; };
 
 export async function render(root) {
   const c = state.cad;
@@ -65,6 +87,7 @@ async function load(root) {
       q(sb.rpc('saldos_contas', { p_empresa: e })),
     ]);
     itens = rows;
+    try { await carregarOrcamento(rows); } catch (err) { orcInfo = {}; console.warn('orçamento', err); }
     saldoBancos = saldos.filter(s => s.disponibilidade === 'Conta com recursos disponíveis' && (!f.conta || s.conta_id === f.conta)).reduce((a, s) => a + +s.saldo_pago, 0);
     desenhar(root);
   } catch (err) { fail(err); }
@@ -91,16 +114,18 @@ function desenhar(root) {
     <div class="kpi"><div class="k-label">Vencidos</div><div class="k-value neg">${money(t.venc)}</div></div>
     <div class="kpi"><div class="k-label">Saldo em bancos</div><div class="k-value ${cls(saldoBancos)}">${money(saldoBancos)}</div></div>
     <div class="kpi"><div class="k-label">Saldo após pagar tudo</div><div class="k-value ${cls(saldoBancos - t.total)}">${money(saldoBancos - t.total)}</div></div>
+    <div class="kpi"><div class="k-label">Acima do orçado</div><div class="k-value ${itens.some(acimaOrc) ? 'neg' : ''}">${itens.filter(acimaOrc).length}</div><div class="k-sub">título(s) em contas que passam do budget acumulado do mês</div></div>
     <div class="kpi"><div class="k-label">Autorizado</div><div class="k-value" style="color:var(--primary)">${money(t.aut)}</div><div class="k-sub">saldo após: ${money(saldoBancos - t.aut)}</div></div>`;
   const tbl = $('#tbl', root);
   if (!itens.length) { tbl.innerHTML = '<div class="empty">Nenhum compromisso em aberto com esses filtros.</div>'; return; }
   const ed = podeEditar();
-  tbl.innerHTML = `<table><thead><tr><th>Nº</th><th>Vencimento</th><th>Atraso</th><th>Favorecido</th><th>Descrição</th><th>Plano de contas</th><th>C. Custo</th><th>Banco</th><th>Prioridade</th><th class="num">Valor</th><th>Autoriza</th><th class="num">Valor autorizado</th><th>Observação</th></tr></thead><tbody>
+  tbl.innerHTML = `<table><thead><tr><th>Nº</th><th>Vencimento</th><th>Atraso</th><th>Favorecido</th><th>Descrição</th><th>Plano de contas</th><th>C. Custo</th><th>Banco</th><th>Prioridade</th><th>Orçamento</th><th class="num">Valor</th><th>Autoriza</th><th class="num">Valor autorizado</th><th>Observação</th></tr></thead><tbody>
     ${itens.map((it, i) => { const mk = marc[it.id] || {}; const dias = Math.floor((new Date(today()) - new Date(it.data)) / 864e5);
       return `<tr data-id="${it.id}"><td>${i + 1}</td><td>${dateBR(it.data)}</td><td>${dias > 0 ? `<span class="badge vencido">${dias} d</span>` : ''}</td>
       <td class="wrap">${esc(it.favorecido_nome || '')}</td><td class="wrap">${esc(it.descricao || '')}</td><td>${esc(it.plano_codigo + ' - ' + it.plano_nome)}</td>
       <td>${esc(it.centro_custo_nome || '')}</td><td>${esc(it.conta_nome || '')}</td>
       <td><span class="badge ${it.prioridade_efetiva === 'Obrigatório' ? 'obrig' : 'negoc'}">${it.prioridade_efetiva}</span></td>
+      <td>${(() => { const o = acimaOrc(it); if (o) return `<span class="badge vencido" title="Budget acumulado até ${MESES_CURTO[o.mes - 1]}: ${money(o.orcAc)} · pago + em aberto: ${money(o.usado)}">acima ${money(o.usado - o.orcAc)}</span>`; const x = infoOrc(it); return x ? '<span class="badge pago">no orçado</span>' : '<span class="small muted">sem orçamento</span>'; })()}</td>
       <td class="num">${money(Math.abs(+it.valor_sinal))}</td>
       <td><input type="checkbox" class="aut" ${mk.autoriza ? 'checked' : ''} ${ed ? '' : 'disabled'}></td>
       <td class="num"><input class="cell val" value="${money(mk.valor ?? Math.abs(+it.valor_sinal))}" ${ed ? '' : 'disabled'}></td>
@@ -114,10 +139,37 @@ function desenhar(root) {
   };
 }
 
+// Antes de gerar: títulos marcados em contas acima do orçado pedem justificativa (uma por conta × mês)
+function pedirJustificativas(lista) {
+  return new Promise((resolve) => {
+    const grupos = new Map();
+    for (const it of lista) { const o = acimaOrc(it); const k = `${it.plano_id}|${o.ano}|${o.mes}`; (grupos.get(k) || grupos.set(k, { it, o, itens: [] }).get(k)).itens.push(it); }
+    const G = [...grupos.values()];
+    const m = modal({ title: 'Pagamentos acima do orçado — justificativa', wide: true, body: `
+      <p class="small" style="margin-top:0">Os títulos marcados abaixo estão em contas que, com o que já foi pago e o que está em aberto, passam do budget acumulado até o mês do vencimento. O pagamento não é bloqueado: escreva o motivo para registrar no controle orçamentário e no PDF da autorização.</p>
+      ${G.map((g, i) => `<div class="card" style="margin:8px 0;padding:10px"><strong>${esc(g.it.plano_codigo)} ${esc(g.it.plano_nome)}</strong> — até ${MESES_CURTO[g.o.mes - 1]}/${g.o.ano}: budget ${money(g.o.orcAc)} · pago + em aberto ${money(g.o.usado)} · <span class="neg">acima ${money(g.o.usado - g.o.orcAc)}</span>
+        <div class="small muted">${g.itens.map(x => `${dateBR(x.data)} · ${esc(x.favorecido_nome || x.descricao || '')} · ${money(+(marc[x.id]?.valor ?? Math.abs(+x.valor_sinal)))}`).join('<br>')}</div>
+        <textarea data-g="${i}" rows="2" style="width:100%;margin-top:6px" placeholder="Justificativa"></textarea></div>`).join('')}`,
+      foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="jok">Continuar e gerar</button>' });
+    let ok = false;
+    $('#jok', m.el).onclick = () => {
+      const txt = [...m.el.querySelectorAll('textarea[data-g]')].map(t => t.value.trim());
+      if (txt.some(x => !x)) return toast('Escreva a justificativa de cada conta', true);
+      ok = true; m.close(); resolve(G.map((g, i) => ({ ...g, texto: txt[i] })));
+    };
+    const obs = new MutationObserver(() => { if (!document.body.contains(m.el)) { obs.disconnect(); if (!ok) resolve(null); } });
+    obs.observe(document.getElementById('modal-root') || document.body, { childList: true });
+  });
+}
+
 async function gerar(root) {
   const t = totais();
   if (!itens.length) return toast('Nenhum título listado', true);
   const elab = $('#elab', root).value.trim();
+  const acima = itens.filter(it => marc[it.id]?.autoriza && acimaOrc(it));
+  let justs = [];
+  if (acima.length) { justs = await pedirJustificativas(acima); if (!justs) return; }
+  const justDoItem = (it) => justs.find(g => g.itens.includes(it))?.texto;
   try {
     const aut = await q(sb.from('autorizacoes').insert({
       empresa_id: state.empresa.id, emissao: today(), elaborado_por: elab || null,
@@ -129,9 +181,12 @@ async function gerar(root) {
       centro_custo: it.centro_custo_nome, conta: it.conta_nome, prioridade: it.prioridade_efetiva,
       valor: Math.abs(+it.valor_sinal), autoriza: !!marc[it.id]?.autoriza,
       valor_autorizado: marc[it.id]?.autoriza ? +(marc[it.id].valor ?? Math.abs(+it.valor_sinal)) : 0,
-      observacao: marc[it.id]?.obs || null,
+      observacao: [justDoItem(it) ? `Acima do orçado: ${justDoItem(it)}` : '', marc[it.id]?.obs || ''].filter(Boolean).join(' · ') || null,
     }));
     for (let i = 0; i < rows.length; i += 500) await q(sb.from('autorizacao_itens').insert(rows.slice(i, i + 500)));
+    if (justs.length) await q(sb.from('orcamento_justificativas').insert(justs.map(g => ({ empresa_id: state.empresa.id, ano: g.o.ano, mes: g.o.mes, plano_id: g.it.plano_id, origem: 'autorizacao',
+      orcado: +g.o.orcAc.toFixed(2), realizado: +g.o.usado.toFixed(2), desvio: +(g.o.usado - g.o.orcAc).toFixed(2), justificativa: g.texto,
+      acao: `Autorização nº ${aut.numero}: ${g.itens.length} título(s), ${money(g.itens.reduce((s, x) => s + +(marc[x.id]?.valor ?? Math.abs(+x.valor_sinal)), 0))}`, autorizacao_id: aut.id }))));
     if (elab && elab !== state.empresa.elaborado_por) {
       sb.from('empresas').update({ elaborado_por: elab }).eq('id', state.empresa.id).then(() => state.empresa.elaborado_por = elab);
     }

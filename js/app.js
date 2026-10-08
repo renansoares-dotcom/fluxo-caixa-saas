@@ -14,6 +14,7 @@ const routes = {
   'dre': () => import('./pages/dre.js'),
   'orcamento': () => import('./pages/orcamento.js'),
   'orcado-realizado': () => import('./pages/orcado-realizado.js'),
+  'controle-orcamento': () => import('./pages/controle-orcamento.js'),
   'fidc': () => import('./pages/fidc.js'),
   'fidc-propostas': () => import('./pages/fidc-propostas.js'),
   'duplicatas': () => import('./pages/duplicatas.js'),
