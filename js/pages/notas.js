@@ -234,7 +234,7 @@ const CATB = {
   outro_sacado: ['Sacado ≠ cliente da nota', 'vencido', false, 'O CNPJ do sacado no borderô é de outra empresa. Provavelmente é outra nota com o mesmo número — confira.'],
   sem_parcela: ['Parcela não identificada', 'vencido', false, 'O título cita a nota, mas não dá para saber a parcela (sem nº e com valor diferente, ou parcela já ligada). Se marcar, liga só à nota.'],
 };
-let BOR = null, OPS = []; const marcB = new Set();
+let BOR = null; const marcB = new Set();
 
 async function pintarBorderos(c, root) {
   if (ui.tipo !== 'saida') { c.innerHTML = '<div class="card"><div class="empty">Borderôs valem para as notas de saída.</div></div>'; return; }
@@ -247,9 +247,6 @@ async function pintarBorderos(c, root) {
     const livres = tits.filter(t => !t.v?.length);
     const ocupadas = new Set(notas.flatMap(n => n.fidc.map(v => v.parcela_id).filter(Boolean)));
     BOR = casarBorderos(notas, livres, ocupadas);
-    const opIds = [...new Set(notas.flatMap(n => n.fidc.map(v => v.t?.operacao_id)).filter(Boolean))]; OPS = [];
-    for (const ch of chunks(opIds)) OPS.push(...await q(sb.from('fidc_operacoes').select('*').in('id', ch)));
-    OPS.sort((a, b) => a.data.localeCompare(b.data) || a.fundo.localeCompare(b.fundo) || String(a.bordero).localeCompare(String(b.bordero)));
     marcB.clear(); BOR.grupos.forEach((g, i) => { g.i = i; if (CATB[g.cat][2]) marcB.add(i); });
   } catch (err) { fail(err); c.innerHTML = ''; return; }
   desenharBorderos(c, root);
@@ -266,7 +263,7 @@ function desenharBorderos(c, root) {
       ${Object.entries(CATB).map(([k, [t, cor]]) => `<div class="kpi"><div class="k-label"><span class="badge ${cor}">${t}</span></div><div class="k-value">${por(k).length}</div><div class="k-sub">${money(vt(por(k)))}</div></div>`).join('')}
       <div class="kpi"><div class="k-label"><span class="badge">Parcelas fora de borderô</span></div><div class="k-value">${BOR.fora.length}</div><div class="k-sub">${money(BOR.fora.reduce((s, x) => s + +x.parcela.valor, 0))} · a prazo</div></div></div>
     ${podeEditar() && G.length ? `<div class="toolbar" style="margin-top:8px"><button class="btn primary" id="gravab" ${marcB.size ? '' : 'disabled'}>Ligar ${marcB.size} título(s) marcado(s)</button></div>` : ''}</div>
-    ${listaBorderos()}
+    ${ligados.length ? `<div class="card"><p class="small" style="margin:0">Os borderôs (fundo, custos, líquido, títulos e aprovação) ficam em <a href="#/fidc-propostas">Propostas de borderô</a> › aba Propostas. Aqui fica só a ligação dos títulos com as notas.</p></div>` : ''}
     ${Object.entries(CATB).map(([k, [t, cor, , dica]]) => { const L = por(k); if (!L.length) return ''; return `<div class="card flush"><div class="card-head" style="padding:12px 12px 0"><div><h2><span class="badge ${cor}">${t}</span> ${L.length}</h2><p class="muted small">${dica}</p></div>
       ${podeEditar() ? `<div style="display:flex;gap:6px"><button class="btn small" data-todos="${k}" data-v="1">Marcar todos</button><button class="btn small" data-todos="${k}" data-v="0">Desmarcar</button></div>` : ''}</div>
       <div class="table-wrap" style="max-height:${k === 'exata' ? 320 : 420}px"><table><thead><tr><th></th><th>Fundo · borderô</th><th>Data</th><th>Título</th><th>Sacado (borderô)</th><th class="num">Valor título</th><th>NF / parcela</th><th>Cliente da nota</th><th>Vencimento</th><th class="num">Valor parcela</th></tr></thead><tbody>
@@ -283,8 +280,6 @@ function desenharBorderos(c, root) {
       </tbody></table></div></div>` : ''}`;
   c.onchange = (e) => { const tr = e.target.closest('tr[data-g]'); if (!tr || e.target.type !== 'checkbox') return; e.target.checked ? marcB.add(+tr.dataset.g) : marcB.delete(+tr.dataset.g); const b = $('#gravab', c); if (b) { b.disabled = !marcB.size; b.textContent = `Ligar ${marcB.size} título(s) marcado(s)`; } };
   c.onclick = async (e) => {
-    const op = e.target.closest('tr[data-op]'); if (op) return verBordero(OPS.find(o => o.id === op.dataset.op));
-    if (e.target.id === 'expbor') return exportXLSX($('#tbor', c), `borderos_${ui.mes}`);
     const t = e.target.closest('[data-todos]'); if (t) { for (const g of G.filter(g => g.cat === t.dataset.todos)) t.dataset.v === '1' ? marcB.add(g.i) : marcB.delete(g.i); return desenharBorderos(c, root); }
     if (e.target.id !== 'gravab') return;
     const sel = G.filter(g => marcB.has(g.i));
@@ -294,51 +289,6 @@ function desenharBorderos(c, root) {
     try { for (const ch of chunks(rows, 300)) await q(sb.from('nfe_fidc_vinculos').insert(ch)); toast(`${rows.length} título(s) ligado(s)`); await carregar(root); }
     catch (err) { fail(String(err.message || err).includes('duplicate') ? new Error('Algum título já estava ligado a outra nota. Recarregue a página.') : err); e.target.disabled = false; }
   };
-}
-
-// Lista dos borderôs que têm títulos das notas do mês (dados da operação vêm da base FIDC)
-function listaBorderos() {
-  if (!OPS.length) return '';
-  const lig = D.notas.flatMap(n => n.fidc.map(v => ({ ...v, nota: n })));
-  const doMes = (o) => lig.filter(v => v.t?.operacao_id === o.id);
-  const S = (f) => OPS.reduce((s, o) => s + (+o[f] || 0), 0);
-  return `<div class="card flush"><div class="card-head" style="padding:12px 12px 0"><div><h2>Borderôs com títulos das notas de ${dateBR(D.ini).slice(3)}</h2>
-      <p class="muted small">Clique no borderô para ver os títulos, as notas e os recebimentos. Valores da operação conforme a base FIDC (o borderô pode ter títulos de notas de outros meses).</p></div>
-      <button class="btn small" id="expbor">Exportar Excel</button></div>
-    <div class="table-wrap" style="max-height:420px"><table id="tbor"><thead><tr><th>Data</th><th>Fundo</th><th>Borderô</th><th class="num">Títulos (do mês / total)</th><th class="num">Valor dos títulos do mês</th><th class="num">Valor de face</th><th class="num">Custo total</th><th class="num">Recompra</th><th class="num">Líquido</th><th class="num">Prazo médio</th><th class="num">Notas</th></tr></thead><tbody>
-    ${OPS.map(o => { const L = doMes(o); return `<tr class="clickable" data-op="${o.id}"><td>${dateBR(o.data)}</td><td>${esc(o.fundo)}</td><td>${esc(o.bordero)}</td><td class="num">${L.length} / ${o.qtd_titulos ?? '—'}</td>
-      <td class="num">${money(L.reduce((s, v) => s + (+v.t?.valor || 0), 0))}</td><td class="num">${money(o.valor_face)}</td><td class="num">${money(o.custo_total)}</td><td class="num">${+o.recompra ? money(o.recompra) : '—'}</td><td class="num">${money(o.liquido)}</td>
-      <td class="num">${o.prazo_medio != null ? Math.round(+o.prazo_medio) + ' d' : '—'}</td><td class="num">${new Set(L.map(v => v.nota_id)).size}</td></tr>`; }).join('')}
-    <tr style="font-weight:600"><td colspan="3">Total (${OPS.length} borderôs)</td><td class="num">${lig.length} / ${S('qtd_titulos')}</td><td class="num">${money(lig.reduce((s, v) => s + (+v.t?.valor || 0), 0))}</td><td class="num">${money(S('valor_face'))}</td><td class="num">${money(S('custo_total'))}</td><td class="num">${money(S('recompra'))}</td><td class="num">${money(S('liquido'))}</td><td></td><td class="num">${new Set(lig.map(v => v.nota_id)).size}</td></tr>
-    </tbody></table></div></div>`;
-}
-
-async function verBordero(o) {
-  if (!o) return;
-  let ts = [];
-  try { ts = await q(sb.from('fidc_titulos').select('id,titulo,sacado,cnpj_sacado,vencimento,valor,v:nfe_fidc_vinculos(nota_id,parcela_id,n:nfe_notas(numero,emissao,dest_nome))').eq('operacao_id', o.id).order('titulo')); } catch (e) { return fail(e); }
-  const conta = (id) => state.cad.contaById[id]?.nome || '—';
-  const kp = (l, v, s = '') => `<div class="kpi"><div class="k-label">${l}</div><div class="k-value">${v}</div>${s ? `<div class="k-sub">${s}</div>` : ''}</div>`;
-  const ligados = ts.filter(t => t.v?.length).length;
-  const m = modal({ title: `Borderô ${o.bordero} — ${o.fundo} — ${dateBR(o.data)}`, wide: true, body: `
-    <div class="kpis" style="margin:0 0 12px">
-      ${kp('Valor de face', money(o.valor_face), `${o.qtd_titulos ?? ts.length} título(s)${o.prazo_medio != null ? ` · prazo médio ${Math.round(+o.prazo_medio)} d` : ''}`)}
-      ${kp('Deságio', money(o.desagio), `${+o.ad_valorem ? `ad valorem ${money(o.ad_valorem)} · ` : ''}IOF ${money(o.iof)}`)}
-      ${kp('Tarifas e encargos', money(+o.tarifas + +o.encargos), `tarifas ${money(o.tarifas)} · encargos ${money(o.encargos)}`)}
-      ${kp('Custo total', money(o.custo_total), +o.valor_face ? `${(o.custo_total / o.valor_face * 100).toFixed(2).replace('.', ',')}% da face` : '')}
-      ${kp('Líquido', money(o.liquido), `${+o.recompra ? `recompra ${money(o.recompra)} · ` : ''}${+o.desc_sacado ? `desc. sacado ${money(o.desc_sacado)} · ` : ''}${esc(conta(o.conta_id))}`)}
-      ${kp('Ligados a notas', `${ligados} / ${ts.length}`, ligados < ts.length ? 'os demais são de notas não importadas' : 'todos os títulos')}</div>
-    ${o.observacao ? `<p class="small muted">${esc(o.observacao)}</p>` : ''}
-    <div class="table-wrap" style="max-height:52vh"><table id="tbt"><thead><tr><th>Título</th><th>Sacado</th><th>Vencimento</th><th class="num">Valor</th><th>NF / parcela</th><th>Emissão</th><th>Cliente da nota</th><th>Recebimento vinculado</th></tr></thead><tbody>
-    ${ts.map(t => { const v = t.v?.[0]; const n = v && D.notas.find(x => x.id === v.nota_id); const p = n?.parcelas.find(x => x.id === v.parcela_id); const r = n ? n.vinc.filter(x => x.parcela_id === v.parcela_id) : [];
-      return `<tr><td>${esc(t.titulo)}</td><td class="wrap small">${esc(t.sacado || '')}</td><td>${dateBR(t.vencimento)}</td><td class="num">${money(t.valor)}</td>
-      <td>${v ? `${v.n?.numero ?? ''}${p ? ` / ${p.numero}` : ''}${p && Math.abs(+p.valor - +t.valor) > 0.05 ? ` <span class="small neg">parcela ${money(p.valor)}</span>` : ''}` : '<span class="muted">—</span>'}</td>
-      <td>${v?.n ? dateBR(v.n.emissao) : ''}</td><td class="wrap small">${esc(v?.n?.dest_nome || '')}</td>
-      <td class="small">${r.map(x => `${dateBR(x.l?.data)} · ${money(x.l?.valor)} · ${esc(conta(x.l?.conta_id))}`).join('<br>') || (v && !n ? '<span class="muted">nota de outro mês</span>' : '<span class="muted">—</span>')}</td></tr>`; }).join('')}
-    <tr style="font-weight:600"><td colspan="3">Total</td><td class="num">${money(ts.reduce((s, t) => s + +t.valor, 0))}</td><td colspan="4"></td></tr>
-    </tbody></table></div>`,
-    foot: '<button class="btn" id="expbt">Exportar Excel</button><button class="btn" data-close>Fechar</button>' });
-  $('#expbt', m.el).onclick = () => exportXLSX($('#tbt', m.el), `bordero_${o.fundo}_${o.bordero}`);
 }
 
 // Localiza o cadastro (cliente/fornecedor) da nota: CNPJ completo, raiz do CNPJ (filial) e, por fim, nome

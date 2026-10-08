@@ -6,7 +6,7 @@ import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formDa
 
 export const title = 'Propostas de borderô';
 
-const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', propostaEdit: null };
+const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', propostaEdit: null, pf: { status: '', fundo: '', mes: '', busca: '' } };
 let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [];
 // sacado: raiz do CNPJ (8 dígitos) quando houver; senão o nome normalizado (os borderôs cortam o nome em ~40 letras)
 const chaveSac = (cnpj, nome) => { const d = String(cnpj || '').replace(/\D/g, ''); return d.length >= 8 ? 'c' + d.slice(0, 8) : 'n' + String(nome || '').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 25); };
@@ -278,35 +278,71 @@ async function salvarProposta(root, S, tits, chk, sims, status) {
 function abaPropostas(c, root) {
   const fuById = Object.fromEntries(fundos.map(f => [f.id, f]));
   const pend = propostas.filter(p => p.status === 'Pendente');
+  const f = ui.pf;
+  const meses = [...new Set(propostas.map(p => p.data_operacao.slice(0, 7)))].sort().reverse();
+  const bord = (p) => p.comparativo?.bordero || '';
+  const L = propostas.filter(p => (!f.status || p.status === f.status) && (!f.fundo || p.fundo_id === f.fundo) && (!f.mes || p.data_operacao.startsWith(f.mes))
+    && (!f.busca || `${p.numero} ${bord(p)} ${p.observacao || ''}`.toLowerCase().includes(f.busca.toLowerCase())))
+    .sort((a, b) => (a.status === 'Pendente' ? 0 : 1) - (b.status === 'Pendente' ? 0 : 1) || b.data_operacao.localeCompare(a.data_operacao) || b.numero - a.numero);
+  const S = (k) => L.reduce((s, p) => s + (+p[k] || 0), 0);
+  const MES = (m) => `${MESES_CURTO[+m.slice(5) - 1]}/${m.slice(0, 4)}`;
   c.innerHTML = `${ehDiretor() && pend.length ? `<div class="card alert-row atencao" style="display:block"><strong>${pend.length} proposta(s) aguardando sua aprovação</strong> — ${money0(pend.reduce((s, p) => s + +p.valor_face, 0))} em títulos.</div>` : ''}
-    <div class="card flush"><div class="card-head"><h2>Propostas de borderô</h2><span class="muted small">Clique para ver os detalhes${ehDiretor() ? ' e aprovar' : ''}.</span></div>
-    <div class="table-wrap">${propostas.length ? `<table><thead><tr><th>Nº</th><th>Status</th><th>Fundo</th><th>Data op.</th><th class="num">Títulos</th><th class="num">Face</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Taxa a.m.</th><th>Borderô original</th></tr></thead><tbody>
-      ${propostas.map(p => `<tr class="clickable" data-id="${p.id}"><td>${p.numero}</td><td><span class="badge ${STATUS_CLS[p.status]}">${p.status}</span></td><td>${esc(fuById[p.fundo_id]?.nome || '')}</td><td>${dateBR(p.data_operacao)}</td>
-        <td class="num">${p.qtd_titulos}</td><td class="num">${money0(p.valor_face)}</td><td class="num">${money0(p.custo_total)}</td><td class="num">${money0(p.liquido)}</td><td class="num">${pct(p.taxa_am / 100, 2)}</td>
-        <td>${p.comparativo ? `<span class="badge ${p.comparativo.recusados || p.comparativo.extras || p.comparativo.divergentes ? 'aberto' : 'pago'}">nº ${esc(p.comparativo.bordero || '')}</span>` : p.status === 'Aprovada' ? '<span class="muted small">a comparar</span>' : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nenhuma proposta ainda.</div>'}</div></div>`;
-  $('table', c)?.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) detalhe(propostas.find(p => p.id === tr.dataset.id), root); });
+    <div class="card"><div class="toolbar" id="pf">
+      <label>Status<select name="status"><option value="">Todos</option>${['Pendente', 'Aprovada', 'Rascunho', 'Rejeitada', 'Cancelada'].map(s => `<option ${f.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+      <label>Fundo<select name="fundo"><option value="">Todos</option>${fundos.map(x => `<option value="${x.id}" ${f.fundo === x.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>
+      <label>Mês<select name="mes"><option value="">Todos</option>${meses.map(m => `<option value="${m}" ${f.mes === m ? 'selected' : ''}>${MES(m)}</option>`).join('')}</select></label>
+      <label class="grow">Buscar<input name="busca" value="${esc(f.busca)}" placeholder="nº da proposta ou do borderô"></label>
+      <button class="btn" id="exp-prop">Exportar Excel</button></div>
+      <div class="kpis" style="margin:12px 0 0">
+        <div class="kpi"><div class="k-label">Propostas</div><div class="k-value">${L.length}</div><div class="k-sub">${L.filter(p => p.status === 'Pendente').length} pendente(s) · ${L.filter(p => p.status === 'Aprovada').length} aprovada(s)</div></div>
+        <div class="kpi"><div class="k-label">Valor de face</div><div class="k-value">${money0(S('valor_face'))}</div><div class="k-sub">${S('qtd_titulos')} títulos</div></div>
+        <div class="kpi"><div class="k-label">Custo</div><div class="k-value">${money0(S('custo_total'))}</div><div class="k-sub">${S('valor_face') ? pct(S('custo_total') / S('valor_face'), 2) : '—'} da face</div></div>
+        <div class="kpi"><div class="k-label">Líquido</div><div class="k-value">${money0(S('liquido'))}</div><div class="k-sub">${S('recompras') ? `recompras ${money0(S('recompras'))}` : '&nbsp;'}</div></div></div></div>
+    <div class="card flush"><div class="card-head"><h2>Propostas de borderô</h2><span class="muted small">Clique para ver os títulos, as notas e os recebimentos${ehDiretor() ? ' e aprovar' : ''}. Borderôs que vieram da base FIDC têm a marca <span class="badge">base FIDC</span>.</span></div>
+    <div class="table-wrap" style="max-height:62vh">${L.length ? `<table id="tprop"><thead><tr><th>Nº</th><th>Status</th><th>Fundo</th><th>Borderô</th><th>Data op.</th><th class="num">Títulos</th><th class="num">Face</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Taxa a.m.</th><th class="num">Prazo</th></tr></thead><tbody>
+      ${L.map(p => `<tr class="clickable" data-id="${p.id}"><td>${p.numero}</td><td><span class="badge ${STATUS_CLS[p.status]}">${p.status}</span></td><td>${esc(fuById[p.fundo_id]?.nome || '')}</td>
+        <td>${p.origem === 'base_fidc' ? `${esc(bord(p))} <span class="badge">base FIDC</span>` : p.comparativo ? `<span class="badge ${p.comparativo.recusados || p.comparativo.extras || p.comparativo.divergentes ? 'aberto' : 'pago'}">nº ${esc(bord(p))}</span>` : p.status === 'Aprovada' ? '<span class="muted small">a comparar</span>' : ''}</td>
+        <td>${dateBR(p.data_operacao)}</td><td class="num">${p.qtd_titulos}</td><td class="num">${money0(p.valor_face)}</td><td class="num">${money0(p.custo_total)}</td><td class="num">${money0(p.liquido)}</td><td class="num">${pct(p.taxa_am / 100, 2)}</td><td class="num">${num1(p.prazo_medio)} d</td></tr>`).join('')}
+      <tr style="font-weight:600"><td colspan="5">Total</td><td class="num">${S('qtd_titulos')}</td><td class="num">${money0(S('valor_face'))}</td><td class="num">${money0(S('custo_total'))}</td><td class="num">${money0(S('liquido'))}</td><td colspan="2"></td></tr></tbody></table>` : '<div class="empty">Nenhuma proposta com esses filtros.</div>'}</div></div>`;
+  $('#pf', c).onchange = (e) => { if (e.target.name && e.target.name !== 'busca') { f[e.target.name] = e.target.value; abaPropostas(c, root); } };
+  let tb; $('#pf [name=busca]', c).oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { f.busca = e.target.value; abaPropostas(c, root); const i = $('#pf [name=busca]', c); i.focus(); i.setSelectionRange?.(i.value.length, i.value.length); }, 350); };
+  $('#exp-prop', c).onclick = () => exportXLSX($('#tprop', c), 'propostas_bordero');
+  $('#tprop', c)?.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) detalhe(propostas.find(p => p.id === tr.dataset.id), root); });
 }
 
 async function detalhe(p, root) {
   const fu = fundos.find(f => f.id === p.fundo_id) || {};
   let itens = [];
-  try { itens = await q(sb.from('fidc_proposta_itens').select('*').eq('proposta_id', p.id).order('vencimento')); } catch (e) { return fail(e); }
+  const base = p.origem === 'base_fidc';
+  try {
+    itens = await q(sb.from('fidc_proposta_itens').select('*').eq('proposta_id', p.id).order('vencimento'));
+    if (base) {
+      const tIds = itens.map(i => i.fidc_titulo_id).filter(Boolean), lIds = itens.map(i => i.lancamento_id).filter(Boolean);
+      const nv = tIds.length ? await q(sb.from('nfe_fidc_vinculos').select('fidc_titulo_id,nota_id,parcela_id,n:nfe_notas(numero,dest_nome)').in('fidc_titulo_id', tIds)) : [];
+      const ls = lIds.length ? await q(sb.from('lancamentos').select('id,data,valor,status,conta_id,descricao').in('id', lIds)) : [];
+      const pIds = nv.map(v => v.parcela_id).filter(Boolean);
+      const rc = pIds.length ? await q(sb.from('nfe_vinculos').select('parcela_id,l:lancamentos(data,valor,conta_id)').in('parcela_id', pIds)) : [];
+      for (const i of itens) { i.nf = nv.find(v => v.fidc_titulo_id === i.fidc_titulo_id); i.lanc = ls.find(l => l.id === i.lancamento_id); i.rec = i.nf ? rc.filter(r => r.parcela_id === i.nf.parcela_id) : []; }
+    }
+  } catch (e) { return fail(e); }
   const an = p.analise || {}; const ROT = { atencao: ['⚠', 'Atenção'], info: ['ℹ', 'Info'], ok: ['✓', 'OK'] };
   const ed = podeEditar();
   const acoes = [];
   if (ehDiretor() && p.status === 'Pendente') acoes.push('<button class="btn danger" id="rej">Rejeitar</button>', '<button class="btn primary" id="apr">Aprovar operação</button>');
-  if (ed && ['Rascunho', 'Rejeitada'].includes(p.status)) acoes.push('<button class="btn" id="edit">Editar</button>', '<button class="btn danger" id="del">Excluir</button>');
+  if (ed && !base && ['Rascunho', 'Rejeitada'].includes(p.status)) acoes.push('<button class="btn" id="edit">Editar</button>', '<button class="btn danger" id="del">Excluir</button>');
   if (ed && p.status === 'Rascunho') acoes.push('<button class="btn primary" id="env">Enviar para aprovação</button>');
-  if (ed && p.status === 'Pendente') acoes.push('<button class="btn" id="canc">Cancelar envio</button>');
+  if (ed && !base && p.status === 'Pendente') acoes.push('<button class="btn" id="canc">Cancelar envio</button>');
+  const semLanc = base ? itens.filter(i => !i.lancamento_id).length : 0;
   const m = modal({
     title: `Proposta nº ${p.numero} — ${fu.nome || ''}`, wide: true,
     body: `<p style="margin:0 0 10px"><span class="badge ${STATUS_CLS[p.status]}">${p.status}</span>
         <span class="muted small">criada em ${dateBR(p.criado_em.slice(0, 10))}${p.enviado_em ? ' · enviada em ' + dateBR(p.enviado_em.slice(0, 10)) : ''}${p.aprovado_em ? ` · ${p.status === 'Aprovada' ? 'aprovada' : 'decidida'} em ${dateBR(p.aprovado_em.slice(0, 10))}` : ''}</span></p>
+      ${base ? `<p class="small" style="margin-top:0">Borderô <strong>${esc(p.comparativo?.bordero || '')}</strong> do ${esc(fu.nome || '')} registrado na base FIDC — valores reais do borderô.${p.status === 'Pendente' ? (semLanc ? ` <span class="neg">${semLanc} título(s) ainda não estão lançados em aberto: importe os XML das NFs antes de aprovar (a aprovação liga os títulos sozinha).</span>` : ' Títulos ligados aos lançamentos em aberto.') : ''}</p>` : ''}
       ${p.motivo ? `<p class="small"><strong>Motivo / comentário do diretor:</strong> ${esc(p.motivo)}</p>` : ''}
       <div class="kpis">
         <div class="kpi"><div class="k-label">Valor de face</div><div class="k-value">${money0(p.valor_face)}</div><div class="k-sub">${p.qtd_titulos} títulos · operação ${dateBR(p.data_operacao)}</div></div>
-        <div class="kpi"><div class="k-label">Custo estimado</div><div class="k-value">${money0(p.custo_total)}</div><div class="k-sub">deságio ${money0(p.desagio)} · tarifas/IOF ${money0(+p.tarifas + +p.iof + +p.ad_valorem)}</div></div>
-        <div class="kpi"><div class="k-label">Líquido estimado</div><div class="k-value">${money0(p.liquido)}</div><div class="k-sub">${p.recompras > 0 ? `recompras ${money0(p.recompras)} · ` : ''}crédito em ${esc(state.cad.contaById[p.conta_credito_id]?.nome || '—')}</div></div>
+        <div class="kpi"><div class="k-label">${base ? 'Custo do borderô' : 'Custo estimado'}</div><div class="k-value">${money0(p.custo_total)}</div><div class="k-sub">deságio ${money0(p.desagio)} · tarifas/IOF ${money0(+p.tarifas + +p.iof + +p.ad_valorem)}</div></div>
+        <div class="kpi"><div class="k-label">${base ? 'Líquido' : 'Líquido estimado'}</div><div class="k-value">${money0(p.liquido)}</div><div class="k-sub">${p.recompras > 0 ? `recompras ${money0(p.recompras)} · ` : ''}crédito em ${esc(state.cad.contaById[p.conta_credito_id]?.nome || '—')}</div></div>
         <div class="kpi"><div class="k-label">Taxa a.m.</div><div class="k-value">${pct(p.taxa_am / 100, 2)}</div><div class="k-sub">prazo ${num1(p.prazo_medio)} d · cobrado ${num1(p.prazo_cobrado)} d</div></div>
       </div>
       ${an.custos ? `<p class="small" style="margin-top:10px"><strong>Custos da operação:</strong> ${descCustos(an.custos, an.condicoes, p.qtd_titulos)}${+p.ad_valorem ? ` · ad valorem ${money(p.ad_valorem)}` : ''}${+p.iof ? ` · IOF ${money(p.iof)}` : ''}.</p>` : ''}
@@ -314,15 +350,21 @@ async function detalhe(p, root) {
       ${an.comparacao ? `<h3 style="margin-top:14px">Comparação entre fundos (no envio)</h3><div class="table-wrap"><table><thead><tr><th>Fundo</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Taxa a.m.</th></tr></thead><tbody>
         ${an.comparacao.slice().sort((a, b) => a.custo - b.custo).map(x => `<tr class="${x.fundo === fu.nome ? 'row-sel' : ''}"><td>${esc(x.fundo)}</td><td class="num">${money0(x.custo)}</td><td class="num">${money0(x.liquido)}</td><td class="num">${pct(x.taxa / 100, 2)}</td></tr>`).join('')}</tbody></table></div>` : ''}
       ${an.checagens ? `<h3 style="margin-top:14px">Verificações</h3><div class="alert-list">${an.checagens.map(([st, t, d]) => `<div class="alert-row ${st}"><span class="alert-tag">${ROT[st][0]} ${ROT[st][1]}</span><div><strong>${esc(t)}</strong><div class="small muted">${esc(d)}</div></div></div>`).join('')}</div>` : ''}
-      ${p.comparativo ? blocoComparativo(p.comparativo) : ''}
+      ${p.comparativo && !base ? blocoComparativo(p.comparativo) : ''}
       <h3 style="margin-top:14px">Títulos (${itens.length})</h3>
-      <div class="table-wrap" style="max-height:300px"><table><thead><tr><th>Vencimento</th><th class="num">Prazo</th><th>Sacado</th><th>NF / parcela</th><th class="num">Valor</th><th class="num">Custo est.</th>${p.comparativo ? '<th>No borderô</th>' : ''}</tr></thead><tbody>
-        ${itens.map(i => `<tr><td>${dateBR(i.vencimento)}</td><td class="num">${i.prazo ?? ''}</td><td class="wrap">${esc(i.sacado || '')}</td><td>${esc(i.documento || '')}</td><td class="num">${money(i.valor)}</td><td class="num">${money(i.custo_estimado)}</td>${p.comparativo ? `<td>${esc(i.situacao_bordero || '')}</td>` : ''}</tr>`).join('')}</tbody></table></div>`,
-    foot: `<button class="btn" id="pdfp" style="margin-right:auto">PDF para aprovação</button>${p.status === 'Aprovada' && ed ? '<button class="btn" id="cmpb">Comparar com borderô original</button>' : ''}${ed && ['Pendente', 'Aprovada'].includes(p.status) ? '<button class="btn" id="dupl">Duplicatas para endosso</button>' : ''}${acoes.join('')}<button class="btn" data-close>Fechar</button>`,
+      ${base ? `<div class="table-wrap" style="max-height:340px"><table id="titp"><thead><tr><th>Título</th><th>Sacado</th><th>Vencimento</th><th class="num">Prazo</th><th class="num">Valor</th><th>NF / cliente</th><th>Lançamento do título</th><th>Recebimento vinculado à nota</th></tr></thead><tbody>
+        ${itens.map(i => `<tr><td>${esc(i.documento || '')}</td><td class="wrap small">${esc(i.sacado || '')}</td><td>${dateBR(i.vencimento)}</td><td class="num">${i.prazo ?? ''}</td><td class="num">${money(i.valor)}</td>
+          <td class="small">${i.nf ? `NF ${i.nf.n?.numero ?? ''} · ${esc(i.nf.n?.dest_nome || '')}` : '<span class="muted">nota não importada</span>'}</td>
+          <td class="small">${i.lanc ? `<span class="badge ${i.lanc.status === 'Pago' ? 'pago' : 'aberto'}">${esc(i.lanc.status)}</span> ${dateBR(i.lanc.data)} · ${esc(state.cad.contaById[i.lanc.conta_id]?.nome || '—')}` : '<span class="muted">—</span>'}</td>
+          <td class="small">${i.rec.map(r => `${dateBR(r.l?.data)} · ${money(r.l?.valor)} · ${esc(state.cad.contaById[r.l?.conta_id]?.nome || '—')}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`).join('')}
+        <tr style="font-weight:600"><td colspan="4">Total</td><td class="num">${money(itens.reduce((s, i) => s + +i.valor, 0))}</td><td colspan="3"></td></tr></tbody></table></div>` : `<div class="table-wrap" style="max-height:300px"><table><thead><tr><th>Vencimento</th><th class="num">Prazo</th><th>Sacado</th><th>NF / parcela</th><th class="num">Valor</th><th class="num">Custo est.</th>${p.comparativo ? '<th>No borderô</th>' : ''}</tr></thead><tbody>
+        ${itens.map(i => `<tr><td>${dateBR(i.vencimento)}</td><td class="num">${i.prazo ?? ''}</td><td class="wrap">${esc(i.sacado || '')}</td><td>${esc(i.documento || '')}</td><td class="num">${money(i.valor)}</td><td class="num">${money(i.custo_estimado)}</td>${p.comparativo ? `<td>${esc(i.situacao_bordero || '')}</td>` : ''}</tr>`).join('')}</tbody></table></div>`}`,
+    foot: `<button class="btn" id="pdfp" style="margin-right:auto">PDF para aprovação</button>${base ? '<button class="btn" id="expi">Exportar Excel</button>' : ''}${p.status === 'Aprovada' && ed && !base ? '<button class="btn" id="cmpb">Comparar com borderô original</button>' : ''}${ed && ['Pendente', 'Aprovada'].includes(p.status) ? '<button class="btn" id="dupl">Duplicatas para endosso</button>' : ''}${acoes.join('')}<button class="btn" data-close>Fechar</button>`,
   });
   const act = async (fn, msg) => { try { await fn(); toast(msg); m.close(); await carregar(); desenhar(root); } catch (e) { fail(e); } };
   $('#pdfp', m.el).onclick = () => pdfProposta(p, fu, itens);
-  $('#apr', m.el) && ($('#apr', m.el).onclick = () => { const c = prompt(`Aprovar a proposta nº ${p.numero}?\nOs ${p.qtd_titulos} títulos passam a pagos na conta ${state.cad.contaById[fu.conta_id]?.nome || fu.nome} em ${dateBR(p.data_operacao)}, são lançados deságio, tarifas e o crédito do líquido, e a operação entra na Análise FIDC como borderô P${p.numero}.\n\nComentário (opcional):`, ''); if (c === null) return;
+  $('#expi', m.el) && ($('#expi', m.el).onclick = () => exportXLSX($('#titp', m.el), `bordero_${fu.nome}_${p.comparativo?.bordero || p.numero}`));
+  $('#apr', m.el) && ($('#apr', m.el).onclick = () => { const c = prompt(base ? `Aprovar o borderô ${p.comparativo?.bordero || ''} (proposta nº ${p.numero})?\nOs ${p.qtd_titulos} títulos passam a pagos na conta ${state.cad.contaById[fu.conta_id]?.nome || fu.nome} em ${dateBR(p.data_operacao)} e são lançados o deságio, as tarifas e o crédito do líquido com os valores reais do borderô.\n\nComentário (opcional):` : `Aprovar a proposta nº ${p.numero}?\nOs ${p.qtd_titulos} títulos passam a pagos na conta ${state.cad.contaById[fu.conta_id]?.nome || fu.nome} em ${dateBR(p.data_operacao)}, são lançados deságio, tarifas e o crédito do líquido, e a operação entra na Análise FIDC como borderô P${p.numero}.\n\nComentário (opcional):`, ''); if (c === null) return;
     act(() => q(sb.rpc('decidir_proposta_fidc', { p_id: p.id, p_aprovar: true, p_motivo: c || null })), `Proposta nº ${p.numero} aprovada`); });
   $('#rej', m.el) && ($('#rej', m.el).onclick = () => { const c = prompt('Motivo da rejeição:', ''); if (c === null) return;
     act(() => q(sb.rpc('decidir_proposta_fidc', { p_id: p.id, p_aprovar: false, p_motivo: c || null })), `Proposta nº ${p.numero} rejeitada`); });
