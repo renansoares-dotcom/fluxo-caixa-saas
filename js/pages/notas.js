@@ -267,46 +267,63 @@ function importar(root) {
       $('#ni-res', m.el).innerHTML = `<div class="kpis" style="margin:0">
         <div class="kpi"><div class="k-label">Notas novas</div><div class="k-value">${prep.novas.length}</div><div class="k-sub">${S.length} saída(s) · ${E.length} entrada(s) · emissão ${meses.map(x => x.slice(5) + '/' + x.slice(0, 4)).join(', ') || '—'}</div></div>
         <div class="kpi"><div class="k-label">Valor das saídas</div><div class="k-value">${money(t(S.filter(n => n.nota.situacao === 'autorizada'), 'v_nf'))}</div><div class="k-sub">${S.reduce((s, n) => s + n.itens.length, 0)} itens · ICMS ${money(t(S, 'v_icms'))}</div></div>
-        <div class="kpi"><div class="k-label">Já importadas</div><div class="k-value">${prep.existentes.length}</div><div class="k-sub">ignoradas (eventos novos são aplicados)</div></div>
+        <div class="kpi"><div class="k-label">Já importadas</div><div class="k-value">${prep.existentes.length}</div><div class="k-sub">conferidas: completa o que faltar (itens, parcelas, eventos)</div></div>
         <div class="kpi"><div class="k-label">Eventos</div><div class="k-value">${prep.eventos.length}</div><div class="k-sub">${prep.notas.filter(n => n.nota.situacao === 'cancelada').length} cancelamento(s) · ${prep.eventos.filter(e => e.tpEvento === '110110').length} carta(s) de correção</div></div></div>
         ${prep.ignoradas.length ? `<p class="small muted">${prep.ignoradas.length} nota(s) ignorada(s): ${[...new Set(prep.ignoradas.map(x => x.motivo))].join(', ')}.</p>` : ''}
         ${prep.repetidas ? `<p class="small muted">${prep.repetidas} XML repetido(s) na seleção (mesma chave) — considerados uma vez.</p>` : ''}
         ${prep.naoNFe ? `<p class="small muted">${prep.naoNFe} arquivo(s) não são NF-e.</p>` : ''}`;
-      $('#ni-ok', m.el).disabled = !(prep.novas.length || prep.existentes.some(n => n.nota.eventos.length));
+      $('#ni-ok', m.el).disabled = !prep.notas.length;
     } catch (err) { fail(err); $('#ni-res', m.el).innerHTML = ''; }
   };
   $('#ni-pasta', m.el).onchange = (e) => ler([...e.target.files]);
   $('#ni-arq', m.el).onchange = (e) => ler([...e.target.files]);
+  // parcelas da nota (sempre com as mesmas colunas, para o insert em lote)
+  const parcelasDe = (x) => {
+    const n = x.nota;
+    if (x.parcelas.length) return x.parcelas.map(p => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor, a_vista: false }));
+    // venda sem duplicatas: parcela única à vista (não vale para remessa/bonificação/devolução)
+    if (n.tipo === 'saida' && n.finalidade === '1' && n.cfops.some(c => !CFOP_SEM_FINANCEIRO.has(c))) return [{ numero: 1, vencimento: n.emissao, valor: n.v_nf, a_vista: true }];
+    return [];
+  };
+  // Grava de forma retomável: a cada lote confere o que já está no banco e só completa o que falta
+  // (nota, itens, parcelas). Importar de novo a mesma pasta nunca duplica e conserta importações interrompidas.
   $('#ni-ok', m.el).onclick = async () => {
-    const btn = $('#ni-ok', m.el); btn.disabled = true; const e = state.empresa.id; let feitas = 0;
-    const acharFav = localizadorFav();
+    const btn = $('#ni-ok', m.el); btn.disabled = true; const e = state.empresa.id; let feitas = 0, novas = 0, completadas = 0;
+    const acharFav = localizadorFav(); const todas = [...prep.novas, ...prep.existentes];
     try {
-      for (const lote of chunks(prep.novas, 25)) {
-        btn.textContent = `Gravando ${feitas}/${prep.novas.length}…`;
-        const rows = lote.map(x => { const { tp_nf, ...n } = x.nota; const doc = String((n.tipo === 'saida' || n.emissao_propria ? n.dest_doc : n.emit_doc) || '').replace(/\D/g, '');
-          return { ...n, empresa_id: e, favorecido_id: acharFav(doc, n.tipo === 'saida' || n.emissao_propria ? n.dest_nome : n.emit_nome, n.tipo === 'saida' && n.finalidade !== '4')?.id || null, arquivo: x.arquivo, xml: x.xml }; });
-        const ins = await q(sb.from('nfe_notas').insert(rows).select('id,chave'));
-        const idPor = new Map(ins.map(r => [r.chave, r.id]));
-        const itens = lote.flatMap(x => x.itens.map(i => ({ ...i, empresa_id: e, nota_id: idPor.get(x.nota.chave) })));
-        const parcelas = lote.flatMap(x => {
-          const n = x.nota; const id = idPor.get(n.chave);
-          if (x.parcelas.length) return x.parcelas.map(p => ({ ...p, empresa_id: e, nota_id: id }));
-          // venda sem duplicatas: parcela única à vista (não vale para remessa/bonificação/devolução)
-          if (n.tipo === 'saida' && n.finalidade === '1' && n.cfops.some(c => !CFOP_SEM_FINANCEIRO.has(c))) return [{ numero: 1, vencimento: n.emissao, valor: n.v_nf, a_vista: true, empresa_id: e, nota_id: id }];
-          return [];
-        });
+      for (const lote of chunks(todas, 25)) {
+        btn.textContent = `Gravando ${feitas}/${todas.length}…`;
+        const idPor = new Map();
+        for (const r of await q(sb.from('nfe_notas').select('id,chave').eq('empresa_id', e).in('chave', lote.map(x => x.nota.chave)))) idPor.set(r.chave, r.id);
+        const faltam = lote.filter(x => !idPor.has(x.nota.chave));
+        if (faltam.length) {
+          const rows = faltam.map(x => { const { tp_nf, ...n } = x.nota; const out = n.tipo === 'saida' || n.emissao_propria; const doc = String((out ? n.dest_doc : n.emit_doc) || '').replace(/\D/g, '');
+            return { ...n, empresa_id: e, favorecido_id: acharFav(doc, out ? n.dest_nome : n.emit_nome, n.tipo === 'saida' && n.finalidade !== '4')?.id || null, arquivo: x.arquivo, xml: x.xml }; });
+          for (const r of await q(sb.from('nfe_notas').insert(rows).select('id,chave'))) idPor.set(r.chave, r.id);
+          novas += faltam.length;
+        }
+        const ids = [...idPor.values()];
+        const comItens = new Set((await q(sb.from('nfe_itens').select('nota_id').in('nota_id', ids))).map(r => r.nota_id));
+        const comParc = new Set((await q(sb.from('nfe_parcelas').select('nota_id').in('nota_id', ids))).map(r => r.nota_id));
+        const itens = [], parcelas = [];
+        for (const x of lote) {
+          const id = idPor.get(x.nota.chave); let fez = false;
+          if (!comItens.has(id) && x.itens.length) { itens.push(...x.itens.map(i => ({ ...i, empresa_id: e, nota_id: id }))); fez = true; }
+          const ps = parcelasDe(x); if (!comParc.has(id) && ps.length) { parcelas.push(...ps.map(p => ({ ...p, empresa_id: e, nota_id: id }))); fez = true; }
+          if (fez && !faltam.includes(x)) completadas++;
+        }
         for (const ch of chunks(itens, 400)) await q(sb.from('nfe_itens').insert(ch));
-        if (parcelas.length) await q(sb.from('nfe_parcelas').insert(parcelas));
+        for (const ch of chunks(parcelas, 400)) await q(sb.from('nfe_parcelas').insert(ch));
+        // eventos (cancelamento / carta de correção) em notas que já existiam
+        for (const x of lote.filter(x => !faltam.includes(x) && x.nota.eventos.length)) await q(sb.from('nfe_notas').update({ eventos: x.nota.eventos, situacao: x.nota.situacao }).eq('id', idPor.get(x.nota.chave)));
         feitas += lote.length;
       }
-      // eventos novos em notas já importadas (cancelamento / carta de correção)
-      for (const x of prep.existentes.filter(x => x.nota.eventos.length)) await q(sb.from('nfe_notas').update({ eventos: x.nota.eventos, situacao: x.nota.situacao }).eq('empresa_id', e).eq('chave', x.nota.chave));
-      toast(`${feitas} nota(s) importada(s)`); m.close();
-      const meses = [...new Set(prep.novas.map(n => n.nota.emissao.slice(0, 7)))].sort(); if (meses.length) ui.mes = meses[0];
-      if (prep.novas.some(n => n.nota.tipo === 'saida')) ui.tipo = 'saida';
+      toast(`${novas} nota(s) importada(s)${completadas ? ` · ${completadas} completada(s)` : ''}`); m.close();
+      const meses = [...new Set(todas.map(n => n.nota.emissao.slice(0, 7)))].sort(); if (meses.length) ui.mes = meses[0];
+      if (todas.some(n => n.nota.tipo === 'saida')) ui.tipo = 'saida';
       await render(root);
       if (confirm('Notas gravadas. Quer conferir agora o cadastro dos clientes/fornecedores dessas notas (novos e diferenças para aprovação)?'))
         importarBeneficiariosNFe(async () => { const n = await ligarFavorecidos(); if (n) toast(`${n} nota(s) ligadas ao cadastro do cliente/fornecedor`); carregar(root); }, { textos });
-    } catch (err) { fail(new Error(`Parou após ${feitas} nota(s): ${err.message || err}. As já gravadas ficam; importe de novo para continuar (as repetidas são ignoradas).`)); btn.disabled = false; btn.textContent = 'Importar'; }
+    } catch (err) { fail(new Error(`Parou em ${feitas}/${todas.length}: ${err.message || err}. O que já foi gravado fica; clique em Importar de novo para completar (nada é duplicado).`)); btn.disabled = false; btn.textContent = 'Importar'; }
   };
 }
