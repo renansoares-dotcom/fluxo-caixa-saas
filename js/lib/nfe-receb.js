@@ -2,7 +2,7 @@
 // no mesmo modelo da conciliação bancária (duas colunas, seleção dos dois lados, linhas verdes quando o total bate).
 // Nenhum lançamento é alterado: o vínculo fica em nfe_vinculos.
 import { sb, state, q, fetchAll, podeEditar } from './data.js';
-import { $, esc, money, dateBR, fail, toast } from './ui.js';
+import { $, esc, money, dateBR, fail, toast, modal } from './ui.js';
 import { casarNotas, nfDoLancamento } from './nfe-fiscal.js';
 
 const R = { de: '', ate: '', lde: '', late: '', bp: '', bl: '', soSug: false, outrasNF: false, selP: new Set(), selL: new Set() };
@@ -83,7 +83,8 @@ export async function autoVincular(notaIds) {
 // ---------------------------------------------------------------------------------------------
 // Tela
 // ---------------------------------------------------------------------------------------------
-export async function pintarRecebimentos(c, root, onMudou) {
+export async function pintarRecebimentos(c, root, onMudou, mes) {
+  if (mes) R.mesGer = mes;
   const e = state.empresa.id;
   if (!R.de) {
     const r = await q(sb.from('nfe_notas').select('emissao').eq('empresa_id', e).eq('tipo', 'saida').order('emissao').limit(1));
@@ -94,11 +95,12 @@ export async function pintarRecebimentos(c, root, onMudou) {
       <label>Vencimento das parcelas<span class="par" style="display:flex;gap:4px"><input type="date" name="de" value="${R.de}"><input type="date" name="ate" value="${R.ate}"></span></label>
       <label>Data dos recebimentos<span class="par" style="display:flex;gap:4px"><input type="date" name="lde" value="${R.lde}"><input type="date" name="late" value="${R.late}"></span></label>
       <span class="spacer" style="flex:1"></span>
-      ${podeEditar() ? '<button class="btn primary" id="rsug" disabled>Aceitar sugestões</button>' : ''}</div>
+      ${podeEditar() ? '<button class="btn" id="rger">Lançar contas a receber das notas</button><button class="btn primary" id="rsug" disabled>Aceitar sugestões</button>' : ''}</div>
     <p class="small muted" style="margin:8px 0 0">Marque a(s) parcela(s) à esquerda e o(s) recebimento(s) à direita: quando os totais batem as linhas ficam verdes e é só <strong>Vincular</strong>. Ao marcar uma parcela, os recebimentos mais prováveis (mesma NF citada, mesmo cliente, valor e data próximos) sobem para o topo. Os lançamentos não são alterados.</p></div>
     <div class="kpis" id="rkpi"></div>
     <div class="conc-grid"><div class="card flush" id="rpar"><div class="loading">Carregando…</div></div><div class="card flush" id="rlan"></div></div>
     <div class="card flush" id="rfoot" style="position:sticky;bottom:0;z-index:2"></div>`;
+  $('#rger', c) && ($('#rger', c).onclick = () => gerarContasReceber(R.mesGer || hojeISO().slice(0, 7), async () => { await carregarDados(c, root, onMudou); onMudou && onMudou(); }));
   $('#rflt', c).onchange = (ev) => { if (ev.target.name) { R[ev.target.name] = ev.target.value; R.selP.clear(); R.selL.clear(); carregarDados(c, root, onMudou); } };
   await carregarDados(c, root, onMudou);
 }
@@ -203,4 +205,85 @@ async function aceitar(c, root, onMudou) {
   if (!rows.length || !confirm(`Vincular ${rows.length} recebimento(s) a ${SUG.length} parcela(s)/nota(s)? São os casos em que o lançamento cita a NF e o valor fecha com a parcela (ou com o que falta da nota).`)) return;
   try { for (const ch of chunks(rows, 300)) await q(sb.from('nfe_vinculos').insert(ch)); toast(`${rows.length} recebimento(s) vinculado(s)`); R.selP.clear(); R.selL.clear(); await carregarDados(c, root, onMudou); onMudou && onMudou(); }
   catch (err) { fail(err); }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Contas a receber a partir das notas: cada parcela ainda sem lançamento vira um título Em aberto (1.01.01),
+// já ligado à parcela (tipo 'titulo'). Se já existe um lançamento da mesma NF/parcela e valor ainda sem nota,
+// ele é ligado em vez de criar outro.
+// ---------------------------------------------------------------------------------------------
+export function gerarContasReceber(mesPadrao, onDone) {
+  const ini = `${mesPadrao}-01`, fim = new Date(Date.UTC(+mesPadrao.slice(0, 4), +mesPadrao.slice(5, 7), 0)).toISOString().slice(0, 10);
+  const contaPad = state.cad.contas.find(c => c.nome === 'BRADESCO'), ccPad = (state.cad.cc || []).find(c => c.nome === 'VENDAS');
+  let itens = []; const marc = new Set();
+  const m = modal({ title: 'Lançar contas a receber das notas', wide: true, body: `
+    <p class="small muted" style="margin-top:0">Cada parcela das notas de venda que ainda não tem lançamento vira um título <strong>Em aberto</strong> (receita 1.01.01, data = vencimento, documento NF-parcela), já ligado à nota.
+      Depois ele é baixado pelo borderô (aprovação da proposta), pela conciliação bancária ou manualmente. Parcelas que já têm um lançamento da mesma NF e valor são só ligadas a ele.</p>
+    <div class="toolbar"><label>Emissão das notas<span style="display:flex;gap:4px"><input type="date" id="gde" value="${ini}"><input type="date" id="gate" value="${fim}"></span></label>
+      <label>Conta prevista<select id="gconta">${state.cad.contas.map(c => `<option value="${c.id}" ${c.id === contaPad?.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></label>
+      <label>Centro de custo<select id="gcc"><option value="">—</option>${(state.cad.cc || []).map(c => `<option value="${c.id}" ${c.id === ccPad?.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></label>
+      <button class="btn" id="gbusca">Buscar parcelas</button></div>
+    <div id="gres" style="margin-top:10px"></div>`,
+    foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="gok" disabled>Lançar</button>' });
+  const pinta = () => {
+    const sel = itens.filter(i => marc.has(i.p.id)); const nCriar = sel.filter(i => !i.existente).length, nLigar = sel.length - nCriar;
+    $('#gres', m.el).innerHTML = !itens.length ? '<div class="empty">Nenhuma parcela sem lançamento nas notas desse período.</div>' : `
+      <p class="small"><strong>${itens.length}</strong> parcela(s) sem lançamento · ${money(itens.reduce((s, i) => s + +i.p.valor, 0))}. Marcadas: ${nCriar} título(s) novo(s)${nLigar ? ` + ${nLigar} ligada(s) a lançamento existente` : ''} · ${money(sel.reduce((s, i) => s + +i.p.valor, 0))}
+        <a href="#" id="gtodos">marcar todas</a> · <a href="#" id="gnenhum">desmarcar</a></p>
+      <div class="table-wrap" style="max-height:50vh"><table><thead><tr><th></th><th>NF / parcela</th><th>Emissão</th><th>Cliente</th><th>Vencimento</th><th class="num">Valor</th><th>O que será feito</th></tr></thead><tbody>
+      ${itens.map(i => `<tr data-g="${i.p.id}" class="clickable"><td><input type="checkbox" ${marc.has(i.p.id) ? 'checked' : ''}></td><td>${i.p.n.numero} / ${i.p.a_vista ? 'à vista' : i.p.numero}</td><td>${dateBR(i.p.n.emissao)}</td>
+        <td class="wrap small">${esc(i.fav?.nome || i.p.n.dest_nome || '')}${i.fav ? '' : ' <span class="badge vencido">sem cadastro</span>'}</td><td>${dateBR(i.p.vencimento)}</td><td class="num">${money(i.p.valor)}</td>
+        <td class="small">${i.existente ? `ligar a ${esc(i.existente.descricao || '')} (${dateBR(i.existente.data)}, ${esc(i.existente.status)})` : 'criar título em aberto'}</td></tr>`).join('')}</tbody></table></div>`;
+    const b = $('#gok', m.el); b.disabled = !sel.length || sel.some(i => !i.fav && !i.existente); b.textContent = sel.length ? `Lançar ${sel.length}` : 'Lançar';
+    if (sel.some(i => !i.fav && !i.existente)) b.title = 'Há parcela marcada de cliente sem cadastro: atualize o cadastro pelas NF-e ou desmarque';
+  };
+  const buscar = async () => {
+    $('#gres', m.el).innerHTML = '<div class="loading">Procurando…</div>';
+    try {
+      const e = state.empresa.id, de = $('#gde', m.el).value, ate = $('#gate', m.el).value;
+      const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor,a_vista,n:nfe_notas!inner(id,chave,numero,emissao,dest_doc,dest_nome,favorecido_id,situacao,finalidade,tipo)')
+        .eq('empresa_id', e).eq('n.tipo', 'saida').eq('n.situacao', 'autorizada').eq('n.finalidade', '1').gte('n.emissao', de).lte('n.emissao', ate).order('vencimento'));
+      const ligadas = new Set(); const nids = [...new Set(ps.map(p => p.nota_id))];
+      for (const c of chunks(nids)) for (const v of await q(sb.from('nfe_vinculos').select('parcela_id,nota_id').in('nota_id', c))) { ligadas.add(v.parcela_id); if (!v.parcela_id) ligadas.add('nota:' + v.nota_id); }
+      const pend = ps.filter(p => !ligadas.has(p.id) && !ligadas.has('nota:' + p.nota_id));
+      // lançamentos (qualquer status) ainda sem nota que citam a NF/parcela com o mesmo valor
+      const venc = pend.map(p => p.vencimento).filter(Boolean).sort();
+      const ids = receitas(); let ls = [];
+      if (pend.length && ids.length) ls = (await fetchAll(() => sb.from('lancamentos').select('id,data,valor,descricao,documento,status,conta_id,v:nfe_vinculos(id)').eq('empresa_id', e).in('plano_id', ids)
+        .gte('data', addDias(de, -10)).lte('data', addDias(venc.at(-1) || ate, 30)))).filter(l => !l.v?.length).map(l => ({ ...l, nf: nfDoLancamento(l) }));
+      const usados = new Set(); const fav = state.cad.favById, porDoc = new Map(state.cad.favorecidos.filter(f => dig(f.documento)).map(f => [dig(f.documento), f]));
+      itens = pend.map(p => {
+        const ex = ls.find(l => !usados.has(l.id) && l.nf.nf === p.n.numero && (l.nf.parcela == null || l.nf.parcela === p.numero) && perto(l.valor, p.valor));
+        if (ex) usados.add(ex.id);
+        return { p, existente: ex || null, fav: fav[p.n.favorecido_id] || porDoc.get(dig(p.n.dest_doc)) || null };
+      });
+      marc.clear(); itens.forEach(i => marc.add(i.p.id));
+      pinta();
+    } catch (err) { fail(err); $('#gres', m.el).innerHTML = ''; }
+  };
+  $('#gbusca', m.el).onclick = buscar;
+  $('#gres', m.el).onclick = (ev) => {
+    if (ev.target.id === 'gtodos' || ev.target.id === 'gnenhum') { ev.preventDefault(); marc.clear(); if (ev.target.id === 'gtodos') itens.forEach(i => marc.add(i.p.id)); return pinta(); }
+    const tr = ev.target.closest('tr[data-g]'); if (!tr) return; const id = tr.dataset.g; marc.has(id) ? marc.delete(id) : marc.add(id); pinta();
+  };
+  $('#gok', m.el).onclick = async () => {
+    const sel = itens.filter(i => marc.has(i.p.id)); if (!sel.length) return;
+    const criar = sel.filter(i => !i.existente), ligar = sel.filter(i => i.existente);
+    if (!confirm(`Lançar ${criar.length} título(s) em aberto (${money(criar.reduce((s, i) => s + +i.p.valor, 0))})${ligar.length ? ` e ligar ${ligar.length} parcela(s) a lançamentos que já existem` : ''}?`)) return;
+    const planoRec = state.cad.plano.find(p => p.codigo === '1.01.01'); if (!planoRec) return toast('Plano 1.01.01 não encontrado', true);
+    const e = state.empresa.id, conta = $('#gconta', m.el).value || null, cc = $('#gcc', m.el).value || null;
+    $('#gok', m.el).disabled = true;
+    try {
+      const vinc = ligar.map(i => ({ empresa_id: e, nota_id: i.p.nota_id, parcela_id: i.p.id, lancamento_id: i.existente.id, tipo: i.existente.status === 'Pago' ? 'exata' : 'titulo' }));
+      for (const lote of chunks(criar, 200)) {
+        const rows = lote.map(i => { const doc = `${i.p.n.numero}-${i.p.numero}`; return { empresa_id: e, data: i.p.vencimento || i.p.n.emissao, emissao: i.p.n.emissao, documento: doc, plano_id: planoRec.id,
+          descricao: `NF ${doc} - ${i.fav.nome}`, favorecido_id: i.fav.id, centro_custo_id: cc, status: 'Em aberto', conta_id: conta, valor: +(+i.p.valor).toFixed(2), origem: `nfe:${i.p.n.chave}` }; });
+        const ins = await q(sb.from('lancamentos').insert(rows).select('id,documento,origem'));
+        for (const i of lote) { const doc = `${i.p.n.numero}-${i.p.numero}`; const l = ins.find(x => x.documento === doc && x.origem === `nfe:${i.p.n.chave}`); if (l) vinc.push({ empresa_id: e, nota_id: i.p.nota_id, parcela_id: i.p.id, lancamento_id: l.id, tipo: 'titulo' }); }
+      }
+      for (const ch of chunks(vinc, 300)) await q(sb.from('nfe_vinculos').insert(ch));
+      toast(`${criar.length} título(s) lançado(s)${ligar.length ? ` · ${ligar.length} ligado(s) a lançamento existente` : ''}`); m.close(); onDone && onDone();
+    } catch (err) { fail(err); $('#gok', m.el).disabled = false; }
+  };
+  buscar();
 }

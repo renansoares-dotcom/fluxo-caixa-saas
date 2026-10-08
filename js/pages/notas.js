@@ -68,7 +68,8 @@ async function carregarDados() {
 
 // depois de vincular na aba Recebimentos × Notas: recarrega os dados e só os indicadores (a aba continua como está)
 async function carregarSilencioso() { try { await carregarDados(); pintarKpis(document); } catch (e) { fail(e); } }
-const recebido = (n) => n.vinc.reduce((s, v) => s + (+v.l?.valor || 0), 0);
+const recebido = (n) => n.vinc.reduce((s, v) => s + (v.l?.status === 'Pago' ? +v.l.valor || 0 : 0), 0);
+const aReceber = (n) => n.vinc.reduce((s, v) => s + (v.l && v.l.status !== 'Pago' ? +v.l.valor || 0 : 0), 0);
 function statusFin(n) {
   if (n.situacao === 'cancelada') return '<span class="badge vencido">cancelada</span>';
   if (!n.parcelas.length) return '<span class="badge">sem financeiro</span>';
@@ -77,6 +78,7 @@ function statusFin(n) {
   if (falta <= 0.05) return `<span class="badge pago">Recebida</span>${fidc}`;
   if (r > 0.005) return `<span class="badge aberto">Parcial · falta ${money(falta)}</span>${fidc}`;
   if (n.fidc.length) return '<span class="badge pago">Antecipada FIDC</span>';
+  if (aReceber(n) > 0.005) return `<span class="badge aberto">A receber · ${money(aReceber(n))}</span>`;
   return '<span class="badge">Em aberto</span>';
 }
 
@@ -104,7 +106,7 @@ function pintar(root) {
   pintarKpis(root);
   const N = filtradas();
   const c = $('#corpo', root);
-  if (ui.aba === 'recebimentos') return ui.tipo === 'saida' ? pintarRecebimentos(c, root, () => carregarSilencioso()) : (c.innerHTML = '<div class="card"><div class="empty">Recebimentos × Notas vale para as notas de saída.</div></div>');
+  if (ui.aba === 'recebimentos') return ui.tipo === 'saida' ? pintarRecebimentos(c, root, () => carregarSilencioso(), ui.mes) : (c.innerHTML = '<div class="card"><div class="empty">Recebimentos × Notas vale para as notas de saída.</div></div>');
   if (!D.notas.length) { c.innerHTML = `<div class="card"><div class="empty">Nenhuma nota ${ui.tipo === 'saida' ? 'de saída' : 'de entrada'} importada com emissão em ${dateBR(D.ini).slice(3)}. Use “Importar XML”.</div></div>`; return; }
   if (ui.aba === 'impostos') return pintarImpostos(c, N);
   if (ui.aba === 'borderos') return pintarBorderos(c, root);
@@ -154,8 +156,8 @@ async function detalhe(n, root) {
     ${n.parcelas.length ? `<div class="table-wrap"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th class="num">Valor</th><th>Borderô FIDC (fundo · nº · data · título · valor)</th><th>Recebimentos (data · valor · conta · descrição)</th></tr></thead><tbody>
       ${n.parcelas.map(p => { const vs = n.vinc.filter(v => v.parcela_id === p.id), fs = n.fidc.filter(v => v.parcela_id === p.id); return `<tr><td>${p.numero}${p.a_vista ? ' (à vista)' : ''}</td><td>${dateBR(p.vencimento)}</td><td class="num">${money(p.valor)}</td>
         <td class="small">${fs.map(v => `${esc(v.t?.fundo)} · ${esc(v.t?.bordero)} · ${dateBR(v.t?.data_operacao)} · ${esc(v.t?.titulo)} · <span class="${Math.abs(+v.t?.valor - +p.valor) <= 0.05 ? '' : 'neg'}">${money(v.t?.valor)}</span>`).join('<br>') || '<span class="muted">—</span>'}</td>
-        <td class="small">${vs.map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`; }).join('')}
-      ${n.vinc.filter(v => !v.parcela_id).length ? `<tr><td colspan="4" class="small">Vinculados à nota (sem parcela definida)</td><td class="small">${n.vinc.filter(v => !v.parcela_id).map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>')}</td></tr>` : ''}
+        <td class="small">${vs.map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${v.l && v.l.status !== 'Pago' ? ' <span class="badge aberto">título em aberto</span>' : ''}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`; }).join('')}
+      ${n.vinc.filter(v => !v.parcela_id).length ? `<tr><td colspan="4" class="small">Vinculados à nota (sem parcela definida)</td><td class="small">${n.vinc.filter(v => !v.parcela_id).map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${v.l && v.l.status !== 'Pago' ? ' <span class="badge aberto">título em aberto</span>' : ''}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>')}</td></tr>` : ''}
       </tbody></table></div>` : '<p class="small muted">Nota sem parcelas (sem financeiro).</p>'}`,
     foot: `<span style="margin-right:auto;display:flex;gap:6px">${podeEditar() && n.vinc.length ? '<button class="btn danger" id="desv">Desfazer vínculos de recebimento</button>' : ''}${podeEditar() && n.fidc.length ? '<button class="btn danger" id="desf">Desfazer ligação com borderô</button>' : ''}</span><button class="btn" id="xml">Baixar XML</button><button class="btn" data-close>Fechar</button>` });
   $('#xml', m.el).onclick = async () => {
