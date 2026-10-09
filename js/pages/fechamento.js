@@ -1,8 +1,8 @@
 // Fechamento do mês: checklist com status automático de cada etapa (extratos conciliados, lançamentos sem conta,
 // em aberto vencidos, notas sem financeiro, borderôs pendentes, desvios do orçamento) e resumo do mês para a direção.
 // Só lê dados — nada aqui altera lançamentos.
-import { sb, state, q, fetchAll, loadCadastros, montarMatriz, montarDRE } from '../lib/data.js';
-import { $, esc, money, money0, pct, dateBR, fail, MESES } from '../lib/ui.js';
+import { sb, state, q, fetchAll, loadCadastros, montarMatriz, montarDRE, isAdmin } from '../lib/data.js';
+import { $, $$, esc, money, money0, pct, dateBR, fail, toast, MESES } from '../lib/ui.js';
 import { revisarSemConta } from '../lib/sem-conta.js';
 
 export const title = 'Fechamento do mês';
@@ -30,13 +30,15 @@ async function carregar(root) {
   try { R = await conferir(ui.mes); } catch (e) { fail(e); c.innerHTML = '<div class="card"><div class="empty">Não foi possível conferir o mês.</div></div>'; return; }
   pintar(c, R);
   const rv = $('[data-rev]', c); if (rv) rv.onclick = () => revisarSemConta(() => carregar(root));
+  $$('[data-travar]', c).forEach(b => b.onclick = () => travar(R, b.dataset.travar, b.dataset.bate === '1', root));
+  $$('[data-destravar]', c).forEach(b => b.onclick = () => destravar(R, b.dataset.destravar, root));
 }
 
 async function conferir(mes) {
   await loadCadastros();
   const e = state.empresa.id, ini = `${mes}-01`, fim = fimMes(mes), ano = +mes.slice(0, 4), m = +mes.slice(5, 7);
   const cad = state.cad;
-  const [ext, imps, semConta, abertos, notas, props, mov, orc, just, saldos, matriz] = await Promise.all([
+  const [ext, imps, semConta, abertos, notas, props, mov, orc, just, saldos, matriz, movMes, travas] = await Promise.all([
     fetchAll(() => sb.from('extrato_itens').select('id,conta_id,status,valor').eq('empresa_id', e).gte('data', ini).lte('data', fim).order('id')),
     q(sb.from('extrato_importacoes').select('conta_id,dt_fim').eq('empresa_id', e)),
     fetchAll(() => sb.from('lancamentos').select('id,data,valor').eq('empresa_id', e).eq('status', 'Pago').is('conta_id', null).lte('data', fim).order('id')),
@@ -49,6 +51,8 @@ async function conferir(mes) {
     q(sb.rpc('saldos_contas', { p_empresa: e, p_ate: fim })),
     // sem os filtros globais da barra (conta, grupo…): o fechamento é sempre da empresa toda
     q(sb.rpc('resumo_mensal', { p_empresa: e, p_ano: ano, p_status: ['Pago'], p_conta: null, p_grupo: null, p_cc: null, p_favorecido: null, p_disp: null })).then(rows => montarMatriz(rows.map(r => ({ plano_id: r.plano_id, mes: r.mes, total: +r.total })))),
+    fetchAll(() => sb.from('lancamentos').select('id,conta_id,valor,plano_id').eq('empresa_id', e).eq('status', 'Pago').not('conta_id', 'is', null).gte('data', ini).lte('data', fim).order('id')),
+    q(sb.from('contas_travas').select('*').eq('empresa_id', e).eq('ativo', true)).catch(() => null), // null = trava ainda não instalada no banco
   ]);
 
   const etapas = [];
@@ -110,7 +114,22 @@ async function conferir(mes) {
   const i = m - 1, recB = val.receita_bruta[i];
   const disp = saldos.filter(s => s.disponibilidade === 'Conta com recursos disponíveis');
   const resumo = { recB, ebitda: val.ebitda[i], resultado: val.resultado[i], ent: matriz.tipo.E[i], sai: matriz.tipo.S[i], saldo: disp.reduce((s, x) => s + +x.saldo_pago, 0), saldos: disp.filter(x => Math.abs(+x.saldo_pago) > 0.005) };
-  return { mes, ini, fim, etapas, resumo };
+  // Contas: movimento do mês no extrato × no sistema, pendências, saldo e trava
+  const movSis = new Map();
+  for (const l of movMes) { const p = cad.planoById[l.plano_id]; const v = (p?.natureza === 'C' ? 1 : -1) * +l.valor; movSis.set(l.conta_id, (movSis.get(l.conta_id) || 0) + v); }
+  const movExt = new Map(), pendExt = new Map(), qtdExt = new Map();
+  for (const x of ext) { movExt.set(x.conta_id, (movExt.get(x.conta_id) || 0) + +x.valor); qtdExt.set(x.conta_id, (qtdExt.get(x.conta_id) || 0) + 1); if (x.status === 'pendente') pendExt.set(x.conta_id, (pendExt.get(x.conta_id) || 0) + 1); }
+  const trv = new Map((travas || []).map(t => [t.conta_id, t]));
+  const ids = new Set([...movSis.keys(), ...ultOfx.keys(), ...trv.keys()]);
+  const contas = [...ids].map(id => {
+    const ct = cad.contaById[id]; if (!ct) return null;
+    const temExt = ultOfx.has(id), cobre = (ultOfx.get(id) || '') >= fim, pend = pendExt.get(id) || 0;
+    const mS = movSis.get(id) || 0, mE = movExt.get(id) || 0, dif = mS - mE;
+    const bate = temExt && cobre && !pend && Math.abs(dif) <= 0.05;
+    const sal = saldos.find(x => x.conta_id === id);
+    return { ct, temExt, cobre, ultExt: ultOfx.get(id), pend, qtd: qtdExt.get(id) || 0, mS, mE, dif, bate, saldo: sal ? +sal.saldo_pago : null, trava: trv.get(id) || null };
+  }).filter(Boolean).sort((a, b) => (b.temExt - a.temExt) || a.ct.nome.localeCompare(b.ct.nome));
+  return { mes, ini, fim, etapas, resumo, contas, travaInstalada: travas !== null };
 }
 
 function pintar(c, R) {
@@ -132,9 +151,45 @@ function pintar(c, R) {
         <td class="wrap small">${x.resumo}${x.obs ? `<div class="muted">${esc(x.obs)}</div>` : ''}</td>
         <td class="noprint">${x.ok ? '' : x.k === 'semconta' ? '<button class="btn small primary" data-rev>Revisar e resolver</button>' : `<a class="btn small" href="${x.link}">${esc(x.acao)}</a>`}</td></tr>`).join('')}
     </tbody></table></div></div>
+    ${cardContas(R)}
     ${S.saldos.length ? `<div class="card flush"><div style="padding:12px 12px 0"><h2 style="margin:0">Saldos em ${dateBR(R.fim)}</h2><p class="muted small" style="margin:4px 0 0">Saldo pelo sistema em cada conta com recursos disponíveis (lançamentos pagos até o fim do mês).</p></div>
       <div class="table-wrap"><table><thead><tr><th>Conta</th><th class="num">Saldo</th></tr></thead><tbody>
       ${S.saldos.map(s => `<tr><td>${esc(s.nome)}</td><td class="num ${+s.saldo_pago < 0 ? 'neg' : ''}">${money(s.saldo_pago)}</td></tr>`).join('')}
       <tr class="row-total"><td>TOTAL</td><td class="num">${money(S.saldo)}</td></tr></tbody></table></div></div>` : ''}
     <p class="muted small">Conferido em ${new Date().toLocaleString('pt-BR')} · ${esc(state.empresa.nome || '')}</p>`;
+}
+
+function cardContas(R) {
+  const adm = isAdmin();
+  const st = (x) => x.bate ? '<span class="badge pago">✔ conciliado · batendo</span>'
+    : !x.temExt ? '<span class="badge">sem extrato</span>'
+    : !x.cobre ? `<span class="badge aberto">extrato só até ${dateBR(x.ultExt)}</span>`
+    : x.pend ? `<span class="badge aberto">${x.pend} pendente(s)</span>`
+    : `<span class="badge vencido">diferença ${money(x.dif)}</span>`;
+  const tv = (x) => x.trava ? `<span class="badge conc" title="Travada em ${new Date(x.trava.criado_em).toLocaleString('pt-BR')}">🔒 travada até ${dateBR(x.trava.ate)}</span>
+      ${adm ? `<button class="btn small ghost noprint" data-destravar="${x.trava.id}">Destravar</button>` : ''}`
+    : !R.travaInstalada ? '<span class="muted small">—</span>'
+    : adm ? `<button class="btn small ${x.bate ? 'primary' : ''} noprint" data-travar="${x.ct.id}" data-bate="${x.bate ? 1 : 0}">Travar até ${dateBR(R.fim)}</button>` : '<span class="muted small">aberta</span>';
+  return `<div class="card flush"><div style="padding:12px 12px 0"><h2 style="margin:0">Contas em ${dateBR(R.fim)}: conciliação e trava</h2>
+    <p class="muted small" style="margin:4px 0 0">Batendo = extrato importado até o fim do mês, nenhum movimento pendente e o movimento do mês no extrato igual ao do sistema. Travar impede mudar data, valor, conta, situação ou excluir lançamentos da conta até a data (classificação, descrição e centro de custo continuam livres).${R.travaInstalada ? '' : ' <strong>A trava ainda não foi instalada no banco de dados.</strong>'}</p></div>
+    <div class="table-wrap"><table><thead><tr><th>Conta</th><th>Situação</th><th class="num">Movimento no extrato</th><th class="num">Movimento no sistema</th><th class="num">Saldo no sistema</th><th>Trava</th></tr></thead><tbody>
+    ${R.contas.map(x => `<tr><td>${esc(x.ct.nome)}</td><td>${st(x)}</td><td class="num">${x.temExt ? money(x.mE) : '—'}</td><td class="num">${money(x.mS)}</td><td class="num ${x.saldo < 0 ? 'neg' : ''}">${x.saldo == null ? '—' : money(x.saldo)}</td><td>${tv(x)}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+async function travar(R, contaId, bate, root) {
+  const x = R.contas.find(c => c.ct.id === contaId); if (!x) return;
+  const msg = `Travar a conta ${x.ct.nome} até ${dateBR(R.fim)}?\n\nDepois disso, os lançamentos pagos dessa conta até ${dateBR(R.fim)} não poderão ter data, valor, conta ou situação alterados, nem ser excluídos ou incluídos — só classificação, descrição e centro de custo.`
+    + (bate ? '' : `\n\nATENÇÃO: a conta NÃO está batendo com o extrato (${x.temExt ? (x.pend ? `${x.pend} pendente(s)` : `diferença ${money(x.dif)}`) : 'sem extrato'}). Travar mesmo assim?`);
+  if (!confirm(msg)) return;
+  try {
+    if (x.trava) await q(sb.from('contas_travas').update({ ativo: false, desfeito_por: state.user?.id, desfeito_em: new Date().toISOString() }).eq('id', x.trava.id));
+    await q(sb.from('contas_travas').insert({ empresa_id: state.empresa.id, conta_id: contaId, ate: R.fim, saldo_sistema: x.saldo, observacao: bate ? 'conciliado e batendo' : 'travada sem bater com o extrato' }));
+    toast(`${x.ct.nome} travada até ${dateBR(R.fim)}`); carregar(root);
+  } catch (e) { fail(e); }
+}
+async function destravar(R, travaId, root) {
+  const x = R.contas.find(c => c.trava?.id === travaId); if (!x) return;
+  if (!confirm(`Destravar a conta ${x.ct.nome}? Os lançamentos até ${dateBR(x.trava.ate)} voltam a poder ser alterados. Fica registrado quem destravou e quando.`)) return;
+  try { await q(sb.from('contas_travas').update({ ativo: false, desfeito_por: state.user?.id, desfeito_em: new Date().toISOString() }).eq('id', travaId)); toast(`${x.ct.nome} destravada`); carregar(root); } catch (e) { fail(e); }
 }
