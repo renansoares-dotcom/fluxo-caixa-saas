@@ -35,8 +35,15 @@ export async function fetchAll(build, page = 1000) {
   return out;
 }
 
+let cadPendente = null;
 export async function loadCadastros(force = false) {
   if (state.cad && !force) return state.cad;
+  // várias telas podem pedir ao mesmo tempo (troca de empresa, renovação de sessão): uma carga só
+  if (cadPendente && !force) return cadPendente;
+  cadPendente = carregarCadastros().finally(() => { cadPendente = null; });
+  return cadPendente;
+}
+async function carregarCadastros() {
   const e = state.empresa.id;
   const [plano, contas, favorecidos, cc, grupos] = await Promise.all([
     fetchAll(() => sb.from('plano_contas').select('*').eq('empresa_id', e).order('codigo')),

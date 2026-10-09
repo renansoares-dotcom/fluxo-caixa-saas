@@ -126,7 +126,8 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // ---------- Roteamento ----------
 let renderSeq = 0;
 async function render() {
-  if (!state.empresa || !state.cad) return;
+  if (!state.empresa) return;
+  if (!state.cad) { try { await loadCadastros(); } catch (e) { fail(e); return; } }
   lerCores();
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'dashboard';
   const loader = routes[route] || routes.dashboard;
@@ -141,6 +142,9 @@ async function render() {
     if (seq !== renderSeq) return;
     $('#page-title').textContent = mod.title;
     document.title = `${mod.title} · ${state.empresa.nome}`;
+    // os cadastros podem ter sido descartados no meio do caminho (sessão renovada, troca de empresa): recarrega antes de desenhar
+    if (!state.cad) await loadCadastros();
+    if (seq !== renderSeq) return;
     page.innerHTML = '';
     await mod.render(page);
   } catch (e) { fail(e); page.innerHTML = `<div class="card empty">Não foi possível carregar esta tela.<br><span class="small">${esc(e.message || e)}</span></div>`; }
