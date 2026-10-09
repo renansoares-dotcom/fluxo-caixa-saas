@@ -44,7 +44,7 @@ async function conferir(mes) {
     q(sb.from('extrato_importacoes').select('conta_id,dt_fim').eq('empresa_id', e)),
     fetchAll(() => sb.from('lancamentos').select('id,data,valor').eq('empresa_id', e).eq('status', 'Pago').is('conta_id', null).lte('data', fim).order('id')),
     fetchAll(() => sb.from('v_lancamentos').select('id,data,valor_sinal,tipo').eq('empresa_id', e).eq('status', 'Em aberto').lte('data', fim).order('id')),
-    fetchAll(() => sb.from('nfe_notas').select('id,numero,situacao,finalidade,v_nf,p:nfe_parcelas(id),v:nfe_vinculos(id),f:nfe_fidc_vinculos(id)').eq('empresa_id', e).eq('tipo', 'saida').gte('emissao', ini).lte('emissao', fim).order('numero')).catch(() => null),
+    fetchAll(() => sb.from('nfe_notas').select('id,numero,situacao,finalidade,v_nf,eventos,p:nfe_parcelas(id),v:nfe_vinculos(id),f:nfe_fidc_vinculos(id)').eq('empresa_id', e).eq('tipo', 'saida').gte('emissao', ini).lte('emissao', fim).order('numero')).catch(() => null),
     q(sb.from('fidc_propostas').select('id,numero,status,data_operacao,valor_face').eq('empresa_id', e).eq('status', 'Pendente').gte('data_operacao', ini).lte('data_operacao', fim)).catch(() => []),
     q(sb.rpc('orcamento_movimento', { p_empresa: e, p_ano: ano })).catch(() => null),
     fetchAll(() => sb.from('orcamentos').select('plano_id,mes,valor,cenario').eq('empresa_id', e).eq('ano', ano).eq('cenario', 'budget').eq('mes', m).order('plano_id')).catch(() => []),
@@ -82,7 +82,7 @@ async function conferir(mes) {
 
   // 4) Notas de venda do mês com financeiro (recebimento, título ou borderô ligado)
   if (notas) {
-    const vendas = notas.filter(n => n.situacao === 'autorizada' && n.finalidade === '1' && n.p?.length);
+    const vendas = notas.filter(n => n.situacao === 'autorizada' && n.finalidade === '1' && n.p?.length && !(n.eventos || []).some(x => x.tipo === 'devolucao_total'));
     const usos = await usosPorNota(vendas.map(n => n.id));
     const sem = vendas.filter(n => !n.v?.length && !n.f?.length && !usos.has(n.id));
     const canc = notas.filter(n => n.situacao === 'cancelada').length;

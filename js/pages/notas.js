@@ -100,8 +100,10 @@ function recPorParcela(n) {
   return r;
 }
 const aReceber = (n) => n.vinc.reduce((s, v) => s + (v.l && v.l.status !== 'Pago' ? +v.l.valor || 0 : 0), 0);
+const devolvida = (n) => (n.eventos || []).some(e => e.tipo === 'devolucao_total');
 function statusFin(n) {
   if (n.situacao === 'cancelada') return '<span class="badge vencido">cancelada</span>';
+  if (devolvida(n)) return `<span class="badge" title="${esc((n.eventos.find(e => e.tipo === 'devolucao_total') || {}).descricao || '')}">anulada por devolução</span>`;
   if (!n.parcelas.length) return '<span class="badge">sem financeiro</span>';
   const tot = soma(n.parcelas, 'valor'), r = recebido(n), falta = tot - r;
   const fidc = n.fidc.length ? ' <span class="badge" title="Parcela(s) antecipada(s) em borderô FIDC">FIDC</span>' : '';
@@ -114,7 +116,7 @@ function statusFin(n) {
 
 // situação financeira da nota (mesma regra do selo da coluna Financeiro)
 function sitFin(n) {
-  if (n.situacao === 'cancelada' || !n.parcelas.length) return 'fora';
+  if (n.situacao === 'cancelada' || !n.parcelas.length || devolvida(n)) return 'fora';
   const tot = soma(n.parcelas, 'valor'), r = recebido(n);
   if (tot - r <= 0.05) return 'recebida';
   if (r > 0.005) return 'parcial';
@@ -137,7 +139,7 @@ function vencs(n) {
 function pintarKpis(root) {
   if (!D || !$('#kpis', root)) return;
   const N = filtradas(), V = N.filter(venda), aut = N.filter(n => n.situacao === 'autorizada');
-  const comFin = V.filter(n => n.parcelas.length), totParc = comFin.reduce((s, n) => s + soma(n.parcelas, 'valor'), 0), rec = comFin.reduce((s, n) => s + Math.min(recebido(n), soma(n.parcelas, 'valor')), 0);
+  const comFin = V.filter(n => n.parcelas.length && !devolvida(n)), totParc = comFin.reduce((s, n) => s + soma(n.parcelas, 'valor'), 0), rec = comFin.reduce((s, n) => s + Math.min(recebido(n), soma(n.parcelas, 'valor')), 0);
   $('#kpis', root).innerHTML = `
     <div class="kpi"><div class="k-label">Notas no período</div><div class="k-value">${aut.length}</div><div class="k-sub">${N.length - aut.length ? `${N.length - aut.length} cancelada(s) · ` : ''}${N.filter(n => n.finalidade === '4').length} devolução(ões)</div></div>
     <div class="kpi"><div class="k-label">${ui.tipo === 'saida' ? 'Faturamento (vendas)' : 'Valor das notas'}</div><div class="k-value">${money(soma(ui.tipo === 'saida' ? V : aut, 'v_nf'))}</div><div class="k-sub">produtos ${money(soma(ui.tipo === 'saida' ? V : aut, 'v_prod'))}</div></div>

@@ -23,8 +23,10 @@ const receitas = () => state.cad.contasPlano.filter(p => p.codigo.startsWith('1.
 // ---------------------------------------------------------------------------------------------
 // Parcelas das notas de venda com o que já foi recebido (vínculos) e o que falta
 async function parcelasPendentes(e, de, ate) {
-  const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor,a_vista,n:nfe_notas!inner(id,numero,emissao,dest_doc,dest_nome,favorecido_id,situacao,finalidade,tipo,v_nf)')
+  let ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor,a_vista,n:nfe_notas!inner(id,numero,emissao,dest_doc,dest_nome,favorecido_id,situacao,finalidade,tipo,v_nf,eventos)')
     .eq('empresa_id', e).gte('vencimento', de).lte('vencimento', ate).eq('n.tipo', 'saida').eq('n.situacao', 'autorizada').eq('n.finalidade', '1').order('vencimento'));
+  // nota anulada por devolução (registrada na nota) não tem nada a receber
+  ps = ps.filter(p => !(p.n.eventos || []).some(x => x.tipo === 'devolucao_total'));
   const notaIds = [...new Set(ps.map(p => p.nota_id))];
   const vinc = [], fidc = [], todasParc = [];
   for (const c of chunks(notaIds)) {
@@ -258,13 +260,13 @@ export function gerarContasReceber(periodo, onDone) {
     $('#gres', m.el).innerHTML = '<div class="loading">Procurando…</div>';
     try {
       const e = state.empresa.id, de = $('#gde', m.el).value, ate = $('#gate', m.el).value;
-      const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor,a_vista,n:nfe_notas!inner(id,chave,numero,emissao,dest_doc,dest_nome,favorecido_id,situacao,finalidade,tipo)')
+      const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor,a_vista,n:nfe_notas!inner(id,chave,numero,emissao,dest_doc,dest_nome,favorecido_id,situacao,finalidade,tipo,eventos)')
         .eq('empresa_id', e).eq('n.tipo', 'saida').eq('n.situacao', 'autorizada').eq('n.finalidade', '1').gte('n.emissao', de).lte('n.emissao', ate).order('vencimento'));
       const ligadas = new Set(); const nids = [...new Set(ps.map(p => p.nota_id))];
       for (const c of chunks(nids)) for (const v of await q(sb.from('nfe_vinculos').select('parcela_id,nota_id').in('nota_id', c))) { ligadas.add(v.parcela_id); if (!v.parcela_id) ligadas.add('nota:' + v.nota_id); }
       // crédito do cliente já usado na parcela: o título nasce só pelo que falta (ou nem nasce, se o crédito cobriu tudo)
       const cred = new Map(); for (const us of (await usosPorNota(nids)).values()) for (const u of us) if (u.parcela_id) cred.set(u.parcela_id, (cred.get(u.parcela_id) || 0) + +u.valor);
-      const pend = ps.filter(p => !ligadas.has(p.id) && !ligadas.has('nota:' + p.nota_id)).map(p => cred.has(p.id) ? { ...p, valor: +(+p.valor - cred.get(p.id)).toFixed(2) } : p).filter(p => +p.valor > 0.05);
+      const pend = ps.filter(p => !(p.n.eventos || []).some(x => x.tipo === 'devolucao_total')).filter(p => !ligadas.has(p.id) && !ligadas.has('nota:' + p.nota_id)).map(p => cred.has(p.id) ? { ...p, valor: +(+p.valor - cred.get(p.id)).toFixed(2) } : p).filter(p => +p.valor > 0.05);
       // lançamentos (qualquer status) ainda sem nota que citam a NF/parcela com o mesmo valor
       const venc = pend.map(p => p.vencimento).filter(Boolean).sort();
       const ids = receitas(); let ls = [];
@@ -361,9 +363,9 @@ export async function desfazerCancelamento(n, onDone) {
 // Notas de venda recentes (últimos `dias` dias) com parcelas ainda sem título/recebimento
 export async function notasSemTitulo(dias = 60) {
   const e = state.empresa.id, de = addDias(hojeISO(), -dias);
-  const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,valor,n:nfe_notas!inner(emissao,tipo,situacao,finalidade),v:nfe_vinculos(id)').eq('empresa_id', e)
+  const ps = await fetchAll(() => sb.from('nfe_parcelas').select('id,nota_id,valor,n:nfe_notas!inner(emissao,tipo,situacao,finalidade,eventos),v:nfe_vinculos(id)').eq('empresa_id', e)
     .eq('n.tipo', 'saida').eq('n.situacao', 'autorizada').eq('n.finalidade', '1').gte('n.emissao', de));
-  const sem = ps.filter(p => !p.v?.length);
+  const sem = ps.filter(p => !p.v?.length && !(p.n.eventos || []).some(x => x.tipo === 'devolucao_total'));
   const ems = sem.map(p => p.n.emissao).sort();
   return { parcelas: sem.length, notas: new Set(sem.map(p => p.nota_id)).size, valor: sem.reduce((s, p) => s + +p.valor, 0), de: ems[0] || null, ate: ems.at(-1) || null };
 }
