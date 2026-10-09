@@ -2,7 +2,7 @@
 // em aberto vencidos, notas sem financeiro, borderôs pendentes, desvios do orçamento) e resumo do mês para a direção.
 // Só lê dados — nada aqui altera lançamentos.
 import { sb, state, q, fetchAll, loadCadastros, montarMatriz, montarDRE, isAdmin } from '../lib/data.js';
-import { $, $$, esc, money, money0, pct, dateBR, fail, toast, MESES } from '../lib/ui.js';
+import { $, $$, esc, money, money0, pct, dateBR, fail, toast, modal, parseNum, MESES } from '../lib/ui.js';
 import { revisarSemConta } from '../lib/sem-conta.js';
 import { usosPorNota } from '../lib/creditos.js';
 
@@ -33,6 +33,7 @@ async function carregar(root) {
   const rv = $('[data-rev]', c); if (rv) rv.onclick = () => revisarSemConta(() => carregar(root));
   $$('[data-travar]', c).forEach(b => b.onclick = () => travar(R, b.dataset.travar, b.dataset.bate === '1', root));
   $$('[data-destravar]', c).forEach(b => b.onclick = () => destravar(R, b.dataset.destravar, root));
+  $$('[data-fechar]', c).forEach(b => b.onclick = () => fecharSemExtrato(R, b.dataset.fechar, root));
 }
 
 async function conferir(mes) {
@@ -122,7 +123,7 @@ async function conferir(mes) {
   const movExt = new Map(), pendExt = new Map(), qtdExt = new Map();
   for (const x of ext) { movExt.set(x.conta_id, (movExt.get(x.conta_id) || 0) + +x.valor); qtdExt.set(x.conta_id, (qtdExt.get(x.conta_id) || 0) + 1); if (x.status === 'pendente') pendExt.set(x.conta_id, (pendExt.get(x.conta_id) || 0) + 1); }
   const trv = new Map((travas || []).map(t => [t.conta_id, t]));
-  const ids = new Set([...movSis.keys(), ...ultOfx.keys(), ...trv.keys()]);
+  const ids = new Set([...movSis.keys(), ...ultOfx.keys(), ...trv.keys(), ...saldos.filter(x => Math.abs(+x.saldo_pago) > 0.005).map(x => x.conta_id)]);
   const contas = [...ids].map(id => {
     const ct = cad.contaById[id]; if (!ct) return null;
     const temExt = ultOfx.has(id), cobre = (ultOfx.get(id) || '') >= fim, pend = pendExt.get(id) || 0;
@@ -164,6 +165,9 @@ function pintar(c, R) {
 function cardContas(R) {
   const adm = isAdmin();
   const st = (x) => x.bate ? '<span class="badge pago">✔ conciliado · batendo</span>'
+    : !x.temExt && x.trava?.saldo_banco != null ? (Math.abs(+x.trava.saldo_banco - +x.trava.saldo_sistema) <= 0.05
+      ? `<span class="badge pago" title="${esc(x.trava.observacao || '')}">✔ fechada pelo saldo informado</span>`
+      : `<span class="badge aberto" title="${esc(x.trava.observacao || '')}">fechada com diferença ${money(+x.trava.saldo_banco - +x.trava.saldo_sistema)}</span>`)
     : !x.temExt ? '<span class="badge">sem extrato</span>'
     : !x.cobre ? `<span class="badge aberto">extrato só até ${dateBR(x.ultExt)}</span>`
     : x.pend ? `<span class="badge aberto">${x.pend} pendente(s)</span>`
@@ -171,11 +175,13 @@ function cardContas(R) {
   const tv = (x) => x.trava ? `<span class="badge conc" title="Travada em ${new Date(x.trava.criado_em).toLocaleString('pt-BR')}">🔒 travada até ${dateBR(x.trava.ate)}</span>
       ${adm ? `<button class="btn small ghost noprint" data-destravar="${x.trava.id}">Destravar</button>` : ''}`
     : !R.travaInstalada ? '<span class="muted small">—</span>'
-    : adm ? `<button class="btn small ${x.bate ? 'primary' : ''} noprint" data-travar="${x.ct.id}" data-bate="${x.bate ? 1 : 0}">Travar até ${dateBR(R.fim)}</button>` : '<span class="muted small">aberta</span>';
+    : !adm ? '<span class="muted small">aberta</span>'
+    : x.temExt ? `<button class="btn small ${x.bate ? 'primary' : ''} noprint" data-travar="${x.ct.id}" data-bate="${x.bate ? 1 : 0}">Travar até ${dateBR(R.fim)}</button>`
+    : `<button class="btn small primary noprint" data-fechar="${x.ct.id}" title="Para conta sem extrato OFX (caixa, cofre…): informe o saldo contado/conferido em ${dateBR(R.fim)} e trave">Fechar com saldo informado</button>`;
   return `<div class="card flush"><div style="padding:12px 12px 0"><h2 style="margin:0">Contas em ${dateBR(R.fim)}: conciliação e trava</h2>
-    <p class="muted small" style="margin:4px 0 0">Batendo = extrato importado até o fim do mês, nenhum movimento pendente e o movimento do mês no extrato igual ao do sistema. Travar impede mudar data, valor, conta, situação ou excluir lançamentos da conta até a data (classificação, descrição e centro de custo continuam livres).${R.travaInstalada ? '' : ' <strong>A trava ainda não foi instalada no banco de dados.</strong>'}</p></div>
+    <p class="muted small" style="margin:4px 0 0">Batendo = extrato importado até o fim do mês, nenhum movimento pendente e o movimento do mês no extrato igual ao do sistema. Conta sem extrato (caixa, cofre…): use “Fechar com saldo informado” — você informa o saldo conferido e, se bater, a conta é travada. Travar impede mudar data, valor, conta, situação ou excluir lançamentos da conta até a data (classificação, descrição e centro de custo continuam livres).${R.travaInstalada ? '' : ' <strong>A trava ainda não foi instalada no banco de dados.</strong>'}</p></div>
     <div class="table-wrap"><table><thead><tr><th>Conta</th><th>Situação</th><th class="num">Movimento no extrato</th><th class="num">Movimento no sistema</th><th class="num">Saldo no sistema</th><th>Trava</th></tr></thead><tbody>
-    ${R.contas.map(x => `<tr><td>${esc(x.ct.nome)}</td><td>${st(x)}</td><td class="num">${x.temExt ? money(x.mE) : '—'}</td><td class="num">${money(x.mS)}</td><td class="num ${x.saldo < 0 ? 'neg' : ''}">${x.saldo == null ? '—' : money(x.saldo)}</td><td>${tv(x)}</td></tr>`).join('')}
+    ${R.contas.map(x => `<tr><td>${esc(x.ct.nome)}</td><td>${st(x)}</td><td class="num">${x.temExt ? money(x.mE) : x.trava?.saldo_banco != null ? `<span class="small muted">saldo informado</span> ${money(x.trava.saldo_banco)}` : '—'}</td><td class="num">${money(x.mS)}</td><td class="num ${x.saldo < 0 ? 'neg' : ''}">${x.saldo == null ? '—' : money(x.saldo)}</td><td>${tv(x)}</td></tr>`).join('')}
     </tbody></table></div></div>`;
 }
 
@@ -194,4 +200,31 @@ async function destravar(R, travaId, root) {
   const x = R.contas.find(c => c.trava?.id === travaId); if (!x) return;
   if (!confirm(`Destravar a conta ${x.ct.nome}? Os lançamentos até ${dateBR(x.trava.ate)} voltam a poder ser alterados. Fica registrado quem destravou e quando.`)) return;
   try { await q(sb.from('contas_travas').update({ ativo: false, desfeito_por: state.user?.id, desfeito_em: new Date().toISOString() }).eq('id', travaId)); toast(`${x.ct.nome} destravada`); carregar(root); } catch (e) { fail(e); }
+}
+
+// Conta sem extrato OFX (caixa carteira, cofre…): o usuário informa o saldo conferido no fim do mês; se bater com o
+// sistema, a conta é fechada (travada) com o saldo registrado; se não bater, mostra a diferença e pede confirmação.
+function fecharSemExtrato(R, contaId, root) {
+  const x = R.contas.find(c => c.ct.id === contaId); if (!x) return;
+  const m = modal({ title: `Fechar ${x.ct.nome} em ${dateBR(R.fim)}`, body: `
+    <p class="small muted" style="margin-top:0">Conta sem extrato bancário: confira o saldo real (contagem do caixa, extrato em papel, relatório do banco) e informe abaixo. Se bater com o sistema, a conta fica travada até ${dateBR(R.fim)}.</p>
+    <div class="kpis" style="margin:0 0 10px"><div class="kpi"><div class="k-label">Saldo no sistema em ${dateBR(R.fim)}</div><div class="k-value">${money(x.saldo)}</div><div class="k-sub">movimento do mês ${money(x.mS)}</div></div></div>
+    <label>Saldo conferido em ${dateBR(R.fim)}<input id="sb" placeholder="0,00" autofocus></label>
+    <p id="dif" class="small"></p>
+    <label>Como foi conferido<input id="ob" placeholder="ex.: contagem do caixa em 30/09 por Fulano; extrato do banco"></label>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Fechar conta</button>' });
+  const val = () => { const t = $('#sb', m.el).value.trim(); return t === '' ? null : parseNum(t); };
+  $('#sb', m.el).oninput = () => { const v = val(); const d = v == null ? null : v - (x.saldo || 0);
+    $('#dif', m.el).innerHTML = d == null ? '' : Math.abs(d) <= 0.05 ? '<span class="pos">✔ Bate com o sistema.</span>' : `<span class="neg">Diferença de ${money(d)}</span> — ${d > 0 ? 'há mais dinheiro do que o sistema mostra (falta lançar entrada ou sobra lançada saída)' : 'há menos dinheiro do que o sistema mostra (falta lançar saída)'}.`; };
+  $('#ok', m.el).onclick = async () => {
+    const v = val(); if (v == null || isNaN(v)) return toast('Informe o saldo conferido', true);
+    const d = v - (x.saldo || 0), bate = Math.abs(d) <= 0.05;
+    if (!bate && !confirm(`O saldo informado (${money(v)}) é diferente do sistema (${money(x.saldo)}): diferença de ${money(d)}.\n\nO ideal é lançar o que falta antes de fechar. Fechar mesmo assim, registrando a diferença?`)) return;
+    const obs = [$('#ob', m.el).value.trim(), bate ? 'saldo informado bate com o sistema' : `fechada com diferença de ${money(d)}`].filter(Boolean).join(' · ');
+    try {
+      if (x.trava) await q(sb.from('contas_travas').update({ ativo: false, desfeito_por: state.user?.id, desfeito_em: new Date().toISOString() }).eq('id', x.trava.id));
+      await q(sb.from('contas_travas').insert({ empresa_id: state.empresa.id, conta_id: contaId, ate: R.fim, saldo_sistema: x.saldo, saldo_banco: +v.toFixed(2), observacao: obs }));
+      toast(`${x.ct.nome} fechada até ${dateBR(R.fim)}`); m.close(); carregar(root);
+    } catch (e) { fail(e); }
+  };
 }
