@@ -11,7 +11,7 @@ export const title = 'Notas fiscais';
 
 const hoje = new Date();
 const ant = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-const ui = { mes: `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`, tipo: 'saida', aba: 'notas', busca: '', campo: 'emissao' };
+const ui = { mes: `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`, tipo: 'saida', aba: 'notas', busca: '', campo: 'emissao', fin: '' };
 let D = null;
 const COLS = 'id,chave,serie,numero,emissao,tipo,emissao_propria,finalidade,natureza,cfops,dest_doc,dest_nome,emit_doc,emit_nome,favorecido_id,v_prod,v_desc,v_nf,v_bc_icms,v_icms,v_st,v_ipi,v_pis,v_cofins,v_ibs,v_cbs,situacao,eventos';
 const fimMes = (m) => { const [a, mm] = m.split('-').map(Number); return new Date(Date.UTC(a, mm, 0)).toISOString().slice(0, 10); };
@@ -30,6 +30,7 @@ export async function render(root) {
         <label><span class="lcampo2">${ui.campo === 'vencimento' ? 'Vencimento' : 'Emissão'}</span> de<input type="date" name="de" value="${ui.de || `${ui.mes}-01`}"></label>
         <label>até<input type="date" name="ate" value="${ui.ate || fimMes(ui.mes)}"></label>
         <label>Tipo<select name="tipo"><option value="saida" ${ui.tipo === 'saida' ? 'selected' : ''}>Saídas (vendas)</option><option value="entrada" ${ui.tipo === 'entrada' ? 'selected' : ''}>Entradas</option></select></label>
+        <label>Financeiro<select name="fin">${[['', 'Todas'], ['nada_venc', 'Vencidas sem nada ligado'], ['nada', 'Sem nada ligado'], ['parcial', 'Recebidas em parte'], ['areceber', 'Com título a receber'], ['fidc', 'Antecipadas FIDC'], ['recebida', 'Recebidas']].map(([v, t]) => `<option value="${v}" ${ui.fin === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         <label class="grow">Buscar<input name="busca" value="${esc(ui.busca)}" placeholder="nº, cliente, CNPJ, natureza"></label>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -41,6 +42,7 @@ export async function render(root) {
     <div id="corpo"></div>`;
   $('#flt', root).addEventListener('change', (e) => {
     const nm = e.target.name; if (!nm || nm === 'busca') return;
+    if (nm === 'fin') { ui.fin = e.target.value; return pintar(root); }
     ui[nm] = e.target.value;
     if (nm === 'campo') { $('#flt .lcampo', root).textContent = `Mês de ${ui.campo === 'vencimento' ? 'vencimento' : 'emissão'}`; $('#flt .lcampo2', root).textContent = ui.campo === 'vencimento' ? 'Vencimento' : 'Emissão'; }
     if (nm === 'mes' && ui.mes) { ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); $('#flt [name=de]', root).value = ui.de; $('#flt [name=ate]', root).value = ui.ate; }
@@ -99,9 +101,20 @@ function statusFin(n) {
   return '<span class="badge">Em aberto</span>';
 }
 
+// situação financeira da nota (mesma regra do selo da coluna Financeiro)
+function sitFin(n) {
+  if (n.situacao === 'cancelada' || !n.parcelas.length) return 'fora';
+  const tot = soma(n.parcelas, 'valor'), r = recebido(n);
+  if (tot - r <= 0.05) return 'recebida';
+  if (r > 0.005) return 'parcial';
+  if (n.fidc.length) return 'fidc';
+  if (aReceber(n) > 0.005) return 'areceber';
+  return 'nada';
+}
 function filtradas() {
-  const b = ui.busca.trim().toLowerCase();
-  return D.notas.filter(n => !b || `${n.numero} ${parte(n)} ${n.dest_doc} ${n.emit_doc} ${n.natureza} ${(n.cfops || []).join(' ')}`.toLowerCase().includes(b));
+  const b = ui.busca.trim().toLowerCase(), hoje = new Date().toISOString().slice(0, 10);
+  return D.notas.filter(n => (!b || `${n.numero} ${parte(n)} ${n.dest_doc} ${n.emit_doc} ${n.natureza} ${(n.cfops || []).join(' ')}`.toLowerCase().includes(b))
+    && (!ui.fin || (ui.fin === 'nada_venc' ? sitFin(n) === 'nada' && n.parcelas.some(p => p.vencimento && p.vencimento < hoje) : sitFin(n) === ui.fin)));
 }
 
 const noPeriodo = (p) => D && p.vencimento && p.vencimento >= D.ini && p.vencimento <= D.fim;

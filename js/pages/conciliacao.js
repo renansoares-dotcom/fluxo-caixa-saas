@@ -477,8 +477,19 @@ function importar(root) {
         const imp = await q(sb.from('extrato_importacoes').insert({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: s.banco, agencia: s.agencia, conta_ofx: s.conta,
           dt_inicio: s.inicio, dt_fim: s.fim, saldo_final: s.saldo, saldo_data: s.saldoData || s.fim, qtd: s.itens.length }).select().single());
         let n = 0;
-        for (let i = 0; i < s.itens.length; i += 500) {
-          const rows = s.itens.slice(i, i + 500).map(x => ({ ...x, empresa_id: e, conta_id: s.contaId, importacao_id: imp.id }));
+        // Bancos (ex.: Bradesco) mudam o FITID a cada exportação: um movimento que já está no sistema com outro FITID
+        // (mesma data, valor, documento e descrição) não entra de novo. Conta por ocorrência, para não perder dois
+        // movimentos iguais legítimos no mesmo dia.
+        const chave = (x) => `${x.data}|${(+x.valor).toFixed(2)}|${(x.documento || '').trim()}|${(x.descricao || '').trim().toUpperCase()}`;
+        const jaTem = new Map(), fitids = new Set();
+        if (s.itens.length) {
+          const ds = s.itens.map(x => x.data).sort();
+          const ex = await fetchAll(() => sb.from('extrato_itens').select('id,data,valor,documento,descricao,fitid').eq('empresa_id', e).eq('conta_id', s.contaId).gte('data', ds[0]).lte('data', ds[ds.length - 1]).order('id'));
+          for (const x of ex) { fitids.add(x.fitid); jaTem.set(chave(x), (jaTem.get(chave(x)) || 0) + 1); }
+        }
+        const itens = s.itens.filter(x => { if (fitids.has(x.fitid)) return false; const k = chave(x), c = jaTem.get(k) || 0; if (c > 0) { jaTem.set(k, c - 1); return false; } return true; });
+        for (let i = 0; i < itens.length; i += 500) {
+          const rows = itens.slice(i, i + 500).map(x => ({ ...x, empresa_id: e, conta_id: s.contaId, importacao_id: imp.id }));
           const ins = await q(sb.from('extrato_itens').upsert(rows, { onConflict: 'empresa_id,conta_id,fitid', ignoreDuplicates: true }).select('id'));
           n += ins?.length || 0;
         }
