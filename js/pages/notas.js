@@ -11,7 +11,7 @@ export const title = 'Notas fiscais';
 
 const hoje = new Date();
 const ant = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-const ui = { mes: `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`, tipo: 'saida', aba: 'notas', busca: '' };
+const ui = { mes: `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`, tipo: 'saida', aba: 'notas', busca: '', campo: 'emissao' };
 let D = null;
 const COLS = 'id,chave,serie,numero,emissao,tipo,emissao_propria,finalidade,natureza,cfops,dest_doc,dest_nome,emit_doc,emit_nome,favorecido_id,v_prod,v_desc,v_nf,v_bc_icms,v_icms,v_st,v_ipi,v_pis,v_cofins,v_ibs,v_cbs,situacao,eventos';
 const fimMes = (m) => { const [a, mm] = m.split('-').map(Number); return new Date(Date.UTC(a, mm, 0)).toISOString().slice(0, 10); };
@@ -25,8 +25,9 @@ export async function render(root) {
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
       <div class="toolbar" id="flt">
-        <label>Mês de emissão<input type="month" name="mes" value="${ui.mes}"></label>
-        <label>Emissão de<input type="date" name="de" value="${ui.de || `${ui.mes}-01`}"></label>
+        <label>Filtrar por<select name="campo"><option value="emissao" ${ui.campo === 'emissao' ? 'selected' : ''}>Data de emissão</option><option value="vencimento" ${ui.campo === 'vencimento' ? 'selected' : ''}>Data de vencimento</option></select></label>
+        <label><span class="lcampo">Mês de ${ui.campo === 'vencimento' ? 'vencimento' : 'emissão'}</span><input type="month" name="mes" value="${ui.mes}"></label>
+        <label><span class="lcampo2">${ui.campo === 'vencimento' ? 'Vencimento' : 'Emissão'}</span> de<input type="date" name="de" value="${ui.de || `${ui.mes}-01`}"></label>
         <label>até<input type="date" name="ate" value="${ui.ate || fimMes(ui.mes)}"></label>
         <label>Tipo<select name="tipo"><option value="saida" ${ui.tipo === 'saida' ? 'selected' : ''}>Saídas (vendas)</option><option value="entrada" ${ui.tipo === 'entrada' ? 'selected' : ''}>Entradas</option></select></label>
         <label class="grow">Buscar<input name="busca" value="${esc(ui.busca)}" placeholder="nº, cliente, CNPJ, natureza"></label>
@@ -41,6 +42,7 @@ export async function render(root) {
   $('#flt', root).addEventListener('change', (e) => {
     const nm = e.target.name; if (!nm || nm === 'busca') return;
     ui[nm] = e.target.value;
+    if (nm === 'campo') { $('#flt .lcampo', root).textContent = `Mês de ${ui.campo === 'vencimento' ? 'vencimento' : 'emissão'}`; $('#flt .lcampo2', root).textContent = ui.campo === 'vencimento' ? 'Vencimento' : 'Emissão'; }
     if (nm === 'mes' && ui.mes) { ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); $('#flt [name=de]', root).value = ui.de; $('#flt [name=ate]', root).value = ui.ate; }
     if ((nm === 'de' || nm === 'ate') && ui.de && ui.ate && ui.de > ui.ate) { toast('A data inicial é depois da final', true); return; }
     carregar(root);
@@ -60,7 +62,14 @@ async function carregar(root) {
 async function carregarDados() {
   const e = state.empresa.id, ini = ui.de || `${ui.mes}-01`, fim = ui.ate || fimMes(ui.mes);
   {
-    const notas = await fetchAll(() => sb.from('nfe_notas').select(COLS).eq('empresa_id', e).eq('tipo', ui.tipo).gte('emissao', ini).lte('emissao', fim).order('numero'));
+    let notas;
+    if (ui.campo === 'vencimento') {
+      // notas com ao menos uma parcela vencendo no período (a emissão pode ser de qualquer mês)
+      const pv = await fetchAll(() => sb.from('nfe_parcelas').select('nota_id').eq('empresa_id', e).gte('vencimento', ini).lte('vencimento', fim).order('id'));
+      notas = [];
+      for (const c of chunks([...new Set(pv.map(p => p.nota_id))])) notas.push(...await q(sb.from('nfe_notas').select(COLS).in('id', c).eq('tipo', ui.tipo)));
+      notas.sort((a, b) => a.numero - b.numero);
+    } else notas = await fetchAll(() => sb.from('nfe_notas').select(COLS).eq('empresa_id', e).eq('tipo', ui.tipo).gte('emissao', ini).lte('emissao', fim).order('numero'));
     const ids = notas.map(n => n.id); const parcelas = [], vinc = [], fv = [];
     for (const c of chunks(ids)) {
       const [p, v, f] = await Promise.all([q(sb.from('nfe_parcelas').select('*').in('nota_id', c)), q(sb.from('nfe_vinculos').select('id,nota_id,parcela_id,lancamento_id,tipo').in('nota_id', c)),
@@ -70,7 +79,7 @@ async function carregarDados() {
     const lv = new Map();
     for (const c of chunks([...new Set(vinc.map(v => v.lancamento_id))])) for (const l of await q(sb.from('lancamentos').select('id,data,valor,descricao,conta_id,status').in('id', c))) lv.set(l.id, l);
     for (const n of notas) { n.parcelas = parcelas.filter(p => p.nota_id === n.id).sort((a, b) => a.numero - b.numero); n.vinc = vinc.filter(v => v.nota_id === n.id).map(v => ({ ...v, l: lv.get(v.lancamento_id) })); n.fidc = fv.filter(v => v.nota_id === n.id); }
-    D = { notas, ini, fim };
+    D = { notas, ini, fim, campo: ui.campo };
   }
 }
 
@@ -95,6 +104,12 @@ function filtradas() {
   return D.notas.filter(n => !b || `${n.numero} ${parte(n)} ${n.dest_doc} ${n.emit_doc} ${n.natureza} ${(n.cfops || []).join(' ')}`.toLowerCase().includes(b));
 }
 
+const noPeriodo = (p) => D && p.vencimento && p.vencimento >= D.ini && p.vencimento <= D.fim;
+function vencs(n) {
+  if (!n.parcelas.length) return '—';
+  const L = n.parcelas.map(p => { const t = dateBR(p.vencimento); return D.campo === 'vencimento' && noPeriodo(p) ? `<b>${t}</b>` : t; });
+  return L.length > 3 ? `${L.slice(0, 3).join('<br>')}<br><span class="muted">+${L.length - 3}</span>` : L.join('<br>');
+}
 function pintarKpis(root) {
   if (!D || !$('#kpis', root)) return;
   const N = filtradas(), V = N.filter(venda), aut = N.filter(n => n.situacao === 'autorizada');
@@ -105,6 +120,7 @@ function pintarKpis(root) {
     <div class="kpi"><div class="k-label">ICMS · IPI</div><div class="k-value">${money(soma(aut, 'v_icms'))}</div><div class="k-sub">IPI ${money(soma(aut, 'v_ipi'))}${soma(aut, 'v_st') ? ` · ST ${money(soma(aut, 'v_st'))}` : ''}</div></div>
     <div class="kpi"><div class="k-label">PIS · COFINS</div><div class="k-value">${money(soma(aut, 'v_pis') + soma(aut, 'v_cofins'))}</div><div class="k-sub">PIS ${money(soma(aut, 'v_pis'))} · COFINS ${money(soma(aut, 'v_cofins'))}</div></div>
     <div class="kpi"><div class="k-label">IBS · CBS (teste 2026)</div><div class="k-value">${money(soma(aut, 'v_ibs') + soma(aut, 'v_cbs'))}</div><div class="k-sub">IBS ${money(soma(aut, 'v_ibs'))} · CBS ${money(soma(aut, 'v_cbs'))}</div></div>
+    ${D.campo === 'vencimento' ? (() => { const P = V.flatMap(n => n.parcelas.filter(noPeriodo)); return `<div class="kpi"><div class="k-label">Parcelas vencendo no período</div><div class="k-value">${money(soma(P, 'valor'))}</div><div class="k-sub">${P.length} parcela(s) de ${dateBR(D.ini)} a ${dateBR(D.fim)}</div></div>`; })() : ''}
     ${ui.tipo === 'saida' ? `<div class="kpi"><div class="k-label">Parcelas com recebimento vinculado</div><div class="k-value">${totParc ? Math.round(rec / totParc * 100) : 0}%</div><div class="k-sub">${money(rec)} de ${money(totParc)}</div></div>` : ''}
     ${ui.tipo === 'saida' ? (() => { const F = comFin.flatMap(n => n.fidc), vF = F.reduce((s, v) => s + (+v.t?.valor || 0), 0); return `<div class="kpi"><div class="k-label">Em borderô FIDC</div><div class="k-value">${totParc ? Math.round(vF / totParc * 100) : 0}%</div><div class="k-sub">${F.length} título(s) · ${money(vF)}</div></div>`; })() : ''}`;
 }
@@ -115,11 +131,11 @@ function pintar(root) {
   const N = filtradas();
   const c = $('#corpo', root);
   if (ui.aba === 'recebimentos') return ui.tipo === 'saida' ? pintarRecebimentos(c, root, () => carregarSilencioso(), ui.mes) : (c.innerHTML = '<div class="card"><div class="empty">Recebimentos × Notas vale para as notas de saída.</div></div>');
-  if (!D.notas.length) { c.innerHTML = `<div class="card"><div class="empty">Nenhuma nota ${ui.tipo === 'saida' ? 'de saída' : 'de entrada'} importada com emissão de ${dateBR(D.ini)} a ${dateBR(D.fim)}. Use “Importar XML”.</div></div>`; return; }
+  if (!D.notas.length) { c.innerHTML = `<div class="card"><div class="empty">Nenhuma nota ${ui.tipo === 'saida' ? 'de saída' : 'de entrada'} importada com ${D.campo === 'vencimento' ? 'parcela vencendo' : 'emissão'} de ${dateBR(D.ini)} a ${dateBR(D.fim)}. Use “Importar XML”.</div></div>`; return; }
   if (ui.aba === 'impostos') return pintarImpostos(c, N);
   if (ui.aba === 'borderos') return pintarBorderos(c, root);
-  c.innerHTML = `<div class="card flush"><div class="table-wrap" style="max-height:66vh"><table><thead><tr><th>Nº</th><th>Emissão</th><th>${ui.tipo === 'saida' ? 'Cliente' : 'Emitente / destinatário'}</th><th>CFOP</th><th class="num">Valor</th><th class="num">ICMS</th><th class="num">IPI</th><th class="num">PIS+COFINS</th><th>Parcelas</th><th>Financeiro</th></tr></thead><tbody>
-    ${N.map(n => `<tr class="clickable ${n.situacao === 'cancelada' ? 'muted' : ''}" data-id="${n.id}"><td>${n.numero}${n.serie !== '1' ? `<span class="muted small"> s.${esc(n.serie)}</span>` : ''}</td><td>${dateBR(n.emissao)}</td>
+  c.innerHTML = `<div class="card flush"><div class="table-wrap" style="max-height:66vh"><table><thead><tr><th>Nº</th><th>Emissão</th><th>Vencimento</th><th>${ui.tipo === 'saida' ? 'Cliente' : 'Emitente / destinatário'}</th><th>CFOP</th><th class="num">Valor</th><th class="num">ICMS</th><th class="num">IPI</th><th class="num">PIS+COFINS</th><th>Parcelas</th><th>Financeiro</th></tr></thead><tbody>
+    ${N.map(n => `<tr class="clickable ${n.situacao === 'cancelada' ? 'muted' : ''}" data-id="${n.id}"><td>${n.numero}${n.serie !== '1' ? `<span class="muted small"> s.${esc(n.serie)}</span>` : ''}</td><td>${dateBR(n.emissao)}</td><td class="small">${vencs(n)}</td>
       <td class="wrap">${esc(parte(n))}<div class="small muted">${esc(n.natureza || '')}${n.finalidade === '4' ? ' · devolução' : ''}${(n.eventos || []).some(e => e.tipo === '110110') ? ' · carta de correção' : ''}</div></td>
       <td class="small">${esc((n.cfops || []).join(', '))}</td><td class="num">${money(n.v_nf)}</td><td class="num">${money(n.v_icms)}</td><td class="num">${money(n.v_ipi)}</td><td class="num">${money(+n.v_pis + +n.v_cofins)}</td>
       <td class="small">${n.parcelas.length ? `${n.parcelas.length}${n.parcelas[0].a_vista ? ' (à vista)' : ''}` : '—'}${n.fidc.length ? `<div class="muted">${[...new Set(n.fidc.map(v => `${v.t?.fundo} ${v.t?.bordero}`))].map(esc).join(', ')}</div>` : ''}</td><td>${statusFin(n)}</td></tr>`).join('')}
