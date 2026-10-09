@@ -12,6 +12,7 @@ const routes = {
   'fluxo-mensal': () => import('./pages/fluxo-mensal.js'),
   'fluxo-diario': () => import('./pages/fluxo-diario.js'),
   'dre': () => import('./pages/dre.js'),
+  'fechamento': () => import('./pages/fechamento.js'),
   'orcamento': () => import('./pages/orcamento.js'),
   'orcado-realizado': () => import('./pages/orcado-realizado.js'),
   'controle-orcamento': () => import('./pages/controle-orcamento.js'),
