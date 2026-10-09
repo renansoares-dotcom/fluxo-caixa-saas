@@ -3,6 +3,7 @@
 // Só lê dados — nada aqui altera lançamentos.
 import { sb, state, q, fetchAll, loadCadastros, montarMatriz, montarDRE } from '../lib/data.js';
 import { $, esc, money, money0, pct, dateBR, fail, MESES } from '../lib/ui.js';
+import { revisarSemConta } from '../lib/sem-conta.js';
 
 export const title = 'Fechamento do mês';
 
@@ -28,6 +29,7 @@ async function carregar(root) {
   let R;
   try { R = await conferir(ui.mes); } catch (e) { fail(e); c.innerHTML = '<div class="card"><div class="empty">Não foi possível conferir o mês.</div></div>'; return; }
   pintar(c, R);
+  const rv = $('[data-rev]', c); if (rv) rv.onclick = () => revisarSemConta(() => carregar(root));
 }
 
 async function conferir(mes) {
@@ -128,7 +130,7 @@ function pintar(c, R) {
       ${R.etapas.map((x, n) => `<tr><td style="text-align:center;font-size:18px">${x.ok ? '<span class="pos">✔</span>' : '<span class="neg">●</span>'}</td>
         <td><strong>${n + 1}. ${esc(x.titulo)}</strong><div><span class="badge ${x.ok ? 'pago' : 'vencido'}">${x.ok ? 'pronto' : 'pendente'}</span></div></td>
         <td class="wrap small">${x.resumo}${x.obs ? `<div class="muted">${esc(x.obs)}</div>` : ''}</td>
-        <td class="noprint">${x.ok ? '' : `<a class="btn small" href="${x.link}">${esc(x.acao)}</a>`}</td></tr>`).join('')}
+        <td class="noprint">${x.ok ? '' : x.k === 'semconta' ? '<button class="btn small primary" data-rev>Revisar e resolver</button>' : `<a class="btn small" href="${x.link}">${esc(x.acao)}</a>`}</td></tr>`).join('')}
     </tbody></table></div></div>
     ${S.saldos.length ? `<div class="card flush"><div style="padding:12px 12px 0"><h2 style="margin:0">Saldos em ${dateBR(R.fim)}</h2><p class="muted small" style="margin:4px 0 0">Saldo pelo sistema em cada conta com recursos disponíveis (lançamentos pagos até o fim do mês).</p></div>
       <div class="table-wrap"><table><thead><tr><th>Conta</th><th class="num">Saldo</th></tr></thead><tbody>
