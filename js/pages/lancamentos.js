@@ -113,12 +113,16 @@ async function load(root) {
     // conciliados com o extrato bancário (marcados na lista; não podem ser excluídos)
     const conc = new Set((await q(sb.from('conciliacoes').select('lancamento_id').in('lancamento_id', data.map(l => l.id)))).map(c => c.lancamento_id));
     conciliados = conc;
+    // lançamentos ligados a uma NF-e importada (Notas Fiscais): selo com nº da nota/parcela
+    const nfs = new Map();
+    try { for (const v of await q(sb.from('nfe_vinculos').select('lancamento_id,tipo,n:nfe_notas(numero),p:nfe_parcelas(numero)').in('lancamento_id', data.map(l => l.id)))) nfs.set(v.lancamento_id, v); } catch { /* sem a estrutura de NF-e: segue sem o selo */ }
+    const seloNF = (l) => { const v = nfs.get(l.id); if (!v?.n) return ''; return ` <span class="badge pago" title="Ligado à NF-e ${v.n.numero} importada (Notas Fiscais)${v.tipo === 'titulo' ? ' — título gerado da nota' : ''}">NF ${v.n.numero}${v.p?.numero ? '/' + v.p.numero : ''} ✓</span>`; };
     tbl.innerHTML = `<table><thead><tr>${podeEditar() ? '<th><input type="checkbox" id="all"></th>' : ''}
       <th>Data</th><th>Plano de contas</th><th>Descrição</th><th>Favorecido</th><th>C. Custo</th><th>Conta</th><th>Status</th><th class="num">Valor</th></tr></thead>
       <tbody>${data.map(l => `<tr class="clickable" data-id="${l.id}">
         ${podeEditar() ? `<td><input type="checkbox" class="sel" value="${l.id}"></td>` : ''}
         <td>${dateBR(l.data)}</td><td>${esc(l.plano_codigo + ' - ' + l.plano_nome)}</td>
-        <td class="wrap">${esc(l.descricao || '')}${l.documento ? `<div class="muted small">NF ${esc(l.documento)}${l.emissao ? ` · emissão ${dateBR(l.emissao)}` : ''}${l.fidc_proposta_id ? ' · FIDC' : ''}</div>` : ''}${l.opc1 ? `<div class="muted small">${esc(l.opc1)}</div>` : ''}</td>
+        <td class="wrap">${esc(l.descricao || '')}${seloNF(l)}${l.documento ? `<div class="muted small">NF ${esc(l.documento)}${l.emissao ? ` · emissão ${dateBR(l.emissao)}` : ''}${l.fidc_proposta_id ? ' · FIDC' : ''}</div>` : ''}${l.opc1 ? `<div class="muted small">${esc(l.opc1)}</div>` : ''}</td>
         <td class="wrap">${esc(l.favorecido_nome || '')}</td><td>${esc(l.centro_custo_nome || '')}</td>
         <td>${esc(l.conta_nome || '—')}</td>
         <td><span class="badge ${l.status === 'Pago' ? 'pago' : 'aberto'}">${l.status}</span>${conc.has(l.id) ? ' <span class="badge conc" title="Conciliado com o extrato bancário">✓ conciliado</span>' : ''}</td>
