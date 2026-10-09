@@ -8,6 +8,7 @@ const routes = {
   'conciliacao': () => import('./pages/conciliacao.js'),
   'notas': () => import('./pages/notas.js'),
   'abertos': () => import('./pages/abertos.js'),
+  'creditos': () => import('./pages/creditos.js'),
   'autorizacao': () => import('./pages/autorizacao.js'),
   'fluxo-mensal': () => import('./pages/fluxo-mensal.js'),
   'fluxo-diario': () => import('./pages/fluxo-diario.js'),

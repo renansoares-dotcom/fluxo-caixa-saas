@@ -6,6 +6,7 @@ import { lerArquivos } from '../lib/nf-titulos.js';
 import { lerNFeCompleta, prepararNotas, casarBorderos, CFOP_SEM_FINANCEIRO } from '../lib/nfe-fiscal.js';
 import { pintarRecebimentos, autoVincular, marcarCancelada, desfazerCancelamento, gerarContasReceber } from '../lib/nfe-receb.js';
 import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
+import { usosPorNota, usarCredito, desfazerUso } from '../lib/creditos.js';
 
 export const title = 'Notas fiscais';
 
@@ -81,13 +82,23 @@ async function carregarDados() {
     const lv = new Map();
     for (const c of chunks([...new Set(vinc.map(v => v.lancamento_id))])) for (const l of await q(sb.from('lancamentos').select('id,data,valor,descricao,conta_id,status').in('id', c))) lv.set(l.id, l);
     for (const n of notas) { n.parcelas = parcelas.filter(p => p.nota_id === n.id).sort((a, b) => a.numero - b.numero); n.vinc = vinc.filter(v => v.nota_id === n.id).map(v => ({ ...v, l: lv.get(v.lancamento_id) })); n.fidc = fv.filter(v => v.nota_id === n.id); }
+    const usos = await usosPorNota(ids); for (const n of notas) n.cred = usos.get(n.id) || [];
     D = { notas, ini, fim, campo: ui.campo };
   }
 }
 
 // depois de vincular na aba Recebimentos × Notas: recarrega os dados e só os indicadores (a aba continua como está)
 async function carregarSilencioso() { try { await carregarDados(); pintarKpis(document); } catch (e) { fail(e); } }
-const recebido = (n) => n.vinc.reduce((s, v) => s + (v.l?.status === 'Pago' ? +v.l.valor || 0 : 0), 0);
+const recebido = (n) => n.vinc.reduce((s, v) => s + (v.l?.status === 'Pago' ? +v.l.valor || 0 : 0), 0) + (n.cred || []).reduce((s, u) => s + +u.valor, 0);
+// recebido por parcela (recebimentos pagos + créditos usados); vínculos sem parcela cobrem as parcelas em ordem
+function recPorParcela(n) {
+  const r = new Map(), add = (k, v) => r.set(k, (r.get(k) || 0) + v);
+  for (const v of n.vinc) if (v.parcela_id && v.l?.status === 'Pago') add(v.parcela_id, +v.l.valor || 0);
+  for (const u of n.cred || []) if (u.parcela_id) add(u.parcela_id, +u.valor);
+  let solto = n.vinc.filter(v => !v.parcela_id && v.l?.status === 'Pago').reduce((s, v) => s + +v.l.valor, 0) + (n.cred || []).filter(u => !u.parcela_id).reduce((s, u) => s + +u.valor, 0);
+  for (const p of n.parcelas) { if (solto <= 0) break; const f = +p.valor - (r.get(p.id) || 0); if (f <= 0) continue; const u = Math.min(f, solto); add(p.id, u); solto -= u; }
+  return r;
+}
 const aReceber = (n) => n.vinc.reduce((s, v) => s + (v.l && v.l.status !== 'Pago' ? +v.l.valor || 0 : 0), 0);
 function statusFin(n) {
   if (n.situacao === 'cancelada') return '<span class="badge vencido">cancelada</span>';
@@ -193,10 +204,10 @@ async function detalhe(n, root) {
     ${n.parcelas.length ? `<div class="table-wrap"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th class="num">Valor</th><th>Borderô FIDC (fundo · nº · data · título · valor)</th><th>Recebimentos (data · valor · conta · descrição)</th></tr></thead><tbody>
       ${n.parcelas.map(p => { const vs = n.vinc.filter(v => v.parcela_id === p.id), fs = n.fidc.filter(v => v.parcela_id === p.id); return `<tr><td>${p.numero}${p.a_vista ? ' (à vista)' : ''}</td><td>${dateBR(p.vencimento)}</td><td class="num">${money(p.valor)}</td>
         <td class="small">${fs.map(v => `${esc(v.t?.fundo)} · ${esc(v.t?.bordero)} · ${dateBR(v.t?.data_operacao)} · ${esc(v.t?.titulo)} · <span class="${Math.abs(+v.t?.valor - +p.valor) <= 0.05 ? '' : 'neg'}">${money(v.t?.valor)}</span>`).join('<br>') || '<span class="muted">—</span>'}</td>
-        <td class="small">${vs.map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${v.l && v.l.status !== 'Pago' ? ' <span class="badge aberto">título em aberto</span>' : ''}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`; }).join('')}
+        <td class="small">${(n.cred || []).filter(u => u.parcela_id === p.id).map(u => `<span class="badge conc">crédito</span> ${dateBR(u.data)} · ${money(u.valor)} · ${esc(({ adiantamento: 'adiantamento', devolucao: 'devolução', desconto: 'desconto', acordo: 'acordo', outro: 'crédito' })[u.c?.tipo] || 'crédito')}${u.observacao ? ' · ' + esc(u.observacao) : ''}${podeEditar() ? ` <button class="btn ghost small" data-du="${u.id}" title="Desfazer o uso do crédito">✕</button>` : ''}<br>`).join('')}${vs.map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${v.l && v.l.status !== 'Pago' ? ' <span class="badge aberto">título em aberto</span>' : ''}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`; }).join('')}
       ${n.vinc.filter(v => !v.parcela_id).length ? `<tr><td colspan="4" class="small">Vinculados à nota (sem parcela definida)</td><td class="small">${n.vinc.filter(v => !v.parcela_id).map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${v.l && v.l.status !== 'Pago' ? ' <span class="badge aberto">título em aberto</span>' : ''}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>')}</td></tr>` : ''}
       </tbody></table></div>` : '<p class="small muted">Nota sem parcelas (sem financeiro).</p>'}`,
-    foot: `<span style="margin-right:auto;display:flex;gap:6px">${podeEditar() && n.tipo === 'saida' && n.situacao === 'autorizada' ? '<button class="btn" id="mcanc">Marcar como cancelada</button>' : ''}${podeEditar() && (n.eventos || []).some(x => x.tipo === 'cancelamento_manual') && n.situacao === 'cancelada' ? '<button class="btn" id="dcanc">Desfazer cancelamento informado</button>' : ''}${podeEditar() && n.vinc.length ? '<button class="btn danger" id="desv">Desfazer vínculos de recebimento</button>' : ''}${podeEditar() && n.fidc.length ? '<button class="btn danger" id="desf">Desfazer ligação com borderô</button>' : ''}</span><button class="btn" id="xml">Baixar XML</button><button class="btn" data-close>Fechar</button>` });
+    foot: `<span style="margin-right:auto;display:flex;gap:6px">${podeEditar() && n.situacao === 'autorizada' && n.parcelas.length ? `<button class="btn" id="ucred" title="Abater nas parcelas um adiantamento ou crédito ${n.tipo === 'saida' ? 'do cliente' : 'com o fornecedor'}">Usar crédito</button>` : ''}${podeEditar() && n.tipo === 'saida' && n.situacao === 'autorizada' ? '<button class="btn" id="mcanc">Marcar como cancelada</button>' : ''}${podeEditar() && (n.eventos || []).some(x => x.tipo === 'cancelamento_manual') && n.situacao === 'cancelada' ? '<button class="btn" id="dcanc">Desfazer cancelamento informado</button>' : ''}${podeEditar() && n.vinc.length ? '<button class="btn danger" id="desv">Desfazer vínculos de recebimento</button>' : ''}${podeEditar() && n.fidc.length ? '<button class="btn danger" id="desf">Desfazer ligação com borderô</button>' : ''}</span><button class="btn" id="xml">Baixar XML</button><button class="btn" data-close>Fechar</button>` });
   $('#xml', m.el).onclick = async () => {
     try { const r = await q(sb.from('nfe_notas').select('xml').eq('id', n.id).single()); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.xml || ''], { type: 'application/xml' })); a.download = `${n.chave}.xml`; a.click(); } catch (e) { fail(e); }
   };
@@ -205,8 +216,11 @@ async function detalhe(n, root) {
     try { await q(sb.from('nfe_vinculos').delete().eq('nota_id', n.id)); toast('Vínculos desfeitos'); m.close(); carregar(root); } catch (e) { fail(e); }
   });
   $('#mcanc', m.el) && ($('#mcanc', m.el).onclick = () => { m.close(); marcarCancelada(n.id, '', () => carregar(root)); });
+  const reabrir = async () => { await carregar(root); const nn = D.notas.find(x => x.id === n.id); if (nn) detalhe(nn, root); };
+  $('#ucred', m.el) && ($('#ucred', m.el).onclick = () => { m.close(); usarCredito(n, recPorParcela(n), reabrir); });
   $('#dcanc', m.el) && ($('#dcanc', m.el).onclick = () => { m.close(); desfazerCancelamento(n, () => carregar(root)); });
   m.el.addEventListener('click', async (ev) => {
+    const du = ev.target.closest('[data-du]'); if (du) { const u = (n.cred || []).find(x => x.id === du.dataset.du); if (u) { m.close(); desfazerUso(u, reabrir); } return; }
     const b = ev.target.closest('[data-dv]'); if (!b) return;
     const v = n.vinc.find(x => x.id === b.dataset.dv);
     if (!confirm(`Desfazer o vínculo com o recebimento de ${dateBR(v?.l?.data)} (${money(v?.l?.valor)})? O lançamento não é alterado.`)) return;

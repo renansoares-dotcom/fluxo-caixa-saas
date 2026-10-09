@@ -4,6 +4,7 @@
 import { sb, state, q, fetchAll, loadCadastros, montarMatriz, montarDRE, isAdmin } from '../lib/data.js';
 import { $, $$, esc, money, money0, pct, dateBR, fail, toast, MESES } from '../lib/ui.js';
 import { revisarSemConta } from '../lib/sem-conta.js';
+import { usosPorNota } from '../lib/creditos.js';
 
 export const title = 'Fechamento do mês';
 
@@ -82,7 +83,8 @@ async function conferir(mes) {
   // 4) Notas de venda do mês com financeiro (recebimento, título ou borderô ligado)
   if (notas) {
     const vendas = notas.filter(n => n.situacao === 'autorizada' && n.finalidade === '1' && n.p?.length);
-    const sem = vendas.filter(n => !n.v?.length && !n.f?.length);
+    const usos = await usosPorNota(vendas.map(n => n.id));
+    const sem = vendas.filter(n => !n.v?.length && !n.f?.length && !usos.has(n.id));
     const canc = notas.filter(n => n.situacao === 'cancelada').length;
     etapas.push({ k: 'notas', titulo: 'Notas de venda do mês ligadas ao financeiro', ok: !sem.length, link: '#/notas', acao: 'Abrir Notas Fiscais',
       resumo: `${vendas.length} notas de venda (${money0(vendas.reduce((s, n) => s + +n.v_nf, 0))})${sem.length ? ` · <strong>${sem.length} sem recebimento nem título</strong>: ${sem.slice(0, 12).map(n => n.numero).join(', ')}${sem.length > 12 ? '…' : ''}` : ', todas ligadas'}${canc ? ` · ${canc} cancelada(s)` : ''}.` });
