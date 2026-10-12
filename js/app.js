@@ -10,6 +10,7 @@ const routes = {
   'abertos': () => import('./pages/abertos.js'),
   'creditos': () => import('./pages/creditos.js'),
   'conta-fornecedor': () => import('./pages/conta-fornecedor.js'),
+  'paraquedas': () => import('./pages/paraquedas.js'),
   'autorizacao': () => import('./pages/autorizacao.js'),
   'fluxo-mensal': () => import('./pages/fluxo-mensal.js'),
   'fluxo-diario': () => import('./pages/fluxo-diario.js'),
@@ -112,6 +113,9 @@ async function entrarEmpresa(emp, papel) {
   anosSelect($('#ano-global'));
   show('app-view');
   try { await loadCadastros(); } catch (e) { fail(e); }
+  // papel "compras": só a tela de paraquedas (o banco também não deixa ler o resto)
+  document.body.classList.toggle('so-compras', papel === 'compras');
+  if (papel === 'compras') { if (location.hash !== '#/paraquedas') location.hash = '#/paraquedas'; else render(); return; }
   if (!location.hash || location.hash === '#/') location.hash = '#/dashboard'; else render();
 }
 
@@ -131,6 +135,7 @@ async function render() {
   if (!state.cad) { try { await loadCadastros(); } catch (e) { fail(e); return; } }
   lerCores();
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'dashboard';
+  if (state.papel === 'compras' && route !== 'paraquedas') { location.hash = '#/paraquedas'; return; }
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
   // menu em cascata: abre o grupo da página atual

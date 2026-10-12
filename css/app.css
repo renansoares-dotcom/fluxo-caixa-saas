@@ -333,3 +333,6 @@ tr.conc-ok>td:first-child{box-shadow:inset 3px 0 0 var(--pos)}
 @media (max-width:900px){.nav-sec>summary{padding:11px 12px;font-size:12px}}
 .edt{width:34px;padding:0 4px!important;text-align:center}
 .badge.conc{background:var(--pos-soft);color:var(--pos);border:1px solid var(--pos)}
+
+/* papel "compras": só o menu de paraquedas */
+.so-compras #nav > a, .so-compras #nav details:not(:has(.nav-compras)), .so-compras #nav .nav-itens a:not(.nav-compras), .so-compras .ano-sel{display:none}
