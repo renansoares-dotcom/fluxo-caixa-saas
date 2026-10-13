@@ -4,6 +4,7 @@ import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.j
 import { $, esc, money, dateBR, fail, toast, modal, exportXLSX } from '../lib/ui.js';
 import { lerArquivos } from '../lib/nf-titulos.js';
 import { lerNFeCompleta, prepararNotas, casarBorderos, CFOP_SEM_FINANCEIRO } from '../lib/nfe-fiscal.js';
+import { pintarPagamentos } from '../lib/nfe-pag.js';
 import { pintarRecebimentos, autoVincular, marcarCancelada, desfazerCancelamento, gerarContasReceber } from '../lib/nfe-receb.js';
 import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
 import { usosPorNota, usarCredito, desfazerUso } from '../lib/creditos.js';
@@ -38,13 +39,14 @@ export async function render(root) {
         <button class="btn" id="exp">Exportar Excel</button>
         ${podeEditar() ? '<button class="btn primary" id="imp">Importar XML</button>' : ''}
       </div></div>
-      <div class="chips" id="abas" style="margin-top:12px">${[['notas', 'Notas'], ['impostos', 'Impostos por CFOP'], ['recebimentos', 'Recebimentos × Notas'], ['borderos', 'Borderôs FIDC']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
+      <div class="chips" id="abas" style="margin-top:12px">${[['notas', 'Notas'], ['impostos', 'Impostos por CFOP'], ['recebimentos', ui.tipo === 'entrada' ? 'Pagamentos × Notas' : 'Recebimentos × Notas'], ['borderos', 'Borderôs FIDC']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div class="kpis" id="kpis"></div>
     <div id="corpo"></div>`;
   $('#flt', root).addEventListener('change', (e) => {
     const nm = e.target.name; if (!nm || nm === 'busca') return;
     if (nm === 'fin') { ui.fin = e.target.value; return pintar(root); }
     ui[nm] = e.target.value;
+    if (nm === 'tipo') { const ch = $('#abas [data-a=recebimentos]', root); if (ch) ch.textContent = ui.tipo === 'entrada' ? 'Pagamentos × Notas' : 'Recebimentos × Notas'; }
     if (nm === 'campo') { $('#flt .lcampo', root).textContent = `Mês de ${ui.campo === 'vencimento' ? 'vencimento' : 'emissão'}`; $('#flt .lcampo2', root).textContent = ui.campo === 'vencimento' ? 'Vencimento' : 'Emissão'; }
     if (nm === 'mes' && ui.mes) { ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); $('#flt [name=de]', root).value = ui.de; $('#flt [name=ate]', root).value = ui.ate; }
     if ((nm === 'de' || nm === 'ate') && ui.de && ui.ate && ui.de > ui.ate) { toast('A data inicial é depois da final', true); return; }
@@ -156,7 +158,7 @@ function pintar(root) {
   pintarKpis(root);
   const N = filtradas();
   const c = $('#corpo', root);
-  if (ui.aba === 'recebimentos') return ui.tipo === 'saida' ? pintarRecebimentos(c, root, () => carregarSilencioso(), ui.mes) : (c.innerHTML = '<div class="card"><div class="empty">Recebimentos × Notas vale para as notas de saída.</div></div>');
+  if (ui.aba === 'recebimentos') return ui.tipo === 'saida' ? pintarRecebimentos(c, root, () => carregarSilencioso(), ui.mes) : pintarPagamentos(c, root, () => carregarSilencioso());
   if (!D.notas.length) { c.innerHTML = `<div class="card"><div class="empty">Nenhuma nota ${ui.tipo === 'saida' ? 'de saída' : 'de entrada'} importada com ${D.campo === 'vencimento' ? 'parcela vencendo' : 'emissão'} de ${dateBR(D.ini)} a ${dateBR(D.fim)}. Use “Importar XML”.</div></div>`; return; }
   if (ui.aba === 'impostos') return pintarImpostos(c, N);
   if (ui.aba === 'borderos') return pintarBorderos(c, root);
