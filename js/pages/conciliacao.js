@@ -24,6 +24,10 @@ const chaveDesc = (s) => normTxt(s).replace(/\d+/g, ' ').replace(/[^a-z ]/g, ' '
 export async function render(root) {
   const c = state.cad;
   const contas = c.contas.filter(x => x.ativo !== false);
+  // link direto (ex.: vindo da Conferência do dia): #/conciliacao?conta=<id>&mes=AAAA-MM
+  const prm = new URLSearchParams(location.hash.split('?')[1] || '');
+  if (prm.get('conta') && contas.some(x => x.id === prm.get('conta'))) { ui.conta = prm.get('conta'); ui.sels.clear(); ui.marcados.clear(); }
+  if (/^\d{4}-\d{2}$/.test(prm.get('mes') || '')) ui.mes = prm.get('mes');
   if (!ui.conta) ui.conta = (contas.find(x => x.ofx_conta) || contas.find(x => /corrente/i.test(x.tipo || '')) || contas[0])?.id || '';
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">

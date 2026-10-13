@@ -336,3 +336,50 @@ tr.conc-ok>td:first-child{box-shadow:inset 3px 0 0 var(--pos)}
 
 /* papel "compras": só o menu de paraquedas */
 .so-compras #nav > a, .so-compras #nav details:not(:has(.nav-compras)), .so-compras #nav .nav-itens a:not(.nav-compras), .so-compras .ano-sel{display:none}
+
+/* Conferência do dia */
+.warn{color:var(--warn)}
+.toolbar label.chk{flex-direction:row;align-items:center;gap:6px;min-width:0;flex:0 0 auto;white-space:nowrap;align-self:flex-end;padding-bottom:8px}
+.cf-prog{height:6px;border-radius:3px;background:var(--surface-2);margin-top:8px;overflow:hidden}
+.cf-prog span{display:block;height:100%;background:var(--pos);border-radius:3px}
+.cf-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 12px 8px}
+.cf-leg{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.cf-leg span{display:inline-flex;align-items:center;gap:5px}
+.cf-wrap{max-height:none}
+table.cf-grid{border-collapse:separate;border-spacing:0;width:auto}
+table.cf-grid th,table.cf-grid td{padding:3px 1px;text-align:center;border-bottom:1px solid var(--border)}
+table.cf-grid th{font-size:11px;font-weight:600;color:var(--muted);line-height:1.1}
+table.cf-grid th div{font-weight:400;font-size:10px}
+table.cf-grid .fds{background:color-mix(in srgb,var(--surface-2) 70%,transparent)}
+table.cf-grid .cf-conta{text-align:left;padding:4px 10px 4px 12px;min-width:150px;max-width:230px;overflow:hidden;text-overflow:ellipsis;position:sticky;left:0;background:var(--surface);z-index:1;white-space:nowrap}
+table.cf-grid td.num{padding:4px 12px;white-space:nowrap}
+.cf-td{cursor:pointer;outline:none}
+.cf-td:focus .cf-c,.cf-td:hover .cf-c{box-shadow:0 0 0 2px var(--primary)}
+.cf-c{display:inline-flex;align-items:center;justify-content:center;width:27px;height:23px;border-radius:5px;font-style:normal;font-size:11px;font-weight:700;line-height:1;border:1px solid transparent;position:relative;font-variant-numeric:tabular-nums}
+.cf-c.vazio{width:27px;background:transparent;border-color:color-mix(in srgb,var(--border) 60%,transparent)}
+.cf-c.ok{background:var(--pos-soft);color:var(--pos);border-color:color-mix(in srgb,var(--pos) 35%,transparent)}
+.cf-c.ok.conf,.cf-c.ok.trav{background:var(--pos);color:#fff;border-color:var(--pos)}
+.cf-c.ok.trav{background:color-mix(in srgb,var(--pos) 70%,var(--surface))}
+.cf-c.trav::after{content:'';position:absolute;right:-2px;top:-2px;width:7px;height:7px;border-radius:2px;background:var(--muted);border:1px solid var(--surface)}
+.cf-c.erro{background:var(--neg);color:#fff;border-color:var(--neg);font-size:9.5px;letter-spacing:-.2px}
+.cf-c.alerta{background:var(--warn-soft);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,transparent)}
+.cf-c.alerta.conf{background:var(--warn);color:#fff;border-color:var(--warn)}
+.cf-c.semext{background:var(--surface-2);color:var(--muted);border-color:var(--border)}
+.cf-dia-kpis{margin-bottom:10px}
+.cf-dia-kpis .k-value{font-size:17px}
+.cf-sit{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.cf-msg{padding:8px 12px;border-radius:8px;font-size:13px;border:1px solid var(--border)}
+.cf-msg.erro{background:var(--neg-soft);color:var(--neg);border-color:color-mix(in srgb,var(--neg) 35%,transparent)}
+.cf-msg.alerta{background:var(--warn-soft);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.cf-msg.ok{background:var(--pos-soft);color:var(--pos)}
+.cf-msg.conf{background:var(--surface-2);color:var(--text)}
+tr.cf-row-al>td{background:var(--warn-soft)}
+.cf-al-dup,.cf-al-warn{color:var(--warn);margin-top:2px}
+.cf-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.cf-nav{display:flex;gap:6px;flex-wrap:wrap}
+.cf-visto{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;flex:1;justify-content:flex-end}
+.cf-visto label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
+.cf-visto label.grow{flex:1;min-width:220px;max-width:460px}
+.cf-visto input{min-width:130px}
+@media print{.cf-td{cursor:default}.cf-c{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media (max-width:640px){.cf-foot{flex-direction:column;align-items:stretch}.cf-visto{justify-content:stretch}}
