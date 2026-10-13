@@ -19,7 +19,7 @@ const fimMes = (m) => { const [a, mm] = m.split('-').map(Number); return new Dat
 const addDias = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const soma = (arr, k) => arr.reduce((s, x) => s + (+x[k] || 0), 0);
 const venda = (n) => n.tipo === 'saida' && n.finalidade === '1' && n.situacao === 'autorizada';
-const parte = (n) => n.tipo === 'saida' ? n.dest_nome : n.emissao_propria ? n.dest_nome : n.emit_nome;
+const parte = (n) => n.emissao_propria ? n.dest_nome : n.emit_nome;
 const chunks = (arr, k = 150) => { const o = []; for (let i = 0; i < arr.length; i += k) o.push(arr.slice(i, i + k)); return o; };
 
 export async function render(root) {
