@@ -23,9 +23,11 @@ export async function render(root) {
       </div>
       <div class="card"><h2>Usuários</h2><div id="mem" class="table-wrap"></div>
         ${adm ? `<form id="mf" class="toolbar" style="margin-top:12px">
-          <label class="grow">E-mail do usuário<input name="email" type="email" required placeholder="a pessoa precisa ter criado a conta"></label>
+          <label class="grow">E-mail do usuário<input name="email" type="email" required placeholder="com ou sem conta na plataforma"></label>
           <label>Papel<select name="papel">${options(PAPEIS.map(([id, nome]) => ({ id, nome: id })), { selected: 'financeiro' })}</select></label>
-          <button class="btn primary">Adicionar</button></form>
+          <button class="btn primary">Adicionar / convidar</button></form>
+          <p class="muted small">Quem já tem conta entra na hora. Quem não tem recebe um <strong>link de convite</strong> (vale 14 dias): ao se cadastrar por ele, já entra nesta empresa com o papel escolhido.</p>
+          <div id="conv" style="margin-top:12px"></div>
           <p class="muted small">${PAPEIS.map(p => `<strong>${p[0]}</strong>: ${p[1].split('— ')[1]}`).join(' · ')}</p>` : ''}
       </div>
     </div>
@@ -49,15 +51,51 @@ export async function render(root) {
     } catch (err) { fail(err); }
   };
   await membros(root);
+  if (adm) await convites(root);
   if (adm) $('#mf', root).onsubmit = async (ev) => {
     ev.preventDefault(); const d = formData(ev.target);
-    try { await q(sb.rpc('adicionar_membro', { p_empresa: e.id, p_email: d.email, p_papel: d.papel })); toast('Usuário adicionado'); ev.target.reset(); membros(root); } catch (err) { fail(err); }
+    try {
+      const r = await q(sb.rpc('criar_convite', { p_empresa: e.id, p_email: d.email, p_papel: d.papel }));
+      ev.target.reset();
+      if (r?.tipo === 'membro') { toast('Usuário adicionado'); membros(root); }
+      else { await convites(root); copiar(linkConvite(r.token)); }
+    } catch (err) { fail(err); }
   };
   if (podeEditar()) {
     $('#modelo', root).onclick = () => exportXLSX([['Data', 'Plano de contas', 'Descrição', 'Favorecido', 'Centro de Custo', 'Status', 'Conta', 'Valor', 'Opcional 1'],
       [new Date().toISOString().slice(0, 10), state.cad.contasPlano[0]?.label || '', 'Exemplo', '', state.cad.cc[0]?.nome || '', 'Pago', state.cad.contas[0]?.nome || '', 100, '']], 'modelo_importacao');
     $('#arq', root).onchange = (ev) => importar(ev.target.files[0], root);
   }
+}
+
+const linkConvite = (token) => location.origin + location.pathname + '?convite=' + token;
+async function copiar(link) {
+  try { await navigator.clipboard.writeText(link); toast('Link do convite copiado — envie para a pessoa'); }
+  catch { prompt('Copie o link do convite e envie para a pessoa:', link); }
+}
+
+// convites pendentes (ainda não usados nem cancelados)
+async function convites(root) {
+  const el = $('#conv', root); if (!el) return;
+  try {
+    const rows = await q(sb.from('convites').select('id, email, papel, token, expira_em').eq('empresa_id', state.empresa.id)
+      .is('aceito_em', null).is('cancelado_em', null).order('criado_em', { ascending: false }));
+    if (!rows.length) { el.innerHTML = ''; return; }
+    const hoje = new Date();
+    el.innerHTML = `<div class="small" style="margin-bottom:6px"><strong>Convites pendentes</strong></div>
+      <table><thead><tr><th>E-mail</th><th>Papel</th><th>Vale até</th><th></th></tr></thead><tbody>
+      ${rows.map(r => `<tr data-id="${r.id}" data-token="${esc(r.token)}"><td>${esc(r.email)}</td><td>${esc(r.papel)}</td>
+        <td>${new Date(r.expira_em) < hoje ? '<span class="neg">vencido — convide de novo</span>' : dateBR(r.expira_em)}</td>
+        <td style="white-space:nowrap"><button class="btn small cp" type="button">Copiar link</button> <button class="btn small danger cc" type="button">Cancelar</button></td></tr>`).join('')}
+      </tbody></table>`;
+    el.onclick = async (ev) => {
+      const tr = ev.target.closest('tr[data-id]'); if (!tr) return;
+      if (ev.target.matches('.cp')) copiar(linkConvite(tr.dataset.token));
+      if (ev.target.matches('.cc') && confirm('Cancelar este convite? O link deixa de funcionar.')) {
+        try { await q(sb.rpc('cancelar_convite', { p_id: tr.dataset.id })); toast('Convite cancelado'); convites(root); } catch (err) { fail(err); }
+      }
+    };
+  } catch (err) { fail(err); }
 }
 
 async function membros(root) {

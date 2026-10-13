@@ -15,7 +15,6 @@ const routes = {
   'fluxo-mensal': () => import('./pages/fluxo-mensal.js'),
   'fluxo-diario': () => import('./pages/fluxo-diario.js'),
   'dre': () => import('./pages/dre.js'),
-  'conferencia': () => import('./pages/conferencia.js'),
   'fechamento': () => import('./pages/fechamento.js'),
   'orcamento': () => import('./pages/orcamento.js'),
   'orcado-realizado': () => import('./pages/orcado-realizado.js'),
@@ -73,6 +72,24 @@ $('#auth-reset').onclick = async () => {
   const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.href.split('#')[0] });
   error ? fail(error) : toast('Enviamos um link de redefinição para seu e-mail');
 };
+// ---------- Convite (link ?convite=…) ----------
+const conviteToken = new URLSearchParams(location.search).get('convite');
+async function prepararConvite() {
+  if (!conviteToken) return;
+  const box = $('#auth-convite');
+  try {
+    const { data, error } = await sb.rpc('ver_convite', { p_token: conviteToken });
+    if (error) throw error;
+    const c = data?.[0];
+    box.classList.remove('hidden');
+    if (!c) { box.innerHTML = '<span class="neg">Este convite não vale mais (já usado, cancelado ou vencido). Peça um novo ao administrador.</span>'; return; }
+    box.innerHTML = `Convite para entrar em <strong>${esc(c.empresa)}</strong> como <strong>${esc(c.papel)}</strong>.<br>Crie sua senha abaixo. Se já tem conta, clique em “Já tenho conta” e entre normalmente.`;
+    $('#auth-form [name=email]').value = c.email;
+    if (!modoCadastro) $('#auth-toggle').click();
+  } catch (err) { box.classList.remove('hidden'); box.innerHTML = `<span class="neg">${esc(err.message)}</span>`; }
+}
+prepararConvite();
+
 const logout = async () => { await sb.auth.signOut(); location.hash = ''; };
 $('#logout').onclick = logout; $('#logout-2').onclick = logout;
 
@@ -81,8 +98,13 @@ async function escolherEmpresa() {
   show('empresa-view');
   const list = $('#empresa-list'); loading(list);
   try {
+    let podeCriar = false;
+    try { podeCriar = !!(await q(sb.rpc('pode_criar_empresa'))); } catch {}
+    $('#empresa-form').classList.toggle('hidden', !podeCriar);
     const rows = await q(sb.from('membros').select('papel, empresas(*)').eq('user_id', state.user.id));
-    if (!rows.length) list.innerHTML = '<p class="muted">Você ainda não participa de nenhuma empresa. Crie a primeira abaixo, ou peça a um administrador para adicionar seu e-mail.</p>';
+    if (!rows.length) list.innerHTML = podeCriar
+      ? '<p class="muted">Você ainda não participa de nenhuma empresa. Crie a primeira abaixo, ou peça a um administrador para adicionar seu e-mail.</p>'
+      : '<p class="muted">Você ainda não participa de nenhuma empresa. Peça ao administrador um convite para o seu e-mail; depois saia e entre de novo que o acesso aparece aqui.</p>';
     else list.innerHTML = rows.map(r => `<div class="empresa-item" data-id="${r.empresas.id}">
       <div><strong>${esc(r.empresas.nome)}</strong><div class="muted small">${esc(r.empresas.cnpj || '')}</div></div>
       <span class="badge negoc">${esc(r.papel)}</span></div>`).join('');
@@ -174,6 +196,12 @@ sb.auth.onAuthStateChange((_ev, session) => {
   setTimeout(boot, 0);
 });
 async function boot() {
+  // convites pendentes para o e-mail da pessoa: entra na empresa com o papel definido pelo administrador
+  try {
+    const n = await q(sb.rpc('aceitar_convites'));
+    if (n) { toast(n === 1 ? 'Convite aceito: acesso liberado' : `${n} convites aceitos`); try { localStorage.removeItem('fc-empresa'); } catch {} }
+  } catch {}
+  if (conviteToken) history.replaceState(null, '', location.pathname + location.hash);
   const last = (() => { try { return localStorage.getItem('fc-empresa'); } catch { return null; } })();
   if (last && !sessionStorage.getItem('fc-escolher')) {
     try {
