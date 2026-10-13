@@ -1,5 +1,5 @@
 import { sb, state, q, loadCadastros, anosSelect } from './lib/data.js';
-import { $, $$, esc, toast, fail, formData, loading, lerCores } from './lib/ui.js';
+import { $, $$, esc, toast, fail, formData, loading, lerCores, modal } from './lib/ui.js';
 import { SUPABASE_URL } from './config.js';
 
 const routes = {
@@ -90,6 +90,31 @@ async function prepararConvite() {
   } catch (err) { box.classList.remove('hidden'); box.innerHTML = `<span class="neg">${esc(err.message)}</span>`; }
 }
 prepararConvite();
+
+// ---------- Nova senha (link "Esqueci minha senha" ou botão "Alterar senha") ----------
+function trocarSenha(recuperacao = false) {
+  const m = modal({
+    title: recuperacao ? 'Crie sua nova senha' : 'Alterar senha',
+    body: `<form id="ns-form" class="form">
+      ${recuperacao ? '<p class="muted small" style="margin-top:0">Você entrou pelo link de recuperação. Defina a nova senha para usar nos próximos acessos.</p>' : ''}
+      <label>Nova senha<input type="password" name="p1" required minlength="6" autocomplete="new-password"></label>
+      <label>Repita a nova senha<input type="password" name="p2" required minlength="6" autocomplete="new-password"></label>
+      <div id="ns-msg" class="msg"></div>
+      <button class="btn primary" type="submit">Salvar nova senha</button></form>`,
+    onMount: (el, close) => {
+      $('#ns-form', el).onsubmit = async (ev) => {
+        ev.preventDefault();
+        const { p1, p2 } = formData(ev.target); const msg = $('#ns-msg', el);
+        if (p1 !== p2) { msg.innerHTML = '<span class="neg">As duas senhas não são iguais.</span>'; return; }
+        const { error } = await sb.auth.updateUser({ password: p1 });
+        if (error) { msg.innerHTML = `<span class="neg">${esc(error.message)}</span>`; return; }
+        close(); toast('Senha alterada. Use a nova senha no próximo acesso.');
+      };
+    },
+  });
+  setTimeout(() => $('#ns-form [name=p1]', m.el)?.focus(), 50);
+}
+$('#trocar-senha').onclick = () => trocarSenha(false);
 
 const logout = async () => { await sb.auth.signOut(); location.hash = ''; };
 $('#logout').onclick = logout; $('#logout-2').onclick = logout;
@@ -188,7 +213,9 @@ if (SUPABASE_URL.includes('SEU-PROJETO')) {
   $('#auth-msg').innerHTML = '<span class="neg">Configure SUPABASE_URL e SUPABASE_ANON_KEY em js/config.js.</span>';
 }
 let authIniciado = false;
-sb.auth.onAuthStateChange((_ev, session) => {
+sb.auth.onAuthStateChange((ev, session) => {
+  // entrou pelo link de "Esqueci minha senha": pede a nova senha
+  if (ev === 'PASSWORD_RECOVERY') setTimeout(() => trocarSenha(true), 300);
   const u = session?.user || null;
   if (authIniciado && u?.id === state.user?.id) return;
   authIniciado = true;
