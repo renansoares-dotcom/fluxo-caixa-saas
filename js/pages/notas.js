@@ -319,7 +319,7 @@ async function ligarFavorecidos() {
   const acharFav = localizadorFav(); const e = state.empresa.id;
   const sem = await fetchAll(() => sb.from('nfe_notas').select('id,tipo,finalidade,emissao_propria,dest_doc,dest_nome,emit_doc,emit_nome').eq('empresa_id', e).is('favorecido_id', null));
   const grupos = new Map();
-  for (const n of sem) { const out = n.tipo === 'saida' || n.emissao_propria; const f = acharFav(out ? n.dest_doc : n.emit_doc, out ? n.dest_nome : n.emit_nome, n.tipo === 'saida' && n.finalidade !== '4'); if (f) (grupos.get(f.id) || grupos.set(f.id, []).get(f.id)).push(n.id); }
+  for (const n of sem) { const out = n.emissao_propria; const f = acharFav(out ? n.dest_doc : n.emit_doc, out ? n.dest_nome : n.emit_nome, n.tipo === 'saida' && n.finalidade !== '4'); if (f) (grupos.get(f.id) || grupos.set(f.id, []).get(f.id)).push(n.id); }
   let k = 0; for (const [fid, ids] of grupos) for (const c of chunks(ids, 200)) { await q(sb.from('nfe_notas').update({ favorecido_id: fid }).in('id', c)); k += c.length; }
   return k;
 }
@@ -382,7 +382,7 @@ function importar(root) {
         for (const r of await q(sb.from('nfe_notas').select('id,chave').eq('empresa_id', e).in('chave', lote.map(x => x.nota.chave)))) idPor.set(r.chave, r.id);
         const faltam = lote.filter(x => !idPor.has(x.nota.chave));
         if (faltam.length) {
-          const rows = faltam.map(x => { const { tp_nf, ...n } = x.nota; const out = n.tipo === 'saida' || n.emissao_propria; const doc = String((out ? n.dest_doc : n.emit_doc) || '').replace(/\D/g, '');
+          const rows = faltam.map(x => { const { tp_nf, ...n } = x.nota; const out = n.emissao_propria; const doc = String((out ? n.dest_doc : n.emit_doc) || '').replace(/\D/g, '');
             return { ...n, empresa_id: e, favorecido_id: acharFav(doc, out ? n.dest_nome : n.emit_nome, n.tipo === 'saida' && n.finalidade !== '4')?.id || null, arquivo: x.arquivo, xml: x.xml }; });
           for (const r of await q(sb.from('nfe_notas').insert(rows).select('id,chave'))) idPor.set(r.chave, r.id);
           novas += faltam.length;
