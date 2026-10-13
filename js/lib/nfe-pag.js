@@ -19,7 +19,7 @@ const perto = (a, b) => Math.abs(+a - +b) <= 0.05;
 const nome1 = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 3 && !['LTDA', 'EIRELI', 'IND', 'INDUSTRIA', 'COMERCIO', 'COM', 'DOS', 'DAS', 'DE', 'BRASIL'].includes(w)).slice(0, 2).join(' ');
 // devoluções e operações sem pagamento (remessa, retorno, conserto, bonificação…)
 const DEVOL = new Set(['1201', '1202', '2201', '2202', '5201', '5202', '6201', '6202', '5410', '5411', '6410', '6411', '5553', '6553', '5556', '6556', '5660', '5661', '5662', '6660', '6661', '6662']);
-const semPagamento = (n) => n.finalidade === '4' || (n.cfops || []).every(c => CFOP_SEM_FINANCEIRO.has(c) || DEVOL.has(c) || c.startsWith('59') || c.startsWith('69') || c.startsWith('19') || c.startsWith('29'));
+export const semPagamento = (n) => n.finalidade === '4' || (n.cfops || []).every(c => CFOP_SEM_FINANCEIRO.has(c) || DEVOL.has(c) || c.startsWith('59') || c.startsWith('69') || c.startsWith('19') || c.startsWith('29'));
 
 /** NF citada no pagamento: "DOCTO 622/1 BRADESCO", "NF 1234", "NFE 1234/2", documento "1234-1" */
 export function nfDoPagamento(l) {

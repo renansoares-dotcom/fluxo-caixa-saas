@@ -1,17 +1,19 @@
-// Conta-corrente de fornecedor: pagamentos antecipados × notas fiscais recebidas.
-// Pensada para a industrialização em Manaus (a IPLAMM adianta o dinheiro, o parceiro compra a resina, produz e
-// fatura bobina/composto com o serviço embutido), mas serve para qualquer fornecedor pago antes da nota.
-// - "Pago ao parceiro" = lançamentos pagos ao fornecedor (natureza D)
-// - cada pagamento pode ser registrado como adiantamento (tabela creditos, natureza fornecedor)
-// - cada nota de entrada consome adiantamentos (creditos_usos) — conciliação sugerida por ordem de data
+// Conta-corrente de fornecedor ou cliente: dinheiro × notas fiscais, com extrato, saldo e relatório em PDF.
+// FORNECEDOR: pagamentos (natureza D) × notas de entrada que ele emite para a empresa. Saldo = pago − notas
+//   (positivo = adiantado, produto/serviço a receber). Pagamentos podem virar adiantamento (creditos) e as notas
+//   abatem os adiantamentos (creditos_usos); pagamentos já ligados à nota (nfe_vinculos) contam como pagos.
+//   Pensada para a industrialização em Manaus, serve para qualquer fornecedor.
+// CLIENTE: notas de venda (saídas, menos devoluções) × recebimentos (natureza C). Saldo = notas − recebido − créditos
+//   usados − antecipado no FIDC (positivo = a receber do cliente; negativo = adiantamento do cliente).
 import { sb, state, q, fetchAll, loadCadastros, podeEditar } from '../lib/data.js';
-import { $, esc, money, dateBR, fail, toast, modal, exportXLSX, today } from '../lib/ui.js';
+import { $, esc, money, dateBR, fail, toast, modal, exportXLSX, today, logoPNG } from '../lib/ui.js';
 import { creditosComSaldo, mesmoGrupo, desfazerUso } from '../lib/creditos.js';
+import { semPagamento } from '../lib/nfe-pag.js';
 
-export const title = 'Conta-corrente de fornecedor';
+export const title = 'Conta-corrente de fornecedor / cliente';
 const LS = 'contaForn.fav';
-const ui = { aba: 'extrato', aberta: null };
-let D = null;   // dados carregados do fornecedor
+const ui = { aba: 'extrato', aberta: null, de: `${new Date().getFullYear()}-01-01`, ate: today(), visao: null };
+let D = null;   // dados carregados
 
 const dig = (s) => String(s || '').replace(/\D/g, '');
 const normN = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
@@ -19,142 +21,205 @@ const chunks = (a, k = 150) => { const o = []; for (let i = 0; i < a.length; i +
 const r2 = (v) => Math.round(v * 100) / 100;
 const KG = new Set(['KG', 'KGS', 'KILO', 'KILOS', 'QUILO', 'QUILOS', 'K G']);
 const ehKg = (u) => KG.has(normN(u));
-const kg = (v) => v == null ? '–' : new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(v) + ' kg';
+const kgFmt = (v) => v == null ? '–' : new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(v) + ' kg';
 const histDesc = (d) => { if (!d || d === '-') return ''; if (/adiantamento/i.test(d)) { const n = d.match(/FORNECEDORES (\d+)/i); return ` · adiantamento${n ? ' nº ' + n[1] : ''}`; } return ' · ' + d.slice(0, 60); };
 const dias = (a, b = today()) => Math.round((new Date(b) - new Date(a)) / 864e5);
+const fmtDoc = (d) => { d = dig(d); return d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d; };
 const lsGet = () => { try { return localStorage.getItem(LS); } catch { return null; } };
 const lsSet = (v) => { try { localStorage.setItem(LS, v); } catch { /* sem storage */ } };
+const ehCliente = (f) => /CLIENTE/i.test(f?.tipo || '');
+const CLI = () => D?.visao === 'cliente';
+const noPeriodo = (d) => d >= ui.de && d <= ui.ate;
 
 export async function render(root) {
   await loadCadastros();
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
-      <div><h2 style="margin:0">Conta-corrente de fornecedor</h2><p class="muted small" style="margin:4px 0 0">Pagamentos antecipados ao fornecedor × notas fiscais que ele emite para a IPLAMM. O saldo mostra quanto do dinheiro adiantado ainda não voltou em nota (produto a receber).</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#/notas">Importar notas (XML)</a><button class="btn" id="exp">Exportar Excel</button></div></div>
+      <div><h2 style="margin:0">Conta-corrente de fornecedor / cliente</h2><p class="muted small" style="margin:4px 0 0">Dinheiro × notas fiscais de um fornecedor ou cliente: extrato com saldo, notas em aberto e relatório em PDF. Fornecedor: pagamentos × notas que ele emite (saldo positivo = adiantado). Cliente: notas de venda × recebimentos (saldo positivo = a receber).</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#/notas">Importar notas (XML)</a><button class="btn" id="exp">Exportar Excel</button><button class="btn primary" id="pdf">Relatório (PDF)</button></div></div>
       <div class="toolbar" style="margin-top:10px">
-        <label class="grow">Fornecedor<input id="fav" list="cf-favs" placeholder="digite o nome ou CNPJ"><datalist id="cf-favs"></datalist></label>
+        <label class="grow">Fornecedor ou cliente<input id="fav" list="cf-favs" placeholder="digite o nome ou CNPJ"><datalist id="cf-favs"></datalist></label>
+        <label>Visão<select id="visao"><option value="fornecedor">Como fornecedor</option><option value="cliente">Como cliente</option></select></label>
+        <label>Período<span style="display:flex;gap:4px"><input type="date" id="de" value="${ui.de}"><input type="date" id="ate" value="${ui.ate}"></span></label>
       </div></div>
     <div id="cf-corpo"><div class="loading">Carregando…</div></div>`;
-  const favs = await candidatos();
-  const fornecedores = state.cad.favorecidos.filter(f => f.tipo === 'FORNECEDORES' || favs.has(f.id));
-  const ord = [...fornecedores].sort((a, b) => (favs.get(b.id) || 0) - (favs.get(a.id) || 0) || a.nome.localeCompare(b.nome));
-  $('#cf-favs', root).innerHTML = ord.map(f => `<option value="${esc(f.nome)}${f.documento ? ' · ' + esc(f.documento) : ''}"></option>`).join('');
-  const rotulo = (f) => `${f.nome}${f.documento ? ' · ' + f.documento : ''}`;
-  const acha = (v) => { const doc = dig(String(v).split('·')[1]); const nome = String(v).split(' · ')[0].trim(); return fornecedores.find(f => (doc && dig(f.documento) === doc) || f.nome === nome) || null; };
-  const ini = state.cad.favById[lsGet()] || ord.find(f => favs.has(f.id));
+  const prio = await candidatos();
+  const todos = state.cad.favorecidos.filter(f => f.ativo !== false);
+  const ord = [...todos].sort((a, b) => (prio.get(b.id) || 0) - (prio.get(a.id) || 0) || a.nome.localeCompare(b.nome));
+  const rotulo = (f) => `${f.nome}${f.documento ? ' · ' + fmtDoc(f.documento) : ''}`;
+  $('#cf-favs', root).innerHTML = ord.map(f => `<option value="${esc(rotulo(f))}" label="${esc(f.tipo || '')}"></option>`).join('');
+  const acha = (v) => { const doc = dig(String(v).split('·')[1]); const nome = String(v).split(' · ')[0].trim(); return todos.find(f => (doc && dig(f.documento) === doc) || f.nome === nome) || null; };
+  const ini = state.cad.favById[lsGet()] || ord.find(f => prio.has(f.id));
+  const abrir = (f, visao) => { lsSet(f.id); ui.aberta = null; ui.visao = visao || (ehCliente(f) ? 'cliente' : 'fornecedor'); $('#visao', root).value = ui.visao; carregar(root, f.id); };
   if (ini) $('#fav', root).value = rotulo(ini);
-  $('#fav', root).onchange = () => { const f = acha($('#fav', root).value); if (f) { lsSet(f.id); ui.aberta = null; carregar(root, f.id); } };
-  $('#exp', root).onclick = () => D && exportXLSX(linhasExcel(), `conta_corrente_${normN(state.cad.favById[D.favId]?.nome).replace(/ /g, '_').slice(0, 30)}`);
-  if (ini) await carregar(root, ini.id);
-  else $('#cf-corpo', root).innerHTML = '<div class="card"><div class="empty">Escolha o fornecedor.</div></div>';
+  $('#fav', root).onchange = () => { const f = acha($('#fav', root).value); if (f) abrir(f); };
+  $('#visao', root).onchange = () => { const f = acha($('#fav', root).value); if (f) abrir(f, $('#visao', root).value); };
+  for (const id of ['de', 'ate']) $('#' + id, root).onchange = (e) => { ui[id] = e.target.value || (id === 'de' ? '2000-01-01' : today()); if (D) { calcular(); pintar(root); } };
+  $('#exp', root).onclick = () => D && exportXLSX(linhasExcel(), `conta_corrente_${normN(D.fav?.nome).replace(/ /g, '_').slice(0, 30)}`);
+  $('#pdf', root).onclick = () => D ? gerarPDF().catch(fail) : toast('Escolha o fornecedor ou cliente', true);
+  if (ini) abrir(ini, ui.visao && lsGet() === ini.id ? ui.visao : null);
+  else $('#cf-corpo', root).innerHTML = '<div class="card"><div class="empty">Escolha o fornecedor ou cliente.</div></div>';
 }
 
-/** fornecedores com adiantamento: Map id → total (para ordenar a lista) */
+/** cadastros com adiantamento (sobem na lista) */
 async function candidatos() {
   const m = new Map(); const e = state.empresa.id;
   try {
     for (const l of await fetchAll(() => sb.from('lancamentos').select('favorecido_id,valor').eq('empresa_id', e).ilike('descricao', '%adiantamento%').not('favorecido_id', 'is', null)))
       m.set(l.favorecido_id, (m.get(l.favorecido_id) || 0) + +l.valor);
-    for (const c of await q(sb.from('creditos').select('favorecido_id,valor').eq('empresa_id', e).eq('natureza', 'fornecedor').eq('cancelado', false)))
+    for (const c of await q(sb.from('creditos').select('favorecido_id,valor').eq('empresa_id', e).eq('cancelado', false)))
       m.set(c.favorecido_id, (m.get(c.favorecido_id) || 0) + +c.valor);
   } catch { /* lista sem prioridade */ }
   return m;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Dados
+// ---------------------------------------------------------------------------------------------
 async function carregar(root, favId) {
   const box = $('#cf-corpo', root); box.innerHTML = '<div class="loading">Carregando…</div>';
   const e = state.empresa.id, cad = state.cad, fav = cad.favById[favId], grupo = mesmoGrupo(favId), raiz = dig(fav?.documento).slice(0, 8);
+  const visao = ui.visao || (ehCliente(fav) ? 'cliente' : 'fornecedor'), cli = visao === 'cliente';
   try {
     const lancs = (await fetchAll(() => sb.from('lancamentos').select('id,data,valor,descricao,documento,conta_id,plano_id,status').eq('empresa_id', e).in('favorecido_id', grupo).eq('status', 'Pago').order('data').order('id')))
-      .filter(l => cad.planoById[l.plano_id]?.natureza !== 'C');
+      .filter(l => cad.planoById[l.plano_id]?.natureza === (cli ? 'C' : 'D') && cad.planoById[l.plano_id]?.tipo !== 'T');
     let creds = [];
-    try { creds = await creditosComSaldo({ favorecidos: grupo, natureza: 'fornecedor', todos: true }); } catch { creds = null; }
-    const usos = [];
-    if (creds?.length) for (const c of chunks(creds.map(x => x.id))) usos.push(...await q(sb.from('creditos_usos').select('id,credito_id,nota_id,parcela_id,valor,data,observacao').in('credito_id', c)));
-    const COLS = 'id,chave,numero,serie,emissao,cfops,natureza,emit_doc,emit_nome,favorecido_id,v_prod,v_nf,v_icms,v_ipi,situacao,eventos,inf_cpl';
-    const porId = new Map();
-    for (const n of await q(sb.from('nfe_notas').select(COLS).eq('empresa_id', e).eq('tipo', 'entrada').eq('emissao_propria', false).in('favorecido_id', grupo))) porId.set(n.id, n);
-    if (raiz.length === 8) for (const n of await q(sb.from('nfe_notas').select(COLS).eq('empresa_id', e).eq('tipo', 'entrada').eq('emissao_propria', false).like('emit_doc', raiz + '%'))) porId.set(n.id, n);
-    // notas que parecem ser deste fornecedor, mas não estão ligadas ao cadastro (nome parecido)
-    const pal = normN(fav?.nome).split(' ').filter(w => w.length > 2 && !['IND', 'COM', 'LTDA', 'INDUSTRIA', 'COMERCIO'].includes(w)).slice(0, 2);
+    try { creds = await creditosComSaldo({ favorecidos: grupo, natureza: cli ? 'cliente' : 'fornecedor', todos: true }); } catch { creds = null; }
+    // notas
+    const COLS = 'id,chave,numero,serie,emissao,tipo,emissao_propria,finalidade,cfops,natureza,emit_doc,emit_nome,dest_doc,dest_nome,favorecido_id,v_prod,v_nf,v_icms,v_ipi,situacao,eventos,inf_cpl';
+    const docCol = cli ? 'dest_doc' : 'emit_doc', porId = new Map();
+    const base = () => { let x = sb.from('nfe_notas').select(COLS).eq('empresa_id', e); return cli ? x : x.eq('tipo', 'entrada').eq('emissao_propria', false); };
+    for (const n of await fetchAll(() => base().in('favorecido_id', grupo))) porId.set(n.id, n);
+    if (raiz.length === 8) for (const n of await fetchAll(() => base().like(docCol, raiz + '%'))) porId.set(n.id, n);
+    // notas de entrada com nome parecido mas sem cadastro (só fornecedor)
+    const pal = normN(fav?.nome).split(' ').filter(w => w.length > 2 && !['IND', 'COM', 'LTDA', 'INDUSTRIA', 'COMERCIO', 'BRASIL'].includes(w)).slice(0, 2);
     let soltas = [];
-    if (pal.length) soltas = (await q(sb.from('nfe_notas').select(COLS).eq('empresa_id', e).eq('tipo', 'entrada').eq('emissao_propria', false).ilike('emit_nome', `%${pal.join('%')}%`)))
-      .filter(n => !porId.has(n.id));
-    const notas = [...porId.values()].filter(n => n.situacao !== 'cancelada').sort((a, b) => a.emissao.localeCompare(b.emissao) || a.numero - b.numero);
-    const ids = notas.map(n => n.id), itens = [], parcelas = [];
+    if (!cli && pal.length) soltas = (await q(sb.from('nfe_notas').select(COLS).eq('empresa_id', e).eq('tipo', 'entrada').eq('emissao_propria', false).is('favorecido_id', null).ilike('emit_nome', `%${pal.join('%')}%`))).filter(n => !porId.has(n.id));
+    let todas = [...porId.values()].filter(n => n.situacao === 'autorizada');
+    // cliente: vendas (saídas próprias normais) e devoluções dele (entrada própria finalidade 4 ou NF de devolução emitida por ele)
+    let devol = [];
+    if (cli) {
+      const CF_DEV = /^[1256]20[12]$|^[56]41[01]$/;
+      devol = todas.filter(n => n.finalidade === '4' || (n.tipo === 'entrada' && !n.emissao_propria && (n.cfops || []).some(c => CF_DEV.test(c))));
+      todas = todas.filter(n => n.tipo === 'saida' && n.emissao_propria && n.finalidade === '1');
+    } else todas = todas.filter(n => !semPagamento(n));
+    const notas = todas.sort((a, b) => a.emissao.localeCompare(b.emissao) || a.numero - b.numero);
+    const ids = [...notas, ...devol].map(n => n.id), itens = [], parcelas = [], vinc = [], fidc = [], usos = [];
     for (const c of chunks(ids)) {
-      itens.push(...await q(sb.from('nfe_itens').select('nota_id,n_item,cprod,xprod,ncm,cfop,ucom,qcom,vprod').in('nota_id', c)));
-      parcelas.push(...await q(sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor').in('nota_id', c)));
+      const [it, pa, vi, fi] = await Promise.all([q(sb.from('nfe_itens').select('nota_id,n_item,cprod,xprod,ncm,cfop,ucom,qcom,vprod').in('nota_id', c)),
+        q(sb.from('nfe_parcelas').select('id,nota_id,numero,vencimento,valor').in('nota_id', c)),
+        q(sb.from('nfe_vinculos').select('id,nota_id,parcela_id,lancamento_id,l:lancamentos(valor,data)').in('nota_id', c)),
+        cli ? q(sb.from('nfe_fidc_vinculos').select('nota_id,parcela_id,t:fidc_titulos(fundo,bordero,valor,data_operacao)').in('nota_id', c)) : Promise.resolve([])]);
+      itens.push(...it); parcelas.push(...pa); vinc.push(...vi); fidc.push(...fi);
     }
-    D = { favId, fav, lancs, creds, usos, notas, soltas, itens, parcelas };
+    if (creds?.length) for (const c of chunks(creds.map(x => x.id))) usos.push(...await q(sb.from('creditos_usos').select('id,credito_id,nota_id,parcela_id,valor,data,observacao').in('credito_id', c)));
+    // pagamentos/recebimentos ligados a alguma nota (de qualquer cadastro)
+    const lancNota = new Set();
+    for (const c of chunks(lancs.map(l => l.id))) for (const v of await q(sb.from('nfe_vinculos').select('lancamento_id').in('lancamento_id', c))) lancNota.add(v.lancamento_id);
+    D = { favId, fav, visao, lancs, creds, usos, notas, devol, soltas, itens, parcelas, vinc, fidc, lancNota };
     calcular(); pintar(root);
   } catch (err) { box.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; fail(err); }
 }
 
 function calcular() {
-  const { lancs, creds, usos, notas, itens, parcelas } = D;
+  const { lancs, creds, usos, notas, devol, itens, parcelas, vinc, fidc } = D, cli = CLI();
   const regPorLanc = new Map((creds || []).filter(c => c.lancamento_id).map(c => [c.lancamento_id, c]));
-  D.naoReg = lancs.filter(l => !regPorLanc.has(l.id));
   D.regPorLanc = regPorLanc;
-  const usoNota = new Map(); for (const u of usos) (usoNota.get(u.nota_id) || usoNota.set(u.nota_id, []).get(u.nota_id)).push(u);
-  const itNota = new Map(); for (const i of itens) (itNota.get(i.nota_id) || itNota.set(i.nota_id, []).get(i.nota_id)).push(i);
-  const pNota = new Map(); for (const p of parcelas) (pNota.get(p.nota_id) || pNota.set(p.nota_id, []).get(p.nota_id)).push(p);
-  const devol = (n) => (n.eventos || []).some(ev => ev.tipo === 'devolucao_total');
-  for (const n of notas) {
-    n.usos = usoNota.get(n.id) || []; n.itens = (itNota.get(n.id) || []).sort((a, b) => a.n_item - b.n_item);
+  // fornecedor: pagamentos que ainda podem virar adiantamento = sem crédito registrado e não ligados a uma nota
+  D.naoReg = cli ? [] : lancs.filter(l => !regPorLanc.has(l.id) && !D.lancNota.has(l.id));
+  const grupoPor = (arr) => { const m = new Map(); for (const x of arr) (m.get(x.nota_id) || m.set(x.nota_id, []).get(x.nota_id)).push(x); return m; };
+  const usoNota = grupoPor(usos), itNota = grupoPor(itens), pNota = grupoPor(parcelas), vNota = grupoPor(vinc), fNota = grupoPor(fidc);
+  const devolvida = (n) => (n.eventos || []).some(ev => ev.tipo === 'devolucao_total');
+  for (const n of [...notas, ...devol]) {
+    n.usos = usoNota.get(n.id) || []; n.vincs = vNota.get(n.id) || []; n.fidcs = fNota.get(n.id) || [];
+    n.itens = (itNota.get(n.id) || []).sort((a, b) => a.n_item - b.n_item);
     n.parcelas = (pNota.get(n.id) || []).sort((a, b) => a.numero - b.numero);
-    n.abatido = r2(n.usos.reduce((s, u) => s + +u.valor, 0)); n.falta = r2(+n.v_nf - n.abatido);
+    n.abatido = r2(n.usos.reduce((s, u) => s + +u.valor, 0));
+    n.pagoDireto = r2(n.vincs.reduce((s, v) => s + +(v.l?.valor || 0), 0));
+    n.antecipado = r2(n.fidcs.reduce((s, f) => s + +(f.t?.valor || 0), 0));
+    n.devolvida = devolvida(n);
+    n.falta = r2(Math.max(+n.v_nf - n.abatido - n.pagoDireto - n.antecipado, 0));
     const ik = n.itens.filter(i => ehKg(i.ucom)); n.kg = ik.length ? ik.reduce((s, i) => s + +i.qcom, 0) : null;
-    n.rkg = n.kg ? ik.reduce((s, i) => s + +i.vprod, 0) / n.kg : null; n.devolvida = devol(n);
+    n.rkg = n.kg ? ik.reduce((s, i) => s + +i.vprod, 0) / n.kg : null;
   }
   const validas = notas.filter(n => !n.devolvida);
-  const T = D.tot = {
-    pago: r2(lancs.reduce((s, l) => s + +l.valor, 0)),
-    reg: r2((creds || []).reduce((s, c) => s + +c.valor, 0)),
-    notas: r2(validas.reduce((s, n) => s + +n.v_nf, 0)),
-    abatido: r2(usos.reduce((s, u) => s + +u.valor, 0)),
-    kg: validas.reduce((s, n) => s + (n.kg || 0), 0),
-  };
-  T.saldo = r2(T.pago - T.notas);
-  T.credSaldo = r2(T.reg - T.abatido);
-  // exposição: os pagamentos mais antigos são cobertos primeiro pelas notas; o que sobra é o dinheiro ainda sem nota
-  let cobre = T.notas; D.descobertos = [];
-  for (const l of lancs) { const v = +l.valor; if (cobre >= v - 0.005) { cobre -= v; continue; } D.descobertos.push({ ...l, aberto: r2(v - Math.max(cobre, 0)) }); cobre = 0; }
-  D.maisAntigo = D.descobertos[0]?.data || null;
-  // extrato
+  // extrato (todas as datas, para saldo anterior correto)
+  const sinal = cli ? -1 : 1;   // fornecedor: pago soma; cliente: nota soma
   const ext = [
-    ...lancs.map(l => ({ data: l.data, ord: 0, tipo: 'pag', hist: `Pagamento · ${state.cad.contaById[l.conta_id]?.nome || '—'}${histDesc(l.descricao)}`, deb: +l.valor, cred: 0, reg: D.regPorLanc.has(l.id) })),
-    ...validas.map(n => ({ data: n.emissao, ord: 1, tipo: 'nf', hist: `NF ${n.numero}${n.kg ? ' · ' + kg(n.kg) : ''}${n.natureza ? ' · ' + n.natureza : ''}`, deb: 0, cred: +n.v_nf, nota: n })),
+    ...lancs.map(l => ({ data: l.data, ord: cli ? 1 : 0, tipo: 'din', hist: `${cli ? 'Recebimento' : 'Pagamento'} · ${state.cad.contaById[l.conta_id]?.nome || '—'}${histDesc(l.descricao)}`, dinheiro: +l.valor, nota: 0, reg: regPorLanc.has(l.id), l })),
+    ...validas.map(n => ({ data: n.emissao, ord: cli ? 0 : 1, tipo: 'nf', hist: `NF ${n.numero}${n.kg ? ' · ' + kgFmt(n.kg) : ''}${n.natureza ? ' · ' + n.natureza : ''}`, dinheiro: 0, nota: +n.v_nf, n })),
+    ...(cli ? devol.map(n => ({ data: n.emissao, ord: 2, tipo: 'dev', hist: `Devolução NF ${n.numero}${n.natureza ? ' · ' + n.natureza : ''}`, dinheiro: 0, nota: -+n.v_nf, n })) : []),
+    ...(cli ? validas.flatMap(n => n.fidcs.map(f => ({ data: f.t?.data_operacao || n.emissao, ord: 3, tipo: 'fidc', hist: `Antecipado no FIDC · ${f.t?.fundo || ''} borderô ${f.t?.bordero || ''} · NF ${n.numero}`, dinheiro: +(f.t?.valor || 0), nota: 0 }))) : []),
+    ...(cli ? usos.map(u => ({ data: u.data, ord: 4, tipo: 'cred', hist: `Crédito usado · NF ${(notas.find(n => n.id === u.nota_id) || {}).numero || ''}${u.observacao ? ' · ' + u.observacao : ''}`, dinheiro: +u.valor, nota: 0 })) : []),
   ].sort((a, b) => a.data.localeCompare(b.data) || a.ord - b.ord);
-  let s = 0; for (const x of ext) { s = r2(s + x.deb - x.cred); x.saldo = s; }
+  let s = 0; for (const x of ext) { s = r2(s + sinal * (x.dinheiro - x.nota)); x.saldo = s; }
   D.extrato = ext;
+  const antes = ext.filter(x => x.data < ui.de), dentro = ext.filter(x => noPeriodo(x.data));
+  const T = D.tot = {
+    anterior: antes.length ? antes.at(-1).saldo : 0,
+    final: (ext.filter(x => x.data <= ui.ate).at(-1) || { saldo: 0 }).saldo,
+    dinheiro: r2(dentro.filter(x => x.tipo === 'din').reduce((a, x) => a + x.dinheiro, 0)),
+    notas: r2(dentro.filter(x => x.tipo === 'nf').reduce((a, x) => a + x.nota, 0)),
+    devol: r2(-dentro.filter(x => x.tipo === 'dev').reduce((a, x) => a + x.nota, 0)),
+    fidc: r2(dentro.filter(x => x.tipo === 'fidc').reduce((a, x) => a + x.dinheiro, 0)),
+    cred: r2(dentro.filter(x => x.tipo === 'cred').reduce((a, x) => a + x.dinheiro, 0)),
+    qn: dentro.filter(x => x.tipo === 'nf').length, ql: dentro.filter(x => x.tipo === 'din').length,
+    kg: validas.filter(n => noPeriodo(n.emissao)).reduce((a, n) => a + (n.kg || 0), 0),
+    reg: r2((creds || []).reduce((a, c) => a + +c.valor, 0)), abatido: r2(usos.reduce((a, u) => a + +u.valor, 0)),
+    aberto: r2(validas.filter(n => n.emissao <= ui.ate).reduce((a, n) => a + n.falta, 0)),
+  };
+  T.credSaldo = r2(T.reg - T.abatido);
+  // fornecedor: exposição (pagamentos mais antigos cobertos primeiro pelas notas)
+  D.descobertos = [];
+  if (!cli) { let cobre = validas.filter(n => n.emissao <= ui.ate).reduce((a, n) => a + +n.v_nf, 0); for (const l of lancs.filter(l => l.data <= ui.ate)) { const v = +l.valor; if (cobre >= v - 0.005) { cobre -= v; continue; } D.descobertos.push({ ...l, aberto: r2(v - Math.max(cobre, 0)) }); cobre = 0; } }
+  D.maisAntigo = D.descobertos[0]?.data || null;
+  // cliente: notas vencidas em aberto
+  D.vencidas = cli ? validas.filter(n => n.falta > 0.05 && (n.parcelas.map(p => p.vencimento).filter(Boolean).sort().pop() || n.emissao) < today()) : [];
+}
+
+// textos de situação usados na tela e no PDF
+function alertasTexto() {
+  const T = D.tot, fav = D.fav, cli = CLI(), out = [];
+  if (!dig(fav?.documento)) out.push({ tag: 'Cadastro', cls: 'atencao', txt: `O cadastro de ${fav?.nome} está sem CNPJ. Sem ele, as notas só aparecem aqui se o nome no XML bater com o cadastro.`, act: 'cnpj' });
+  if (D.soltas.length) out.push({ tag: 'Notas', cls: 'atencao', txt: `${D.soltas.length} nota(s) de entrada com nome parecido (${D.soltas[0].emit_nome}, ${money(D.soltas.reduce((s, n) => s + +n.v_nf, 0))}) não estão ligadas a este cadastro.`, act: 'ligar' });
+  if (!D.notas.length && !D.soltas.length) out.push({ tag: 'Notas', cls: '', txt: `Nenhuma nota ${cli ? 'de venda para este cliente' : 'deste fornecedor'} foi importada.` });
+  if (!cli && D.creds === null) out.push({ tag: 'Banco', cls: 'atencao', txt: 'A estrutura de créditos não foi encontrada no banco.' });
+  else if (!cli && D.naoReg.length) out.push({ tag: 'Adiantamentos', cls: '', txt: `${D.naoReg.length} pagamento(s) (${money(D.naoReg.reduce((s, l) => s + +l.valor, 0))}) não estão ligados a uma nota nem registrados como adiantamento.`, act: 'reg' });
+  const pend = D.notas.filter(n => !n.devolvida && n.falta > 0.05).length;
+  if (!cli && D.creds && pend && D.creds.some(c => c.saldo > 0.005)) out.push({ tag: 'Conciliação', cls: '', txt: `${pend} nota(s) com valor ainda não abatido dos adiantamentos.`, act: 'auto' });
+  if (!cli) {
+    const idade = D.maisAntigo ? dias(D.maisAntigo, ui.ate) : 0;
+    if (T.final > 0.005 && idade > 60) out.push({ tag: 'Exposição', cls: 'atencao', txt: `${money(D.descobertos.reduce((s, l) => s + l.aberto, 0))} pagos sem nota correspondente; o pagamento mais antigo ainda descoberto é de ${dateBR(D.maisAntigo)} (${idade} dias).` });
+    if (T.final < -0.005) out.push({ tag: 'Saldo', cls: 'atencao', txt: `As notas passam os pagamentos em ${money(-T.final)}: há valor a pagar ao fornecedor ou pagamento lançado em outro cadastro.` });
+  } else {
+    if (D.vencidas.length) out.push({ tag: 'Vencidas', cls: 'atencao', txt: `${D.vencidas.length} nota(s) com vencimento passado e saldo em aberto: ${money(D.vencidas.reduce((s, n) => s + n.falta, 0))}.` });
+    if (T.final < -0.005) out.push({ tag: 'Adiantamento', cls: '', txt: `O cliente pagou ${money(-T.final)} a mais que as notas: adiantamento do cliente ou recebimento de outra empresa lançado neste cadastro.` });
+  }
+  return out;
 }
 
 function pintar(root) {
-  const T = D.tot, box = $('#cf-corpo', root), fav = D.fav, ed = podeEditar();
-  const idade = D.maisAntigo ? dias(D.maisAntigo) : 0;
-  const alertas = [];
-  if (!dig(fav?.documento)) alertas.push(['atencao', 'Cadastro', `O cadastro de <strong>${esc(fav?.nome)}</strong> está sem CNPJ. Sem ele, as notas só aparecem aqui se o nome no XML for igual ao do cadastro. ${ed ? '<button class="btn small" id="cnpj">Informar CNPJ</button>' : ''}`]);
-  if (D.soltas.length) alertas.push(['atencao', 'Notas', `${D.soltas.length} nota(s) de entrada com nome parecido (<em>${esc(D.soltas[0].emit_nome)}</em>, ${money(D.soltas.reduce((s, n) => s + +n.v_nf, 0))}) não estão ligadas a este cadastro. ${ed ? '<button class="btn small" id="ligar">Ligar a este fornecedor</button>' : ''}`]);
-  if (!D.notas.length && !D.soltas.length) alertas.push(['', 'Notas', 'Nenhuma nota deste fornecedor foi importada ainda. Importe os XML em <a href="#/notas">Notas Fiscais › Importar XML</a>; entradas são reconhecidas pelo próprio arquivo.']);
-  if (D.creds === null) alertas.push(['atencao', 'Banco', 'A estrutura de créditos não foi encontrada no banco (SQL de créditos e adiantamentos).']);
-  else if (D.naoReg.length) alertas.push(['', 'Adiantamentos', `${D.naoReg.length} pagamento(s) (${money(D.naoReg.reduce((s, l) => s + +l.valor, 0))}) ainda não estão registrados como adiantamento — registrar permite abater nas notas e aparece em Créditos e Adiantamentos. ${ed ? '<button class="btn small" id="reg">Registrar como adiantamento</button>' : ''}`]);
-  const pend = D.notas.filter(n => !n.devolvida && n.falta > 0.005).length;
-  if (D.creds && pend && D.creds.some(c => c.saldo > 0.005)) alertas.push(['', 'Conciliação', `${pend} nota(s) com valor ainda não abatido dos adiantamentos. ${ed ? '<button class="btn small" id="auto">Conciliar automaticamente</button>' : ''}`]);
-  if (T.saldo > 0.005 && idade > 60) alertas.push(['atencao', 'Exposição', `Há ${money(D.descobertos.reduce((s, l) => s + l.aberto, 0))} adiantados sem nota; o pagamento mais antigo ainda descoberto é de ${dateBR(D.maisAntigo)} (${idade} dias).`]);
-  if (T.saldo < -0.005) alertas.push(['atencao', 'Saldo', `As notas recebidas passam os pagamentos em ${money(-T.saldo)}: a IPLAMM deve ao fornecedor ou há pagamento lançado para outro cadastro.`]);
-
+  const T = D.tot, box = $('#cf-corpo', root), ed = podeEditar(), cli = CLI();
+  const al = alertasTexto();
+  const btn = { cnpj: 'Informar CNPJ', ligar: 'Ligar a este fornecedor', reg: 'Registrar como adiantamento', auto: 'Conciliar automaticamente' };
+  const kpis = cli ? [
+    ['Saldo anterior', money(T.anterior), `até ${dateBR(ui.de)}`],
+    ['Notas de venda no período', money(T.notas - T.devol), `${T.qn} nota(s)${T.devol ? ` · devoluções ${money(T.devol)}` : ''}`],
+    ['Recebido no período', money(T.dinheiro + T.fidc + T.cred), `recebimentos ${money(T.dinheiro)}${T.fidc ? ` · FIDC ${money(T.fidc)}` : ''}${T.cred ? ` · créditos ${money(T.cred)}` : ''}`],
+    [T.final >= 0 ? 'Saldo a receber' : 'Adiantamento do cliente', money(Math.abs(T.final)), `em ${dateBR(ui.ate)} · notas em aberto ${money(T.aberto)}`],
+  ] : [
+    ['Saldo anterior', money(T.anterior), `até ${dateBR(ui.de)}`],
+    ['Pago no período', money(T.dinheiro), `${T.ql} pagamento(s)`],
+    ['Notas recebidas no período', money(T.notas), `${T.qn} nota(s)${T.kg ? ' · ' + kgFmt(T.kg) : ''}`],
+    [T.final >= 0 ? 'Saldo a receber em produto' : 'Notas acima dos pagamentos', money(Math.abs(T.final)), `em ${dateBR(ui.ate)} · adiantamentos registrados ${money(T.reg)}`],
+  ];
+  D.kpis = kpis; D.alertas = al;
+  const abas = [['extrato', 'Extrato'], ['pag', `${cli ? 'Recebimentos' : 'Pagamentos'} (${D.lancs.filter(l => noPeriodo(l.data)).length})`], ['notas', `Notas (${D.notas.filter(n => noPeriodo(n.emissao)).length})`], ['prod', 'Produtos']];
   box.innerHTML = `
-    <div class="kpis">
-      <div class="kpi"><div class="k-label">Pago ao fornecedor</div><div class="k-value">${money(T.pago)}</div><div class="k-sub">${D.lancs.length} pagamento(s)${D.lancs.length ? ` · ${dateBR(D.lancs[0].data)} a ${dateBR(D.lancs.at(-1).data)}` : ''}</div></div>
-      <div class="kpi"><div class="k-label">Notas recebidas</div><div class="k-value">${money(T.notas)}</div><div class="k-sub">${D.notas.filter(n => !n.devolvida).length} nota(s)${T.kg ? ' · ' + kg(T.kg) : ''}</div></div>
-      <div class="kpi"><div class="k-label">${T.saldo >= 0 ? 'Saldo a receber em produto' : 'Notas acima dos pagamentos'}</div><div class="k-value ${T.saldo < -0.005 ? 'neg' : ''}">${money(Math.abs(T.saldo))}</div><div class="k-sub">pago − notas${T.pago ? ` · ${Math.round(Math.min(T.notas / T.pago, 9.99) * 100)}% já faturado` : ''}</div></div>
-      <div class="kpi"><div class="k-label">Adiantamentos registrados</div><div class="k-value">${money(T.reg)}</div><div class="k-sub">abatido em notas ${money(T.abatido)} · saldo ${money(T.credSaldo)}</div></div>
-    </div>
-    ${alertas.length ? `<div class="card"><div class="alert-list">${alertas.map(([c, t, m]) => `<div class="alert-row ${c}"><span class="alert-tag">${t}</span><div class="small">${m}</div></div>`).join('')}</div></div>` : ''}
-    <div class="card" style="padding-bottom:8px"><div class="chips" id="abas">${[['extrato', 'Extrato'], ['pag', `Pagamentos (${D.lancs.length})`], ['notas', `Notas (${D.notas.length})`], ['prod', 'Produtos']].map(([k, t]) => `<button class="chip ${ui.aba === k ? 'on' : ''}" data-aba="${k}">${t}</button>`).join('')}</div></div>
+    <div class="kpis">${kpis.map(([l, v, s], i) => `<div class="kpi"><div class="k-label">${l}</div><div class="k-value ${i === 3 && (cli ? T.final > 0.005 && D.vencidas.length : T.final < -0.005) ? 'neg' : ''}">${v}</div><div class="k-sub">${s}</div></div>`).join('')}</div>
+    ${al.length ? `<div class="card"><div class="alert-list">${al.map(a => `<div class="alert-row ${a.cls}"><span class="alert-tag">${a.tag}</span><div class="small">${esc(a.txt)} ${a.act && ed ? `<button class="btn small" id="act-${a.act}">${btn[a.act]}</button>` : ''}</div></div>`).join('')}</div></div>` : ''}
+    <div class="card" style="padding-bottom:8px"><div class="chips" id="abas">${abas.map(([k, t]) => `<button class="chip ${ui.aba === k ? 'on' : ''}" data-aba="${k}">${t}</button>`).join('')}</div></div>
     <div class="card flush"><div class="table-wrap" id="cf-tab">${tabela()}</div></div>`;
-
   $('#abas', box).onclick = (e) => { const a = e.target.closest('[data-aba]')?.dataset.aba; if (a) { ui.aba = a; pintar(root); } };
   $('#cf-tab', box).onclick = (e) => {
     const n = e.target.closest('[data-nota]')?.dataset.nota; const du = e.target.closest('[data-du]')?.dataset.du;
@@ -162,60 +227,155 @@ function pintar(root) {
     if (n && ui.aba === 'extrato') { ui.aba = 'notas'; ui.aberta = n; return pintar(root); }
     if (n) { ui.aberta = ui.aberta === n ? null : n; $('#cf-tab', box).innerHTML = tabela(); }
   };
-  $('#reg', box) && ($('#reg', box).onclick = () => registrar(root));
-  $('#auto', box) && ($('#auto', box).onclick = () => conciliar(root));
-  $('#ligar', box) && ($('#ligar', box).onclick = () => ligar(root));
-  $('#cnpj', box) && ($('#cnpj', box).onclick = () => informarCnpj(root));
+  $('#act-reg', box) && ($('#act-reg', box).onclick = () => registrar(root));
+  $('#act-auto', box) && ($('#act-auto', box).onclick = () => conciliar(root));
+  $('#act-ligar', box) && ($('#act-ligar', box).onclick = () => ligar(root));
+  $('#act-cnpj', box) && ($('#act-cnpj', box).onclick = () => informarCnpj(root));
 }
 
+// linhas das tabelas (tela, Excel e PDF usam as mesmas)
+function linhasExtrato() {
+  const cli = CLI(), T = D.tot;
+  const rows = [{ data: ui.de, hist: 'Saldo anterior', a: null, b: null, saldo: T.anterior, anterior: true }];
+  for (const x of D.extrato.filter(x => noPeriodo(x.data))) rows.push({ data: x.data, hist: x.hist, a: cli ? (x.nota > 0 ? x.nota : null) : (x.dinheiro || null), b: cli ? (x.dinheiro || (x.nota < 0 ? -x.nota : null)) : (x.nota || null), saldo: x.saldo, x });
+  return rows;
+}
+const cabExtrato = () => CLI() ? ['Data', 'Histórico', 'Nota de venda', 'Recebido / devolução', 'Saldo a receber'] : ['Data', 'Histórico', 'Pago (adiantado)', 'Nota recebida', 'Saldo com o fornecedor'];
+const notasPeriodo = () => D.notas.filter(n => noPeriodo(n.emissao));
+
 function tabela() {
-  if (ui.aba === 'pag') return !D.lancs.length ? '<div class="empty">Nenhum pagamento a este fornecedor.</div>' : `<table><thead><tr><th>Data</th><th>Conta</th><th>Plano</th><th>Descrição</th><th class="num">Valor</th><th>Adiantamento</th></tr></thead><tbody>
-    ${D.lancs.map(l => { const c = D.regPorLanc.get(l.id); return `<tr><td>${dateBR(l.data)}</td><td>${esc(state.cad.contaById[l.conta_id]?.nome || '—')}</td><td class="small">${esc(state.cad.planoById[l.plano_id]?.codigo || '')}</td><td class="wrap small">${esc(l.descricao || l.documento || '')}</td><td class="num">${money(l.valor)}</td>
-      <td>${c ? `<span class="badge pago">registrado</span>${c.usado > 0.005 ? `<div class="small muted">usado ${money(c.usado)}</div>` : ''}` : '<span class="badge aberto">não registrado</span>'}</td></tr>`; }).join('')}
-    </tbody><tfoot><tr><th colspan="4">Total</th><th class="num">${money(D.tot.pago)}</th><th></th></tr></tfoot></table>`;
-  if (ui.aba === 'notas') return !D.notas.length ? '<div class="empty">Nenhuma nota deste fornecedor importada.</div>' : `<table><thead><tr><th>NF</th><th>Emissão</th><th>CFOP</th><th class="num">Quantidade</th><th class="num">R$/kg</th><th class="num">Valor da nota</th><th class="num">Abatido do adiantamento</th><th class="num">Falta abater</th></tr></thead><tbody>
-    ${D.notas.map(n => `<tr class="clickable" data-nota="${n.id}"><td><strong>${n.numero}</strong>${n.devolvida ? ' <span class="badge vencido">devolvida</span>' : ''}</td><td>${dateBR(n.emissao)}</td><td class="small">${esc((n.cfops || []).join(', '))}</td><td class="num">${kg(n.kg)}</td><td class="num">${n.rkg ? money(n.rkg) : '–'}</td>
-      <td class="num">${money(n.v_nf)}</td><td class="num">${money(n.abatido)}</td><td class="num">${n.falta > 0.005 && !n.devolvida ? `<strong>${money(n.falta)}</strong>` : '<span class="badge pago">ok</span>'}</td></tr>
+  const cli = CLI();
+  if (ui.aba === 'pag') {
+    const L = D.lancs.filter(l => noPeriodo(l.data));
+    return !L.length ? `<div class="empty">Nenhum ${cli ? 'recebimento' : 'pagamento'} no período.</div>` : `<table><thead><tr><th>Data</th><th>Conta</th><th>Plano</th><th>Descrição</th><th class="num">Valor</th><th>Situação</th></tr></thead><tbody>
+    ${L.map(l => { const c = D.regPorLanc.get(l.id); return `<tr><td>${dateBR(l.data)}</td><td>${esc(state.cad.contaById[l.conta_id]?.nome || '—')}</td><td class="small">${esc(state.cad.planoById[l.plano_id]?.codigo || '')}</td><td class="wrap small">${esc(l.descricao || l.documento || '')}</td><td class="num">${money(l.valor)}</td>
+      <td>${D.lancNota.has(l.id) ? '<span class="badge pago">ligado à nota</span>' : c ? `<span class="badge pago">adiantamento</span>${c.usado > 0.005 ? `<div class="small muted">usado ${money(c.usado)}</div>` : ''}` : cli ? '<span class="badge aberto">sem nota</span>' : '<span class="badge aberto">não registrado</span>'}</td></tr>`; }).join('')}
+    </tbody><tfoot><tr><th colspan="4">Total</th><th class="num">${money(L.reduce((s, l) => s + +l.valor, 0))}</th><th></th></tr></tfoot></table>`;
+  }
+  if (ui.aba === 'notas') {
+    const N = notasPeriodo();
+    return !N.length ? '<div class="empty">Nenhuma nota no período.</div>' : `<table><thead><tr><th>NF</th><th>Emissão</th><th>CFOP</th>${cli ? '<th>Vencimento</th>' : '<th class="num">Quantidade</th><th class="num">R$/kg</th>'}<th class="num">Valor da nota</th><th class="num">${cli ? 'Recebido / FIDC / crédito' : 'Pago / abatido'}</th><th class="num">Em aberto</th></tr></thead><tbody>
+    ${N.map(n => `<tr class="clickable" data-nota="${n.id}"><td><strong>${n.numero}</strong>${n.devolvida ? ' <span class="badge vencido">devolvida</span>' : ''}</td><td>${dateBR(n.emissao)}</td><td class="small">${esc((n.cfops || []).join(', '))}</td>
+      ${cli ? `<td class="small">${n.parcelas.map(p => dateBR(p.vencimento)).join(', ') || '—'}</td>` : `<td class="num">${kgFmt(n.kg)}</td><td class="num">${n.rkg ? money(n.rkg) : '–'}</td>`}
+      <td class="num">${money(n.v_nf)}</td><td class="num">${money(n.pagoDireto + n.abatido + n.antecipado)}</td><td class="num">${n.falta > 0.05 && !n.devolvida ? `<strong>${money(n.falta)}</strong>` : '<span class="badge pago">ok</span>'}</td></tr>
       ${ui.aberta === n.id ? `<tr class="sub"><td colspan="8"><div style="padding:6px 4px">
         <table><thead><tr><th>#</th><th>Produto</th><th>NCM</th><th>CFOP</th><th class="num">Qtd</th><th>Un</th><th class="num">Valor</th><th class="num">Unitário</th></tr></thead><tbody>
         ${n.itens.map(i => `<tr><td>${i.n_item}</td><td class="wrap">${esc(i.xprod)}</td><td>${esc(i.ncm || '')}</td><td>${esc(i.cfop || '')}</td><td class="num">${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(+i.qcom)}</td><td>${esc(i.ucom || '')}</td><td class="num">${money(i.vprod)}</td><td class="num">${+i.qcom ? money(+i.vprod / +i.qcom) : '–'}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">Sem itens gravados.</td></tr>'}
         </tbody></table>
-        ${n.usos.length ? `<p class="small" style="margin:8px 0 4px"><strong>Abatido dos adiantamentos</strong></p>${n.usos.map(u => { const c = (D.creds || []).find(x => x.id === u.credito_id); return `<div class="small">${dateBR(u.data)} · ${money(u.valor)} do adiantamento de ${dateBR(c?.data)} (${money(c?.valor)})${u.observacao ? ' · ' + esc(u.observacao) : ''} ${podeEditar() ? `<button class="btn ghost small" data-du="${u.id}" title="Desfazer">✕</button>` : ''}</div>`; }).join('')}` : ''}
+        ${n.vincs.length ? `<p class="small" style="margin:8px 0 4px"><strong>${cli ? 'Recebimentos' : 'Pagamentos'} ligados</strong></p>${n.vincs.map(v => `<div class="small">${dateBR(v.l?.data)} · ${money(v.l?.valor)}</div>`).join('')}` : ''}
+        ${n.fidcs.length ? `<p class="small" style="margin:8px 0 4px"><strong>Antecipado no FIDC</strong></p>${n.fidcs.map(f => `<div class="small">${esc(f.t?.fundo || '')} · borderô ${esc(f.t?.bordero || '')} · ${money(f.t?.valor)}</div>`).join('')}` : ''}
+        ${n.usos.length ? `<p class="small" style="margin:8px 0 4px"><strong>${cli ? 'Créditos usados' : 'Abatido dos adiantamentos'}</strong></p>${n.usos.map(u => { const c = (D.creds || []).find(x => x.id === u.credito_id); return `<div class="small">${dateBR(u.data)} · ${money(u.valor)} do crédito de ${dateBR(c?.data)} (${money(c?.valor)})${u.observacao ? ' · ' + esc(u.observacao) : ''} ${podeEditar() ? `<button class="btn ghost small" data-du="${u.id}" title="Desfazer">✕</button>` : ''}</div>`; }).join('')}` : ''}
         ${n.inf_cpl ? `<p class="small muted" style="margin:8px 0 0">${esc(n.inf_cpl.slice(0, 500))}</p>` : ''}
       </div></td></tr>` : ''}`).join('')}
-    </tbody><tfoot><tr><th colspan="3">Total</th><th class="num">${kg(D.tot.kg)}</th><th class="num">${D.tot.kg ? money(D.notas.filter(n => !n.devolvida && n.kg).reduce((s, n) => s + n.rkg * n.kg, 0) / D.tot.kg) : '–'}</th><th class="num">${money(D.tot.notas)}</th><th class="num">${money(D.tot.abatido)}</th><th class="num">${money(D.notas.filter(n => !n.devolvida).reduce((s, n) => s + Math.max(n.falta, 0), 0))}</th></tr></tfoot></table>`;
+    </tbody><tfoot><tr><th colspan="3">Total</th>${cli ? '<th></th>' : `<th class="num">${kgFmt(N.filter(n => !n.devolvida).reduce((s, n) => s + (n.kg || 0), 0))}</th><th></th>`}<th class="num">${money(N.reduce((s, n) => s + +n.v_nf, 0))}</th><th class="num">${money(N.reduce((s, n) => s + n.pagoDireto + n.abatido + n.antecipado, 0))}</th><th class="num">${money(N.filter(n => !n.devolvida).reduce((s, n) => s + n.falta, 0))}</th></tr></tfoot></table>`;
+  }
   if (ui.aba === 'prod') {
-    const g = new Map();
-    for (const n of D.notas.filter(x => !x.devolvida)) for (const i of n.itens) {
-      const k = normN(i.xprod); const x = g.get(k) || g.set(k, { nome: i.xprod, ncm: i.ncm, un: i.ucom, qtd: 0, valor: 0, notas: new Set(), ult: '' }).get(k);
-      x.qtd += +i.qcom; x.valor += +i.vprod; x.notas.add(n.numero); if (n.emissao > x.ult) x.ult = n.emissao;
-    }
-    const L = [...g.values()].sort((a, b) => b.valor - a.valor);
-    return !L.length ? '<div class="empty">Sem itens de notas importadas.</div>' : `<table><thead><tr><th>Produto</th><th>NCM</th><th class="num">Quantidade</th><th>Un</th><th class="num">Valor</th><th class="num">Preço médio</th><th class="num">Notas</th><th>Última</th></tr></thead><tbody>
+    const L = produtos();
+    return !L.length ? '<div class="empty">Sem itens de notas no período.</div>' : `<table><thead><tr><th>Produto</th><th>NCM</th><th class="num">Quantidade</th><th>Un</th><th class="num">Valor</th><th class="num">Preço médio</th><th class="num">Notas</th><th>Última</th></tr></thead><tbody>
       ${L.map(x => `<tr><td class="wrap">${esc(x.nome)}</td><td>${esc(x.ncm || '')}</td><td class="num">${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(x.qtd)}</td><td>${esc(x.un || '')}</td><td class="num">${money(x.valor)}</td><td class="num">${x.qtd ? money(x.valor / x.qtd) : '–'}</td><td class="num">${x.notas.size}</td><td>${dateBR(x.ult)}</td></tr>`).join('')}
       </tbody></table>`;
   }
-  return !D.extrato.length ? '<div class="empty">Sem movimento.</div>' : `<table><thead><tr><th>Data</th><th>Histórico</th><th class="num">Pago (adiantado)</th><th class="num">Nota recebida</th><th class="num">Saldo com o fornecedor</th></tr></thead><tbody>
-    ${D.extrato.map(x => `<tr${x.nota ? ` class="clickable" data-nota="${x.nota.id}"` : ''}><td>${dateBR(x.data)}</td><td class="wrap small">${esc(x.hist)}${x.tipo === 'pag' && !x.reg && D.creds ? ' <span class="badge aberto">não registrado</span>' : ''}</td><td class="num">${x.deb ? money(x.deb) : ''}</td><td class="num">${x.cred ? money(x.cred) : ''}</td><td class="num ${x.saldo < -0.005 ? 'neg' : ''}"><strong>${money(x.saldo)}</strong></td></tr>`).join('')}
-    </tbody><tfoot><tr><th colspan="2">Total</th><th class="num">${money(D.tot.pago)}</th><th class="num">${money(D.tot.notas)}</th><th class="num">${money(D.tot.saldo)}</th></tr></tfoot></table>`;
+  const R = linhasExtrato(), [c1, c2, c3, c4, c5] = cabExtrato();
+  return `<table><thead><tr><th>${c1}</th><th>${c2}</th><th class="num">${c3}</th><th class="num">${c4}</th><th class="num">${c5}</th></tr></thead><tbody>
+    ${R.map(r => `<tr${r.x?.n ? ` class="clickable" data-nota="${r.x.n.id}"` : ''}${r.anterior ? ' style="font-weight:600"' : ''}><td>${dateBR(r.data)}</td><td class="wrap small">${esc(r.hist)}${r.x?.tipo === 'din' && !cli && !r.x.reg && !D.lancNota.has(r.x.l.id) && D.creds ? ' <span class="badge aberto">não registrado</span>' : ''}</td><td class="num">${r.a ? money(r.a) : ''}</td><td class="num">${r.b ? money(r.b) : ''}</td><td class="num ${r.saldo < -0.005 ? 'neg' : ''}"><strong>${money(r.saldo)}</strong></td></tr>`).join('')}
+    </tbody><tfoot><tr><th colspan="2">Movimento do período</th><th class="num">${money(R.reduce((s, r) => s + (r.a || 0), 0))}</th><th class="num">${money(R.reduce((s, r) => s + (r.b || 0), 0))}</th><th class="num">${money(D.tot.final)}</th></tr></tfoot></table>`;
+}
+
+function produtos() {
+  const g = new Map();
+  for (const n of notasPeriodo().filter(x => !x.devolvida)) for (const i of n.itens) {
+    const k = normN(i.xprod); const x = g.get(k) || g.set(k, { nome: i.xprod, ncm: i.ncm, un: i.ucom, qtd: 0, valor: 0, notas: new Set(), ult: '' }).get(k);
+    x.qtd += +i.qcom; x.valor += +i.vprod; x.notas.add(n.numero); if (n.emissao > x.ult) x.ult = n.emissao;
+  }
+  return [...g.values()].sort((a, b) => b.valor - a.valor);
 }
 
 function linhasExcel() {
-  const f = D.fav;
-  const rows = [[`Conta-corrente — ${f?.nome || ''}${f?.documento ? ' · ' + f.documento : ''}`], [`Gerado em ${dateBR(today())}`], [],
-    ['Data', 'Histórico', 'Pago (adiantado)', 'Nota recebida', 'Saldo']];
-  for (const x of D.extrato) rows.push([dateBR(x.data), x.hist, x.deb || null, x.cred || null, x.saldo]);
-  rows.push([], ['Total', '', D.tot.pago, D.tot.notas, D.tot.saldo]);
+  const f = D.fav, cab = cabExtrato();
+  const rows = [[`Conta-corrente (${CLI() ? 'cliente' : 'fornecedor'}) — ${f?.nome || ''}${f?.documento ? ' · ' + fmtDoc(f.documento) : ''}`], [`Período ${dateBR(ui.de)} a ${dateBR(ui.ate)} · gerado em ${dateBR(today())}`], [], cab];
+  for (const r of linhasExtrato()) rows.push([dateBR(r.data), r.hist, r.a, r.b, r.saldo]);
+  rows.push([], ['Notas do período'], ['NF', 'Emissão', 'CFOP', 'Valor', 'Pago / recebido', 'Em aberto']);
+  for (const n of notasPeriodo()) rows.push([n.numero, dateBR(n.emissao), (n.cfops || []).join(', '), +n.v_nf, r2(n.pagoDireto + n.abatido + n.antecipado), n.devolvida ? 0 : n.falta]);
   return rows;
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ações
+// Relatório em PDF
+// ---------------------------------------------------------------------------------------------
+const pdfTxt = (t) => String(t ?? '').replace(/[−–]/g, '-').replace(/×/g, 'x').replace(/ /g, ' ').replace(/[✓✕]/g, '');
+async function gerarPDF() {
+  if (!window.jspdf) return toast('Biblioteca de PDF ainda carregando, tente de novo em instantes', true);
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  if (!doc.autoTable) return toast('Biblioteca de tabelas do PDF ainda carregando', true);
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 12;
+  const azul = [43, 85, 152], marinho = [42, 31, 111], cli = CLI(), f = D.fav, T = D.tot;
+  const logo = await logoPNG();
+  const titulo = `Conta-corrente de ${cli ? 'cliente' : 'fornecedor'}`;
+  const cabecalho = () => {
+    if (logo) doc.addImage(logo.data, 'PNG', M, 8, 12 * logo.ratio, 12);
+    doc.setTextColor(...marinho); doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(titulo, W - M, 13, { align: 'right' });
+    doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+    doc.text(pdfTxt(`${state.empresa.nome} · período ${dateBR(ui.de)} a ${dateBR(ui.ate)} · emitido em ${dateBR(today())}`), W - M, 18, { align: 'right' });
+    doc.setDrawColor(...marinho); doc.setLineWidth(.5); doc.line(M, 22, W - M, 22); doc.setTextColor(20);
+  };
+  const secao = (t) => { let y = (doc.lastAutoTable?.finalY ?? 40) + 8; if (y > H - 30) { doc.addPage(); cabecalho(); y = 30; } doc.setFontSize(10.5); doc.setFont(undefined, 'bold'); doc.setTextColor(...marinho); doc.text(pdfTxt(t), M, y); doc.setTextColor(20); doc.setFont(undefined, 'normal'); return y + 2; };
+  const grade = { theme: 'grid', styles: { fontSize: 7.4, cellPadding: 1.2, lineColor: [226, 231, 239] }, headStyles: { fillColor: azul, textColor: 255 }, margin: { left: M, right: M, top: 28 }, didDrawPage: (d) => { if (d.pageNumber > 1) cabecalho(); } };
+  cabecalho();
+  // identificação
+  doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text(pdfTxt(f?.nome || ''), M, 29);
+  doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+  doc.text(pdfTxt([f?.documento ? `CNPJ/CPF ${fmtDoc(f.documento)}` : 'sem CNPJ no cadastro', f?.tipo, f?.dados_bancarios].filter(Boolean).join(' · ')), M, 34); doc.setTextColor(20);
+  // indicadores
+  doc.autoTable({ startY: 37, theme: 'plain', body: [D.kpis.map(k => k[0]), D.kpis.map(k => k[1]), D.kpis.map(k => k[2])].map(r => r.map(pdfTxt)), margin: { left: M, right: M },
+    styles: { fontSize: 8, cellPadding: { top: .6, bottom: .6, left: 1.5, right: 1.5 } }, columnStyles: Object.fromEntries([0, 1, 2, 3].map(i => [i, { cellWidth: (W - 2 * M) / 4 }])),
+    didParseCell: (d) => { const r = d.row.index; if (r === 0 || r === 2) { d.cell.styles.textColor = 110; d.cell.styles.fontSize = 7.2; } if (r === 1) { d.cell.styles.fontSize = 12; d.cell.styles.fontStyle = 'bold'; d.cell.styles.textColor = marinho; } } });
+  // situação
+  if (D.alertas.length) { const y = secao('Pontos de atenção'); doc.autoTable({ ...grade, startY: y, head: [['Item', 'Situação']], body: D.alertas.map(a => [a.tag, pdfTxt(a.txt)]), columnStyles: { 0: { cellWidth: 26, fontStyle: 'bold' } } }); }
+  // extrato
+  const cab = cabExtrato(), ext = linhasExtrato();
+  let y = secao('Extrato do período');
+  doc.autoTable({ ...grade, startY: y, head: [cab], body: ext.map(r => [dateBR(r.data), pdfTxt(r.hist), r.a ? money(r.a) : '', r.b ? money(r.b) : '', money(r.saldo)]),
+    foot: [['', 'Movimento do período / saldo final', money(ext.reduce((s, r) => s + (r.a || 0), 0)), money(ext.reduce((s, r) => s + (r.b || 0), 0)), money(T.final)]],
+    footStyles: { fillColor: [232, 238, 248], textColor: 20, fontStyle: 'bold' }, columnStyles: { 0: { cellWidth: 18 }, 2: { halign: 'right', cellWidth: 26 }, 3: { halign: 'right', cellWidth: 26 }, 4: { halign: 'right', cellWidth: 28 } },
+    didParseCell: (d) => { if (d.section === 'body' && d.row.index === 0) d.cell.styles.fontStyle = 'bold'; if (d.section === 'foot' && d.column.index > 1) d.cell.styles.halign = 'right'; } });
+  // notas
+  const N = notasPeriodo();
+  if (N.length) {
+    y = secao(`Notas fiscais do período (${N.length})`);
+    const head = cli ? ['NF', 'Emissão', 'Vencimento', 'Valor', 'Recebido/FIDC/crédito', 'Em aberto'] : ['NF', 'Emissão', 'CFOP', 'Quantidade', 'R$/kg', 'Valor', 'Pago/abatido', 'Em aberto'];
+    const body = N.map(n => cli ? [n.numero, dateBR(n.emissao), n.parcelas.map(p => dateBR(p.vencimento)).join(', ') || '-', money(n.v_nf), money(n.pagoDireto + n.abatido + n.antecipado), n.devolvida ? 'devolvida' : money(n.falta)]
+      : [n.numero, dateBR(n.emissao), (n.cfops || []).join(', '), kgFmt(n.kg), n.rkg ? money(n.rkg) : '-', money(n.v_nf), money(n.pagoDireto + n.abatido), n.devolvida ? 'devolvida' : money(n.falta)]);
+    const tot = (fn) => money(N.reduce((s, n) => s + fn(n), 0));
+    const foot = cli ? ['Total', '', '', tot(n => +n.v_nf), tot(n => n.pagoDireto + n.abatido + n.antecipado), tot(n => n.devolvida ? 0 : n.falta)]
+      : ['Total', '', '', kgFmt(N.filter(n => !n.devolvida).reduce((s, n) => s + (n.kg || 0), 0)), '', tot(n => +n.v_nf), tot(n => n.pagoDireto + n.abatido), tot(n => n.devolvida ? 0 : n.falta)];
+    doc.autoTable({ ...grade, startY: y, head: [head], body, foot: [foot], footStyles: { fillColor: [232, 238, 248], textColor: 20, fontStyle: 'bold' },
+      didParseCell: (d) => { if (d.column.index >= (cli ? 3 : 3)) d.cell.styles.halign = 'right'; } });
+  }
+  // produtos (fornecedor)
+  const P = produtos();
+  if (!cli && P.length) {
+    y = secao('Produtos recebidos no período');
+    doc.autoTable({ ...grade, startY: y, head: [['Produto', 'NCM', 'Quantidade', 'Un', 'Valor', 'Preço médio', 'Notas']],
+      body: P.map(x => [pdfTxt(x.nome), x.ncm || '', new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(x.qtd), x.un || '', money(x.valor), x.qtd ? money(x.valor / x.qtd) : '-', x.notas.size]),
+      didParseCell: (d) => { if ([2, 4, 5, 6].includes(d.column.index)) d.cell.styles.halign = 'right'; } });
+  }
+  // rodapé
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++) {
+    doc.setPage(i); doc.setFontSize(7); doc.setTextColor(130);
+    doc.text(`Página ${i} de ${n}`, W - M, H - 6, { align: 'right' });
+    doc.text(pdfTxt(cli ? 'Fonte: notas fiscais de venda (XML), recebimentos lançados, borderôs FIDC e créditos registrados na plataforma.' : 'Fonte: notas fiscais de entrada (XML), pagamentos lançados e adiantamentos registrados na plataforma.'), M, H - 6);
+  }
+  doc.save(`conta_corrente_${normN(f?.nome).replace(/ /g, '_').slice(0, 40)}_${ui.de}_${ui.ate}.pdf`);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ações (fornecedor)
 // ---------------------------------------------------------------------------------------------
 function registrar(root) {
   const L = D.naoReg;
   const m = modal({ title: 'Registrar pagamentos como adiantamento', wide: true, body: `
-    <p class="small muted" style="margin-top:0">Cada pagamento marcado vira um adiantamento ao fornecedor (Créditos e Adiantamentos), ligado ao lançamento. O lançamento não muda — conta, plano e valor continuam iguais.</p>
+    <p class="small muted" style="margin-top:0">Cada pagamento marcado vira um adiantamento ao fornecedor (Créditos e Adiantamentos), ligado ao lançamento. O lançamento não muda — conta, plano e valor continuam iguais. Pagamentos já ligados a uma nota (Pagamentos × Notas) não aparecem aqui.</p>
     <div class="table-wrap" style="max-height:380px"><table><thead><tr><th><input type="checkbox" id="all" checked></th><th>Data</th><th>Conta</th><th>Descrição</th><th class="num">Valor</th></tr></thead><tbody>
     ${L.map(l => `<tr><td><input type="checkbox" data-l="${l.id}" checked></td><td>${dateBR(l.data)}</td><td>${esc(state.cad.contaById[l.conta_id]?.nome || '—')}</td><td class="wrap small">${esc(l.descricao || '')}</td><td class="num">${money(l.valor)}</td></tr>`).join('')}
     </tbody></table></div><p class="small" id="tot"></p>`,
@@ -235,13 +395,12 @@ function registrar(root) {
   };
 }
 
-/** Plano de conciliação: adiantamentos mais antigos abatem as notas mais antigas. */
+/** Plano de conciliação: adiantamentos mais antigos abatem as notas mais antigas (no que falta de cada nota). */
 function planoFIFO() {
   const creds = (D.creds || []).filter(c => c.saldo > 0.005).sort((a, b) => a.data.localeCompare(b.data)).map(c => ({ ...c, resta: c.saldo }));
   const usadoParc = new Map(); for (const u of D.usos) if (u.parcela_id) usadoParc.set(u.parcela_id, (usadoParc.get(u.parcela_id) || 0) + +u.valor);
   const out = [];
   for (const n of D.notas.filter(x => !x.devolvida && x.falta > 0.005)) {
-    // o que falta por parcela (sem parcelas: a nota inteira)
     let partes = n.parcelas.map(p => ({ parcela_id: p.id, falta: r2(+p.valor - (usadoParc.get(p.id) || 0)) })).filter(p => p.falta > 0.005);
     if (!partes.length) partes = [{ parcela_id: null, falta: n.falta }];
     let faltaNota = n.falta;
