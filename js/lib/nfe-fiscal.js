@@ -74,7 +74,10 @@ export function prepararNotas(lidos, cnpjEmpresa) {
     if (!raiz || (!propria && !dest)) { ignoradas.push({ n, motivo: 'empresa não participa' }); continue; }
     if (propria && dest) { ignoradas.push({ n, motivo: 'entre estabelecimentos da empresa' }); continue; }
     const evs = eventos.filter(e => e.chave === n.chave);
-    out.push({ ...x, nota: { ...n, tipo: n.tp_nf === '1' ? 'saida' : 'entrada', emissao_propria: propria,
+    // tpNF é do ponto de vista de quem emite: nota de fornecedor com tpNF=1 (saída dele) é ENTRADA para a empresa;
+    // nota de terceiro com tpNF=0 (entrada dele, com a empresa como remetente) é SAÍDA para a empresa.
+    const saida = propria ? n.tp_nf === '1' : n.tp_nf === '0';
+    out.push({ ...x, nota: { ...n, tipo: saida ? 'saida' : 'entrada', emissao_propria: propria,
       situacao: evs.some(e => e.tpEvento === '110111') ? 'cancelada' : n.situacao,
       eventos: evs.map(e => ({ tipo: e.tpEvento, descricao: e.descricao, data: e.data, seq: e.seq, correcao: e.correcao })) } });
   }
