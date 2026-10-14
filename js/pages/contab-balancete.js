@@ -23,6 +23,7 @@ export async function render(root) {
       <button class="btn" id="exp">Exportar Excel</button>
     </div>
     <div id="info" class="muted small" style="margin-bottom:8px"></div>
+    <div id="pend"></div>
     <div class="kpis" id="kp" style="margin-bottom:12px"></div>
     <div class="card flush"><div class="table-wrap" id="tbl"></div></div>`;
   $('#niv', root).value = String(ui.nivel);
@@ -46,7 +47,16 @@ async function carregar(root) {
     ]);
     dados = { contas, bals, aberturas, itens: null };
     const datasAb = [...new Set(aberturas.map(a => a.data))].sort().reverse();
-    const opts = [...bals.map(b => [`b:${b.id}`, `${dateBR(b.data_ini)} a ${dateBR(b.data_fim)} (contabilidade)`]),
+    // balancete feito pela plataforma: um por mês, a partir do mês seguinte à abertura
+    const meses = [];
+    if (datasAb.length) {
+      const fim = new Date().toISOString().slice(0, 7);
+      for (let d = new Date(datasAb[datasAb.length - 1] + 'T12:00:00'); ; ) {
+        d.setDate(1); d.setMonth(d.getMonth() + 1); const m = d.toISOString().slice(0, 7); if (m > fim) break; meses.push(m);
+      }
+    }
+    const opts = [...meses.reverse().map(m => [`g:${m}`, `${MESN[+m.slice(5) - 1]}/${m.slice(0, 4)} (plataforma)`]),
+                  ...bals.map(b => [`b:${b.id}`, `${dateBR(b.data_ini)} a ${dateBR(b.data_fim)} (contabilidade)`]),
                   ...datasAb.map(d => [`a:${d}`, `Saldo de abertura em ${dateBR(d)}`])];
     if (!opts.length) {
       $('#bsel', root).innerHTML = '<option value="">—</option>';
@@ -54,7 +64,7 @@ async function carregar(root) {
       tbl.innerHTML = `<div class="empty">Nenhum balancete importado ainda.<br><span class="small">${podeEditar() ? 'Use “Importar balancete (PDF)” com o balancete assinado enviado pela contabilidade.' : 'Peça a quem cuida da contabilidade para importar o balancete.'}</span></div>`;
       return;
     }
-    if (!opts.some(o => o[0] === ui.sel)) ui.sel = opts[0][0];
+    if (!opts.some(o => o[0] === ui.sel)) ui.sel = (opts.find(o => o[0][0] === 'b') || opts[0])[0];
     $('#bsel', root).innerHTML = opts.map(([v, t]) => `<option value="${v}" ${v === ui.sel ? 'selected' : ''}>${esc(t)}</option>`).join('');
     await carregarItens(root);
   } catch (e) {
@@ -67,7 +77,14 @@ async function carregarItens(root) {
   const tbl = $('#tbl', root); loading(tbl);
   try {
     const [tipo, id] = [ui.sel.slice(0, 1), ui.sel.slice(2)];
-    if (tipo === 'b') {
+    $('#pend', root).innerHTML = '';
+    if (tipo === 'g') {
+      const ini = id + '-01', fim = fimMes(id);
+      dados.itens = await q(sb.rpc('contab_balancete_gerencial', { p_empresa: state.empresa.id, p_ini: ini, p_fim: fim }));
+      $('#info', root).innerHTML = `Balancete feito pela plataforma · ${dateBR(ini)} a ${dateBR(fim)} · saldo de abertura + lançamentos contábeis gerados dos fatos financeiros pagos.
+        ${podeEditar() ? ' <button class="btn small" id="gerar">Gerar lançamentos contábeis do mês</button>' : ''}`;
+      if ($('#gerar', root)) $('#gerar', root).onclick = () => gerar(root, ini, fim);
+    } else if (tipo === 'b') {
       dados.itens = await fetchAll(() => sb.from('contab_balancete_itens').select('conta_id, saldo_anterior, debito, credito, saldo_atual').eq('balancete_id', id));
       const b = dados.bals.find(x => x.id === id);
       $('#info', root).innerHTML = `Balancete oficial da contabilidade · ${dateBR(b.data_ini)} a ${dateBR(b.data_fim)} · arquivo ${esc(b.arquivo_nome || '—')} · importado por ${esc(b.importado_email || '—')} em ${dateBR(b.importado_em)}`;
@@ -83,15 +100,15 @@ async function carregarItens(root) {
 // monta a árvore com os valores do balancete (sintéticas somadas a partir das analíticas quando faltarem)
 function linhas() {
   const by = new Map(dados.contas.map(c => [c.id, { ...c, ant: 0, deb: 0, cred: 0, atu: 0, tem: false, filhos: [] }]));
-  const ab = ui.sel.startsWith('a:');
+  const ab = ui.sel.startsWith('a:'), soma = ui.sel[0] !== 'b';   // abertura e plataforma: sintéticas = própria + filhas
   for (const it of dados.itens) {
     const c = by.get(it.conta_id); if (!c) continue;
     c.ant = +it.saldo_anterior; c.deb = +it.debito; c.cred = +it.credito; c.atu = +it.saldo_atual; c.tem = true;
   }
   for (const c of by.values()) if (c.pai_id && by.has(c.pai_id)) by.get(c.pai_id).filhos.push(c);
-  if (ab) {
-    const soma = (c) => { if (!c.filhos.length) return c.atu; c.atu = c.filhos.reduce((s, f) => s + soma(f), 0); c.tem = true; return c.atu; };
-    for (const c of by.values()) if (!c.pai_id) soma(c);
+  if (soma) {
+    const sobe = (c) => { for (const f of c.filhos) { sobe(f); for (const k of ['ant', 'deb', 'cred', 'atu']) c[k] += f[k]; if (f.tem) c.tem = true; } };
+    for (const c of by.values()) if (!c.pai_id || !by.has(c.pai_id)) sobe(c);
   }
   // ordem do relatório: árvore (mãe, depois as filhas), irmãs em ordem de classificação
   const ord = [], porCls = (a, b) => cmpClass(a.classificacao, b.classificacao);
@@ -99,6 +116,27 @@ function linhas() {
   [...by.values()].filter(c => !c.pai_id || !by.has(c.pai_id)).sort(porCls).forEach(desce);
   return { ord, by, ab };
 }
+const MESN = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const fimMes = (m) => { const d = new Date(+m.slice(0, 4), +m.slice(5), 0); return `${m}-${String(d.getDate()).padStart(2, '0')}`; };
+
+// gera (ou refaz) os lançamentos contábeis do mês a partir dos lançamentos financeiros pagos
+async function gerar(root, ini, fim) {
+  const b = $('#gerar', root); b.disabled = true; b.textContent = 'Gerando…';
+  try {
+    const r = await q(sb.rpc('gerar_contabil_financeiro', { p_empresa: state.empresa.id, p_ini: ini, p_fim: fim }));
+    toast(`${r.gerados} lançamentos contábeis gerados${r.pendentes ? ` · ${r.pendentes} pendente(s)` : ''}`);
+    await carregarItens(root);
+    $('#pend', root).innerHTML = pendHTML(r);
+  } catch (e) { fail(e); b.disabled = false; b.textContent = 'Gerar lançamentos contábeis do mês'; }
+}
+function pendHTML(r) {
+  if (!r.pendentes) return `<div class="card" style="margin-bottom:12px"><strong class="pos">✔ Todos os ${r.gerados} lançamentos financeiros pagos do mês foram contabilizados.</strong></div>`;
+  return `<div class="card" style="margin-bottom:12px"><strong class="neg">${r.pendentes} lançamento(s) financeiro(s) sem contabilização</strong>
+    <span class="small muted"> — complete o de-para em Contabilidade › De-para e gere de novo.</span>
+    ${(r.pendencias || []).map(p => `<details style="margin-top:6px"><summary>${esc(p.motivo)}: ${p.qtd} · ${money(p.valor)}</summary>
+      <table class="small"><tbody>${(p.exemplos || []).map(x => `<tr><td>${dateBR(x.data)}</td><td>${esc(x.classif)}</td><td>${esc(x.descricao || '')}</td><td class="num">${money(x.valor)}</td></tr>`).join('')}</tbody></table></details>`).join('')}</div>`;
+}
+
 function cmpClass(a, b) {
   const x = a.split('.'), y = b.split('.');
   for (let i = 0; i < Math.max(x.length, y.length); i++) {

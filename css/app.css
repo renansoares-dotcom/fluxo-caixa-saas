@@ -436,3 +436,5 @@ body.cf-imprimindo .card-head{margin:0}
 .bal-check{list-style:none;padding:0;margin:12px 0;display:grid;gap:4px}
 .nowrap{white-space:nowrap}
 .bal-abert{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:8px;margin-top:10px;font-size:13px;color:var(--text)}.bal-abert input{width:auto;margin-top:2px}
+tr.dp-falta td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+.dp-in{width:100%;min-width:200px}
