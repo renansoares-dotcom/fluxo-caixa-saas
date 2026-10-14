@@ -50,8 +50,21 @@ export async function render(root) {
     if (t.name === 'mes') { if (!t.value) return; ui.mes = t.value; try { localStorage.setItem(LS, ui.mes); } catch {} carregar(); }
     else { ui[t.name] = t.checked; pintar(); }
   });
-  $('#cimp', root).onclick = () => window.print();
+  $('#cimp', root).onclick = imprimir;
   await carregar();
+}
+
+// impressão em paisagem (A4 deitado) só para esta tela: o mapa do mês tem 31 colunas
+function imprimir() {
+  const st = document.createElement('style');
+  st.id = 'cf-print';
+  st.textContent = '@page{size:A4 landscape;margin:7mm}';
+  document.head.appendChild(st);
+  document.body.classList.add('cf-imprimindo');
+  const fim = () => { st.remove(); document.body.classList.remove('cf-imprimindo'); window.removeEventListener('afterprint', fim); };
+  window.addEventListener('afterprint', fim);
+  window.print();
+  setTimeout(fim, 1500);   // navegadores que não disparam afterprint
 }
 
 async function carregar() {
