@@ -1,4 +1,4 @@
-import { sb, state, q, loadCadastros, anosSelect } from './lib/data.js';
+import { sb, state, q, loadCadastros, anosSelect, temArea } from './lib/data.js';
 import { $, $$, esc, toast, fail, formData, loading, lerCores, modal } from './lib/ui.js';
 import { SUPABASE_URL } from './config.js';
 
@@ -127,7 +127,7 @@ async function escolherEmpresa() {
     let podeCriar = false;
     try { podeCriar = !!(await q(sb.rpc('pode_criar_empresa'))); } catch {}
     $('#empresa-form').classList.toggle('hidden', !podeCriar);
-    const rows = await q(sb.from('membros').select('papel, empresas(*)').eq('user_id', state.user.id));
+    const rows = await q(sb.from('membros').select('*, empresas(*)').eq('user_id', state.user.id));
     if (!rows.length) list.innerHTML = podeCriar
       ? '<p class="muted">Você ainda não participa de nenhuma empresa. Crie a primeira abaixo, ou peça a um administrador para adicionar seu e-mail.</p>'
       : '<p class="muted">Você ainda não participa de nenhuma empresa. Peça ao administrador um convite para o seu e-mail; depois saia e entre de novo que o acesso aparece aqui.</p>';
@@ -136,9 +136,9 @@ async function escolherEmpresa() {
       <span class="badge negoc">${esc(r.papel)}</span></div>`).join('');
     $$('.empresa-item', list).forEach(el => el.onclick = () => {
       const r = rows.find(x => x.empresas.id === el.dataset.id);
-      entrarEmpresa(r.empresas, r.papel);
+      entrarEmpresa(r.empresas, r.papel, r.areas);
     });
-    if (rows.length === 1 && !sessionStorage.getItem('fc-escolher')) entrarEmpresa(rows[0].empresas, rows[0].papel);
+    if (rows.length === 1 && !sessionStorage.getItem('fc-escolher')) entrarEmpresa(rows[0].empresas, rows[0].papel, rows[0].areas);
   } catch (e) { fail(e); }
 }
 $('#empresa-form').onsubmit = async (e) => {
@@ -153,9 +153,23 @@ $('#empresa-form').onsubmit = async (e) => {
 };
 $('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'); state.empresa = null; state.cad = null; escolherEmpresa(); };
 
-async function entrarEmpresa(emp, papel) {
+// esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
+function aplicarAreas() {
+  $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
+  const dash = $('#nav > a[data-route="dashboard"]'); if (dash) dash.hidden = !temArea('fin');
+}
+// primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
+function primeiraRota() {
+  const a = $$('#nav a[data-route]').find(x => !x.hidden && !x.closest('.nav-area')?.hidden);
+  return a?.dataset.route || 'cadastros/plano';
+}
+const areaDaRota = (route) => route === 'dashboard' ? 'fin' : $(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
+
+async function entrarEmpresa(emp, papel, areas) {
   sessionStorage.removeItem('fc-escolher');
   state.empresa = emp; state.papel = papel; state.cad = null;
+  state.areas = Array.isArray(areas) && areas.length ? areas : null;
+  aplicarAreas();
   try { localStorage.setItem('fc-empresa', emp.id); } catch {}
   $('#empresa-switch').textContent = emp.nome + ' ▾';
   $('#user-email').textContent = state.user.email;
@@ -165,7 +179,7 @@ async function entrarEmpresa(emp, papel) {
   // papel "compras": só a tela de paraquedas (o banco também não deixa ler o resto)
   document.body.classList.toggle('so-compras', papel === 'compras');
   if (papel === 'compras') { if (location.hash !== '#/paraquedas') location.hash = '#/paraquedas'; else render(); return; }
-  if (!location.hash || location.hash === '#/') location.hash = '#/dashboard'; else render();
+  if (!location.hash || location.hash === '#/') location.hash = '#/' + (temArea('fin') ? 'dashboard' : primeiraRota()); else render();
 }
 
 $('#ano-global').onchange = (e) => { state.ano = +e.target.value; render(); };
@@ -185,6 +199,7 @@ async function render() {
   lerCores();
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'dashboard';
   if (state.papel === 'compras' && route !== 'paraquedas') { location.hash = '#/paraquedas'; return; }
+  { const ar = routes[route] ? areaDaRota(route) : 'fin'; if (['fin', 'cpd', 'cont'].includes(ar) && !temArea(ar)) { location.hash = '#/' + primeiraRota(); return; } }
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
   // menu em cascata: abre o grupo da página atual
@@ -237,8 +252,8 @@ async function boot() {
   const last = (() => { try { return localStorage.getItem('fc-empresa'); } catch { return null; } })();
   if (last && !sessionStorage.getItem('fc-escolher')) {
     try {
-      const r = await q(sb.from('membros').select('papel, empresas(*)').eq('user_id', state.user.id).eq('empresa_id', last).maybeSingle());
-      if (r) return entrarEmpresa(r.empresas, r.papel);
+      const r = await q(sb.from('membros').select('*, empresas(*)').eq('user_id', state.user.id).eq('empresa_id', last).maybeSingle());
+      if (r) return entrarEmpresa(r.empresas, r.papel, r.areas);
     } catch {}
   }
   escolherEmpresa();

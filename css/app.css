@@ -428,3 +428,4 @@ body.cf-imprimindo .card-head{margin:0}
 .trilha:empty{display:none}
 .titulo-pag #page-title{margin:0}
 @media (max-width:600px){.trilha{font-size:10px}}
+.areas-chk{display:flex;gap:10px;flex-wrap:wrap}.areas-chk label.chk{display:inline-flex;align-items:center;gap:4px;font-size:13px;white-space:nowrap}

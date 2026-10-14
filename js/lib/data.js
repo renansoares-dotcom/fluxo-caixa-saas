@@ -9,6 +9,7 @@ export const state = {
   user: null,
   empresa: null,   // {id, nome, ...}
   papel: null,     // admin | financeiro | diretor | leitura
+  areas: null,     // áreas do menu que o usuário vê (fin, cpd, cont); null = todas
   ano: new Date().getFullYear(),
   cad: null,       // cadastros em cache
   filtros: { conta: '', grupo: '', cc: '', favorecido: '', disp: '', visao: 'Pago' },
@@ -16,6 +17,9 @@ export const state = {
 
 export const podeEditar = () => ['admin', 'financeiro'].includes(state.papel);
 export const isAdmin = () => state.papel === 'admin';
+// acesso por área (Financeiro, CPD, Contabilidade): administrador vê todas; sem marcação = todas
+export const AREAS = [['fin', 'Financeiro'], ['cpd', 'CPD'], ['cont', 'Contabilidade']];
+export const temArea = (a) => state.papel === 'admin' || !state.areas || state.areas.includes(a);
 
 export async function q(promise) {
   const { data, error } = await promise;

@@ -1,4 +1,4 @@
-import { sb, state, q, fetchAll, isAdmin, podeEditar, loadCadastros } from '../lib/data.js';
+import { sb, state, q, fetchAll, isAdmin, podeEditar, loadCadastros, AREAS } from '../lib/data.js';
 import { $, esc, options, formData, toast, fail, parseNum, dateBR, money, exportXLSX } from '../lib/ui.js';
 
 export const title = 'Empresa e usuários';
@@ -103,13 +103,34 @@ async function membros(root) {
   try {
     const rows = await q(sb.rpc('listar_membros', { p_empresa: state.empresa.id }));
     const adm = isAdmin();
-    el.innerHTML = `<table><thead><tr><th>E-mail</th><th>Papel</th><th></th></tr></thead><tbody>
+    const comAreas = rows.some(r => 'areas' in r);   // falso enquanto a migration 033 não roda
+    const areasTd = (r) => {
+      if (r.papel === 'admin') return '<span class="muted small">Todas (administrador)</span>';
+      if (r.papel === 'compras') return '<span class="muted small">Só paraquedas</span>';
+      const tem = (a) => !r.areas || r.areas.includes(a);
+      if (!adm || r.user_id === state.user.id || !comAreas) return esc(AREAS.filter(([a]) => tem(a)).map(([, n]) => n).join(', '));
+      return `<div class="areas-chk">${AREAS.map(([a, n]) => `<label class="chk"><input type="checkbox" class="ar" value="${a}" ${tem(a) ? 'checked' : ''}> ${n}</label>`).join('')}</div>`;
+    };
+    el.innerHTML = `<table><thead><tr><th>E-mail</th><th>Papel</th><th>Áreas</th><th></th></tr></thead><tbody>
       ${rows.map(r => `<tr data-u="${r.user_id}"><td>${esc(r.email)}</td>
         <td>${adm && r.user_id !== state.user.id ? `<select class="pap">${options(PAPEIS.map(([id]) => ({ id, nome: id })), { selected: r.papel })}</select>` : esc(r.papel)}</td>
-        <td>${adm && r.user_id !== state.user.id ? '<button class="btn small danger rm">Remover</button>' : ''}</td></tr>`).join('')}</tbody></table>`;
+        <td>${areasTd(r)}</td>
+        <td>${adm && r.user_id !== state.user.id ? '<button class="btn small danger rm">Remover</button>' : ''}</td></tr>`).join('')}</tbody></table>
+      <p class="muted small" style="margin-top:8px">Áreas: o que a pessoa enxerga no menu (Financeiro inclui o Dashboard; Cadastros aparecem para todos).
+      O que ela pode <strong>alterar</strong> continua definido pelo papel — para um contador só consultar, use papel <em>leitura</em> + área Contabilidade.
+      ${adm && !comAreas ? '<br><strong class="warn">Para liberar a escolha de áreas, rode a migration 20261014000033_membros_areas.sql.</strong>' : ''}</p>`;
     el.onchange = async (ev) => {
-      if (!ev.target.matches('.pap')) return;
-      try { await q(sb.from('membros').update({ papel: ev.target.value }).eq('empresa_id', state.empresa.id).eq('user_id', ev.target.closest('tr').dataset.u)); toast('Papel alterado'); } catch (err) { fail(err); }
+      const tr = ev.target.closest('tr');
+      if (ev.target.matches('.pap')) {
+        try { await q(sb.from('membros').update({ papel: ev.target.value }).eq('empresa_id', state.empresa.id).eq('user_id', tr.dataset.u)); toast('Papel alterado'); membros(root); } catch (err) { fail(err); }
+        return;
+      }
+      if (!ev.target.matches('.ar')) return;
+      const marcadas = [...tr.querySelectorAll('.ar:checked')].map(x => x.value);
+      if (!marcadas.length) { ev.target.checked = true; toast('Deixe ao menos uma área marcada', 'error'); return; }
+      const areas = marcadas.length === AREAS.length ? null : marcadas;   // todas marcadas = sem restrição
+      try { await q(sb.from('membros').update({ areas }).eq('empresa_id', state.empresa.id).eq('user_id', tr.dataset.u)); toast('Áreas alteradas — valem no próximo acesso da pessoa'); }
+      catch (err) { ev.target.checked = !ev.target.checked; fail(err); }
     };
     el.onclick = async (ev) => {
       if (!ev.target.matches('.rm') || !confirm('Remover acesso deste usuário?')) return;
