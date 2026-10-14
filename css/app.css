@@ -335,7 +335,7 @@ tr.conc-ok>td:first-child{box-shadow:inset 3px 0 0 var(--pos)}
 .badge.conc{background:var(--pos-soft);color:var(--pos);border:1px solid var(--pos)}
 
 /* papel "compras": só o menu de paraquedas */
-.so-compras #nav > a, .so-compras #nav details:not(:has(.nav-compras)), .so-compras #nav .nav-itens a:not(.nav-compras), .so-compras .ano-sel{display:none}
+.so-compras #nav > a, .so-compras #nav .nav-area:not(:has(.nav-compras)), .so-compras #nav details:not(:has(.nav-compras)), .so-compras #nav .nav-itens a:not(.nav-compras), .so-compras .ano-sel{display:none}
 
 /* Conferência do dia */
 .warn{color:var(--warn)}
@@ -411,3 +411,20 @@ body.cf-imprimindo .card-head{margin:0}
 
 @media (max-width:640px){.cf-foot{flex-direction:column;align-items:stretch}.cf-visto{justify-content:stretch}}
 .convite-box{background:var(--surface-2,rgba(47,111,179,.08));border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0 0 12px;line-height:1.45}
+
+/* Áreas-mãe do menu: Financeiro, CPD, Contabilidade */
+.nav-area{--area:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
+.nav-area[data-area="fin"],.trilha[data-area="fin"]{--area:var(--brand-blue)}
+.nav-area[data-area="cpd"],.trilha[data-area="cpd"]{--area:#0e9f8f}
+.nav-area[data-area="cont"],.trilha[data-area="cont"]{--area:var(--brand-navy)}
+.nav-area-tit{display:flex;align-items:center;gap:8px;padding:2px 10px 4px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--area)}
+.nav-area-tit::before{content:'';width:4px;height:14px;border-radius:2px;background:var(--area)}
+.nav-area .nav-sec:has(a.active)>summary{color:var(--area)}
+.nav-area .nav-itens{border-left-color:color-mix(in srgb,var(--area) 35%,var(--border))}
+.nav-breve{padding:7px 10px;font-size:13px;color:var(--muted);opacity:.7;cursor:default}
+.nav-breve em{font-style:normal;white-space:nowrap;display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-left:4px;padding:1px 5px;border-radius:6px;background:var(--surface-2)}
+.titulo-pag{min-width:0;display:flex;flex-direction:column}
+.trilha{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--area,var(--muted));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trilha:empty{display:none}
+.titulo-pag #page-title{margin:0}
+@media (max-width:600px){.trilha{font-size:10px}}

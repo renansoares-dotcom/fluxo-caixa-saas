@@ -196,6 +196,10 @@ async function render() {
     const mod = await loader();
     if (seq !== renderSeq) return;
     $('#page-title').textContent = mod.title;
+    // trilha: Área › Seção (de onde a página fica no menu)
+    { const a = $(`#nav a[data-route="${route}"]`); const area = a?.closest('.nav-area'); const sec = a?.closest('details')?.querySelector('summary')?.textContent;
+      const tit = area?.querySelector('.nav-area-tit')?.textContent; const tr = $('#page-trilha');
+      tr.textContent = [tit, sec].filter(Boolean).join(' › '); tr.dataset.area = area?.dataset.area || ''; }
     document.title = `${mod.title} · ${state.empresa.nome}`;
     // os cadastros podem ter sido descartados no meio do caminho (sessão renovada, troca de empresa): recarrega antes de desenhar
     if (!state.cad) await loadCadastros();

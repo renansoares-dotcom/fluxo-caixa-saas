@@ -54,33 +54,55 @@
       <button class="empresa-switch" id="empresa-switch" title="Trocar empresa"></button>
       <nav id="nav">
         <a href="#/dashboard" data-route="dashboard">Dashboard</a>
+
+        <div class="nav-area" data-area="fin"><div class="nav-area-tit">Financeiro</div>
         <details class="nav-sec"><summary>Movimento</summary><div class="nav-itens">
         <a href="#/lancamentos" data-route="lancamentos">Lançamentos</a>
         <a href="#/conciliacao" data-route="conciliacao">Conciliação Bancária</a>
         <a href="#/abertos" data-route="abertos">Contas A Pagar / Receber</a>
         <a href="#/creditos" data-route="creditos">Créditos E Adiantamentos</a>
         <a href="#/conta-fornecedor" data-route="conta-fornecedor">Conta-Corrente Fornecedor / Cliente</a>
-        <a href="#/paraquedas" data-route="paraquedas" class="nav-compras">Paraquedas (Sem Nota)</a>
+        </div></details>
+        <details class="nav-sec"><summary>Pagamentos</summary><div class="nav-itens">
         <a href="#/autorizacao" data-route="autorizacao">Autorização De Pagamentos</a>
+        <a href="#/paraquedas" data-route="paraquedas" class="nav-compras">Paraquedas (Sem Nota)</a>
         </div></details>
-        <details class="nav-sec"><summary>Fiscal</summary><div class="nav-itens">
-        <a href="#/notas" data-route="notas">Notas Fiscais</a>
-        </div></details>
-        <details class="nav-sec"><summary>Relatórios</summary><div class="nav-itens">
-        <a href="#/fluxo-mensal" data-route="fluxo-mensal">Fluxo De Caixa Mensal</a>
-        <a href="#/fluxo-diario" data-route="fluxo-diario">Fluxo De Caixa Diário</a>
-        <a href="#/dre" data-route="dre">DRE Gerencial</a>
+        <details class="nav-sec"><summary>Fechamento</summary><div class="nav-itens">
         <a href="#/conferencia" data-route="conferencia">Conferência Do Dia</a>
         <a href="#/fechamento" data-route="fechamento">Fechamento Do Mês</a>
+        </div></details>
+        <details class="nav-sec"><summary>Fluxo De Caixa</summary><div class="nav-itens">
+        <a href="#/fluxo-mensal" data-route="fluxo-mensal">Fluxo De Caixa Mensal</a>
+        <a href="#/fluxo-diario" data-route="fluxo-diario">Fluxo De Caixa Diário</a>
         </div></details>
         <details class="nav-sec"><summary>Planejamento</summary><div class="nav-itens">
         <a href="#/orcamento" data-route="orcamento">Budget / Forecast</a>
         <a href="#/orcado-realizado" data-route="orcado-realizado">Orçado X Realizado</a>
         <a href="#/controle-orcamento" data-route="controle-orcamento">Controle Orçamentário</a>
+        </div></details>
+        <details class="nav-sec"><summary>Crédito / FIDC</summary><div class="nav-itens">
         <a href="#/fidc" data-route="fidc">Análise FIDC</a>
         <a href="#/fidc-propostas" data-route="fidc-propostas">Propostas De Borderô</a>
         <a href="#/duplicatas" data-route="duplicatas">Duplicatas Para Endosso</a>
         </div></details>
+        </div>
+
+        <div class="nav-area" data-area="cpd"><div class="nav-area-tit">CPD</div>
+        <details class="nav-sec"><summary>Fiscal</summary><div class="nav-itens">
+        <a href="#/notas" data-route="notas">Notas Fiscais</a>
+        </div></details>
+        </div>
+
+        <div class="nav-area" data-area="cont"><div class="nav-area-tit">Contabilidade</div>
+        <details class="nav-sec"><summary>Demonstrações</summary><div class="nav-itens">
+        <a href="#/dre" data-route="dre">DRE Gerencial</a>
+        <span class="nav-breve" title="Em construção">Balancete <em>em breve</em></span>
+        <span class="nav-breve" title="Em construção">Balanço Patrimonial <em>em breve</em></span>
+        <span class="nav-breve" title="Em construção">DFC <em>em breve</em></span>
+        </div></details>
+        </div>
+
+        <div class="nav-area" data-area="cad">
         <details class="nav-sec"><summary>Cadastros</summary><div class="nav-itens">
         <a href="#/cadastros/plano" data-route="cadastros/plano">Plano De Contas</a>
         <a href="#/cadastros/contas" data-route="cadastros/contas">Contas Bancárias</a>
@@ -88,6 +110,7 @@
         <a href="#/cadastros/centros" data-route="cadastros/centros">Centros De Custo E Grupos</a>
         <a href="#/config" data-route="config">Empresa E Usuários</a>
         </div></details>
+        </div>
       </nav>
       <div class="sidebar-foot">
         <span id="user-email" class="muted small"></span>
@@ -98,7 +121,7 @@
     <main class="main">
       <header class="topbar">
         <button class="btn ghost icon" id="menu-btn" aria-label="Menu">☰</button>
-        <h1 id="page-title">Dashboard</h1>
+        <div class="titulo-pag"><div id="page-trilha" class="trilha"></div><h1 id="page-title">Dashboard</h1></div>
         <div class="topbar-right">
           <label class="ano-sel">Ano <select id="ano-global"></select></label>
           <button class="btn ghost icon" id="theme-btn" title="Tema claro/escuro" aria-label="Alternar tema"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg></button>
