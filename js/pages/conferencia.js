@@ -61,7 +61,12 @@ function imprimir() {
   st.textContent = '@page{size:A4 landscape;margin:7mm}';
   document.head.appendChild(st);
   document.body.classList.add('cf-imprimindo');
-  const fim = () => { st.remove(); document.body.classList.remove('cf-imprimindo'); window.removeEventListener('afterprint', fim); };
+  // mede o conteúdo na largura útil da folha (A4 deitado, margem 7 mm ≈ 1066 × 740 px) e reduz até caber numa página
+  const W = 1066, H = 735;
+  rootEl.style.width = W + 'px'; rootEl.style.zoom = '';
+  const z = Math.min(1, H / rootEl.scrollHeight, W / rootEl.scrollWidth);
+  rootEl.style.zoom = String(Math.floor(z * 100) / 100);
+  const fim = () => { st.remove(); document.body.classList.remove('cf-imprimindo'); rootEl.style.width = ''; rootEl.style.zoom = ''; window.removeEventListener('afterprint', fim); };
   window.addEventListener('afterprint', fim);
   window.print();
   setTimeout(fim, 1500);   // navegadores que não disparam afterprint

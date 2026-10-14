@@ -384,23 +384,30 @@ tr.cf-row-al>td{background:var(--warn-soft)}
 @media print{
   .cf-td{cursor:default}
   .cf-c,.cf-prog span,.fds{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body.cf-imprimindo .page{padding:0}
-  body.cf-imprimindo .kpis{grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
-  body.cf-imprimindo .kpi{padding:6px 8px;box-shadow:none}
-  body.cf-imprimindo .kpi .k-value{font-size:15px}
-  body.cf-imprimindo .card{box-shadow:none;margin-bottom:6px;padding:8px}
-  body.cf-imprimindo table.cf-grid{width:100%;font-size:8.5px}
-  body.cf-imprimindo table.cf-grid th,body.cf-imprimindo table.cf-grid td{padding:1px 0}
-  body.cf-imprimindo table.cf-grid .cf-conta{min-width:0;max-width:none;padding:2px 4px;position:static;font-size:8.5px}
-  body.cf-imprimindo table.cf-grid td.num{padding:2px 4px;font-size:8.5px}
-  body.cf-imprimindo .cf-c{width:19px;height:15px;font-size:7px;border-radius:3px}
-  body.cf-imprimindo .cf-c.erro{font-size:6px;letter-spacing:-.3px}
-  body.cf-imprimindo .cf-c.trav::after{width:4px;height:4px}
-  body.cf-imprimindo .cf-head{display:flex!important;padding:4px 6px}
-  body.cf-imprimindo .cf-head .btn{display:none}
-  body.cf-imprimindo .cf-leg{font-size:8px;gap:8px}
-  body.cf-imprimindo .cf-leg .cf-c{width:14px;height:12px}
-  body.cf-imprimindo .card-head p{font-size:9px}
+  body.cf-imprimindo .sidebar,body.cf-imprimindo .topbar{display:none!important}
 }
+/* modo de impressão da Conferência (aplicado antes de imprimir, para medir e caber numa página) */
+body.cf-imprimindo .page{padding:0}
+body.cf-imprimindo .kpis{grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+body.cf-imprimindo .kpi{padding:6px 8px;box-shadow:none}
+body.cf-imprimindo .kpi .k-value{font-size:15px}
+body.cf-imprimindo .card{box-shadow:none;margin-bottom:6px;padding:8px}
+body.cf-imprimindo table.cf-grid{width:100%;font-size:8.5px}
+body.cf-imprimindo table.cf-grid th,body.cf-imprimindo table.cf-grid td{padding:1px 0}
+body.cf-imprimindo table.cf-grid .cf-conta{min-width:0;max-width:none;padding:2px 4px;position:static;font-size:8.5px}
+body.cf-imprimindo table.cf-grid td.num{padding:2px 4px;font-size:8.5px}
+body.cf-imprimindo .cf-c{width:19px;height:15px;font-size:7px;border-radius:3px}
+body.cf-imprimindo .cf-c.erro{font-size:6px;letter-spacing:-.3px}
+body.cf-imprimindo .cf-c.trav::after{width:4px;height:4px}
+body.cf-imprimindo .cf-head{display:flex!important;padding:4px 6px}
+body.cf-imprimindo .cf-head .btn{display:none}
+body.cf-imprimindo .cf-leg{font-size:8px;gap:8px}
+body.cf-imprimindo .cf-leg .cf-c{width:14px;height:12px}
+body.cf-imprimindo .card-head p{font-size:9px}
+body.cf-imprimindo .cf-conta .small{display:inline;font-size:7.5px;margin-left:4px}
+body.cf-imprimindo .cf-conta strong{font-size:8.5px}
+body.cf-imprimindo #ccorpo > p, body.cf-imprimindo #ccorpo .card.flush > p{font-size:7.5px;margin:2px 6px;padding:0 6px 4px!important}
+body.cf-imprimindo .card-head{margin:0}
+
 @media (max-width:640px){.cf-foot{flex-direction:column;align-items:stretch}.cf-visto{justify-content:stretch}}
 .convite-box{background:var(--surface-2,rgba(47,111,179,.08));border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0 0 12px;line-height:1.45}
