@@ -15,6 +15,7 @@ const routes = {
   'fluxo-mensal': () => import('./pages/fluxo-mensal.js'),
   'fluxo-diario': () => import('./pages/fluxo-diario.js'),
   'dre': () => import('./pages/dre.js'),
+  'contab/balancete': () => import('./pages/contab-balancete.js'),
   'conferencia': () => import('./pages/conferencia.js'),
   'fechamento': () => import('./pages/fechamento.js'),
   'orcamento': () => import('./pages/orcamento.js'),

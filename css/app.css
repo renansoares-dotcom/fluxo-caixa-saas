@@ -429,3 +429,10 @@ body.cf-imprimindo .card-head{margin:0}
 .titulo-pag #page-title{margin:0}
 @media (max-width:600px){.trilha{font-size:10px}}
 .areas-chk{display:flex;gap:10px;flex-wrap:wrap}.areas-chk label.chk{display:inline-flex;align-items:center;gap:4px;font-size:13px;white-space:nowrap}
+/* Contabilidade › Balancete */
+.bal-tbl td,.bal-tbl th{white-space:nowrap}
+.bal-tbl tr.bal-s{cursor:pointer}
+.bal-tg{display:inline-block;width:14px;color:var(--muted)}
+.bal-check{list-style:none;padding:0;margin:12px 0;display:grid;gap:4px}
+.nowrap{white-space:nowrap}
+.bal-abert{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:8px;margin-top:10px;font-size:13px;color:var(--text)}.bal-abert input{width:auto;margin-top:2px}
