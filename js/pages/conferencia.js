@@ -212,7 +212,7 @@ function pintar() {
       <div class="kpi"><div class="k-label">Pagos sem conta no mês</div><div class="k-value ${D.semConta.length ? 'neg' : ''}">${D.semConta.length}</div><div class="k-sub">${D.semConta.length ? `${money0(D.semConta.reduce((s, l) => s + +l.valor, 0))} fora do saldo das contas` : 'nenhum'}</div></div>
     </div>
     <div class="card flush">
-      <div class="cf-head noprint"><div class="cf-leg">${['ok', 'erro', 'alerta', 'semext'].map(s => `<span><i class="cf-c ${s}">${ICONE[s]}</i>${DESC[s]}</span>`).join('')}<span><i class="cf-c ok conf">✔</i>conferido</span><span><i class="cf-c ok trav">✔</i>travado</span></div>
+      <div class="cf-head noprint"><div class="cf-leg">${['ok', 'erro', 'alerta', 'semext'].map(s => `<span><i class="cf-c ${s}">${ICONE[s]}</i>${DESC[s]}</span>`).join('')}<span><i class="cf-c ok conf">✔</i>conferido</span><span title="Visto dado num dia que tinha aviso ou diferença, com a explicação na observação"><i class="cf-c alerta conf">✔</i>conferido com ressalva</span><span><i class="cf-c ok trav">✔</i>travado</span></div>
         ${podeEditar() && D.vistosOk && prontos.length ? `<button class="btn small primary" id="cflote">Dar visto nos ${prontos.length} dia(s) que batem</button>` : ''}</div>
       <div class="table-wrap cf-wrap"><table class="cf-grid"><thead><tr><th class="cf-conta">Conta</th>
         ${D.dias.map(d => { const w = new Date(d + 'T12:00:00').getDay(); return `<th class="${w === 0 || w === 6 ? 'fds' : ''}">${+d.slice(8)}<div>${SEM[w].charAt(0).toUpperCase()}</div></th>`; }).join('')}
