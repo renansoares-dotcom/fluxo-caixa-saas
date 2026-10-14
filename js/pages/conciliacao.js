@@ -1,6 +1,6 @@
 // Conciliação bancária: importa o extrato OFX, sugere os vínculos com os lançamentos e registra a conciliação.
 // Extrato à esquerda, lançamentos do sistema à direita (mesmo padrão das propostas de borderô).
-import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
+import { sb, state, q, fetchAll, podeEditar, daConta } from '../lib/data.js';
 import { $, esc, money, cls, dateBR, options, fail, toast, modal } from '../lib/ui.js';
 import { abrirLancamento } from '../lib/lanc-form.js';
 import { lerOFX, decodificarOFX } from '../lib/ofx.js';
@@ -18,7 +18,8 @@ const cent = (v) => Math.round(+v * 100);
 const addDias = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const difDias = (a, b) => Math.round((new Date(a + 'T12:00:00') - new Date(b + 'T12:00:00')) / 864e5);
 const fimMes = (m) => { const [a, mm] = m.split('-').map(Number); return new Date(Date.UTC(a, mm, 0)).toISOString().slice(0, 10); };
-const sinal = (l) => (state.cad.planoById[l.plano_id]?.natureza === 'D' ? -1 : 1) * +l.valor;
+// na conta de destino de uma transferência única o lançamento é entrada
+const sinal = (l) => l.conta_destino_id && l.conta_destino_id === ui.conta ? +l.valor : (state.cad.planoById[l.plano_id]?.natureza === 'D' ? -1 : 1) * +l.valor;
 const chaveDesc = (s) => normTxt(s).replace(/\d+/g, ' ').replace(/[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length > 2).slice(0, 4).join(' ');
 
 export async function render(root) {
@@ -59,8 +60,8 @@ async function carregar(root) {
     const [itens, links, lancs, abertos, imps] = await Promise.all([
       fetchAll(() => sb.from('extrato_itens').select('*').eq('empresa_id', e).eq('conta_id', ui.conta).gte('data', ini).lte('data', fim).order('data').order('created_at')),
       fetchAll(() => sb.from('conciliacoes').select('id,extrato_id,lancamento_id,grupo_id').eq('empresa_id', e).eq('conta_id', ui.conta)),
-      fetchAll(() => sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,centro_custo_id,descricao,documento,conta_id').eq('empresa_id', e).eq('conta_id', ui.conta).eq('status', 'Pago').gte('data', addDias(ini, -10)).lte('data', addDias(fim, 10)).order('data')),
-      fetchAll(() => sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,centro_custo_id,descricao,documento,conta_id').eq('empresa_id', e).eq('status', 'Em aberto').gte('data', addDias(ini, -20)).lte('data', addDias(fim, 20)).order('data')),
+      fetchAll(() => sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,centro_custo_id,descricao,documento,conta_id,conta_destino_id').eq('empresa_id', e).or(daConta(ui.conta)).eq('status', 'Pago').gte('data', addDias(ini, -10)).lte('data', addDias(fim, 10)).order('data')),
+      fetchAll(() => sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,centro_custo_id,descricao,documento,conta_id,conta_destino_id').eq('empresa_id', e).eq('status', 'Em aberto').gte('data', addDias(ini, -20)).lte('data', addDias(fim, 20)).order('data')),
       q(sb.from('extrato_importacoes').select('*').eq('empresa_id', e).eq('conta_id', ui.conta).lte('saldo_data', fim).order('saldo_data', { ascending: false }).limit(1)),
     ]);
     const imp = imps?.[0] && imps[0].saldo_data >= ini ? imps[0] : null;
@@ -71,7 +72,7 @@ async function carregar(root) {
     D = { itens, links, porItem, lancLig, lancs, abertos: abertos.filter(a => !lancLig.has(a.id)), imp, saldoSis, ini, fim, lancById: Object.fromEntries([...lancs, ...abertos].map(l => [l.id, l])) };
     // lançamentos conciliados fora da janela carregada (para mostrar o vínculo)
     const faltam = links.filter(l => itens.some(i => i.id === l.extrato_id) && !D.lancById[l.lancamento_id]).map(l => l.lancamento_id);
-    for (let i = 0; i < faltam.length; i += 150) for (const l of await q(sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,descricao,documento,conta_id').in('id', faltam.slice(i, i + 150)))) D.lancById[l.id] = l;
+    for (let i = 0; i < faltam.length; i += 150) for (const l of await q(sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,descricao,documento,conta_id,conta_destino_id').in('id', faltam.slice(i, i + 150)))) D.lancById[l.id] = l;
     // vínculos órfãos (o movimento voltou a pendente porque um lançamento do grupo foi excluído): remove
     const orfaos = links.filter(l => { const it = itens.find(i => i.id === l.extrato_id); return it && it.status !== 'conciliado'; });
     if (orfaos.length && podeEditar()) {
@@ -188,7 +189,7 @@ function pintarExtrato(root) {
 const linhaLanc = (l, { marcar = true, marcado = false } = {}) => {
   const p = state.cad.planoById[l.plano_id]; const f = state.cad.favById[l.favorecido_id]; const v = sinal(l);
   return `<tr data-l="${l.id}">${marcar ? `<td><input type="checkbox" ${marcado ? 'checked' : ''}></td>` : ''}<td>${dateBR(l.data)}</td>
-    <td class="wrap">${esc(f?.nome || l.descricao || '')}<div class="small muted">${esc(p ? `${p.codigo} ${p.nome}` : '')}${l.documento ? ` · NF ${esc(l.documento)}` : ''}${l.status === 'Em aberto' ? ' · <span class="neg">em aberto</span>' : ''}${l.conta_id && l.conta_id !== ui.conta ? ` · ${esc(state.cad.contaById[l.conta_id]?.nome || '')}` : ''}</div></td>
+    <td class="wrap">${esc(f?.nome || l.descricao || '')}<div class="small muted">${esc(p ? `${p.codigo} ${p.nome}` : '')}${l.documento ? ` · NF ${esc(l.documento)}` : ''}${l.status === 'Em aberto' ? ' · <span class="neg">em aberto</span>' : ''}${l.conta_destino_id ? (l.conta_destino_id === ui.conta ? ` · ⇄ vindo de ${esc(state.cad.contaById[l.conta_id]?.nome || '')}` : ` · ⇄ para ${esc(state.cad.contaById[l.conta_destino_id]?.nome || '')}`) : l.conta_id && l.conta_id !== ui.conta ? ` · ${esc(state.cad.contaById[l.conta_id]?.nome || '')}` : ''}</div></td>
     <td class="num ${cls(v)}">${money(v)}</td><td class="edt"><button class="btn ghost icon small" data-edit="${l.id}" title="Abrir o lançamento para edição">✎</button></td></tr>`;
 };
 
@@ -428,7 +429,7 @@ async function criar(item, root) {
   } catch { /* sem histórico */ }
   abrirLancamento({ ...base, data: item.data, status: 'Pago', valor: Math.abs(item.valor), conta_id: ui.conta, descricao: item.descricao, documento: item.documento }, async (salvo) => {
     if (!salvo) return carregar(root);
-    if (salvo.status !== 'Pago' || salvo.conta_id !== ui.conta || cent(sinal(salvo)) !== cent(item.valor)) {
+    if (salvo.status !== 'Pago' || (salvo.conta_id !== ui.conta && salvo.conta_destino_id !== ui.conta) || cent(sinal(salvo)) !== cent(item.valor)) {
       toast('Lançamento criado, mas valor/natureza/conta não batem com o movimento: concilie manualmente.', true); return carregar(root);
     }
     D.lancById[salvo.id] = salvo; await conciliar([{ item, ids: [salvo.id] }], root);

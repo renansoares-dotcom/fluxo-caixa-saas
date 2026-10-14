@@ -2,10 +2,13 @@
 import { sb, state, q, podeEditar, loadCadastros } from './data.js';
 import { modal, options, esc, $, toast, fail, parseNum, today, money } from './ui.js';
 
+// transferência é um lançamento só (origem → destino) no plano de saída 3.02; os planos de entrada de transferência
+// (3.01) só aparecem quando o lançamento já é um deles (transferências antigas, em duas pontas)
+export const ehTransfUnica = (p) => p?.tipo === 'T' && p?.natureza === 'D';
 export function planoOptions(selected, tipos = ['E', 'S', 'T']) {
   const c = state.cad;
   return c.classes.filter(cl => tipos.includes(cl.tipo) && cl.ativo).map(cl => {
-    const filhos = c.contasPlano.filter(p => p.pai_id === cl.id && (p.ativo || p.id === selected));
+    const filhos = c.contasPlano.filter(p => p.pai_id === cl.id && (p.ativo || p.id === selected) && !(p.tipo === 'T' && p.natureza === 'C' && p.id !== selected));
     if (!filhos.length) return '';
     return `<optgroup label="${esc(cl.label)}">${options(filhos, { label: 'label', selected })}</optgroup>`;
   }).join('');
@@ -47,7 +50,8 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
     <label>Status<select name="status">${options([{ id: 'Pago' }, { id: 'Em aberto' }], { label: 'id', selected: l.status })}</select></label>
     <label>Valor (R$)<input name="valor" inputmode="decimal" value="${l.valor != null ? money(l.valor) : ''}" required placeholder="0,00"></label>
     <label class="span2">Plano de contas<select name="plano_id" required><option value="">Selecione…</option>${planoOptions(l.plano_id)}</select></label>
-    <label>Conta / banco<select name="conta_id">${options(c.contas.filter(x => x.ativo || x.id === l.conta_id), { empty: '(sem conta)', selected: l.conta_id })}</select></label>
+    <label><span id="lf-lconta">Conta / banco</span><select name="conta_id">${options(c.contas.filter(x => x.ativo || x.id === l.conta_id), { empty: '(sem conta)', selected: l.conta_id })}</select></label>
+    <label id="lf-dest" hidden>Para a conta (destino)<select name="conta_destino_id">${options(c.contas.filter(x => x.ativo || x.id === l.conta_destino_id), { empty: 'Selecione…', selected: l.conta_destino_id })}</select></label>
     <label class="span2">Descrição<input name="descricao" value="${esc(l.descricao)}"></label>
     <label>Centro de custo<select name="centro_custo_id">${options(c.cc, { empty: '—', selected: l.centro_custo_id })}</select></label>
     <label class="span2">Favorecido<input name="favorecido" list="dl-fav" value="${esc(fav)}" placeholder="Digite para buscar ou cadastrar">${favDatalist()}</label>
@@ -64,6 +68,14 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
      <button class="btn" data-close>Cancelar</button><button class="btn primary" id="lf-save">Salvar</button>`;
   const m = modal({ title: editando ? 'Editar lançamento' : 'Novo lançamento', body: (editando && l.fidc_proposta_id ? '<p class="small muted" style="margin-top:0">Título vinculado a uma proposta de borderô FIDC.</p>' : '') + body, foot });
   const form = $('#lanc-form', m.el);
+  // transferência: "De" (conta) → "Para" (destino)
+  const modoTransf = () => {
+    const t = ehTransfUnica(c.planoById[form.plano_id.value]);
+    $('#lf-dest', m.el).hidden = !t; form.conta_destino_id.required = t && !l.id ? true : t && !!l.conta_destino_id;
+    $('#lf-lconta', m.el).textContent = t ? 'De (conta de origem)' : 'Conta / banco';
+    form.conta_id.required = t;
+  };
+  form.plano_id.addEventListener('change', modoTransf); modoTransf();
   if (ro) form.querySelectorAll('input,select').forEach(i => i.disabled = true);
   if (ro) return;
   // lançamento conciliado com o extrato: só descrição e opcionais; sem exclusão
@@ -94,12 +106,14 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
       const row = {
         empresa_id: state.empresa.id, data: fd.data, status: fd.status, valor: Math.abs(parseNum(fd.valor)),
         plano_id: fd.plano_id, conta_id: fd.conta_id || null, descricao: fd.descricao || null,
+        conta_destino_id: ehTransfUnica(plano) ? (fd.conta_destino_id || null) : null,
         centro_custo_id: fd.centro_custo_id || null, prioridade: fd.prioridade || null,
         opc1: fd.opc1 || null, opc2: fd.opc2 || null, opc3: fd.opc3 || null, opc4: fd.opc4 || null,
         documento: (fd.documento || '').trim() || null, emissao: fd.emissao || null,
         favorecido_id: await resolverFavorecido(fd.favorecido, plano),
       };
       if (!row.valor) throw new Error('Informe um valor maior que zero');
+      if (row.conta_destino_id && row.conta_destino_id === row.conta_id) throw new Error('A conta de destino precisa ser diferente da conta de origem');
       let salvo;
       if (editando) salvo = await q(sb.from('lancamentos').update(row).eq('id', l.id).select().single());
       else salvo = await q(sb.from('lancamentos').insert(row).select().single());

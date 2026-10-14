@@ -196,3 +196,20 @@ export function mesesHeader(extra = '') {
   return MESES.map(m => `<th class="num">${m}</th>`).join('') + extra;
 }
 export { esc };
+
+// ---------------------------------------------------------------------
+// Transferência única: um lançamento com conta de origem (conta_id) e de destino (conta_destino_id).
+// pontas() devolve cada lançamento como ponta(s) por conta: a origem com o sinal do plano e, quando há destino,
+// uma segunda ponta no destino como entrada (plano de contrapartida 3.01). Use em qualquer cálculo por conta.
+// ---------------------------------------------------------------------
+export function pontas(ls) {
+  const cad = state.cad, out = [];
+  for (const l of ls) {
+    const p = cad.planoById[l.plano_id];
+    out.push({ ...l, sinal: (p?.natureza === 'C' ? 1 : -1) * +l.valor, destino: false });
+    if (l.conta_destino_id) out.push({ ...l, conta_id: l.conta_destino_id, conta_origem_id: l.conta_id, plano_id: p?.contrapartida_id || l.plano_id, sinal: +l.valor, destino: true });
+  }
+  return out;
+}
+// filtro PostgREST "lançamentos desta conta" (origem ou destino da transferência)
+export const daConta = (id) => `conta_id.eq.${id},conta_destino_id.eq.${id}`;

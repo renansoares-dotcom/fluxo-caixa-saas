@@ -3,7 +3,7 @@
 // possível duplicidade, classificação suspeita, transferência sem a outra ponta) ou se ainda precisa ser conferido
 // à mão (conta sem extrato). Clicando, abre o dia com os lançamentos e o extrato lado a lado e o botão de visto.
 // Nada aqui altera lançamentos: só grava o visto (conferencias_dia); as correções são feitas no formulário de sempre.
-import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.js';
+import { sb, state, q, fetchAll, podeEditar, loadCadastros, pontas } from '../lib/data.js';
 import { $, $$, esc, money, money0, cls, dateBR, fail, toast, modal, parseNum, MESES } from '../lib/ui.js';
 import { abrirLancamento } from '../lib/lanc-form.js';
 import { normTxt } from '../lib/nf-titulos.js';
@@ -67,9 +67,9 @@ async function montar(mes) {
   await loadCadastros();
   const cad = state.cad, e = state.empresa.id, ini = `${mes}-01`, fim = fimMes(mes);
   const iniW = addDias(ini, -5), fimW = addDias(fim, 5);   // folga para duplicidade e transferências na virada do mês
-  const [saldos, lancs, semConta, ext, imps, travas, vistos] = await Promise.all([
+  const [saldos, lancsRaw, semConta, ext, imps, travas, vistos] = await Promise.all([
     q(sb.rpc('saldos_contas', { p_empresa: e, p_ate: addDias(ini, -1) })),
-    fetchAll(() => sb.from('lancamentos').select('id,data,valor,plano_id,favorecido_id,descricao,documento,conta_id,centro_custo_id,status')
+    fetchAll(() => sb.from('lancamentos').select('id,data,valor,plano_id,favorecido_id,descricao,documento,conta_id,conta_destino_id,centro_custo_id,status')
       .eq('empresa_id', e).eq('status', 'Pago').not('conta_id', 'is', null).gte('data', iniW).lte('data', fimW).order('data').order('id')),
     fetchAll(() => sb.from('lancamentos').select('id,data,valor').eq('empresa_id', e).eq('status', 'Pago').is('conta_id', null).gte('data', ini).lte('data', fim).order('id')),
     fetchAll(() => sb.from('extrato_itens').select('id,conta_id,data,valor,status,descricao,documento').eq('empresa_id', e).gte('data', ini).lte('data', fim).order('data').order('id')),
@@ -77,17 +77,20 @@ async function montar(mes) {
     q(sb.from('contas_travas').select('conta_id,ate,saldo_banco').eq('empresa_id', e).eq('ativo', true)).catch(() => []),
     q(sb.from('conferencias_dia').select('*').eq('empresa_id', e).gte('data', ini).lte('data', fim)).catch(() => null), // null = tabela ainda não instalada
   ]);
+  // transferência única vira duas pontas (origem e destino); daqui em diante tudo é por ponta
+  const lancs = pontas(lancsRaw);
   // conciliações dos itens do extrato do mês e notas ligadas aos lançamentos do mês
   const lMes = lancs.filter(l => l.data >= ini && l.data <= fim);
   const conc = [], vinc = [];
   await Promise.all([
-    ...chunks(ext.map(x => x.id)).map(ch => q(sb.from('conciliacoes').select('extrato_id,lancamento_id').in('extrato_id', ch)).then(r => conc.push(...r))),
+    ...chunks(ext.map(x => x.id)).map(ch => q(sb.from('conciliacoes').select('extrato_id,lancamento_id,conta_id').in('extrato_id', ch)).then(r => conc.push(...r))),
     ...chunks(lMes.map(l => l.id)).map(ch => q(sb.from('nfe_vinculos').select('lancamento_id,n:nfe_notas(numero,tipo)').in('lancamento_id', ch)).then(r => vinc.push(...r)).catch(() => {})),
   ]);
-  const concL = new Map(); for (const k of conc) concL.set(k.lancamento_id, k.extrato_id);
+  const ck = (id, conta) => `${id}|${conta}`;   // a mesma transferência é conciliada uma vez em cada conta
+  const concL = new Map(); for (const k of conc) concL.set(ck(k.lancamento_id, k.conta_id), k.extrato_id);
   const concX = new Map(); for (const k of conc) { if (!concX.has(k.extrato_id)) concX.set(k.extrato_id, []); concX.get(k.extrato_id).push(k.lancamento_id); }
   const notaL = new Map(); for (const v of vinc) if (v.n) notaL.set(v.lancamento_id, v.n);
-  const sinal = (l) => (cad.planoById[l.plano_id]?.natureza === 'C' ? 1 : -1) * +l.valor;
+  const sinal = (l) => l.sinal;
 
   // ----- alertas por lançamento -----
   const alertas = new Map();   // lancamento_id -> [{t, msg}]
@@ -106,7 +109,7 @@ async function montar(mes) {
     clusters.push(cur);
     for (const cl of clusters) {
       if (cl.length < 2) continue;
-      const provas = cl.map(l => concL.get(l.id) ? 'x' + concL.get(l.id) : notaL.get(l.id) ? 'n' + notaL.get(l.id).numero : null);
+      const provas = cl.map(l => concL.get(ck(l.id, l.conta_id)) ? 'x' + concL.get(ck(l.id, l.conta_id)) : notaL.get(l.id) ? 'n' + notaL.get(l.id).numero : null);
       if (provas.every(Boolean) && new Set(provas).size === cl.length) continue;
       const d1 = cl[0].data, d2 = cl[cl.length - 1].data;
       const msg = `Possível duplicidade: ${cl.length} lançamentos iguais (${money(cl[0].valor)}, ${cl[0].favorecido_id ? 'mesmo favorecido e ' : ''}mesma descrição) ${d1 === d2 ? `no dia ${dateBR(d1)}` : `entre ${dateBR(d1)} e ${dateBR(d2)}`}`;
@@ -125,7 +128,7 @@ async function montar(mes) {
     if (n?.tipo === 'saida' && p.natureza === 'D') add(l.id, 'clas', `Ligado à NF de venda ${n.numero}, mas lançado como saída (${p.codigo}).`);
     if (n?.tipo === 'entrada' && p.natureza === 'C') add(l.id, 'clas', `Ligado à NF de compra ${n.numero}, mas lançado como entrada (${p.codigo}).`);
     // 3) transferência sem a outra ponta (mesmo valor, sinal contrário, outra conta, até 1 dia)
-    if (p.tipo === 'T') {
+    if (p.tipo === 'T' && !l.conta_destino_id) {   // transferência única já tem as duas pontas
       const par = lancs.some(o => o.id !== l.id && o.conta_id !== l.conta_id && cad.planoById[o.plano_id]?.tipo === 'T' && cent(o.valor) === cent(l.valor)
         && cad.planoById[o.plano_id]?.natureza !== p.natureza && Math.abs(difDias(o.data, l.data)) <= 1);
       if (!par) add(l.id, 'transf', `Transferência ${p.natureza === 'D' ? 'de saída' : 'de entrada'} de ${money(l.valor)} sem a outra ponta em outra conta (mesmo valor, até 1 dia).`);
@@ -158,7 +161,7 @@ async function montar(mes) {
       const temExt = dx.length > 0 || cobre(ct.id, d);
       const extMov = dx.filter(x => x.status !== 'ignorado').reduce((s, x) => s + +x.valor, 0);
       const pend = dx.filter(x => x.status === 'pendente');
-      const naoConc = temExt ? dl.filter(l => !concL.has(l.id)) : [];
+      const naoConc = temExt ? dl.filter(l => !concL.has(ck(l.id, l.conta_id))) : [];
       const al = dl.flatMap(l => (alertas.get(l.id) || []).map(a => ({ ...a, l })));
       const v = vis.get(`${ct.id}|${d}`) || null;
       const travado = !!(trava && d <= trava.ate);
@@ -288,10 +291,10 @@ function pintarDia() {
   $('.modal-head h2', M.el).textContent = `${ct.nome} · ${SEM[w]} ${dateBR(x.d)}`;
   const mov = x.ent + x.sai, semExt = !x.temExt && !x.passagem;
   const linhaL = (l) => {
-    const p = cad.planoById[l.plano_id], f = cad.favById[l.favorecido_id], v = (p?.natureza === 'C' ? 1 : -1) * +l.valor;
+    const p = cad.planoById[l.plano_id], f = cad.favById[l.favorecido_id], v = l.sinal;
     const al = x.al.filter(a => a.l.id === l.id), nc = x.temExt && x.naoConc.includes(l);
     return `<tr class="${al.length ? 'cf-row-al' : ''}"><td style="width:22px;text-align:center">${x.temExt ? (nc ? '<span class="warn" title="Não conciliado com o extrato">○</span>' : '<span class="pos" title="Conciliado com o extrato">✓</span>') : ''}</td>
-      <td class="wrap">${esc(f?.nome || l.descricao || '—')}<div class="small muted">${esc(p ? `${p.codigo} ${p.nome}` : 'sem plano')}${f && l.descricao ? ` · ${esc(l.descricao)}` : ''}${l.documento ? ` · NF ${esc(l.documento)}` : ''}</div>
+      <td class="wrap">${esc(f?.nome || l.descricao || '—')}<div class="small muted">${esc(p ? `${p.codigo} ${p.nome}` : 'sem plano')}${f && l.descricao ? ` · ${esc(l.descricao)}` : ''}${l.documento ? ` · NF ${esc(l.documento)}` : ''}${l.conta_destino_id ? (l.destino ? ` · ⇄ vindo de ${esc(cad.contaById[l.conta_origem_id]?.nome || '')}` : ` · ⇄ para ${esc(cad.contaById[l.conta_destino_id]?.nome || '')}`) : ''}</div>
         ${al.map(a => `<div class="small cf-al-${a.t === 'dup' ? 'dup' : 'warn'}">${a.t === 'dup' ? '⧉' : '!'} ${esc(a.msg)}</div>`).join('')}</td>
       <td class="num ${cls(v)}">${money(v)}</td><td class="noprint" style="width:34px"><button class="btn ghost icon small" data-edit="${l.id}" title="Abrir o lançamento">✎</button></td></tr>`;
   };
@@ -307,7 +310,7 @@ function pintarDia() {
       ${x.temExt ? `<div class="kpi"><div class="k-label">Extrato do dia</div><div class="k-value">${money(x.extMov)}</div><div class="k-sub">diferença <strong class="${Math.abs(mov - x.extMov) > TOL ? 'neg' : 'pos'}">${money(mov - x.extMov)}</strong></div></div>` : ''}
     </div>
     <div class="cf-sit">${x.probs.map(p => `<div class="cf-msg erro">✕ ${esc(p.msg)}</div>`).join('')}
-      ${x.naoConc.length ? `<div class="cf-msg alerta">! ${x.naoConc.length} lançamento(s) sem conciliação com o extrato (${money(x.naoConc.reduce((s, l) => s + (cad.planoById[l.plano_id]?.natureza === 'C' ? 1 : -1) * +l.valor, 0))}).</div>` : ''}
+      ${x.naoConc.length ? `<div class="cf-msg alerta">! ${x.naoConc.length} lançamento(s) sem conciliação com o extrato (${money(x.naoConc.reduce((s, l) => s + l.sinal, 0))}).</div>` : ''}
       ${x.al.length ? `<div class="cf-msg alerta">! ${x.al.length} aviso(s) nos lançamentos abaixo (marcados em amarelo).</div>` : ''}
       ${!x.probs.length && !x.al.length && !x.naoConc.length ? `<div class="cf-msg ok">${x.passagem ? '✓ Conta de passagem zerada no fim do dia.' : x.temExt ? '✓ Movimento igual ao extrato e tudo conciliado.' : 'Conta sem extrato importado: confira com o extrato do banco (ou a contagem do caixa) e informe o saldo real abaixo.'}</div>` : ''}
       ${v ? `<div class="cf-msg conf">✔ Visto de ${esc(v.conferido_email || 'usuário')} em ${new Date(v.conferido_em).toLocaleString('pt-BR')}${v.saldo_informado != null ? ` · saldo informado ${money(v.saldo_informado)}` : ''}${v.observacao ? ` · “${esc(v.observacao)}”` : ''}</div>` : x.travado ? `<div class="cf-msg conf">🔒 Conta travada até ${dateBR(D.linhas[M.r].trava?.ate)}: data, valor, conta e situação destes lançamentos não mudam mais.</div>` : ''}
@@ -339,7 +342,7 @@ function pintarDia() {
 // conta de passagem: o que entrou e o que saiu, por classificação — mostra de onde vem a sobra
 function resumoPassagem(x) {
   const cad = state.cad, g = new Map();
-  for (const l of x.dl) { const p = cad.planoById[l.plano_id]; const k = p ? `${p.codigo} ${p.nome}` : 'sem plano'; const v = (p?.natureza === 'C' ? 1 : -1) * +l.valor; const o = g.get(k) || { n: 0, v: 0 }; o.n++; o.v += v; g.set(k, o); }
+  for (const l of x.dl) { const p = cad.planoById[l.plano_id]; const k = p ? `${p.codigo} ${p.nome}` : 'sem plano'; const v = l.sinal; const o = g.get(k) || { n: 0, v: 0 }; o.n++; o.v += v; g.set(k, o); }
   const rows = [...g.entries()].sort((a, b) => b[1].v - a[1].v);
   return `<tr><td colspan="3" class="small muted wrap">Conta de passagem (FIDC / escrow): tudo o que entra no dia precisa sair no mesmo dia (repasse, juros, tarifas, recompra). A soma abaixo é o que sobrou.</td></tr>
     ${rows.map(([k, o]) => `<tr><td class="wrap">${esc(k)}</td><td class="small muted">${o.n}×</td><td class="num ${cls(o.v)}">${money(o.v)}</td></tr>`).join('')}

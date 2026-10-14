@@ -1,7 +1,7 @@
 // Fechamento do mês: checklist com status automático de cada etapa (extratos conciliados, lançamentos sem conta,
 // em aberto vencidos, notas sem financeiro, borderôs pendentes, desvios do orçamento) e resumo do mês para a direção.
 // Só lê dados — nada aqui altera lançamentos.
-import { sb, state, q, fetchAll, loadCadastros, montarMatriz, montarDRE, isAdmin } from '../lib/data.js';
+import { sb, state, q, fetchAll, loadCadastros, montarMatriz, montarDRE, isAdmin, pontas } from '../lib/data.js';
 import { $, $$, esc, money, money0, pct, dateBR, fail, toast, modal, parseNum, MESES } from '../lib/ui.js';
 import { revisarSemConta } from '../lib/sem-conta.js';
 import { usosPorNota } from '../lib/creditos.js';
@@ -53,7 +53,7 @@ async function conferir(mes) {
     q(sb.rpc('saldos_contas', { p_empresa: e, p_ate: fim })),
     // sem os filtros globais da barra (conta, grupo…): o fechamento é sempre da empresa toda
     q(sb.rpc('resumo_mensal', { p_empresa: e, p_ano: ano, p_status: ['Pago'], p_conta: null, p_grupo: null, p_cc: null, p_favorecido: null, p_disp: null })).then(rows => montarMatriz(rows.map(r => ({ plano_id: r.plano_id, mes: r.mes, total: +r.total })))),
-    fetchAll(() => sb.from('lancamentos').select('id,conta_id,valor,plano_id').eq('empresa_id', e).eq('status', 'Pago').not('conta_id', 'is', null).gte('data', ini).lte('data', fim).order('id')),
+    fetchAll(() => sb.from('lancamentos').select('id,conta_id,conta_destino_id,valor,plano_id').eq('empresa_id', e).eq('status', 'Pago').not('conta_id', 'is', null).gte('data', ini).lte('data', fim).order('id')),
     q(sb.from('contas_travas').select('*').eq('empresa_id', e).eq('ativo', true)).catch(() => null), // null = trava ainda não instalada no banco
   ]);
 
@@ -119,7 +119,7 @@ async function conferir(mes) {
   const resumo = { recB, ebitda: val.ebitda[i], resultado: val.resultado[i], ent: matriz.tipo.E[i], sai: matriz.tipo.S[i], saldo: disp.reduce((s, x) => s + +x.saldo_pago, 0), saldos: disp.filter(x => Math.abs(+x.saldo_pago) > 0.005) };
   // Contas: movimento do mês no extrato × no sistema, pendências, saldo e trava
   const movSis = new Map();
-  for (const l of movMes) { const p = cad.planoById[l.plano_id]; const v = (p?.natureza === 'C' ? 1 : -1) * +l.valor; movSis.set(l.conta_id, (movSis.get(l.conta_id) || 0) + v); }
+  for (const l of pontas(movMes)) movSis.set(l.conta_id, (movSis.get(l.conta_id) || 0) + l.sinal);   // transferência única: origem e destino
   const movExt = new Map(), pendExt = new Map(), qtdExt = new Map();
   for (const x of ext) { movExt.set(x.conta_id, (movExt.get(x.conta_id) || 0) + +x.valor); qtdExt.set(x.conta_id, (qtdExt.get(x.conta_id) || 0) + 1); if (x.status === 'pendente') pendExt.set(x.conta_id, (pendExt.get(x.conta_id) || 0) + 1); }
   const trv = new Map((travas || []).map(t => [t.conta_id, t]));

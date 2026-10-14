@@ -71,6 +71,10 @@ function defaultDate() {
 }
 
 const periodo = () => !!(f.de || f.ate);
+// valor com sinal visto pela conta filtrada: no destino da transferência é entrada; sem filtro de conta, a transferência
+// única soma zero (sai de uma conta e entra na outra)
+const vS = (l) => !l.conta_destino_id ? +l.valor_sinal : f.conta && f.conta === l.conta_destino_id ? +l.valor : f.conta ? +l.valor_sinal : 0;
+const contaTxt = (l) => l.conta_destino_id ? `${l.conta_nome || '—'} → ${l.conta_destino_nome || '—'}` : (l.conta_nome || '—');
 
 function base(sel = '*', opts) {
   let qy = sb.from('v_lancamentos').select(sel, opts).eq('empresa_id', state.empresa.id);
@@ -84,7 +88,8 @@ function base(sel = '*', opts) {
   } else qy = qy.eq('ano', state.ano);
   if (f.status) qy = qy.eq('status', f.status);
   if (f.classe) qy = qy.eq('classe_id', f.classe);
-  if (f.conta === 'none') qy = qy.is('conta_id', null); else if (f.conta) qy = qy.eq('conta_id', f.conta);
+  // transferência única aparece nas duas contas: na origem (conta_id) e no destino (conta_destino_id)
+  if (f.conta === 'none') qy = qy.is('conta_id', null); else if (f.conta) qy = qy.or(`conta_id.eq.${f.conta},conta_destino_id.eq.${f.conta}`);
   if (f.cc) qy = qy.eq('centro_custo_id', f.cc);
   if (f.busca) {
     const s = f.busca.replace(/[%,()]/g, ' ').trim();
@@ -98,12 +103,12 @@ async function load(root) {
   try {
     const [{ data, count, error }, tot] = await Promise.all([
       base('*', { count: 'exact' }).order('data').order('created_at').range(f.page * PAGE, f.page * PAGE + PAGE - 1),
-      fetchAll(() => base('tipo,valor_sinal,status')),
+      fetchAll(() => base('tipo,valor_sinal,valor,status,conta_id,conta_destino_id')),
     ]);
     if (error) throw error;
     const ent = tot.filter(t => t.tipo === 'E').reduce((s, t) => s + +t.valor_sinal, 0);
     const sai = tot.filter(t => t.tipo === 'S').reduce((s, t) => s + +t.valor_sinal, 0);
-    const trf = tot.filter(t => t.tipo === 'T').reduce((s, t) => s + +t.valor_sinal, 0);
+    const trf = tot.filter(t => t.tipo === 'T').reduce((s, t) => s + vS(t), 0);
     $('#tot', root).innerHTML = `
       <div class="kpi"><div class="k-label">Lançamentos</div><div class="k-value">${count.toLocaleString('pt-BR')}</div></div>
       <div class="kpi"><div class="k-label">Entradas</div><div class="k-value pos">${money(ent)}</div></div>
@@ -124,9 +129,9 @@ async function load(root) {
         <td>${dateBR(l.data)}</td><td>${esc(l.plano_codigo + ' - ' + l.plano_nome)}</td>
         <td class="wrap">${esc(l.descricao || '')}${seloNF(l)}${l.documento ? `<div class="muted small">NF ${esc(l.documento)}${l.emissao ? ` · emissão ${dateBR(l.emissao)}` : ''}${l.fidc_proposta_id ? ' · FIDC' : ''}</div>` : ''}${l.opc1 ? `<div class="muted small">${esc(l.opc1)}</div>` : ''}</td>
         <td class="wrap">${esc(l.favorecido_nome || '')}</td><td>${esc(l.centro_custo_nome || '')}</td>
-        <td>${esc(l.conta_nome || '—')}</td>
+        <td class="${l.conta_destino_id ? 'wrap' : ''}">${esc(contaTxt(l))}</td>
         <td><span class="badge ${l.status === 'Pago' ? 'pago' : 'aberto'}">${l.status}</span>${conc.has(l.id) ? ' <span class="badge conc" title="Conciliado com o extrato bancário">✓ conciliado</span>' : ''}</td>
-        <td class="num ${cls(l.valor_sinal)}">${money(l.valor_sinal)}</td></tr>`).join('')}</tbody></table>`;
+        <td class="num ${cls(vS(l))}">${l.conta_destino_id && !f.conta ? `<span class="muted" title="Transferência: sai de ${esc(l.conta_nome || '')} e entra em ${esc(l.conta_destino_nome || '')}">⇄ ${money(l.valor)}</span>` : money(vS(l))}</td></tr>`).join('')}</tbody></table>`;
     const pages = Math.ceil(count / PAGE);
     $('#pager', root).innerHTML = `<span class="muted small">Página ${f.page + 1} de ${pages}</span>
       <button class="btn small" id="pv" ${f.page ? '' : 'disabled'}>‹ Anterior</button>
@@ -156,9 +161,9 @@ async function exportar() {
   try {
     const rows = await fetchAll(() => base('*').order('data'));
     exportXLSX([
-      ['Data', 'Classificação', 'Plano de contas', 'Descrição', 'NF / documento', 'Emissão', 'Opcional 1', 'Opcional 2', 'Opcional 3', 'Opcional 4', 'Favorecido', 'Centro de custo', 'Status', 'Conta', 'Valor', 'Grupo', 'Disponibilidade'],
+      ['Data', 'Classificação', 'Plano de contas', 'Descrição', 'NF / documento', 'Emissão', 'Opcional 1', 'Opcional 2', 'Opcional 3', 'Opcional 4', 'Favorecido', 'Centro de custo', 'Status', 'Conta', 'Conta de destino', 'Valor', 'Grupo', 'Disponibilidade'],
       ...rows.map(l => [l.data, `${l.classe_codigo} - ${l.classe_nome}`, `${l.plano_codigo} - ${l.plano_nome}`, l.descricao, l.documento, l.emissao, l.opc1, l.opc2, l.opc3, l.opc4,
-        l.favorecido_nome, l.centro_custo_nome, l.status, l.conta_nome, +l.valor_sinal, l.grupo_nome, l.disponibilidade])
+        l.favorecido_nome, l.centro_custo_nome, l.status, l.conta_nome, l.conta_destino_nome || '', l.conta_destino_id && !f.conta ? +l.valor : vS(l), l.grupo_nome, l.disponibilidade])
     ], periodo() ? `lancamentos_${f.de || 'inicio'}_a_${f.ate || 'fim'}` : `lancamentos_${state.ano}${f.mes ? '_' + String(f.mes).padStart(2, '0') : ''}`);
   } catch (e) { fail(e); }
 }
