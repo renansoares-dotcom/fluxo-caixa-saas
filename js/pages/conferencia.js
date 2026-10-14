@@ -18,6 +18,7 @@ let rootEl = null;
 
 const TOL = 0.05;
 const PASSAGEM = /^(fidc|conta escrow)$/i;          // contas que precisam terminar o dia zeradas
+const SEM_NEGATIVO = /^caixa$/i;                    // dinheiro em espécie (caixinha / fundo de caixa): nunca pode ficar negativo
 const TITULO_VENDA = /^\s*\d-\d{3,7}\/\d{1,3}\s*$/;  // "1-34912/1": parcela de NF de venda vinda do Iniflex
 const SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const cent = (v) => Math.round(+v * 100);
@@ -152,7 +153,7 @@ async function montar(mes) {
   for (const ct of ativas) {
     const ls = porConta.get(ct.id) || [], xs = extConta.get(ct.id) || [];
     const s0 = saldoAnt.get(ct.id) ?? +ct.saldo_inicial ?? 0;
-    const passagem = PASSAGEM.test(ct.tipo || ''), trava = trv.get(ct.id) || null;
+    const passagem = PASSAGEM.test(ct.tipo || ''), semNeg = SEM_NEGATIVO.test(ct.tipo || ''), trava = trv.get(ct.id) || null;
     let saldo = s0; const cel = [];
     for (const d of dias) {
       const dl = ls.filter(l => l.data === d), dx = xs.filter(x => x.data === d);
@@ -167,6 +168,7 @@ async function montar(mes) {
       const travado = !!(trava && d <= trava.ate);
       const ativo = dl.length || dx.length;
       const probs = [];
+      if (semNeg && saldo < -TOL) probs.push({ t: 'neg', msg: `Caixa em espécie terminou o dia NEGATIVO (${money(saldo)}): falta lançar entrada (saque/suprimento) ou há saída a mais.` });
       if (passagem && ativo && Math.abs(saldo) > TOL) probs.push({ t: 'pass', msg: `Conta de passagem terminou o dia com saldo ${money(saldo)} (deveria zerar).` });
       if (temExt && Math.abs((ent + sai) - extMov) > TOL) probs.push({ t: 'dif', msg: `Movimento do sistema (${money(ent + sai)}) diferente do extrato (${money(extMov)}): diferença ${money(ent + sai - extMov)}.` });
       if (pend.length) probs.push({ t: 'pend', msg: `${pend.length} linha(s) do extrato sem lançamento conciliado (${money(pend.reduce((s, x) => s + +x.valor, 0))}).` });
@@ -215,11 +217,11 @@ function pintar() {
       <div class="table-wrap cf-wrap"><table class="cf-grid"><thead><tr><th class="cf-conta">Conta</th>
         ${D.dias.map(d => { const w = new Date(d + 'T12:00:00').getDay(); return `<th class="${w === 0 || w === 6 ? 'fds' : ''}">${+d.slice(8)}<div>${SEM[w].charAt(0).toUpperCase()}</div></th>`; }).join('')}
         <th class="num">Saldo ${dateBR(D.fim).slice(0, 5)}</th></tr></thead><tbody>
-      ${linhas.map((r, ri) => `<tr><td class="cf-conta"><strong>${esc(r.ct.nome)}</strong><div class="small muted">${esc(r.ct.tipo || '')}${r.passagem ? ' · passagem' : ''}${r.trava ? ` · 🔒 ${dateBR(r.trava.ate)}` : ''}</div></td>
+      ${linhas.map((r, ri) => `<tr><td class="cf-conta"><strong>${esc(r.ct.nome)}</strong><div class="small muted">${esc(r.ct.tipo || '')}${r.passagem ? ' · passagem' : ''}${SEM_NEGATIVO.test(r.ct.tipo || '') ? ' · não pode ficar negativo' : ''}${r.trava ? ` · 🔒 ${dateBR(r.trava.ate)}` : ''}</div></td>
         ${r.cel.map((x, di) => celula(x, ri, di)).join('')}
-        <td class="num ${r.passagem && Math.abs(r.sFim) > TOL ? 'neg' : cls(r.sFim)}">${money(r.sFim)}</td></tr>`).join('') || `<tr><td colspan="${D.dias.length + 2}" class="muted">${ui.soProb ? 'Nenhuma conta com problema no mês. 🎉' : 'Nenhuma conta com movimento no mês.'}</td></tr>`}
+        <td class="num ${(r.passagem && Math.abs(r.sFim) > TOL) || (SEM_NEGATIVO.test(r.ct.tipo || '') && r.sFim < -TOL) ? 'neg' : cls(r.sFim)}">${money(r.sFim)}</td></tr>`).join('') || `<tr><td colspan="${D.dias.length + 2}" class="muted">${ui.soProb ? 'Nenhuma conta com problema no mês. 🎉' : 'Nenhuma conta com movimento no mês.'}</td></tr>`}
       </tbody></table></div>
-      <p class="small muted" style="padding:0 12px 10px">Bate = movimento do dia no sistema igual ao extrato importado, sem linha pendente (contas com OFX), ou saldo zerado no fim do dia (contas de passagem: FIDC e escrow). Contas sem extrato ficam cinza até você conferir e dar o visto, de preferência informando o saldo real do dia. Dias até a data da trava já contam como conferidos quando batem.</p>
+      <p class="small muted" style="padding:0 12px 10px">Bate = movimento do dia no sistema igual ao extrato importado, sem linha pendente (contas com OFX), ou saldo zerado no fim do dia (contas de passagem: FIDC e escrow). Contas sem extrato ficam cinza até você conferir e dar o visto, de preferência informando o saldo real do dia. Dias até a data da trava já contam como conferidos quando batem. Caixa em espécie (tipo Caixa) fica vermelho em todo dia em que terminar negativo.</p>
     </div>
     <p class="muted small">Conferido em ${new Date().toLocaleString('pt-BR')} · ${esc(state.empresa.nome || '')}</p>`;
   // abre o dia: clique ou Enter no quadradinho
@@ -239,7 +241,7 @@ function celula(x, ri, di) {
   if (x.st === 'vazio') return `<td class="cf-td ${fds ? 'fds' : ''}" data-r="${ri}" data-d="${di}" tabindex="-1"><i class="cf-c vazio"></i></td>`;
   const ressalva = x.v?.situacao === 'ressalva' || (x.v && (x.st === 'erro' || x.st === 'alerta'));
   const k = x.conferido ? (ressalva ? 'alerta conf' : `ok ${x.v ? 'conf' : 'trav'}`) : x.st;
-  const txt = x.conferido ? '✔' : x.st === 'erro' ? (x.probs.find(p => p.t === 'dif' || p.t === 'pass') ? kfmt(x.probs.find(p => p.t === 'pass') ? x.fim : (x.ent + x.sai - x.extMov)) : '✕') : ICONE[x.st];
+  const txt = x.conferido ? '✔' : x.st === 'erro' ? (x.probs.find(p => p.t === 'dif' || p.t === 'pass' || p.t === 'neg') ? kfmt(x.probs.find(p => p.t === 'pass' || p.t === 'neg') ? x.fim : (x.ent + x.sai - x.extMov)) : '✕') : ICONE[x.st];
   const tip = [`${x.ct.nome} · ${SEM[w]} ${dateBR(x.d)}`, `${x.dl.length} lançamento(s): entradas ${money(x.ent)} · saídas ${money(x.sai)} · saldo ${money(x.fim)}`,
     x.temExt ? `extrato: ${x.dx.length} linha(s), movimento ${money(x.extMov)}` : x.passagem ? 'conta de passagem: deve zerar' : 'sem extrato importado',
     ...x.probs.map(p => '✕ ' + p.msg), ...[...new Set(x.al.map(a => '! ' + a.msg))].slice(0, 3), x.naoConc.length ? `! ${x.naoConc.length} lançamento(s) não conciliados com o extrato` : '',

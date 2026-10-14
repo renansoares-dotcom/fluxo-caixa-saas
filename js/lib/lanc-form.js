@@ -118,6 +118,7 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
       if (editando) salvo = await q(sb.from('lancamentos').update(row).eq('id', l.id).select().single());
       else salvo = await q(sb.from('lancamentos').insert(row).select().single());
       toast('Lançamento salvo'); m.close(); onSaved(salvo);
+      avisarCaixaNegativo(salvo);
     } catch (e) { fail(e); }
   };
   if (editando) {
@@ -127,4 +128,18 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
     };
     $('#lf-dup', m.el).onclick = () => { m.close(); abrirLancamento({ ...l, id: undefined }, onSaved, { duplicar: true }); };
   }
+}
+
+// dinheiro em espécie (conta do tipo Caixa) não pode terminar o dia negativo: avisa logo depois de salvar
+async function avisarCaixaNegativo(l) {
+  if (!l || l.status !== 'Pago') return;
+  const contas = [l.conta_id, l.conta_destino_id].filter(id => id && /^caixa$/i.test(state.cad.contaById[id]?.tipo || ''));
+  if (!contas.length) return;
+  try {
+    const s = await q(sb.rpc('saldos_contas', { p_empresa: state.empresa.id, p_ate: l.data }));
+    for (const id of contas) {
+      const x = s.find(r => r.conta_id === id);
+      if (x && +x.saldo_pago < -0.005) toast(`Atenção: ${state.cad.contaById[id].nome} termina ${l.data.split('-').reverse().join('/')} NEGATIVO (${money(x.saldo_pago)}). Caixa em espécie não pode ficar negativo: falta lançar a entrada (saque/suprimento) ou há saída a mais.`, true);
+    }
+  } catch { /* só aviso */ }
 }
