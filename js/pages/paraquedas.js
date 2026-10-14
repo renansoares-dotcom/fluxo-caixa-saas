@@ -3,14 +3,14 @@
 // do dia) → pago (vira adiantamento ao fornecedor) → nota recebida (a nota abate o adiantamento).
 // "Terá nota fiscal = não" fica separado para o controle de pagamentos sem lastro fiscal.
 import { sb, state, q, fetchAll, loadCadastros, podeEditar } from '../lib/data.js';
-import { $, esc, money, dateBR, fail, toast, modal, options, parseNum, exportXLSX, today } from '../lib/ui.js';
+import { $, esc, money, dateBR, fail, toast, modal, options, parseNum, exportXLSX, today, logoPNG } from '../lib/ui.js';
 
 export const title = 'Paraquedas — pagamentos sem nota';
 const ST = { aguardando: 'Aguardando aprovação', aprovado: 'Aprovado', rejeitado: 'Rejeitado', cancelado: 'Cancelado', pago: 'Pago — aguardando nota', nota_recebida: 'Nota recebida' };
 const ST_CLS = { aguardando: 'aberto', aprovado: 'conc', rejeitado: 'vencido', cancelado: '', pago: 'aberto', nota_recebida: 'pago' };
 const PIX = { cnpj: 'CNPJ', cpf: 'CPF', email: 'E-mail', telefone: 'Telefone', aleatoria: 'Chave aleatória' };
 const ui = { aba: null, busca: '' };
-let L = [], LANC = new Map(), SEM_TABELA = false;
+let L = [], LANC = new Map(), SEM_TABELA = false, VIS = { R: [], aba: '' };
 
 const dig = (s) => String(s || '').replace(/\D/g, '');
 const fmtDoc = (d) => { d = dig(d); return d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d; };
@@ -43,13 +43,14 @@ export async function render(root) {
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
       <div><h2 style="margin:0">Paraquedas</h2><p class="muted small" style="margin:4px 0 0">Pagamentos pedidos antes da nota fiscal. A direção aprova; o financeiro programa no fluxo do dia; depois de pago, a nota fiscal abate o adiantamento.</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="novo">+ Novo paraquedas</button>${compras() ? '' : '<button class="btn" id="exp">Exportar Excel</button>'}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="novo">+ Novo paraquedas</button><button class="btn" id="pdf" title="Relatório da aba aberta (com a busca aplicada) para imprimir ou salvar em PDF">Relatório (PDF)</button>${compras() ? '' : '<button class="btn" id="exp">Exportar Excel</button>'}</div></div>
       <div class="toolbar" style="margin-top:10px"><label class="grow">Buscar<input id="busca" placeholder="fornecedor, CNPJ, descrição, nº" value="${esc(ui.busca)}"></label></div></div>
     <div class="kpis" id="pq-kpis"></div><div id="pq-alertas"></div>
     <div class="card" style="padding-bottom:8px"><div class="chips" id="pq-abas"></div></div>
     <div id="pq-corpo"><div class="loading">Carregando…</div></div>`;
   $('#novo', root).onclick = () => editar(null, root);
   $('#exp', root) && ($('#exp', root).onclick = () => exportXLSX($('#pq-corpo table', root), 'paraquedas'));
+  $('#pdf', root).onclick = () => relatorioPDF();
   $('#busca', root).oninput = (e) => { ui.busca = e.target.value; pintar(root); };
   $('#pq-abas', root).onclick = (e) => { const a = e.target.closest('[data-aba]')?.dataset.aba; if (a) { ui.aba = a; pintar(root); } };
   await carregar(root);
@@ -93,6 +94,7 @@ function pintar(root) {
   $('#conf-pagos', root) && ($('#conf-pagos', root).onclick = () => confirmarPagos(pagosSist, root));
 
   const R = L.filter(abas.find(a => a[0] === ui.aba)[2]).filter(filtra);
+  VIS = { R, aba: abas.find(a => a[0] === ui.aba)[1] };
   const sel = ui.aba === 'aguardando' && aprova();
   const box = $('#pq-corpo', root);
   if (!R.length) { box.innerHTML = '<div class="card"><div class="empty">Nenhum paraquedas aqui.</div></div>'; return; }
@@ -338,4 +340,74 @@ async function cancelar(p, root) {
     await q(sb.from('paraquedas').update({ status: 'cancelado', motivo: motivo || 'cancelado', lancamento_id: null }).eq('id', p.id));
     toast('Paraquedas cancelado'); carregar(root);
   } catch (e) { fail(e); }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Relatório em PDF (A4 deitado) da aba aberta, com a busca aplicada
+// ---------------------------------------------------------------------------------------------
+const pdfTxt = (t) => String(t ?? '').replace(/[−–—]/g, '-').replace(/×/g, 'x').replace(/ /g, ' ').replace(/[✓✕·]/g, (c) => c === '·' ? '-' : '');
+function situacaoTxt(p) {
+  const f = fase(p), l = LANC.get(p.lancamento_id);
+  return f === 'programar' ? 'Aprovado - a programar' : f === 'fluxo' ? `No fluxo (${l?.status || 'lançamento'})` : f === 'pago_sist' ? 'Pago no fluxo'
+    : f === 'sem_lastro' ? 'Pago - sem nota' : p.status === 'nota_recebida' && !p.tera_nota ? 'Concluído sem nota' : ST[p.status];
+}
+async function relatorioPDF() {
+  const R = VIS.R;
+  if (!R.length) return toast('Nenhum paraquedas nesta aba para o relatório', true);
+  if (!window.jspdf) return toast('Biblioteca de PDF ainda carregando, tente de novo em instantes', true);
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  if (!doc.autoTable) return toast('Biblioteca de tabelas do PDF ainda carregando', true);
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 10;
+  const azul = [43, 85, 152], marinho = [42, 31, 111];
+  const logo = await logoPNG();
+  const titulo = `Paraquedas - ${VIS.aba}`;
+  const cabecalho = () => {
+    if (logo) doc.addImage(logo.data, 'PNG', M, 7, 11 * logo.ratio, 11);
+    doc.setTextColor(...marinho); doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(pdfTxt(titulo), W - M, 12, { align: 'right' });
+    doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+    doc.text(pdfTxt(`${state.empresa.nome} - pagamentos pedidos antes da nota fiscal - emitido em ${new Date().toLocaleString('pt-BR')}${ui.busca.trim() ? ` - busca: "${ui.busca.trim()}"` : ''}`), W - M, 17, { align: 'right' });
+    doc.setDrawColor(...marinho); doc.setLineWidth(.5); doc.line(M, 20, W - M, 20); doc.setTextColor(20);
+  };
+  cabecalho();
+  // resumo
+  const tot = R.reduce((s, p) => s + +p.valor, 0), urg = R.filter(p => p.prioridade === 'urgente'), semNf = R.filter(p => !p.tera_nota);
+  const datas = R.map(p => p.data_pagamento).filter(Boolean).sort();
+  const kpis = [['Paraquedas', String(R.length), datas.length ? `pagamento de ${dateBR(datas[0])} a ${dateBR(datas[datas.length - 1])}` : ''],
+    ['Valor total', money(tot), ''], ['Urgentes', String(urg.length), money(urg.reduce((s, p) => s + +p.valor, 0))],
+    ['Sem nota fiscal', String(semNf.length), money(semNf.reduce((s, p) => s + +p.valor, 0))]];
+  doc.autoTable({ startY: 23, theme: 'plain', body: [kpis.map(k => k[0]), kpis.map(k => k[1]), kpis.map(k => k[2])].map(r => r.map(pdfTxt)), margin: { left: M, right: M },
+    styles: { fontSize: 8, cellPadding: { top: .5, bottom: .5, left: 1.5, right: 1.5 } }, columnStyles: Object.fromEntries([0, 1, 2, 3].map(i => [i, { cellWidth: (W - 2 * M) / 4 }])),
+    didParseCell: (d) => { const r = d.row.index; if (r !== 1) { d.cell.styles.textColor = 110; d.cell.styles.fontSize = 7.2; } else { d.cell.styles.fontSize = 12; d.cell.styles.fontStyle = 'bold'; d.cell.styles.textColor = marinho; } } });
+  // tabela
+  const banco = (p) => [p.pix_chave ? `Pix ${PIX[p.pix_tipo] || ''}: ${p.pix_chave}` : '', p.conta_bancaria ? `${p.banco || ''} ag ${p.agencia || ''} cc ${p.conta_bancaria}` : ''].filter(Boolean).join('\n') || '-';
+  const body = R.map(p => [
+    String(p.numero) + (p.prioridade === 'urgente' ? '\nURGENTE' : ''),
+    dateBR(p.data_pagamento),
+    `${p.razao_social}${p.cnpj ? `\n${fmtDoc(p.cnpj)}` : ''}`,
+    banco(p),
+    `${p.descricao}${p.pedido ? `\npedido ${p.pedido}` : ''}${p.solicitante ? `\npor ${p.solicitante}` : ''}${p.motivo ? `\n${p.motivo}` : ''}`,
+    p.tera_nota ? `Sim${p.previsao_nota ? `\nprev. ${dateBR(p.previsao_nota)}` : ''}` : 'Não terá',
+    situacaoTxt(p) + (p.aprovado_em ? `\n${['rejeitado'].includes(p.status) ? 'decidido' : 'aprovado'} ${dateBR(p.aprovado_em.slice(0, 10))}` : ''),
+    money(p.valor),
+  ].map(pdfTxt));
+  doc.autoTable({ startY: (doc.lastAutoTable?.finalY ?? 30) + 3, theme: 'grid', margin: { left: M, right: M, top: 24 },
+    head: [['Nº', 'Pagar em', 'Quem recebe', 'Pix / dados bancários', 'Descrição', 'Nota fiscal', 'Situação', 'Valor']],
+    body, foot: [['', '', `${R.length} paraquedas`, '', '', '', 'Total', money(tot)]],
+    styles: { fontSize: 7.4, cellPadding: 1.3, lineColor: [226, 231, 239], valign: 'top' }, headStyles: { fillColor: azul, textColor: 255 },
+    footStyles: { fillColor: [232, 238, 248], textColor: 20, fontStyle: 'bold' }, showFoot: 'lastPage',
+    columnStyles: { 0: { cellWidth: 18 }, 1: { cellWidth: 18 }, 2: { cellWidth: 52 }, 3: { cellWidth: 46 }, 4: { cellWidth: 'auto' }, 5: { cellWidth: 24 }, 6: { cellWidth: 34 }, 7: { cellWidth: 24, halign: 'right' } },
+    didParseCell: (d) => { if (d.section === 'body' && d.column.index === 0 && /URGENTE/.test(d.cell.raw)) d.cell.styles.textColor = [192, 53, 43]; if (d.column.index === 7) d.cell.styles.halign = 'right'; },
+    didDrawPage: (d) => { if (d.pageNumber > 1) cabecalho(); } });
+  // assinaturas
+  let y = doc.lastAutoTable.finalY + 18;
+  if (y > H - 20) { doc.addPage(); cabecalho(); y = 45; }
+  const larg = (W - 2 * M - 20) / 3;
+  ['Solicitante / Compras', 'Financeiro', 'Direção (aprovação)'].forEach((t, i) => {
+    const x = M + i * (larg + 10);
+    doc.setDrawColor(120); doc.setLineWidth(.2); doc.line(x, y, x + larg, y);
+    doc.setFontSize(8); doc.setTextColor(90); doc.text(pdfTxt(t), x + larg / 2, y + 4, { align: 'center' });
+  });
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(130); doc.text(`Página ${i} de ${n}`, W - M, H - 5, { align: 'right' }); doc.text('Fonte: Paraquedas (fluxo-caixa-saas)', M, H - 5); }
+  doc.save(`paraquedas_${VIS.aba.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_')}_${today()}.pdf`);
 }
