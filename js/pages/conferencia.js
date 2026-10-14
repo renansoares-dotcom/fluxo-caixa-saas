@@ -54,8 +54,11 @@ export async function render(root) {
   await carregar();
 }
 
-// impressão em paisagem (A4 deitado) só para esta tela: o mapa do mês tem 31 colunas
-function imprimir() {
+// impressão em paisagem (A4 deitado) só para esta tela: o mapa do mês tem 31 colunas.
+// Vale pelo botão e também pelo Ctrl+P (beforeprint). A arrumação só é desfeita no afterprint — desfazer antes
+// (com o diálogo de impressão ainda aberto) fazia a prévia voltar para retrato.
+function prepararImpressao() {
+  if (!rootEl || !rootEl.querySelector('.cf-grid') || !location.hash.startsWith('#/conferencia') || document.getElementById('cf-print')) return;
   const st = document.createElement('style');
   st.id = 'cf-print';
   st.textContent = '@page{size:A4 landscape;margin:7mm}';
@@ -66,11 +69,16 @@ function imprimir() {
   rootEl.style.width = W + 'px'; rootEl.style.zoom = '';
   const z = Math.min(1, H / rootEl.scrollHeight, W / rootEl.scrollWidth);
   rootEl.style.zoom = String(Math.floor(z * 100) / 100);
-  const fim = () => { st.remove(); document.body.classList.remove('cf-imprimindo'); rootEl.style.width = ''; rootEl.style.zoom = ''; window.removeEventListener('afterprint', fim); };
-  window.addEventListener('afterprint', fim);
-  window.print();
-  setTimeout(fim, 1500);   // navegadores que não disparam afterprint
 }
+function desfazerImpressao() {
+  document.getElementById('cf-print')?.remove();
+  document.body.classList.remove('cf-imprimindo');
+  if (rootEl) { rootEl.style.width = ''; rootEl.style.zoom = ''; }
+}
+function imprimir() { prepararImpressao(); window.print(); }
+window.addEventListener('beforeprint', prepararImpressao);
+window.addEventListener('afterprint', desfazerImpressao);
+
 
 async function carregar() {
   const c = $('#ccorpo', rootEl); if (!c) return;
