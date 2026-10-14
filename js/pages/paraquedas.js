@@ -1,5 +1,5 @@
 // Paraquedas: pagamentos pedidos antes da nota fiscal (adiantamentos e compras do dia).
-// Fluxo: lançado (compras/financeiro) → aprovado pela direção → programado (vira lançamento "Em aberto" no fluxo
+// Fluxo: lançado (compras/financeiro) → autorizado pelo diretor ou financeiro → programado (vira lançamento "Em aberto" no fluxo
 // do dia) → pago (vira adiantamento ao fornecedor) → nota recebida (a nota abate o adiantamento).
 // "Terá nota fiscal = não" fica separado para o controle de pagamentos sem lastro fiscal.
 import { sb, state, q, fetchAll, loadCadastros, podeEditar } from '../lib/data.js';
@@ -16,7 +16,8 @@ const dig = (s) => String(s || '').replace(/\D/g, '');
 const fmtDoc = (d) => { d = dig(d); return d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d; };
 const dias = (a) => Math.round((new Date(today()) - new Date(a)) / 864e5);
 const compras = () => state.papel === 'compras';
-const aprova = () => ['admin', 'diretor'].includes(state.papel);
+// quem autoriza paraquedas: diretor ou financeiro (e o administrador)
+const aprova = () => ['admin', 'diretor', 'financeiro'].includes(state.papel);
 const ehMeu = (p) => p.criado_por === state.user?.id;
 
 /** situação na tela: "aprovado" se divide em "a programar" (sem lançamento) e "no fluxo" (com lançamento) */
@@ -42,7 +43,7 @@ export async function render(root) {
   if (!abas.some(a => a[0] === ui.aba)) ui.aba = abas[0][0];
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
-      <div><h2 style="margin:0">Paraquedas</h2><p class="muted small" style="margin:4px 0 0">Pagamentos pedidos antes da nota fiscal. A direção aprova; o financeiro programa no fluxo do dia; depois de pago, a nota fiscal abate o adiantamento.</p></div>
+      <div><h2 style="margin:0">Paraquedas</h2><p class="muted small" style="margin:4px 0 0">Pagamentos pedidos antes da nota fiscal. O diretor ou o financeiro autoriza; o financeiro programa no fluxo do dia; depois de pago, a nota fiscal abate o adiantamento.</p></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="novo">+ Novo paraquedas</button><button class="btn" id="pdf" title="Relatório da aba aberta (com a busca aplicada) para imprimir ou salvar em PDF">Relatório (PDF)</button>${compras() ? '' : '<button class="btn" id="exp">Exportar Excel</button>'}</div></div>
       <div class="toolbar" style="margin-top:10px"><label class="grow">Buscar<input id="busca" placeholder="fornecedor, CNPJ, descrição, nº" value="${esc(ui.busca)}"></label></div></div>
     <div class="kpis" id="pq-kpis"></div><div id="pq-alertas"></div>
@@ -214,7 +215,7 @@ function editar(p, root, soVer = false) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Aprovação (direção)
+// Aprovação (diretor ou financeiro)
 // ---------------------------------------------------------------------------------------------
 function decidir(sel, status, root) {
   if (!sel.length) return toast('Marque pelo menos um paraquedas', true);
@@ -402,7 +403,7 @@ async function relatorioPDF() {
   let y = doc.lastAutoTable.finalY + 18;
   if (y > H - 20) { doc.addPage(); cabecalho(); y = 45; }
   const larg = (W - 2 * M - 20) / 3;
-  ['Solicitante / Compras', 'Financeiro', 'Direção (aprovação)'].forEach((t, i) => {
+  ['Solicitante / Compras', 'Financeiro', 'Autorizado por (diretor / financeiro)'].forEach((t, i) => {
     const x = M + i * (larg + 10);
     doc.setDrawColor(120); doc.setLineWidth(.2); doc.line(x, y, x + larg, y);
     doc.setFontSize(8); doc.setTextColor(90); doc.text(pdfTxt(t), x + larg / 2, y + 4, { align: 'center' });
