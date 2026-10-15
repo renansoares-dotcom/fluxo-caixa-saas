@@ -81,8 +81,9 @@ async function carregarItens(root) {
     if (tipo === 'g') {
       const ini = id + '-01', fim = fimMes(id);
       dados.itens = await q(sb.rpc('contab_balancete_gerencial', { p_empresa: state.empresa.id, p_ini: ini, p_fim: fim }));
-      $('#info', root).innerHTML = `Balancete feito pela plataforma · ${dateBR(ini)} a ${dateBR(fim)} · saldo de abertura + lançamentos contábeis gerados dos fatos financeiros pagos.
-        ${podeEditar() ? ' <button class="btn small" id="gerar">Gerar lançamentos contábeis do mês</button>' : ''}`;
+      $('#info', root).innerHTML = `<div class="card bal-gerar"><div><strong>Balancete feito pela plataforma · ${dateBR(ini)} a ${dateBR(fim)}</strong>
+        <div class="small muted">Saldo de abertura + lançamentos contábeis gerados a partir dos lançamentos pagos. Gerar de novo refaz o mês, sem duplicar.</div></div>
+        ${podeEditar() ? '<button class="btn primary" id="gerar">Gerar lançamentos contábeis do mês</button>' : ''}</div>`;
       if ($('#gerar', root)) $('#gerar', root).onclick = () => gerar(root, ini, fim);
     } else if (tipo === 'b') {
       dados.itens = await fetchAll(() => sb.from('contab_balancete_itens').select('conta_id, saldo_anterior, debito, credito, saldo_atual').eq('balancete_id', id));
