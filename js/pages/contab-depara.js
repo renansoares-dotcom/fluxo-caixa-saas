@@ -199,7 +199,9 @@ async function importarPlanilha(root) {
   grv.onclick = async () => {
     grv.disabled = true; grv.textContent = 'Gravando…';
     try {
-      const lote = async (t, rows, on) => { for (let i = 0; i < rows.length; i += 500) await q(sb.from(t).upsert(rows.slice(i, i + 500), { onConflict: on })); };
+      // a mesma chave pode aparecer duas vezes na planilha (ex.: beneficiário com nome repetido): vale a última
+      const unico = (rows, on) => [...new Map(rows.map(r => [on.split(',').map(k => r[k]).join('|'), r])).values()];
+      const lote = async (t, rows, on) => { rows = unico(rows, on); for (let i = 0; i < rows.length; i += 500) await q(sb.from(t).upsert(rows.slice(i, i + 500), { onConflict: on })); };
       await lote('contab_depara_plano', plano, 'plano_id');
       await lote('contab_depara_conta', contas, 'conta_bancaria_id');
       await lote('contab_depara_favorecido', favs, 'favorecido_id,papel');
