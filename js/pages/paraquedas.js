@@ -6,7 +6,7 @@ import { sb, state, q, fetchAll, loadCadastros, podeEditar } from '../lib/data.j
 import { $, esc, money, dateBR, fail, toast, modal, options, parseNum, exportXLSX, today, logoPNG } from '../lib/ui.js';
 import { dispararAvisos } from '../lib/notif.js';
 
-export const title = 'Paraquedas — pagamentos sem nota';
+export const title = 'Pagamentos Antecipados';
 const ST = { aguardando: 'Aguardando aprovação', aprovado: 'Aprovado', rejeitado: 'Rejeitado', cancelado: 'Cancelado', pago: 'Pago — aguardando nota', nota_recebida: 'Nota recebida' };
 const ST_CLS = { aguardando: 'aberto', aprovado: 'conc', rejeitado: 'vencido', cancelado: '', pago: 'aberto', nota_recebida: 'pago' };
 const PIX = { cnpj: 'CNPJ', cpf: 'CPF', email: 'E-mail', telefone: 'Telefone', aleatoria: 'Chave aleatória' };
@@ -44,14 +44,14 @@ export async function render(root) {
   if (!abas.some(a => a[0] === ui.aba)) ui.aba = abas[0][0];
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
-      <div><h2 style="margin:0">Paraquedas</h2><p class="muted small" style="margin:4px 0 0">Pagamentos pedidos antes da nota fiscal. O diretor ou o financeiro autoriza; o financeiro programa no fluxo do dia; depois de pago, a nota fiscal abate o adiantamento.</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="novo">+ Novo paraquedas</button><button class="btn" id="pdf" title="Relatório da aba aberta (com a busca aplicada) para imprimir ou salvar em PDF">Relatório (PDF)</button>${compras() ? '' : '<button class="btn" id="exp">Exportar Excel</button>'}</div></div>
+      <div><h2 style="margin:0">Pagamentos Antecipados</h2><p class="muted small" style="margin:4px 0 0">Pagamentos pedidos antes da nota fiscal. O diretor ou o financeiro autoriza; o financeiro programa no fluxo do dia; depois de pago, a nota fiscal abate o adiantamento.</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="novo">+ Novo pagamento antecipado</button><button class="btn" id="pdf" title="Relatório da aba aberta (com a busca aplicada) para imprimir ou salvar em PDF">Relatório (PDF)</button>${compras() ? '' : '<button class="btn" id="exp">Exportar Excel</button>'}</div></div>
       <div class="toolbar" style="margin-top:10px"><label class="grow">Buscar<input id="busca" placeholder="fornecedor, CNPJ, descrição, nº" value="${esc(ui.busca)}"></label></div></div>
     <div class="kpis" id="pq-kpis"></div><div id="pq-alertas"></div>
     <div class="card" style="padding-bottom:8px"><div class="chips" id="pq-abas"></div></div>
     <div id="pq-corpo"><div class="loading">Carregando…</div></div>`;
   $('#novo', root).onclick = () => editar(null, root);
-  $('#exp', root) && ($('#exp', root).onclick = () => exportXLSX($('#pq-corpo table', root), 'paraquedas'));
+  $('#exp', root) && ($('#exp', root).onclick = () => exportXLSX($('#pq-corpo table', root), 'pagamentos_antecipados'));
   $('#pdf', root).onclick = () => relatorioPDF();
   $('#busca', root).oninput = (e) => { ui.busca = e.target.value; pintar(root); };
   $('#pq-abas', root).onclick = (e) => { const a = e.target.closest('[data-aba]')?.dataset.aba; if (a) { ui.aba = a; pintar(root); } };
@@ -74,7 +74,7 @@ async function carregar(root) {
 
 function pintar(root) {
   if (SEM_TABELA) {
-    $('#pq-corpo', root).innerHTML = '<div class="card"><div class="empty">A estrutura do Paraquedas ainda não foi instalada no banco. Rode o SQL <strong>20261012000027_paraquedas.sql</strong> no SQL Editor do Supabase.</div></div>';
+    $('#pq-corpo', root).innerHTML = '<div class="card"><div class="empty">A estrutura de Pagamentos Antecipados ainda não foi instalada no banco. Rode o SQL <strong>20261012000027_paraquedas.sql</strong> no SQL Editor do Supabase.</div></div>';
     $('#pq-abas', root).innerHTML = ''; $('#pq-kpis', root).innerHTML = ''; return;
   }
   const abas = compras() ? ABAS_COMPRAS : ABAS, b = ui.busca.trim().toLowerCase();
@@ -89,20 +89,20 @@ function pintar(root) {
     <div class="kpi"><div class="k-label">Rejeitados</div><div class="k-value">${cont(p => p.status === 'rejeitado')}</div><div class="k-sub">corrija e reenvie</div></div>` : `
     <div class="kpi"><div class="k-label">Aguardando aprovação</div><div class="k-value">${money(soma(p => p.status === 'aguardando'))}</div><div class="k-sub">${cont(p => p.status === 'aguardando')} pedido(s) · ${cont(p => p.status === 'aguardando' && p.prioridade === 'urgente')} urgente(s)</div></div>
     <div class="kpi"><div class="k-label">Aprovados para hoje</div><div class="k-value">${money(soma(p => ['programar', 'fluxo'].includes(fase(p)) && p.data_pagamento <= hoje))}</div><div class="k-sub">${cont(p => fase(p) === 'programar')} ainda fora do fluxo</div></div>
-    <div class="kpi"><div class="k-label">Pagos aguardando nota</div><div class="k-value ${velho > 30 ? 'neg' : ''}">${money(semNf.reduce((s, p) => s + +p.valor, 0))}</div><div class="k-sub">${semNf.length} paraquedas${semNf.length ? ` · mais antigo ${velho} dias` : ''}</div></div>
+    <div class="kpi"><div class="k-label">Pagos aguardando nota</div><div class="k-value ${velho > 30 ? 'neg' : ''}">${money(semNf.reduce((s, p) => s + +p.valor, 0))}</div><div class="k-sub">${semNf.length} PA${semNf.length ? ` · mais antigo ${velho} dias` : ''}</div></div>
     <div class="kpi"><div class="k-label">Sem nota fiscal (sem lastro)</div><div class="k-value">${money(soma(p => !p.tera_nota && ['aprovado', 'pago'].includes(p.status)))}</div><div class="k-sub">aprovados ou pagos</div></div>`;
   const pagosSist = L.filter(p => fase(p) === 'pago_sist');
-  $('#pq-alertas', root).innerHTML = !compras() && podeEditar() && pagosSist.length ? `<div class="card"><div class="alert-list"><div class="alert-row"><span class="alert-tag">Pagamento</span><div class="small">${pagosSist.length} paraquedas já pago(s) no fluxo (${money(pagosSist.reduce((s, p) => s + +p.valor, 0))}). Confirme para virarem adiantamento ao fornecedor e aguardarem a nota. <button class="btn small" id="conf-pagos">Confirmar pagos</button></div></div></div></div>` : '';
+  $('#pq-alertas', root).innerHTML = !compras() && podeEditar() && pagosSist.length ? `<div class="card"><div class="alert-list"><div class="alert-row"><span class="alert-tag">Pagamento</span><div class="small">${pagosSist.length} pagamento(s) antecipado(s) já pago(s) no fluxo (${money(pagosSist.reduce((s, p) => s + +p.valor, 0))}). Confirme para virarem adiantamento ao fornecedor e aguardarem a nota. <button class="btn small" id="conf-pagos">Confirmar pagos</button></div></div></div></div>` : '';
   $('#conf-pagos', root) && ($('#conf-pagos', root).onclick = () => confirmarPagos(pagosSist, root));
 
   const R = L.filter(abas.find(a => a[0] === ui.aba)[2]).filter(filtra);
   VIS = { R, aba: abas.find(a => a[0] === ui.aba)[1] };
   const sel = ui.aba === 'aguardando' && aprova();
   const box = $('#pq-corpo', root);
-  if (!R.length) { box.innerHTML = '<div class="card"><div class="empty">Nenhum paraquedas aqui.</div></div>'; return; }
+  if (!R.length) { box.innerHTML = '<div class="card"><div class="empty">Nenhum pagamento antecipado aqui.</div></div>'; return; }
   box.innerHTML = `<div class="card flush"><div class="table-wrap"><table><thead><tr>${sel ? '<th><input type="checkbox" id="pq-all"></th>' : ''}<th>Nº</th><th>Pagar em</th><th>Quem recebe</th><th>Descrição</th><th>Nota fiscal</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
     ${R.map(p => linha(p, sel)).join('')}
-    </tbody><tfoot><tr>${sel ? '<th></th>' : ''}<th colspan="5">${R.length} paraquedas</th><th class="num">${money(R.reduce((s, p) => s + +p.valor, 0))}</th><th colspan="2"></th></tr></tfoot></table></div>
+    </tbody><tfoot><tr>${sel ? '<th></th>' : ''}<th colspan="5">${R.length} pagamento(s) antecipado(s)</th><th class="num">${money(R.reduce((s, p) => s + +p.valor, 0))}</th><th colspan="2"></th></tr></tfoot></table></div>
     ${sel ? `<div class="toolbar" style="padding:12px;justify-content:flex-end;gap:8px"><span class="small" id="pq-seltot"></span><button class="btn" id="pq-rej">Rejeitar</button><button class="btn primary" id="pq-apr">Aprovar selecionados</button></div>` : ''}</div>`;
   box.onclick = (e) => {
     const a = e.target.closest('[data-act]'); if (!a) return;
@@ -157,7 +157,7 @@ function editar(p, root, soVer = false) {
   const v = p || { prioridade: 'normal', tera_nota: true, data_pagamento: today(), solicitante: state.user?.email?.split('@')[0] || '' };
   const favs = compras() ? [] : cad.favorecidos.filter(f => f.tipo !== 'CLIENTES');
   const dis = soVer ? 'disabled' : '';
-  const m = modal({ title: novo ? 'Novo paraquedas' : `Paraquedas nº ${p.numero}${soVer ? '' : ' — editar'}`, wide: true, body: `
+  const m = modal({ title: novo ? 'Novo pagamento antecipado' : `Pagamento antecipado — PA nº ${p.numero}${soVer ? '' : ' — editar'}`, wide: true, body: `
     ${p?.motivo && p.status === 'rejeitado' ? `<p class="neg small" style="margin-top:0">Rejeitado: ${esc(p.motivo)}. Corrija e salve para reenviar à aprovação.</p>` : ''}
     <h3 style="margin:0 0 6px">Quem recebe</h3>
     <div class="grid2">
@@ -212,8 +212,8 @@ function editar(p, root, soVer = false) {
     if (p?.status === 'rejeitado') Object.assign(row, { status: 'aguardando', motivo: null });
     const btn = $('#ok', m.el); btn.disabled = true;
     try {
-      if (novo) { const [r] = await q(sb.from('paraquedas').insert({ ...row, empresa_id: state.empresa.id }).select('numero')); toast(`Paraquedas nº ${r?.numero || ''} enviado para aprovação`); }
-      else { await q(sb.from('paraquedas').update(row).eq('id', p.id)); toast(p.status === 'rejeitado' ? 'Reenviado para aprovação' : 'Paraquedas salvo'); }
+      if (novo) { const [r] = await q(sb.from('paraquedas').insert({ ...row, empresa_id: state.empresa.id }).select('numero')); toast(`PA nº ${r?.numero || ''} enviado para autorização`); }
+      else { await q(sb.from('paraquedas').update(row).eq('id', p.id)); toast(p.status === 'rejeitado' ? 'Reenviado para aprovação' : 'Pagamento antecipado salvo'); }
       m.close(); carregar(root); dispararAvisos();
     } catch (e) { btn.disabled = false; fail(e); }
   };
@@ -223,10 +223,10 @@ function editar(p, root, soVer = false) {
 // Aprovação (diretor ou financeiro)
 // ---------------------------------------------------------------------------------------------
 function decidir(sel, status, root) {
-  if (!sel.length) return toast('Marque pelo menos um paraquedas', true);
+  if (!sel.length) return toast('Marque pelo menos um pagamento antecipado', true);
   const tot = sel.reduce((s, p) => s + +p.valor, 0), apr = status === 'aprovado';
-  const m = modal({ title: apr ? 'Aprovar paraquedas' : 'Rejeitar paraquedas', body: `
-    <p style="margin-top:0">${sel.length} paraquedas · <strong>${money(tot)}</strong>${sel.some(p => !p.tera_nota) ? `<br><span class="neg small">${sel.filter(p => !p.tera_nota).length} sem nota fiscal (${money(sel.filter(p => !p.tera_nota).reduce((s, p) => s + +p.valor, 0))})</span>` : ''}</p>
+  const m = modal({ title: apr ? 'Autorizar pagamentos antecipados' : 'Recusar pagamentos antecipados', body: `
+    <p style="margin-top:0">${sel.length} PA · <strong>${money(tot)}</strong>${sel.some(p => !p.tera_nota) ? `<br><span class="neg small">${sel.filter(p => !p.tera_nota).length} sem nota fiscal (${money(sel.filter(p => !p.tera_nota).reduce((s, p) => s + +p.valor, 0))})</span>` : ''}</p>
     <ul class="small" style="max-height:220px;overflow:auto">${sel.map(p => `<li>nº ${p.numero} · ${esc(p.razao_social)} · ${money(p.valor)} · ${dateBR(p.data_pagamento)}</li>`).join('')}</ul>
     ${apr ? '' : '<label>Motivo da rejeição *<input id="mot" placeholder="volta para quem pediu corrigir"></label>'}`,
     foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">${apr ? 'Aprovar' : 'Rejeitar'}</button>` });
@@ -245,7 +245,7 @@ function decidir(sel, status, root) {
 function programar(p, root) {
   const cad = state.cad, doc = dig(p.cnpj);
   const fav = cad.favById[p.favorecido_id] || cad.favorecidos.find(f => doc && dig(f.documento) === doc) || cad.favorecidos.find(f => doc.length === 14 && dig(f.documento).slice(0, 8) === doc.slice(0, 8)) || cad.favorecidos.find(f => f.nome === p.razao_social);
-  const m = modal({ title: `Programar paraquedas nº ${p.numero}`, wide: true, body: `
+  const m = modal({ title: `Programar PA nº ${p.numero}`, wide: true, body: `
     <p class="small muted" style="margin-top:0">Cria o lançamento <strong>Em aberto</strong> em ${dateBR(p.data_pagamento)} — ele entra no fluxo diário, em Contas a pagar e na Autorização de pagamentos. A baixa é feita como em qualquer título.</p>
     <p><strong>${esc(p.razao_social)}</strong> ${esc(fmtDoc(p.cnpj))} · ${money(p.valor)} · ${esc(p.descricao)}</p>
     <div class="grid2">
@@ -253,7 +253,7 @@ function programar(p, root) {
       <label>Centro de custo<select id="ccu">${options(cad.cc, { selected: p.centro_custo_id, empty: '—' })}</select></label>
       <label>Conta de saída<select id="cta">${options(cad.contas, { selected: p.conta_id, empty: '—' })}</select></label>
       <label>Data<input type="date" id="dt" value="${p.data_pagamento < today() ? today() : p.data_pagamento}"></label>
-      <label class="grow">Fornecedor no cadastro<select id="fv">${fav ? `<option value="${fav.id}">${esc(fav.nome)} ${esc(fav.documento || '')}</option>` : ''}<option value="">— sem cadastro —</option>${podeEditar() && !fav ? '<option value="novo" selected>Cadastrar agora com a razão social e o CNPJ do paraquedas</option>' : ''}</select></label>
+      <label class="grow">Fornecedor no cadastro<select id="fv">${fav ? `<option value="${fav.id}">${esc(fav.nome)} ${esc(fav.documento || '')}</option>` : ''}<option value="">— sem cadastro —</option>${podeEditar() && !fav ? '<option value="novo" selected>Cadastrar agora com a razão social e o CNPJ do pagamento antecipado</option>' : ''}</select></label>
     </div>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Criar lançamento</button>' });
   $('#ok', m.el).onclick = async () => {
@@ -267,9 +267,9 @@ function programar(p, root) {
         favId = f.id; await loadCadastros(true);
       }
       const [l] = await q(sb.from('lancamentos').insert({ empresa_id: state.empresa.id, data: $('#dt', m.el).value, plano_id: pl, conta_id: $('#cta', m.el).value || null, centro_custo_id: $('#ccu', m.el).value || null,
-        favorecido_id: favId, valor: +p.valor, status: 'Em aberto', descricao: `PARAQUEDAS ${p.numero} — ${p.descricao}`.slice(0, 250), origem: 'paraquedas' }).select('id'));
+        favorecido_id: favId, valor: +p.valor, status: 'Em aberto', descricao: `PA ${p.numero} — ${p.descricao}`.slice(0, 250), origem: 'paraquedas' }).select('id'));
       await q(sb.from('paraquedas').update({ lancamento_id: l.id, plano_id: pl, conta_id: $('#cta', m.el).value || null, centro_custo_id: $('#ccu', m.el).value || null, favorecido_id: favId }).eq('id', p.id));
-      toast(`Paraquedas nº ${p.numero} no fluxo de ${dateBR($('#dt', m.el).value)}`); m.close(); carregar(root);
+      toast(`PA nº ${p.numero} no fluxo de ${dateBR($('#dt', m.el).value)}`); m.close(); carregar(root);
     } catch (e) { btn.disabled = false; fail(e); }
   };
 }
@@ -277,19 +277,19 @@ function programar(p, root) {
 /** lançamentos dos paraquedas já baixados (Pago): com nota → adiantamento ao fornecedor; sem nota → pago sem lastro */
 async function confirmarPagos(lista, root) {
   const comNf = lista.filter(p => p.tera_nota && p.favorecido_id), semFav = lista.filter(p => p.tera_nota && !p.favorecido_id);
-  if (!confirm(`Confirmar ${lista.length} paraquedas pago(s)?\n\n${comNf.length} viram adiantamento ao fornecedor (aguardam a nota).\n${lista.filter(p => !p.tera_nota).length} sem nota ficam como pagos sem lastro.${semFav.length ? `\n${semFav.length} sem fornecedor no cadastro ficam pagos sem virar adiantamento.` : ''}`)) return;
+  if (!confirm(`Confirmar ${lista.length} pagamento(s) antecipado(s) pago(s)?\n\n${comNf.length} viram adiantamento ao fornecedor (aguardam a nota).\n${lista.filter(p => !p.tera_nota).length} sem nota ficam como pagos sem lastro.${semFav.length ? `\n${semFav.length} sem fornecedor no cadastro ficam pagos sem virar adiantamento.` : ''}`)) return;
   let k = 0;
   try {
     for (const p of lista) {
       const l = LANC.get(p.lancamento_id); let credito_id = null;
       if (p.tera_nota && p.favorecido_id) {
         const [c] = await q(sb.from('creditos').insert({ empresa_id: state.empresa.id, favorecido_id: p.favorecido_id, natureza: 'fornecedor', tipo: 'adiantamento', data: l?.data || p.data_pagamento,
-          valor: +p.valor, descricao: `Paraquedas ${p.numero} — ${p.descricao}`.slice(0, 200), lancamento_id: p.lancamento_id }).select('id'));
+          valor: +p.valor, descricao: `PA ${p.numero} — ${p.descricao}`.slice(0, 200), lancamento_id: p.lancamento_id }).select('id'));
         credito_id = c.id;
       }
       await q(sb.from('paraquedas').update({ status: 'pago', credito_id }).eq('id', p.id)); k++;
     }
-    toast(`${k} paraquedas confirmado(s) como pagos`);
+    toast(`${k} pagamento(s) antecipado(s) confirmado(s) como pagos`);
   } catch (e) { fail(e); }
   carregar(root); dispararAvisos();
 }
@@ -311,7 +311,7 @@ async function ligarNota(p, root) {
   } catch (err) { return fail(err); }
   let cred = null;
   if (p.credito_id) { const [c] = await creditoSaldo(p.credito_id); cred = c; }
-  const m = modal({ title: `Nota do paraquedas nº ${p.numero}`, wide: true, body: `
+  const m = modal({ title: `Nota do PA nº ${p.numero}`, wide: true, body: `
     <p class="small muted" style="margin-top:0">${esc(p.razao_social)} · pago ${money(p.valor)}${cred ? ` · saldo do adiantamento ${money(cred.saldo)}` : ''}. Escolha a nota de entrada; o valor dela abate o adiantamento. Se a nota ainda não foi importada, importe o XML em Notas Fiscais.</p>
     ${notas.length ? `<div class="table-wrap" style="max-height:320px"><table><thead><tr><th></th><th>NF</th><th>Emissão</th><th>Emitente</th><th class="num">Valor</th><th class="num">Falta abater</th></tr></thead><tbody>
       ${notas.map((n, i) => `<tr><td><input type="radio" name="nt" value="${n.id}" ${i === 0 ? 'checked' : ''}></td><td>${n.numero}</td><td>${dateBR(n.emissao)}</td><td class="wrap small">${esc(n.emit_nome)}</td><td class="num">${money(n.v_nf)}</td><td class="num">${money(n.falta)}</td></tr>`).join('')}
@@ -321,7 +321,7 @@ async function ligarNota(p, root) {
     const n = notas.find(x => x.id === m.el.querySelector('[name=nt]:checked')?.value); if (!n) return;
     try {
       const valor = cred ? Math.min(cred.saldo, n.falta) : 0;
-      if (valor > 0.005) await q(sb.from('creditos_usos').insert({ empresa_id: e, credito_id: cred.id, nota_id: n.id, parcela_id: null, data: n.emissao, valor: +valor.toFixed(2), observacao: `Paraquedas ${p.numero}` }));
+      if (valor > 0.005) await q(sb.from('creditos_usos').insert({ empresa_id: e, credito_id: cred.id, nota_id: n.id, parcela_id: null, data: n.emissao, valor: +valor.toFixed(2), observacao: `PA ${p.numero}` }));
       await q(sb.from('paraquedas').update({ status: 'nota_recebida', nota_id: n.id }).eq('id', p.id));
       toast(`NF ${n.numero} ligada${valor > 0.005 ? ` · ${money(valor)} abatido` : ''}${cred && cred.saldo - valor > 0.005 ? ` · sobra ${money(cred.saldo - valor)} de adiantamento` : ''}`); m.close(); carregar(root);
     } catch (err) { fail(err); }
@@ -333,14 +333,14 @@ async function creditoSaldo(id) {
 }
 
 async function concluirSemNota(p, root) {
-  if (!confirm(`Concluir o paraquedas nº ${p.numero} sem nota fiscal (${money(p.valor)})? Ele continua na aba "Sem nota fiscal".`)) return;
+  if (!confirm(`Concluir o PA nº ${p.numero} sem nota fiscal (${money(p.valor)})? Ele continua na aba "Sem nota fiscal".`)) return;
   try { await q(sb.from('paraquedas').update({ status: 'nota_recebida' }).eq('id', p.id)); toast('Concluído'); carregar(root); } catch (e) { fail(e); }
 }
 
 // Comprovante de pagamento (PDF ou imagem, até 10 MB) — guardado no espaço privado "paraquedas"
 function anexarComprovante(p, root) {
-  const m = modal({ title: `Comprovante de pagamento — paraquedas nº ${p.numero}`, body: `
-    <p class="small muted" style="margin-top:0">${esc(p.razao_social)} · ${money(p.valor)}. PDF ou foto (JPG, PNG), até 10 MB. Quem lançou o paraquedas é avisado.</p>
+  const m = modal({ title: `Comprovante de pagamento — PA nº ${p.numero}`, body: `
+    <p class="small muted" style="margin-top:0">${esc(p.razao_social)} · ${money(p.valor)}. PDF ou foto (JPG, PNG), até 10 MB. Quem lançou o pagamento antecipado é avisado.</p>
     ${p.comprovante_path ? `<p class="small">Atual: ${esc(p.comprovante_nome || 'comprovante')} — será substituído.</p>` : ''}
     <input type="file" id="arq" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic">`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Anexar</button>' });
@@ -371,12 +371,12 @@ async function verComprovante(p) {
 
 async function cancelar(p, root) {
   const l = LANC.get(p.lancamento_id);
-  const motivo = prompt(`Cancelar o paraquedas nº ${p.numero} (${money(p.valor)})?${l ? '\nO lançamento em aberto no fluxo também será excluído.' : ''}\n\nMotivo:`);
+  const motivo = prompt(`Cancelar o PA nº ${p.numero} (${money(p.valor)})?${l ? '\nO lançamento em aberto no fluxo também será excluído.' : ''}\n\nMotivo:`);
   if (motivo === null) return;
   try {
     if (l) { if (l.status === 'Pago') return toast('O lançamento já foi pago — não dá para cancelar.', true); await q(sb.from('lancamentos').delete().eq('id', l.id)); }
     await q(sb.from('paraquedas').update({ status: 'cancelado', motivo: motivo || 'cancelado', lancamento_id: null }).eq('id', p.id));
-    toast('Paraquedas cancelado'); carregar(root); dispararAvisos();
+    toast('Pagamento antecipado cancelado'); carregar(root); dispararAvisos();
   } catch (e) { fail(e); }
 }
 
@@ -391,14 +391,14 @@ function situacaoTxt(p) {
 }
 async function relatorioPDF() {
   const R = VIS.R;
-  if (!R.length) return toast('Nenhum paraquedas nesta aba para o relatório', true);
+  if (!R.length) return toast('Nenhum pagamento antecipado nesta aba para o relatório', true);
   if (!window.jspdf) return toast('Biblioteca de PDF ainda carregando, tente de novo em instantes', true);
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   if (!doc.autoTable) return toast('Biblioteca de tabelas do PDF ainda carregando', true);
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 10;
   const azul = [43, 85, 152], marinho = [42, 31, 111];
   const logo = await logoPNG();
-  const titulo = `Paraquedas - ${VIS.aba}`;
+  const titulo = `Pagamentos Antecipados - ${VIS.aba}`;
   const cabecalho = () => {
     if (logo) doc.addImage(logo.data, 'PNG', M, 7, 11 * logo.ratio, 11);
     doc.setTextColor(...marinho); doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(pdfTxt(titulo), W - M, 12, { align: 'right' });
@@ -410,7 +410,7 @@ async function relatorioPDF() {
   // resumo
   const tot = R.reduce((s, p) => s + +p.valor, 0), urg = R.filter(p => p.prioridade === 'urgente'), semNf = R.filter(p => !p.tera_nota);
   const datas = R.map(p => p.data_pagamento).filter(Boolean).sort();
-  const kpis = [['Paraquedas', String(R.length), datas.length ? `pagamento de ${dateBR(datas[0])} a ${dateBR(datas[datas.length - 1])}` : ''],
+  const kpis = [['Pagamentos antecipados', String(R.length), datas.length ? `pagamento de ${dateBR(datas[0])} a ${dateBR(datas[datas.length - 1])}` : ''],
     ['Valor total', money(tot), ''], ['Urgentes', String(urg.length), money(urg.reduce((s, p) => s + +p.valor, 0))],
     ['Sem nota fiscal', String(semNf.length), money(semNf.reduce((s, p) => s + +p.valor, 0))]];
   doc.autoTable({ startY: 23, theme: 'plain', body: [kpis.map(k => k[0]), kpis.map(k => k[1]), kpis.map(k => k[2])].map(r => r.map(pdfTxt)), margin: { left: M, right: M },
@@ -430,7 +430,7 @@ async function relatorioPDF() {
   ].map(pdfTxt));
   doc.autoTable({ startY: (doc.lastAutoTable?.finalY ?? 30) + 3, theme: 'grid', margin: { left: M, right: M, top: 24 },
     head: [['Nº', 'Pagar em', 'Quem recebe', 'Pix / dados bancários', 'Descrição', 'Nota fiscal', 'Situação', 'Valor']],
-    body, foot: [['', '', `${R.length} paraquedas`, '', '', '', 'Total', money(tot)]],
+    body, foot: [['', '', `${R.length} PA`, '', '', '', 'Total', money(tot)]],
     styles: { fontSize: 7.4, cellPadding: 1.3, lineColor: [226, 231, 239], valign: 'top' }, headStyles: { fillColor: azul, textColor: 255 },
     footStyles: { fillColor: [232, 238, 248], textColor: 20, fontStyle: 'bold' }, showFoot: 'lastPage',
     columnStyles: { 0: { cellWidth: 18 }, 1: { cellWidth: 18 }, 2: { cellWidth: 52 }, 3: { cellWidth: 46 }, 4: { cellWidth: 'auto' }, 5: { cellWidth: 24 }, 6: { cellWidth: 34 }, 7: { cellWidth: 24, halign: 'right' } },
@@ -446,6 +446,6 @@ async function relatorioPDF() {
     doc.setFontSize(8); doc.setTextColor(90); doc.text(pdfTxt(t), x + larg / 2, y + 4, { align: 'center' });
   });
   const n = doc.getNumberOfPages();
-  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(130); doc.text(`Página ${i} de ${n}`, W - M, H - 5, { align: 'right' }); doc.text('Fonte: Paraquedas (fluxo-caixa-saas)', M, H - 5); }
-  doc.save(`paraquedas_${VIS.aba.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_')}_${today()}.pdf`);
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(130); doc.text(`Página ${i} de ${n}`, W - M, H - 5, { align: 'right' }); doc.text('Fonte: Pagamentos Antecipados (fluxo-caixa-saas)', M, H - 5); }
+  doc.save(`pagamentos_antecipados_${VIS.aba.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_')}_${today()}.pdf`);
 }
