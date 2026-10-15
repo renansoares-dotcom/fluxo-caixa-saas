@@ -1,6 +1,7 @@
 import { sb, state, q, loadCadastros, anosSelect, temArea } from './lib/data.js';
 import { $, $$, esc, toast, fail, formData, loading, lerCores, modal } from './lib/ui.js';
 import { SUPABASE_URL } from './config.js';
+import { iniciarNotificacoes, pararNotificacoes } from './lib/notif.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -124,7 +125,7 @@ function trocarSenha(recuperacao = false) {
 }
 $('#trocar-senha').onclick = () => trocarSenha(false);
 
-const logout = async () => { await sb.auth.signOut(); location.hash = ''; };
+const logout = async () => { pararNotificacoes(); await sb.auth.signOut(); location.hash = ''; };
 $('#logout').onclick = logout; $('#logout-2').onclick = logout;
 
 // ---------- Empresas ----------
@@ -178,6 +179,7 @@ async function entrarEmpresa(emp, papel, areas) {
   state.empresa = emp; state.papel = papel; state.cad = null;
   state.areas = Array.isArray(areas) && areas.length ? areas : null;
   aplicarAreas();
+  iniciarNotificacoes();
   try { localStorage.setItem('fc-empresa', emp.id); } catch {}
   $('#empresa-switch').textContent = emp.nome + ' ▾';
   $('#user-email').textContent = state.user.email;

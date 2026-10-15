@@ -439,3 +439,15 @@ body.cf-imprimindo .card-head{margin:0}
 tr.dp-falta td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .dp-in{width:100%;min-width:200px}
 .bal-gerar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+
+/* Notificações (sino) */
+.notif-wrap{position:relative}
+.notif-n{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#e34948;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center}
+.notif-painel{position:absolute;right:0;top:calc(100% + 6px);width:min(380px,92vw);max-height:70vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);z-index:50}
+.notif-topo{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border)}
+.notif-push{padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+.notif-item{padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer}
+.notif-item:hover{background:var(--surface-2)}
+.notif-item.nova{box-shadow:inset 3px 0 0 var(--primary)}
+.notif-item.nova .notif-tit{font-weight:600}
+.notif-tit{font-size:13px}

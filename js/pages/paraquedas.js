@@ -4,6 +4,7 @@
 // "Terá nota fiscal = não" fica separado para o controle de pagamentos sem lastro fiscal.
 import { sb, state, q, fetchAll, loadCadastros, podeEditar } from '../lib/data.js';
 import { $, esc, money, dateBR, fail, toast, modal, options, parseNum, exportXLSX, today, logoPNG } from '../lib/ui.js';
+import { dispararAvisos } from '../lib/notif.js';
 
 export const title = 'Paraquedas — pagamentos sem nota';
 const ST = { aguardando: 'Aguardando aprovação', aprovado: 'Aprovado', rejeitado: 'Rejeitado', cancelado: 'Cancelado', pago: 'Pago — aguardando nota', nota_recebida: 'Nota recebida' };
@@ -111,6 +112,8 @@ function pintar(root) {
     else if (act === 'nota') ligarNota(p, root);
     else if (act === 'cancelar') cancelar(p, root);
     else if (act === 'concluir') concluirSemNota(p, root);
+    else if (act === 'comprovante') anexarComprovante(p, root);
+    else if (act === 'vercomp') verComprovante(p);
   };
   if (sel) {
     const marcados = () => [...box.querySelectorAll('[data-sel]:checked')].map(i => L.find(p => p.id === i.dataset.sel));
@@ -134,6 +137,8 @@ function linha(p, sel) {
   if (!compras() && ed && f === 'programar') acoes.push(['programar', 'Programar no fluxo']);
   if (!compras() && ed && f === 'sem_nf') acoes.push(['nota', 'Ligar nota']);
   if (!compras() && ed && f === 'sem_lastro') acoes.push(['concluir', 'Concluir']);
+  if (p.comprovante_path) acoes.push(['vercomp', '📎 Comprovante']);
+  if (!compras() && ed && ['aprovado', 'pago', 'nota_recebida'].includes(p.status)) acoes.push(['comprovante', p.comprovante_path ? 'Trocar comprovante' : 'Anexar comprovante']);
   if ((ehMeu(p) && ['aguardando', 'rejeitado'].includes(p.status)) || (ed && ['aguardando', 'rejeitado', 'aprovado'].includes(p.status) && f !== 'pago_sist')) acoes.push(['cancelar', 'Cancelar']);
   return `<tr>${sel ? `<td><input type="checkbox" data-sel="${p.id}"></td>` : ''}<td><strong>${p.numero}</strong>${p.prioridade === 'urgente' ? ' <span class="badge vencido">urgente</span>' : ''}</td>
     <td>${dateBR(p.data_pagamento)}</td>
@@ -209,7 +214,7 @@ function editar(p, root, soVer = false) {
     try {
       if (novo) { const [r] = await q(sb.from('paraquedas').insert({ ...row, empresa_id: state.empresa.id }).select('numero')); toast(`Paraquedas nº ${r?.numero || ''} enviado para aprovação`); }
       else { await q(sb.from('paraquedas').update(row).eq('id', p.id)); toast(p.status === 'rejeitado' ? 'Reenviado para aprovação' : 'Paraquedas salvo'); }
-      m.close(); carregar(root);
+      m.close(); carregar(root); dispararAvisos();
     } catch (e) { btn.disabled = false; fail(e); }
   };
 }
@@ -229,7 +234,7 @@ function decidir(sel, status, root) {
     const motivo = apr ? null : $('#mot', m.el).value.trim(); if (!apr && !motivo) return toast('Informe o motivo', true);
     try {
       await q(sb.from('paraquedas').update({ status, motivo }).in('id', sel.map(p => p.id)));
-      toast(apr ? `${sel.length} aprovado(s) · ${money(tot)}` : `${sel.length} rejeitado(s)`); m.close(); carregar(root);
+      toast(apr ? `${sel.length} aprovado(s) · ${money(tot)}` : `${sel.length} rejeitado(s)`); m.close(); carregar(root); dispararAvisos();
     } catch (e) { fail(e); }
   };
 }
@@ -286,7 +291,7 @@ async function confirmarPagos(lista, root) {
     }
     toast(`${k} paraquedas confirmado(s) como pagos`);
   } catch (e) { fail(e); }
-  carregar(root);
+  carregar(root); dispararAvisos();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -332,6 +337,38 @@ async function concluirSemNota(p, root) {
   try { await q(sb.from('paraquedas').update({ status: 'nota_recebida' }).eq('id', p.id)); toast('Concluído'); carregar(root); } catch (e) { fail(e); }
 }
 
+// Comprovante de pagamento (PDF ou imagem, até 10 MB) — guardado no espaço privado "paraquedas"
+function anexarComprovante(p, root) {
+  const m = modal({ title: `Comprovante de pagamento — paraquedas nº ${p.numero}`, body: `
+    <p class="small muted" style="margin-top:0">${esc(p.razao_social)} · ${money(p.valor)}. PDF ou foto (JPG, PNG), até 10 MB. Quem lançou o paraquedas é avisado.</p>
+    ${p.comprovante_path ? `<p class="small">Atual: ${esc(p.comprovante_nome || 'comprovante')} — será substituído.</p>` : ''}
+    <input type="file" id="arq" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic">`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Anexar</button>' });
+  $('#ok', m.el).onclick = async () => {
+    const f = $('#arq', m.el).files[0]; if (!f) return toast('Escolha o arquivo', true);
+    if (f.size > 10 * 1024 * 1024) return toast('Arquivo maior que 10 MB', true);
+    const btn = $('#ok', m.el); btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      const nome = f.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]+/g, '_').slice(-80);
+      const path = `${state.empresa.id}/${p.id}/${Date.now()}-${nome}`;
+      const up = await sb.storage.from('paraquedas').upload(path, f, { contentType: f.type || 'application/octet-stream', upsert: false });
+      if (up.error) throw up.error;
+      const antigo = p.comprovante_path;
+      await q(sb.from('paraquedas').update({ comprovante_path: path, comprovante_nome: f.name.slice(0, 200), comprovante_em: new Date().toISOString(), comprovante_por: state.user?.email || null }).eq('id', p.id));
+      if (antigo) await sb.storage.from('paraquedas').remove([antigo]);
+      toast('Comprovante anexado'); m.close(); carregar(root); dispararAvisos();
+    } catch (e) { btn.disabled = false; btn.textContent = 'Anexar'; fail(/bucket|not found/i.test(e.message || '') ? new Error('O espaço de comprovantes ainda não foi criado: rode a migration 20261015000036.') : e); }
+  };
+}
+async function verComprovante(p) {
+  const w = window.open('', '_blank');
+  try {
+    const { data, error } = await sb.storage.from('paraquedas').createSignedUrl(p.comprovante_path, 300);
+    if (error) throw error;
+    if (w) w.location = data.signedUrl; else location.href = data.signedUrl;
+  } catch (e) { if (w) w.close(); fail(e); }
+}
+
 async function cancelar(p, root) {
   const l = LANC.get(p.lancamento_id);
   const motivo = prompt(`Cancelar o paraquedas nº ${p.numero} (${money(p.valor)})?${l ? '\nO lançamento em aberto no fluxo também será excluído.' : ''}\n\nMotivo:`);
@@ -339,7 +376,7 @@ async function cancelar(p, root) {
   try {
     if (l) { if (l.status === 'Pago') return toast('O lançamento já foi pago — não dá para cancelar.', true); await q(sb.from('lancamentos').delete().eq('id', l.id)); }
     await q(sb.from('paraquedas').update({ status: 'cancelado', motivo: motivo || 'cancelado', lancamento_id: null }).eq('id', p.id));
-    toast('Paraquedas cancelado'); carregar(root);
+    toast('Paraquedas cancelado'); carregar(root); dispararAvisos();
   } catch (e) { fail(e); }
 }
 
