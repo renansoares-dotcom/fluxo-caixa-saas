@@ -183,7 +183,8 @@ $('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
 function aplicarAreas() {
   $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'com', 'cmp', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
-  for (const r of ['dashboard', 'hoje', 'decisoes', 'executivo']) { const a = $(`#nav > a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
+  for (const r of ['dashboard', 'hoje', 'decisoes', 'executivo']) { const a = $(`#nav a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
+  const pain = $('#nav .nav-area[data-area="pain"]'); if (pain) pain.hidden = !temArea('fin');
 }
 // primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
 function primeiraRota() {
@@ -217,6 +218,15 @@ async function entrarEmpresa(emp, papel, areas) {
 $('#ano-global').onchange = (e) => { state.ano = +e.target.value; render(); };
 // menu em cascata: um grupo aberto por vez
 $$('#nav details').forEach(d => d.addEventListener('toggle', () => { if (d.open) $$('#nav details').forEach(o => { if (o !== d) o.open = false; }); }));
+// menu em acordeão também nas áreas: uma área aberta por vez (a da tela atual abre sozinha; a última aberta fica guardada)
+function abrirArea(area, guardar = true) {
+  $$('#nav .nav-area').forEach(a => a.classList.toggle('aberta', a === area));
+  if (guardar && area) { try { localStorage.setItem('nav-area', area.dataset.area); } catch {} }
+}
+$$('#nav .nav-area-tit').forEach(t => { t.setAttribute('role', 'button'); t.tabIndex = 0;
+  const alterna = () => { const a = t.closest('.nav-area'); a.classList.contains('aberta') ? a.classList.remove('aberta') : abrirArea(a); };
+  t.addEventListener('click', alterna); t.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alterna(); } }); });
+{ let g = null; try { g = localStorage.getItem('nav-area'); } catch {} const a = g && $(`#nav .nav-area[data-area="${g}"]`); if (a) abrirArea(a, false); }
 // menu lateral no celular: abre por cima do conteúdo, fecha no fundo escuro, no Esc ou ao navegar
 const menu = (abrir) => { $('#sidebar').classList.toggle('open', abrir); $('#sidebar-backdrop').hidden = !abrir; document.body.classList.toggle('menu-aberto', abrir); };
 $('#menu-btn').onclick = () => menu(!$('#sidebar').classList.contains('open'));
@@ -241,6 +251,7 @@ async function render() {
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
   // menu em cascata: abre o grupo da página atual
   const ativo = $(`#nav a[data-route="${route}"]`)?.closest('details'); if (ativo && !ativo.open) { $$('#nav details').forEach(d => { d.open = d === ativo; }); }
+  { const ar = $(`#nav a[data-route="${route}"]`)?.closest('.nav-area'); if (ar && !ar.classList.contains('aberta')) abrirArea(ar); }
   $('#sidebar').classList.remove('open'); $('#sidebar-backdrop').hidden = true; document.body.classList.remove('menu-aberto');
   const old = $('#page'); const page = old.cloneNode(false); old.replaceWith(page); loading(page);
   const seq = ++renderSeq;

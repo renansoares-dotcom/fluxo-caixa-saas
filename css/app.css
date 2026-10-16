@@ -529,3 +529,15 @@ td.rc-st{white-space:normal;min-width:200px}
 .fu-col-h{display:flex;justify-content:space-between;align-items:baseline;gap:6px;padding:4px 4px 8px}
 .fu-card{padding:10px 12px;margin-bottom:8px}
 .fu-card:hover{border-color:var(--primary)}
+
+/* menu: áreas retráteis (uma aberta por vez) */
+.nav-area:not(.aberta)>:not(.nav-area-tit){display:none}
+.nav-area-tit{cursor:pointer;user-select:none;border-radius:8px;padding:8px 10px}
+.nav-area-tit:hover{background:var(--surface-2)}
+.nav-area-tit::after{content:'';margin-left:auto;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;margin-right:4px}
+.nav-area.aberta>.nav-area-tit::after{transform:rotate(45deg)}
+.nav-area:has(a.active):not(.aberta)>.nav-area-tit{background:color-mix(in srgb,var(--area) 10%,transparent)}
+.nav-area[data-area="pain"]{--area:var(--primary);margin-top:4px;border-top:0;padding-top:0}
+.nav-area[data-area="com"],.trilha[data-area="com"]{--area:#c2410c}
+.nav-area[data-area="cmp"],.trilha[data-area="cmp"]{--area:#7c3aed}
+.nav-solta{margin-left:4px}
