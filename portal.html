@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal do Cliente</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="icon" type="image/svg+xml" href="assets/iplamm-icon.svg">
+  <style>
+    body{background:var(--bg)}
+    .pt-wrap{max-width:1040px;margin:0 auto;padding:16px}
+    .pt-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0 16px;border-bottom:1px solid var(--border);margin-bottom:16px}
+    .pt-top img{height:40px}
+    .pt-auth{max-width:420px;margin:40px auto}
+    .pt-auth form{display:grid;gap:10px}
+    .pt-aviso{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:13px}
+    @media (max-width:640px){ .pt-hide-sm{display:none} }
+  </style>
+</head>
+<body>
+  <div class="pt-wrap">
+    <div class="pt-top"><div style="display:flex;align-items:center;gap:12px"><img class="logo-light" src="assets/iplamm-logo.svg" alt=""><img class="logo-dark" src="assets/iplamm-logo-dark.svg" alt=""><div><b>Portal do Cliente</b><div class="muted small" id="pt-quem"></div></div></div>
+      <div id="pt-user" hidden style="display:flex;gap:8px;align-items:center"><select id="pt-cli"></select><button class="btn ghost small" id="pt-senha">Alterar senha</button><button class="btn ghost small" id="pt-sair">Sair</button></div></div>
+    <div id="pt-main"><div class="loading">Carregando…</div></div>
+  </div>
+  <div id="modal-root"></div><div id="toast-root"></div>
+  <script type="module" src="js/portal.js"></script>
+</body>
+</html>

@@ -21,6 +21,7 @@ const routes = {
   'comercial/carteira': () => import(`./pages/comercial-carteira.js?v=${V}`),
   'comercial/funil': () => import(`./pages/comercial-funil.js?v=${V}`),
   'comercial/vendedores': () => import(`./pages/comercial-vendedores.js?v=${V}`),
+  'portal-clientes': () => import(`./pages/portal-admin.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),

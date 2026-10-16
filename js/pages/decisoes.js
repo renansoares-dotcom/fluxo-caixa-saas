@@ -35,7 +35,8 @@ async function carregar() {
     return { data: esp.data_ref, abaixo: prods.filter(p => (sal[p.codigo] || 0) <= +p.ponto_pedido).map(p => ({ ...p, saldo: sal[p.codigo] || 0 })) };
   })().catch(() => null);
   const com = await import('../lib/comercial.js').then(m => m.baseComercial()).catch(() => null);
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com };
+  const prorrog = await q(sb.from('portal_prorrogacoes').select('id,valor,solicitado_em').eq('empresa_id', e).eq('status', 'pendente')).catch(() => []);
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog };
 }
 
 // ---------------------------------------------------------------- regras
@@ -137,6 +138,12 @@ function regras(D) {
         desc: `${esf.length} cliente(s) sem comprar há mais de 1,5× o intervalo normal deles. Maiores: ${esf.slice(0, 5).map(c => `${c.nome} (${c.desde} dias; ${money0(c.v12)} em 12 meses)`).join(' · ')}.`,
         impacto: v, impactoTxt: `${money0(v)} em 12 meses`, regra: 'Pelas NF-e de venda dos últimos 2 anos: dias desde a última compra > 1,5 × intervalo médio entre compras do cliente (mínimo 20 dias) e menos de 180 dias.',
         acao: 'Abrir carteira', rota: 'comercial/carteira' }); } }
+
+  // 12. pedidos de prorrogação do Portal do Cliente aguardando
+  if (D.prorrog?.length) { const v = D.prorrog.reduce((t, p) => t + +p.valor, 0);
+    out.push({ k: 'portal-prorrogacao', origem: 'Financeiro', urg: D.prorrog.some(p => p.solicitado_em < addDias(D.hoje, -2)) ? 'alta' : 'media', titulo: 'Responder os pedidos de prorrogação dos clientes',
+      desc: `${D.prorrog.length} pedido(s) feitos pelo Portal do Cliente aguardando resposta. O cliente vê a decisão no portal.`, impacto: v, impactoTxt: money0(v),
+      regra: 'Pedidos com situação pendente em Portal do Cliente; urgência alta se algum tem mais de 2 dias.', acao: 'Abrir Portal do Cliente', rota: 'portal-clientes' }); }
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }
