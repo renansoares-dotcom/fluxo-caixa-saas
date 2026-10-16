@@ -516,3 +516,7 @@ tr.dp-falta td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .cp-insight{padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);font-size:13px}
 .cp-insight-cat{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;margin-bottom:2px}
 tr.clickable{cursor:pointer}tr.clickable:hover td{background:var(--surface-2)}
+/* Compras */
+.modal label.chk{flex-direction:row;align-items:flex-start;gap:8px;font-size:13px;color:var(--text);font-weight:400}
+.modal label.chk input{width:auto;min-height:0;margin-top:2px;flex:0 0 auto}
+td.rc-st{white-space:normal;min-width:200px}

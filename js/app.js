@@ -10,6 +10,10 @@ const routes = {
   'hoje': () => import(`./pages/hoje.js?v=${V}`),
   'decisoes': () => import(`./pages/decisoes.js?v=${V}`),
   'executivo': () => import(`./pages/executivo.js?v=${V}`),
+  'compras': () => import(`./pages/compras-painel.js?v=${V}`),
+  'compras/requisicoes': () => import(`./pages/compras-requisicoes.js?v=${V}`),
+  'compras/pedidos': () => import(`./pages/compras-pedidos.js?v=${V}`),
+  'compras/recebimentos': () => import(`./pages/compras-recebimentos.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),
@@ -170,7 +174,7 @@ $('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'
 
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
 function aplicarAreas() {
-  $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
+  $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'cmp', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
   for (const r of ['dashboard', 'hoje', 'decisoes', 'executivo']) { const a = $(`#nav > a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
 }
 // primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
@@ -196,7 +200,7 @@ async function entrarEmpresa(emp, papel, areas) {
   // papel "compras": só a tela de paraquedas (o banco também não deixa ler o resto)
   document.body.classList.toggle('so-compras', papel === 'compras');
   $$('#nav .nav-audit').forEach(el => el.hidden = !['admin', 'diretor'].includes(papel));
-  if (papel === 'compras') { if (location.hash !== '#/paraquedas') location.hash = '#/paraquedas'; else render(); return; }
+  if (papel === 'compras') { if (!rotaDeCompras(location.hash.replace(/^#\//, ''))) location.hash = '#/compras'; else render(); return; }
   if (!location.hash || location.hash === '#/') location.hash = '#/' + (temArea('fin') ? 'hoje' : primeiraRota()); else render();
 }
 
@@ -210,14 +214,16 @@ $('#sidebar-backdrop').onclick = () => menu(false);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#sidebar').classList.contains('open')) menu(false); });
 
 // ---------- Roteamento ----------
+// perfil compras: Pagamentos Antecipados e o módulo Compras
+const rotaDeCompras = (r) => r === 'paraquedas' || r === 'compras' || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;
   if (!state.cad) { try { await loadCadastros(); } catch (e) { fail(e); return; } }
   lerCores();
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
-  if (state.papel === 'compras' && route !== 'paraquedas') { location.hash = '#/paraquedas'; return; }
-  { const ar = routes[route] ? areaDaRota(route) : 'fin'; if (['fin', 'cpd', 'cont'].includes(ar) && !temArea(ar)) { location.hash = '#/' + primeiraRota(); return; } }
+  if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
+  { const ar = routes[route] ? areaDaRota(route) : 'fin'; if (['fin', 'cmp', 'cpd', 'cont'].includes(ar) && !temArea(ar)) { location.hash = '#/' + primeiraRota(); return; } }
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
   // menu em cascata: abre o grupo da página atual

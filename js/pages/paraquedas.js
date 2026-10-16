@@ -55,10 +55,11 @@ export async function render(root) {
   $('#pdf', root).onclick = () => relatorioPDF();
   $('#busca', root).oninput = (e) => { ui.busca = e.target.value; pintar(root); };
   $('#pq-abas', root).onclick = (e) => { const a = e.target.closest('[data-aba]')?.dataset.aba; if (a) { ui.aba = a; pintar(root); } };
-  const ab = state.abrir?.tipo === 'pa' ? state.abrir : null;   // vindo da busca global
+  const ab = ['pa', 'pa-novo'].includes(state.abrir?.tipo) ? state.abrir : null;   // vindo da busca global ou de um pedido de compra
   if (ab) delete state.abrir;
   await carregar(root);
-  if (ab) { const p = L.find(x => x.id === ab.id); if (p) editar(p, root, true); }
+  if (ab?.tipo === 'pa') { const p = L.find(x => x.id === ab.id); if (p) editar(p, root, true); }
+  if (ab?.tipo === 'pa-novo') editar(null, root, false, ab.v);
 }
 
 async function carregar(root) {
@@ -155,9 +156,9 @@ function linha(p, sel) {
 // ---------------------------------------------------------------------------------------------
 // Formulário
 // ---------------------------------------------------------------------------------------------
-function editar(p, root, soVer = false) {
+function editar(p, root, soVer = false, pre = null) {
   const novo = !p, ed = podeEditar(), cad = state.cad;
-  const v = p || { prioridade: 'normal', tera_nota: true, data_pagamento: today(), solicitante: state.user?.email?.split('@')[0] || '' };
+  const v = p || { prioridade: 'normal', tera_nota: true, data_pagamento: today(), solicitante: state.user?.email?.split('@')[0] || '', ...(pre || {}) };
   const favs = compras() ? [] : cad.favorecidos.filter(f => f.tipo !== 'CLIENTES');
   const dis = soVer ? 'disabled' : '';
   const m = modal({ title: novo ? 'Novo pagamento antecipado' : `Pagamento antecipado — PA nº ${p.numero}${soVer ? '' : ' — editar'}`, wide: true, body: `

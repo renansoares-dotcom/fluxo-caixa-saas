@@ -17,7 +17,8 @@ const rotaLiberada = (route) => {
   const a = document.querySelector(`#nav a[data-route="${route}"]`);
   if (!a || a.hidden) return false;
   const ar = areaDaRota(route);
-  return !['fin', 'cpd', 'cont'].includes(ar) || temArea(ar);
+  if (compras() && !a.classList.contains('nav-compras')) return false;
+  return !['fin', 'cmp', 'cpd', 'cont'].includes(ar) || temArea(ar);
 };
 const ir = (route, abrir) => { if (abrir) state.abrir = abrir; if (location.hash === '#/' + route) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + route; };
 
@@ -85,6 +86,14 @@ async function remotos(termo) {
     pq = nPA ? pq.eq('numero', +nPA) : (ehValor || data) ? null : pq.or(`razao_social.ilike.${like},descricao.ilike.${like}`);
     if (pq) tarefas.push(q(pq.order('numero', { ascending: false }).limit(MAX)).then(rows => rows.length && out.push({ grupo: 'Pagamentos antecipados', ordem: 5, itens: rows.map(p => ({
       texto: `PA nº ${p.numero} · ${p.razao_social || ''}`, sub: `${money(p.valor)} · pagar em ${dateBR(p.data_pagamento)} · ${p.status}`, go: () => ir('paraquedas', { tipo: 'pa', id: p.id }),
+    })) })).catch(() => {}));
+  }
+  if (rotaLiberada('compras/pedidos')) {
+    const nPC = (t.match(/^(?:pc\s*n?º?\s*)?(\d+)$/i) || [])[1];
+    let pc = sb.from('compras_pedidos').select('id,numero,status,total,pedido_iniflex,data_pedido').eq('empresa_id', e);
+    pc = nPC ? pc.or(`numero.eq.${+nPC},pedido_iniflex.eq.${nPC}`) : (ehValor || data) ? null : pc.ilike('pedido_iniflex', like);
+    if (pc) tarefas.push(q(pc.order('numero', { ascending: false }).limit(MAX)).then(rows => rows.length && out.push({ grupo: 'Pedidos de compra', ordem: 6, itens: rows.map(p => ({
+      texto: `PC ${p.numero}${p.pedido_iniflex ? ' · Iniflex ' + p.pedido_iniflex : ''}`, sub: `${money(p.total)} · ${dateBR(p.data_pedido)} · ${p.status}`, go: () => ir('compras/pedidos', { tipo: 'pedido', id: p.id }),
     })) })).catch(() => {}));
   }
   await Promise.all(tarefas);
