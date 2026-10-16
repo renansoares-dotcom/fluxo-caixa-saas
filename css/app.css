@@ -476,3 +476,11 @@ tr.dp-falta td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .mm-mini{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .mm-mini>div{border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--surface-2)}
 @media (max-width:900px){.mm-grid{grid-template-columns:1fr}}
+/* Decision Center */
+.dc-lista{display:grid;gap:12px;margin-top:12px}
+.dc-rec{padding:14px 16px}
+.dc-cab{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dc-imp{margin-left:auto;font-weight:600}
+.dc-acoes{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.dc-rec details summary{cursor:pointer}
+.kpi.on{outline:2px solid var(--primary)}
