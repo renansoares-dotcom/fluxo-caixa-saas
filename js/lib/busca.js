@@ -12,7 +12,7 @@ const soDig = (s) => String(s ?? '').replace(/\D/g, '');
 const compras = () => state.papel === 'compras';
 
 // área de uma rota, como no menu
-const areaDaRota = (route) => ['dashboard', 'hoje', 'decisoes'].includes(route) ? 'fin' : document.querySelector(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
+const areaDaRota = (route) => ['dashboard', 'hoje', 'decisoes', 'executivo'].includes(route) ? 'fin' : document.querySelector(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
 const rotaLiberada = (route) => {
   const a = document.querySelector(`#nav a[data-route="${route}"]`);
   if (!a || a.hidden) return false;

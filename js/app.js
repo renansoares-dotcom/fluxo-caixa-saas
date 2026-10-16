@@ -9,6 +9,7 @@ const V = Date.now();
 const routes = {
   'hoje': () => import(`./pages/hoje.js?v=${V}`),
   'decisoes': () => import(`./pages/decisoes.js?v=${V}`),
+  'executivo': () => import(`./pages/executivo.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),
@@ -170,14 +171,14 @@ $('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
 function aplicarAreas() {
   $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
-  for (const r of ['dashboard', 'hoje', 'decisoes']) { const a = $(`#nav > a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
+  for (const r of ['dashboard', 'hoje', 'decisoes', 'executivo']) { const a = $(`#nav > a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
 }
 // primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
 function primeiraRota() {
   const a = $$('#nav a[data-route]').find(x => !x.hidden && !x.closest('.nav-area')?.hidden);
   return a?.dataset.route || 'cadastros/plano';
 }
-const areaDaRota = (route) => ['dashboard', 'hoje', 'decisoes'].includes(route) ? 'fin' : $(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
+const areaDaRota = (route) => ['dashboard', 'hoje', 'decisoes', 'executivo'].includes(route) ? 'fin' : $(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
 
 async function entrarEmpresa(emp, papel, areas) {
   sessionStorage.removeItem('fc-escolher');
