@@ -2,10 +2,11 @@
 import { sb, state, q, fetchAll } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, today, fail, toast, modal, confirmDialog } from '../lib/ui.js';
 import { cadCompras, ST_REQ, badge, qtd, inp, unit, num, diasTxt, lerDias, podeAprovar } from '../lib/compras.js';
+import { carregarProdutos, datalistProdutos, ligarItensProduto, produtoDoItem } from '../lib/produtos.js';
 
 export const title = 'Requisições e cotações';
 const ui = { filtro: 'abertas', busca: '' };
-let R = [], C = null;
+let R = [], C = null, PRODS = [];
 
 const FILTROS = [['abertas', 'Em andamento', ['pendente', 'aprovada']], ['pendente', 'Aguardando aprovação', ['pendente']], ['aprovada', 'Aprovadas (cotar)', ['aprovada']],
   ['atendida', 'Viraram pedido', ['atendida']], ['rejeitada', 'Rejeitadas', ['rejeitada']], ['cancelada', 'Canceladas', ['cancelada']], ['todas', 'Todas', null]];
@@ -32,6 +33,7 @@ async function carregar(root) {
       fetchAll(() => sb.from('compras_requisicao_itens').select('*').eq('empresa_id', e).order('id')),
       fetchAll(() => sb.from('compras_cotacoes').select('id,requisicao_id,escolhida').eq('empresa_id', e).order('id'))]);
     C = cad;
+    PRODS = await carregarProdutos().catch(() => []);
     R = reqs.map(r => ({ ...r, itens: itens.filter(i => i.requisicao_id === r.id), nCot: cots.filter(c => c.requisicao_id === r.id).length }));
     pintar(root);
   } catch (err) { fail(err); $('#rq-lista', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; }
@@ -53,7 +55,7 @@ function pintar(root) {
 
 // ------------------------------------------------------------ nova / editar
 function linhaItem(i = {}) {
-  return `<tr><td><input class="it-d" value="${esc(i.descricao || '')}" placeholder="ex.: PEBD 2420 virgem" style="min-width:260px"></td>
+  return `<tr><td><input class="it-d" list="dl-prod" ${i.produto_id ? `data-prod="${i.produto_id}"` : ''} value="${esc(i.descricao || '')}" placeholder="ex.: PEBD 2420 virgem" style="min-width:260px"></td>
     <td><input class="it-u" value="${esc(i.unidade || 'UN')}" style="width:64px"></td>
     <td><input class="it-q" value="${i.quantidade ? inp(i.quantidade) : ''}" style="width:100px"></td>
     <td><input class="it-v" value="${i.valor_estimado ? String(+i.valor_estimado).replace('.', ',') : ''}" placeholder="opcional" style="width:110px"></td>
@@ -71,15 +73,16 @@ function editar(r, root) {
       <label>Prioridade<select id="rq-pri"><option value="normal">Normal</option><option value="urgente" ${v.prioridade === 'urgente' ? 'selected' : ''}>Urgente</option></select></label>
       <label class="span2">Observação / justificativa<input id="rq-obs" value="${esc(v.observacao || '')}"></label>
     </div>
-    <h3 style="margin:14px 0 6px">Itens</h3>
+    <h3 style="margin:14px 0 6px">Itens <span class="muted small" style="font-weight:400">escolha o produto do cadastro na lista ou escreva livre</span></h3>${datalistProdutos('dl-prod', PRODS)}
     <div class="table-wrap"><table><thead><tr><th>Descrição *</th><th>Unid.</th><th>Quantidade *</th><th>Valor unit. estimado</th><th>NCM</th><th></th></tr></thead><tbody id="rq-itens">${v.itens.map(linhaItem).join('')}</tbody></table></div>
     <button class="btn ghost small" id="rq-mais" style="margin-top:6px">+ Item</button>`,
     foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rq-salvar">${r ? 'Salvar' : 'Enviar para aprovação'}</button>` });
   const tb = $('#rq-itens', m.el);
+  ligarItensProduto(tb, PRODS);
   $('#rq-mais', m.el).onclick = () => tb.insertAdjacentHTML('beforeend', linhaItem());
   tb.onclick = (e) => { if (e.target.closest('.it-x')) e.target.closest('tr').remove(); };
   $('#rq-salvar', m.el).onclick = async (ev) => {
-    const itens = $$('tr', tb).map(tr => ({ descricao: $('.it-d', tr).value.trim(), unidade: $('.it-u', tr).value.trim().toUpperCase() || 'UN',
+    const itens = $$('tr', tb).map(tr => ({ produto_id: produtoDoItem(tr), descricao: $('.it-d', tr).value.trim(), unidade: $('.it-u', tr).value.trim().toUpperCase() || 'UN',
       quantidade: num($('.it-q', tr).value), valor_estimado: $('.it-v', tr).value.trim() ? num($('.it-v', tr).value) : null, ncm: $('.it-n', tr).value.replace(/\D/g, '') || null }))
       .filter(i => i.descricao || i.quantidade);
     const sol = $('#rq-sol', m.el).value.trim();
@@ -221,7 +224,7 @@ function gerarPedido(r, c, citens, pai, root) {
         centro_custo_id: r.centro_custo_id, frete: c ? +c.frete : 0, parcelas_dias: c?.parcelas_dias?.length ? c.parcelas_dias : [28],
         condicao_pagamento: c?.condicao_pagamento || null, entrega_prevista: c?.prazo_entrega_dias != null ? addDias(today(), c.prazo_entrega_dias) : r.necessidade,
         observacao: r.observacao }).select('id,numero').single());
-      const itens = r.itens.map(i => ({ empresa_id: e, pedido_id: ped.id, requisicao_item_id: i.id, descricao: i.descricao, unidade: i.unidade, ncm: i.ncm, quantidade: +i.quantidade,
+      const itens = r.itens.map(i => ({ empresa_id: e, pedido_id: ped.id, requisicao_item_id: i.id, produto_id: i.produto_id || null, descricao: i.descricao, unidade: i.unidade, ncm: i.ncm, quantidade: +i.quantidade,
         valor_unitario: c ? +(citens.find(x => x.cotacao_id === c.id && x.requisicao_item_id === i.id)?.valor_unitario || 0) : +(i.valor_estimado || 0) }));
       await q(sb.from('compras_pedido_itens').insert(itens));
       if (c) await q(sb.from('compras_cotacoes').update({ escolhida: true }).eq('id', c.id));

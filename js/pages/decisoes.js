@@ -25,7 +25,16 @@ async function carregar() {
     seguro(fetchAll(() => sb.from('lancamentos').select('valor').eq('empresa_id', e).eq('status', 'Pago').is('conta_id', null).order('id')), []),
     import(`./necessidade-caixa.js?v=${Date.now()}`).then(m => m.resumoNecessidade()).catch(() => null),
   ]);
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec };
+  // estoque: último espelho do Iniflex × ponto de pedido dos produtos
+  const estq = await (async () => {
+    const [esp] = await q(sb.from('estoque_espelhos').select('id,data_ref').eq('empresa_id', e).order('data_ref', { ascending: false }).limit(1));
+    if (!esp) return null;
+    const [prods, itens] = await Promise.all([q(sb.from('produtos').select('id,codigo,descricao,unidade,ponto_pedido').eq('empresa_id', e).eq('ativo', true).not('ponto_pedido', 'is', null)),
+      fetchAll(() => sb.from('estoque_espelho_itens').select('codigo,quantidade').eq('espelho_id', esp.id).order('id'))]);
+    const sal = {}; for (const i of itens) sal[i.codigo] = (sal[i.codigo] || 0) + +i.quantidade;
+    return { data: esp.data_ref, abaixo: prods.filter(p => (sal[p.codigo] || 0) <= +p.ponto_pedido).map(p => ({ ...p, saldo: sal[p.codigo] || 0 })) };
+  })().catch(() => null);
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq };
 }
 
 // ---------------------------------------------------------------- regras
@@ -112,6 +121,13 @@ function regras(D) {
   if (semDoc.length) out.push({ k: 'cadastro-doc', origem: 'Cadastro', urg: 'baixa', titulo: 'Completar CNPJ/CPF dos beneficiários',
     desc: `${semDoc.length} cliente(s) e fornecedor(es) ativos sem CNPJ/CPF. Sem documento a nota fiscal, o endosso e a contabilidade não casam com o cadastro. Ex.: ${semDoc.slice(0, 5).map(f => f.nome).join(', ')}.`,
     impacto: 0, impactoTxt: `${semDoc.length} cadastro(s)`, regra: 'Beneficiários ativos do tipo cliente ou fornecedor com documento vazio.', acao: 'Abrir beneficiários', rota: 'cadastros/favorecidos' });
+
+  // 10. estoque abaixo do ponto de pedido (espelho do Iniflex)
+  if (D.estq?.abaixo.length) { const ab = D.estq.abaixo;
+    out.push({ k: 'ponto-pedido', origem: 'Estoque', urg: ab.some(p => p.saldo <= 0) ? 'alta' : 'media', titulo: 'Repor os itens abaixo do ponto de pedido',
+      desc: `${ab.length} produto(s) no ponto de pedido ou abaixo na posição do Iniflex de ${dateBR(D.estq.data)}: ${ab.slice(0, 5).map(p => `${p.codigo} ${p.descricao} (${p.saldo.toLocaleString('pt-BR')} ${p.unidade})`).join(' · ')}${ab.length > 5 ? '…' : ''}.`,
+      impacto: 0, impactoTxt: `${ab.length} item(ns)`, regra: 'Saldo do último espelho do Iniflex (soma dos depósitos) menor ou igual ao ponto de pedido do cadastro. Em Posição de estoque há o botão que gera a requisição.',
+      acao: 'Abrir posição de estoque', rota: 'estoque' }); }
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

@@ -14,6 +14,9 @@ const routes = {
   'compras/requisicoes': () => import(`./pages/compras-requisicoes.js?v=${V}`),
   'compras/pedidos': () => import(`./pages/compras-pedidos.js?v=${V}`),
   'compras/recebimentos': () => import(`./pages/compras-recebimentos.js?v=${V}`),
+  'estoque': () => import(`./pages/estoque.js?v=${V}`),
+  'estoque/produtos': () => import(`./pages/produtos.js?v=${V}`),
+  'estoque/depara': () => import(`./pages/produtos-depara.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),
@@ -215,7 +218,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 
 // ---------- Roteamento ----------
 // perfil compras: Pagamentos Antecipados e o módulo Compras
-const rotaDeCompras = (r) => r === 'paraquedas' || r === 'compras' || r.startsWith('compras/');
+const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;

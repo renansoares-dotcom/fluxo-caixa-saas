@@ -2,10 +2,11 @@
 import { sb, state, q, fetchAll } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, today, fail, toast, modal, confirmDialog, exportXLSX } from '../lib/ui.js';
 import { cadCompras, ST_PED, badge, ABERTOS, qtd, inp, unit, num, diasTxt, lerDias, podeAprovar } from '../lib/compras.js';
+import { carregarProdutos, datalistProdutos, ligarItensProduto, produtoDoItem } from '../lib/produtos.js';
 
 export const title = 'Pedidos de compra';
 const ui = { filtro: 'andamento', busca: '' };
-let P = [], C = null;
+let P = [], C = null, PRODS = [];
 const FILTROS = [['andamento', 'Em andamento', ['rascunho', 'aguardando', 'aprovado', 'enviado', 'recebido_parcial']], ['aguardando', 'Aguardando aprovação', ['aguardando']],
   ['receber', 'A receber', ABERTOS], ['recebido', 'Recebidos', ['recebido']], ['cancelado', 'Cancelados', ['cancelado']], ['todos', 'Todos', null]];
 
@@ -33,7 +34,7 @@ export async function carregarPedidos() {
     return { ...p, itens: it, pctRec: vIt ? vRec / vIt : 0, aReceber: ['cancelado', 'recebido'].includes(p.status) ? 0 : Math.max(+p.total * (1 - (vIt ? vRec / vIt : 0)), 0) }; });
 }
 async function carregar(root) {
-  try { [C, P] = await Promise.all([cadCompras(), carregarPedidos()]); pintar(root); }
+  try { [C, P, PRODS] = await Promise.all([cadCompras(), carregarPedidos(), carregarProdutos().catch(() => [])]); pintar(root); }
   catch (err) { fail(err); $('#pc-lista', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; }
 }
 
@@ -52,7 +53,7 @@ function pintar(root) {
 
 // ------------------------------------------------------------ editar (rascunho/aguardando) ou criar avulso
 function linhaItem(i = {}) {
-  return `<tr><td><input class="it-d" value="${esc(i.descricao || '')}" style="min-width:240px"></td><td><input class="it-u" value="${esc(i.unidade || 'UN')}" style="width:60px"></td>
+  return `<tr><td><input class="it-d" list="dl-prod" ${i.produto_id ? `data-prod="${i.produto_id}"` : ''} value="${esc(i.descricao || '')}" style="min-width:240px"></td><td><input class="it-u" value="${esc(i.unidade || 'UN')}" style="width:60px"></td>
     <td><input class="it-q" value="${i.quantidade ? inp(i.quantidade) : ''}" style="width:95px"></td><td><input class="it-v" value="${i.valor_unitario != null ? String(+i.valor_unitario).replace('.', ',') : ''}" style="width:110px"></td>
     <td><input class="it-n" value="${esc(i.ncm || '')}" style="width:95px"></td><td class="num it-t"></td><td><button class="btn ghost icon it-x">✕</button></td></tr>`;
 }
@@ -73,18 +74,19 @@ function editar(p, root) {
       <label>Desconto<input id="pe-ds" value="${(+v.desconto || 0).toFixed(2).replace('.', ',')}"></label>
       <label class="span2">Observação<input id="pe-obs" value="${esc(v.observacao || '')}"></label>
     </div>
-    <h3 style="margin:14px 0 6px">Itens</h3>
+    <h3 style="margin:14px 0 6px">Itens <span class="muted small" style="font-weight:400">escolha o produto do cadastro na lista ou escreva livre</span></h3>${datalistProdutos('dl-prod', PRODS)}
     <div class="table-wrap"><table><thead><tr><th>Descrição *</th><th>Unid.</th><th>Quantidade *</th><th>Valor unit. *</th><th>NCM</th><th class="num">Total</th><th></th></tr></thead><tbody id="pe-itens">${v.itens.map(linhaItem).join('')}</tbody></table></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><button class="btn ghost small" id="pe-mais">+ Item</button><b id="pe-tot"></b></div>`,
     foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pe-ok">Salvar</button>` });
   const tb = $('#pe-itens', m.el);
+  ligarItensProduto(tb, PRODS);
   const somar = () => { let t = 0; $$('tr', tb).forEach(tr => { const s = num($('.it-q', tr).value) * num($('.it-v', tr).value); t += s; $('.it-t', tr).textContent = s ? money(s) : ''; });
     $('#pe-tot', m.el).textContent = 'Total do pedido: ' + money(t + num($('#pe-fr', m.el).value) - num($('#pe-ds', m.el).value)); };
   m.el.addEventListener('input', somar); somar();
   $('#pe-mais', m.el).onclick = () => tb.insertAdjacentHTML('beforeend', linhaItem());
   tb.onclick = (e) => { if (e.target.closest('.it-x')) { e.target.closest('tr').remove(); somar(); } };
   $('#pe-ok', m.el).onclick = async (ev) => {
-    const itens = $$('tr', tb).map(tr => ({ descricao: $('.it-d', tr).value.trim(), unidade: $('.it-u', tr).value.trim().toUpperCase() || 'UN', quantidade: num($('.it-q', tr).value),
+    const itens = $$('tr', tb).map(tr => ({ produto_id: produtoDoItem(tr), descricao: $('.it-d', tr).value.trim(), unidade: $('.it-u', tr).value.trim().toUpperCase() || 'UN', quantidade: num($('.it-q', tr).value),
       valor_unitario: num($('.it-v', tr).value), ncm: $('.it-n', tr).value.replace(/\D/g, '') || null })).filter(i => i.descricao || i.quantidade);
     const cab = { favorecido_id: $('#pe-f', m.el).value || null, data_pedido: $('#pe-dt', m.el).value || today(), entrega_prevista: $('#pe-ent', m.el).value || null,
       parcelas_dias: lerDias($('#pe-pd', m.el).value).length ? lerDias($('#pe-pd', m.el).value) : [0], condicao_pagamento: $('#pe-cd', m.el).value.trim() || null,

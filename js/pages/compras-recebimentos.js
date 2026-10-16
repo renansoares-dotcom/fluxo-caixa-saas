@@ -42,10 +42,17 @@ function pintar(root) {
 }
 
 // casa os itens do pedido com os itens da nota: mesma descrição/NCM primeiro, depois pela ordem
-function casar(itens, nitens) {
+// casa os itens do pedido com os itens da nota: 1º pelo de-para (produto × código do fornecedor), depois descrição/NCM, depois a ordem.
+// fator (de-para): 1 unidade da nota = fator unidades do produto
+let PF = [];
+const fatorDe = (i, x, doc) => +(PF.find(f => f.produto_id === i.produto_id && f.emit_doc === doc && f.codigo_fornecedor === x.cprod)?.fator || 1);
+function casar(itens, nitens, doc) {
   const usados = new Set(), norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const pelaRegra = itens.map(i => (i.produto_id ? nitens.find(x => PF.some(f => f.produto_id === i.produto_id && f.emit_doc === doc && f.codigo_fornecedor === x.cprod)) : null) || null);
+  pelaRegra.forEach(n => n && usados.add(n.id));
   return itens.map((i, k) => {
-    let n = nitens.find(x => !usados.has(x.id) && (norm(x.xprod).includes(norm(i.descricao)) || norm(i.descricao).includes(norm(x.xprod))))
+    let n = pelaRegra[k];
+    if (!n) n = nitens.find(x => !usados.has(x.id) && (norm(x.xprod).includes(norm(i.descricao)) || norm(i.descricao).includes(norm(x.xprod))))
       || nitens.find(x => !usados.has(x.id) && i.ncm && x.ncm === i.ncm) || nitens.filter(x => !usados.has(x.id))[0];
     if (n) usados.add(n.id);
     return n || null;
@@ -54,7 +61,11 @@ function casar(itens, nitens) {
 
 async function receber(p, root) {
   let notas = [];
-  try { notas = await q(sb.rpc('compras_notas_candidatas', { p_pedido: p.id })); } catch (err) { return fail(err); }
+  try {
+    const ids = [...new Set(p.itens.map(i => i.produto_id).filter(Boolean))];
+    [notas, PF] = await Promise.all([q(sb.rpc('compras_notas_candidatas', { p_pedido: p.id })),
+      ids.length ? q(sb.from('produto_fornecedores').select('produto_id,emit_doc,codigo_fornecedor,fator').in('produto_id', ids)) : []]);
+  } catch (err) { return fail(err); }
   const pend = p.itens.filter(i => +i.qtd_recebida < +i.quantidade);
   const m = modal({ title: `Receber PC ${p.numero} — ${C.forById[p.favorecido_id]?.nome || ''}`, wide: true, body: `
     <h3 style="margin:0 0 6px">Nota fiscal</h3>
@@ -70,24 +81,25 @@ async function receber(p, root) {
   let nota = null, casados = [];
   const conf = $('#rc-conf', m.el);
   const pintarConf = () => {
-    casados = nota ? casar(pend, nota.itens) : pend.map(() => null);
+    casados = nota ? casar(pend, nota.itens, nota.emit_doc) : pend.map(() => null);
     conf.innerHTML = `<h3 style="margin:0 0 6px">Conferência pedido × ${nota ? 'nota' : 'recebido'}</h3>
       <div class="table-wrap"><table><thead><tr><th>Item do pedido</th><th class="num">Falta</th><th class="num">Unit. pedido</th>${nota ? '<th>Item da nota</th><th class="num">Quant. nota</th><th class="num">Unit. nota</th>' : ''}<th>Recebido agora</th><th>Conferência</th></tr></thead><tbody>
       ${pend.map((i, k) => { const n = casados[k], falta = i.quantidade - i.qtd_recebida;
         return `<tr data-k="${k}"><td class="wrap">${esc(i.descricao)} <span class="muted small">${esc(i.unidade)}</span></td><td class="num">${qtd(falta)}</td><td class="num">${unit(i.valor_unitario)}</td>
         ${nota ? `<td><select class="rc-ni" style="max-width:240px"><option value="">— não veio na nota —</option>${nota.itens.map(x => `<option value="${x.id}" ${n?.id === x.id ? 'selected' : ''}>${x.n_item}. ${esc(x.xprod)} (${esc(x.ucom || '')})</option>`).join('')}</select></td>
           <td class="num rc-nq"></td><td class="num rc-nv"></td>` : ''}
-        <td><input class="rc-q" value="${inp(nota ? (n ? Math.min(+n.qcom, falta) : 0) : falta)}" style="width:100px"></td><td class="small rc-st"></td></tr>`; }).join('')}</tbody></table></div>
+        <td><input class="rc-q" value="${inp(nota ? (n ? Math.min(+n.qcom * fatorDe(i, n, nota.emit_doc), falta) : 0) : falta)}" style="width:100px"></td><td class="small rc-st"></td></tr>`; }).join('')}</tbody></table></div>
       ${nota ? `<div id="rc-parc" class="small" style="margin-top:10px"></div>` : ''}`;
     const atual = () => {
       const div = [];
       $$('tr[data-k]', conf).forEach(tr => {
         const i = pend[+tr.dataset.k], nid = nota ? $('.rc-ni', tr).value : '', n = nota?.itens.find(x => x.id === nid), q2 = num($('.rc-q', tr).value), falta = i.quantidade - i.qtd_recebida, st = [];
-        if (nota) { $('.rc-nq', tr).textContent = n ? qtd(n.qcom) : ''; $('.rc-nv', tr).textContent = n ? unit(n.vuncom) : ''; }
+        const fa = n ? fatorDe(i, n, nota.emit_doc) : 1, nq = n ? +n.qcom * fa : 0, nv = n ? +n.vuncom / fa : 0;   // na unidade do pedido
+        if (nota) { $('.rc-nq', tr).textContent = n ? qtd(nq) + (fa !== 1 ? ` (${qtd(n.qcom)} ${n.ucom || ''})` : '') : ''; $('.rc-nv', tr).textContent = n ? unit(nv) : ''; }
         if (q2 > falta + 1e-9) st.push(`acima do pedido (+${qtd(q2 - falta)})`);
         if (q2 > 0 && q2 < falta - 1e-9) st.push(`parcial (faltam ${qtd(falta - q2)})`);
-        if (n && Math.abs(+n.qcom - q2) > 1e-6) st.push(`nota ${qtd(n.qcom)} ≠ recebido`);
-        if (n && i.valor_unitario > 0 && Math.abs(n.vuncom / i.valor_unitario - 1) > 0.005) st.push(`preço ${unit(n.vuncom)} × pedido ${unit(i.valor_unitario)} (${n.vuncom > i.valor_unitario ? '+' : ''}${((n.vuncom / i.valor_unitario - 1) * 100).toFixed(1).replace('.', ',')}%)`);
+        if (n && Math.abs(nq - q2) > 1e-6) st.push(`nota ${qtd(nq)} ≠ recebido`);
+        if (n && i.valor_unitario > 0 && Math.abs(nv / i.valor_unitario - 1) > 0.005) st.push(`preço ${unit(nv)} × pedido ${unit(i.valor_unitario)} (${nv > i.valor_unitario ? '+' : ''}${((nv / i.valor_unitario - 1) * 100).toFixed(1).replace('.', ',')}%)`);
         if (nota && !n && q2 > 0) st.push('item não está na nota');
         $('.rc-st', tr).innerHTML = st.length ? `<span class="warn">${esc(st.join(' · '))}</span>` : '<span class="pos">ok</span>';
         for (const s of st) if (!s.startsWith('parcial')) div.push({ item: i.descricao, texto: `${i.descricao}: ${s}` });
@@ -112,7 +124,7 @@ async function receber(p, root) {
   $('#rc-ok', m.el).onclick = async (ev) => {
     if (!$('input[name=rc-n]:checked', m.el)) return toast('Escolha a nota ou "sem nota"', true);
     const itens = $$('tr[data-k]', conf).map(tr => { const i = pend[+tr.dataset.k], nid = nota ? $('.rc-ni', tr).value : '';
-      return { pedido_item_id: i.id, quantidade: num($('.rc-q', tr).value), valor_unitario: nid ? +nota.itens.find(x => x.id === nid).vuncom : +i.valor_unitario, nfe_item_id: nid || null }; })
+      return { pedido_item_id: i.id, quantidade: num($('.rc-q', tr).value), valor_unitario: nid ? +nota.itens.find(x => x.id === nid).vuncom / fatorDe(i, nota.itens.find(x => x.id === nid), nota.emit_doc) : +i.valor_unitario, nfe_item_id: nid || null }; })
       .filter(x => x.quantidade > 0);
     if (!itens.length) return toast('Informe a quantidade recebida de ao menos um item', true);
     ev.target.disabled = true;
