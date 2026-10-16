@@ -37,6 +37,7 @@ const routes = {
   'cadastros/favorecidos': () => import(`./pages/cad-favorecidos.js?v=${V}`),
   'cadastros/centros': () => import(`./pages/cad-centros.js?v=${V}`),
   'config': () => import(`./pages/config.js?v=${V}`),
+  'auditoria': () => import(`./pages/auditoria.js?v=${V}`),
 };
 
 // ---------- Tema ----------
@@ -188,6 +189,7 @@ async function entrarEmpresa(emp, papel, areas) {
   try { await loadCadastros(); } catch (e) { fail(e); }
   // papel "compras": só a tela de paraquedas (o banco também não deixa ler o resto)
   document.body.classList.toggle('so-compras', papel === 'compras');
+  $$('#nav .nav-audit').forEach(el => el.hidden = !['admin', 'diretor'].includes(papel));
   if (papel === 'compras') { if (location.hash !== '#/paraquedas') location.hash = '#/paraquedas'; else render(); return; }
   if (!location.hash || location.hash === '#/') location.hash = '#/' + (temArea('fin') ? 'dashboard' : primeiraRota()); else render();
 }

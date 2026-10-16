@@ -63,8 +63,9 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
     <label>Opcional 3<input name="opc3" value="${esc(l.opc3)}"></label>
     <label>Opcional 4<input name="opc4" value="${esc(l.opc4)}"></label>
   </form>`;
-  const foot = ro ? '<button class="btn" data-close>Fechar</button>' :
-    `${editando ? '<button class="btn danger" id="lf-del" style="margin-right:auto">Excluir</button><button class="btn" id="lf-dup">Duplicar</button>' : ''}
+  const hist = editando && ['admin', 'diretor'].includes(state.papel) ? '<button class="btn ghost" id="lf-hist">Histórico</button>' : '';
+  const foot = ro ? `${hist}<button class="btn" data-close>Fechar</button>` :
+    `${editando ? '<button class="btn danger" id="lf-del" style="margin-right:auto">Excluir</button>' + hist + '<button class="btn" id="lf-dup">Duplicar</button>' : ''}
      <button class="btn" data-close>Cancelar</button><button class="btn primary" id="lf-save">Salvar</button>`;
   const m = modal({ title: editando ? 'Editar lançamento' : 'Novo lançamento', body: (editando && l.fidc_proposta_id ? '<p class="small muted" style="margin-top:0">Título vinculado a uma proposta de borderô FIDC.</p>' : '') + body, foot });
   const form = $('#lanc-form', m.el);
@@ -76,6 +77,9 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
     form.conta_id.required = t;
   };
   form.plano_id.addEventListener('change', modoTransf); modoTransf();
+  $('#lf-hist', m.el) && ($('#lf-hist', m.el).onclick = async () => {
+    const { abrirHistorico } = await import(`../pages/auditoria.js?v=${Date.now()}`); abrirHistorico('lancamentos', l.id);
+  });
   if (ro) form.querySelectorAll('input,select').forEach(i => i.disabled = true);
   if (ro) return;
   // lançamento conciliado com o extrato: só descrição e opcionais; sem exclusão
