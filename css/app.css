@@ -464,3 +464,15 @@ tr.dp-falta td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .busca-item.on,.busca-item:hover{background:var(--surface-2)}
 .busca-dica{padding:10px 16px}
 @media (max-width:700px){.busca-btn .busca-txt,.busca-btn kbd{display:none}}
+
+/* Minha Manhã */
+.mm-topo{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
+.mm-grid{margin-top:16px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+.mm-grid>div>.card+.card{margin-top:16px}
+.mm-item{display:flex;gap:10px;align-items:flex-start;padding:9px 4px;border-top:1px solid var(--border);font-size:13px}
+.mm-item:first-of-type{border-top:0}
+.mm-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-top:5px;background:var(--muted)}
+.mm-dot.alta{background:var(--neg,#d92d20)} .mm-dot.media{background:var(--warn)} .mm-dot.baixa{background:var(--muted)}
+.mm-mini{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.mm-mini>div{border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--surface-2)}
+@media (max-width:900px){.mm-grid{grid-template-columns:1fr}}

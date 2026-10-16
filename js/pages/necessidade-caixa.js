@@ -96,6 +96,16 @@ function candidatos(w, falta) {
   return { sel, soma: s, total: lista.reduce((t, l) => t + +l.valor, 0), qtd: lista.length };
 }
 
+// resumo para a Minha Manhã (usa as mesmas escolhas salvas na tela)
+export async function resumoNecessidade() {
+  await carregar();
+  const salvas = ls.get('nc-contas', null);
+  const sel = new Set(salvas ? salvas : D.saldos.filter(s => !/bloqueio/i.test(s.nome)).map(s => s.conta_id));
+  const minimo = ls.get('nc-min', 50000);
+  const R = calcular(sel, minimo);
+  return { minimo, saldoIni: R.saldoIni, primeira: R.semanas.find(w => w.abaixo) || null, pior: R.semanas.reduce((a, w) => (w.saldo < a.saldo ? w : a), R.semanas[0]) };
+}
+
 export async function render(root) {
   root.innerHTML = '<div class="loading">Carregando…</div>';
   try { await carregar(); } catch (e) { fail(e); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; return; }

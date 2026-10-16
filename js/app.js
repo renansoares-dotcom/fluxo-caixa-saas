@@ -7,6 +7,7 @@ import { iniciarBusca } from './lib/busca.js';
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
 const routes = {
+  'hoje': () => import(`./pages/hoje.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),
@@ -168,14 +169,14 @@ $('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
 function aplicarAreas() {
   $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
-  const dash = $('#nav > a[data-route="dashboard"]'); if (dash) dash.hidden = !temArea('fin');
+  for (const r of ['dashboard', 'hoje']) { const a = $(`#nav > a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
 }
 // primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
 function primeiraRota() {
   const a = $$('#nav a[data-route]').find(x => !x.hidden && !x.closest('.nav-area')?.hidden);
   return a?.dataset.route || 'cadastros/plano';
 }
-const areaDaRota = (route) => route === 'dashboard' ? 'fin' : $(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
+const areaDaRota = (route) => ['dashboard', 'hoje'].includes(route) ? 'fin' : $(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
 
 async function entrarEmpresa(emp, papel, areas) {
   sessionStorage.removeItem('fc-escolher');
@@ -194,7 +195,7 @@ async function entrarEmpresa(emp, papel, areas) {
   document.body.classList.toggle('so-compras', papel === 'compras');
   $$('#nav .nav-audit').forEach(el => el.hidden = !['admin', 'diretor'].includes(papel));
   if (papel === 'compras') { if (location.hash !== '#/paraquedas') location.hash = '#/paraquedas'; else render(); return; }
-  if (!location.hash || location.hash === '#/') location.hash = '#/' + (temArea('fin') ? 'dashboard' : primeiraRota()); else render();
+  if (!location.hash || location.hash === '#/') location.hash = '#/' + (temArea('fin') ? 'hoje' : primeiraRota()); else render();
 }
 
 $('#ano-global').onchange = (e) => { state.ano = +e.target.value; render(); };
@@ -212,7 +213,7 @@ async function render() {
   if (!state.empresa) return;
   if (!state.cad) { try { await loadCadastros(); } catch (e) { fail(e); return; } }
   lerCores();
-  const route = location.hash.replace(/^#\//, '').split('?')[0] || 'dashboard';
+  const route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
   if (state.papel === 'compras' && route !== 'paraquedas') { location.hash = '#/paraquedas'; return; }
   { const ar = routes[route] ? areaDaRota(route) : 'fin'; if (['fin', 'cpd', 'cont'].includes(ar) && !temArea(ar)) { location.hash = '#/' + primeiraRota(); return; } }
   const loader = routes[route] || routes.dashboard;
