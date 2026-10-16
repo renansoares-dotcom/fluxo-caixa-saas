@@ -19,6 +19,7 @@ const routes = {
   'autorizacao': () => import(`./pages/autorizacao.js?v=${V}`),
   'fluxo-mensal': () => import(`./pages/fluxo-mensal.js?v=${V}`),
   'fluxo-diario': () => import(`./pages/fluxo-diario.js?v=${V}`),
+  'necessidade-caixa': () => import(`./pages/necessidade-caixa.js?v=${V}`),
   'dre': () => import(`./pages/dre.js?v=${V}`),
   'contab/balancete': () => import(`./pages/contab-balancete.js?v=${V}`),
   'contab/depara': () => import(`./pages/contab-depara.js?v=${V}`),
