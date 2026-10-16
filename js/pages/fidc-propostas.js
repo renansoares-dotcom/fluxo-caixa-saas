@@ -32,6 +32,8 @@ const STATUS_CLS = { Rascunho: 'negoc', Pendente: 'aberto', Aprovada: 'pago', Re
 
 export async function render(root) {
   if (!ui.dataOp) ui.dataOp = hojeISO();
+  const ab = state.abrir?.tipo === 'proposta' ? state.abrir : null;   // vindo da busca global
+  if (ab) { delete state.abrir; ui.aba = 'propostas'; }
   let vindos = null;
   if (state.borderoSel?.length) { // títulos marcados na aba A receber
     vindos = state.borderoSel; delete state.borderoSel; ui.fundoId = '';
@@ -48,6 +50,7 @@ export async function render(root) {
   loading($('#corpo', root));
   try {
     await carregar(); desenhar(root);
+    if (ab) { const p = propostas.find(x => x.id === ab.id); if (p) detalhe(p, root); }
     if (vindos) { const ok = vindos.filter(id => ui.sel.has(id)).length; toast(`${ok} título(s) da aba A receber prontos para simular${ok < vindos.length ? ` · ${vindos.length - ok} não disponíveis` : ''}`); $('#painel', root)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }
   } catch (err) { fail(err); }
 }

@@ -36,6 +36,8 @@ function pendencias(f, dupDocs) {
 }
 
 export async function render(root) {
+  const ab = state.abrir?.tipo === 'fav' ? state.abrir : null;   // vindo da busca global
+  if (ab) { delete state.abrir; const f = state.cad?.favById[ab.id]; const a = f && ABAS.find(x => x.tipos?.includes(f.tipo)); if (a) ui.aba = a.k; ui.busca = ''; }
   root.innerHTML = `<div class="card"><div class="card-head" style="margin-bottom:0">
       <div class="chips" id="abas">${ABAS.map(a => `<span class="chip ${ui.aba === a.k ? 'on' : ''}" data-k="${a.k}">${a.nome} <span class="muted" data-n="${a.k}"></span></span>`).join('')}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="exp">Exportar Excel</button>${podeEditar() ? '<button class="btn" id="xml">Cadastrar pelas NF-e (XML)</button><button class="btn primary" id="novo">+ Novo</button>' : ''}</div></div></div>
@@ -55,6 +57,7 @@ export async function render(root) {
   $('#exp', root).onclick = () => exportXLSX($('#corpo table', root), `beneficiarios_${aba.k}`);
   if (aba.fundos) return listaFundos($('#corpo', root), root);
   lista($('#corpo', root), aba, root);
+  if (ab && state.cad.favById[ab.id]) editar(state.cad.favById[ab.id], root);
 }
 
 function lista(c, aba, root) {

@@ -2,6 +2,7 @@ import { sb, state, q, loadCadastros, anosSelect, temArea } from './lib/data.js'
 import { $, $$, esc, toast, fail, formData, loading, lerCores, modal } from './lib/ui.js';
 import { SUPABASE_URL } from './config.js';
 import { iniciarNotificacoes, pararNotificacoes } from './lib/notif.js';
+import { iniciarBusca } from './lib/busca.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -181,6 +182,7 @@ async function entrarEmpresa(emp, papel, areas) {
   state.areas = Array.isArray(areas) && areas.length ? areas : null;
   aplicarAreas();
   iniciarNotificacoes();
+  iniciarBusca();
   try { localStorage.setItem('fc-empresa', emp.id); } catch {}
   $('#empresa-switch').textContent = emp.nome + ' ▾';
   $('#user-email').textContent = state.user.email;

@@ -451,3 +451,16 @@ tr.dp-falta td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .notif-item.nova{box-shadow:inset 3px 0 0 var(--primary)}
 .notif-item.nova .notif-tit{font-weight:600}
 .notif-tit{font-size:13px}
+
+/* busca global (Ctrl+K) */
+.busca-btn{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.busca-btn kbd{font:11px/1 inherit;border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--muted)}
+.busca-back{align-items:flex-start;padding-top:10vh}
+.busca-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);width:min(680px,94vw);overflow:hidden}
+.busca-box input{width:100%;border:0;border-bottom:1px solid var(--border);border-radius:0;padding:14px 16px;font-size:15px;background:var(--surface);color:var(--text);outline:none}
+.busca-res{max-height:60vh;overflow:auto;padding:6px 0}
+.busca-grupo{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:8px 16px 4px}
+.busca-item{padding:7px 16px;cursor:pointer}
+.busca-item.on,.busca-item:hover{background:var(--surface-2)}
+.busca-dica{padding:10px 16px}
+@media (max-width:700px){.busca-btn .busca-txt,.busca-btn kbd{display:none}}

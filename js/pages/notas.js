@@ -24,6 +24,9 @@ const parte = (n) => n.emissao_propria ? n.dest_nome : n.emit_nome;
 const chunks = (arr, k = 150) => { const o = []; for (let i = 0; i < arr.length; i += k) o.push(arr.slice(i, i + k)); return o; };
 
 export async function render(root) {
+  // vindo da busca global: abre o mês da nota e o detalhe dela
+  const ab = state.abrir?.tipo === 'nota' ? state.abrir : null;
+  if (ab) { delete state.abrir; ui.tipo = ab.tipo_nf; ui.campo = 'emissao'; ui.mes = ab.emissao.slice(0, 7); ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); ui.aba = 'notas'; ui.fin = ''; ui.busca = ''; }
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
       <div class="toolbar" id="flt">
@@ -57,6 +60,7 @@ export async function render(root) {
   $('#imp', root) && ($('#imp', root).onclick = () => importar(root));
   $('#exp', root).onclick = () => exportXLSX($('#corpo table', root), `notas_${ui.tipo}_${D?.ini || ui.mes}_${D?.fim || ''}`);
   await carregar(root);
+  if (ab) { const n = D?.notas.find(x => x.id === ab.id); if (n) detalhe(n, root); }
 }
 
 async function carregar(root) {
