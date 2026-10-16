@@ -2,7 +2,7 @@ import { sb, state, q, fetchAll, isAdmin, podeEditar, loadCadastros, AREAS } fro
 import { $, esc, options, formData, toast, fail, parseNum, dateBR, money, exportXLSX } from '../lib/ui.js';
 
 export const title = 'Empresa e usuários';
-const PAPEIS = [['admin', 'Administrador — tudo, inclusive usuários'], ['financeiro', 'Financeiro — lança e edita'], ['diretor', 'Diretor — consulta e aprova autorizações'], ['leitura', 'Leitura — só consulta'], ['compras', 'Compras — só lança pagamentos antecipados (pagamentos sem nota) e vê os próprios']];
+const PAPEIS = [['admin', 'Administrador — tudo, inclusive usuários'], ['financeiro', 'Financeiro — lança e edita'], ['diretor', 'Diretor — consulta e aprova autorizações'], ['leitura', 'Leitura — só consulta'], ['compras', 'Compras — módulo Compras, estoque e pagamentos antecipados (os próprios)'], ['vendas', 'Vendas — representante: só a área Comercial e a própria carteira']];
 
 export async function render(root) {
   const e = state.empresa, adm = isAdmin();
@@ -106,7 +106,8 @@ async function membros(root) {
     const comAreas = rows.some(r => 'areas' in r);   // falso enquanto a migration 033 não roda
     const areasTd = (r) => {
       if (r.papel === 'admin') return '<span class="muted small">Todas (administrador)</span>';
-      if (r.papel === 'compras') return '<span class="muted small">Só pagamentos antecipados</span>';
+      if (r.papel === 'compras') return '<span class="muted small">Compras e pagamentos antecipados</span>';
+      if (r.papel === 'vendas') return '<span class="muted small">Comercial (própria carteira)</span>';
       const tem = (a) => !r.areas || r.areas.includes(a);
       if (!adm || r.user_id === state.user.id || !comAreas) return esc(AREAS.filter(([a]) => tem(a)).map(([, n]) => n).join(', '));
       return `<div class="areas-chk">${AREAS.map(([a, n]) => `<label class="chk"><input type="checkbox" class="ar" value="${a}" ${tem(a) ? 'checked' : ''}> ${n}</label>`).join('')}</div>`;

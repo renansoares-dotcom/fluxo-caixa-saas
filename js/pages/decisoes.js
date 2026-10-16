@@ -34,7 +34,8 @@ async function carregar() {
     const sal = {}; for (const i of itens) sal[i.codigo] = (sal[i.codigo] || 0) + +i.quantidade;
     return { data: esp.data_ref, abaixo: prods.filter(p => (sal[p.codigo] || 0) <= +p.ponto_pedido).map(p => ({ ...p, saldo: sal[p.codigo] || 0 })) };
   })().catch(() => null);
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq };
+  const com = await import('../lib/comercial.js').then(m => m.baseComercial()).catch(() => null);
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com };
 }
 
 // ---------------------------------------------------------------- regras
@@ -128,6 +129,14 @@ function regras(D) {
       desc: `${ab.length} produto(s) no ponto de pedido ou abaixo na posição do Iniflex de ${dateBR(D.estq.data)}: ${ab.slice(0, 5).map(p => `${p.codigo} ${p.descricao} (${p.saldo.toLocaleString('pt-BR')} ${p.unidade})`).join(' · ')}${ab.length > 5 ? '…' : ''}.`,
       impacto: 0, impactoTxt: `${ab.length} item(ns)`, regra: 'Saldo do último espelho do Iniflex (soma dos depósitos) menor ou igual ao ponto de pedido do cadastro. Em Posição de estoque há o botão que gera a requisição.',
       acao: 'Abrir posição de estoque', rota: 'estoque' }); }
+
+  // 11. clientes esfriando (NF-e de saída)
+  if (D.com) { const esf = Object.values(D.com.info).filter(c => c.st === 'esfriando').sort((a, b) => b.v12 - a.v12);
+    if (esf.length) { const v = esf.reduce((t, c) => t + c.v12, 0);
+      out.push({ k: 'clientes-esfriando', origem: 'Comercial', urg: v > 500000 ? 'alta' : 'media', titulo: 'Ligar para os clientes que estão esfriando',
+        desc: `${esf.length} cliente(s) sem comprar há mais de 1,5× o intervalo normal deles. Maiores: ${esf.slice(0, 5).map(c => `${c.nome} (${c.desde} dias; ${money0(c.v12)} em 12 meses)`).join(' · ')}.`,
+        impacto: v, impactoTxt: `${money0(v)} em 12 meses`, regra: 'Pelas NF-e de venda dos últimos 2 anos: dias desde a última compra > 1,5 × intervalo médio entre compras do cliente (mínimo 20 dias) e menos de 180 dias.',
+        acao: 'Abrir carteira', rota: 'comercial/carteira' }); } }
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

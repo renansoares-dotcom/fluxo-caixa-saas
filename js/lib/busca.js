@@ -18,7 +18,8 @@ const rotaLiberada = (route) => {
   if (!a || a.hidden) return false;
   const ar = areaDaRota(route);
   if (compras() && !a.classList.contains('nav-compras')) return false;
-  return !['fin', 'cmp', 'cpd', 'cont'].includes(ar) || temArea(ar);
+  if (state.papel === 'vendas' && !a.classList.contains('nav-vendas')) return false;
+  return !['fin', 'com', 'cmp', 'cpd', 'cont'].includes(ar) || temArea(ar);
 };
 const ir = (route, abrir) => { if (abrir) state.abrir = abrir; if (location.hash === '#/' + route) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + route; };
 

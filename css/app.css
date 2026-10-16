@@ -520,3 +520,12 @@ tr.clickable{cursor:pointer}tr.clickable:hover td{background:var(--surface-2)}
 .modal label.chk{flex-direction:row;align-items:flex-start;gap:8px;font-size:13px;color:var(--text);font-weight:400}
 .modal label.chk input{width:auto;min-height:0;margin-top:2px;flex:0 0 auto}
 td.rc-st{white-space:normal;min-width:200px}
+
+/* perfil vendas: só os links do Comercial */
+.so-vendas #nav > a, .so-vendas #nav .nav-area:not(:has(.nav-vendas)), .so-vendas #nav details:not(:has(.nav-vendas)), .so-vendas #nav .nav-itens a:not(.nav-vendas), .so-vendas .ano-sel{display:none}
+/* funil */
+.fu-kanban{display:grid;gap:12px;overflow-x:auto;align-items:start}
+.fu-col{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;min-height:120px}
+.fu-col-h{display:flex;justify-content:space-between;align-items:baseline;gap:6px;padding:4px 4px 8px}
+.fu-card{padding:10px 12px;margin-bottom:8px}
+.fu-card:hover{border-color:var(--primary)}
