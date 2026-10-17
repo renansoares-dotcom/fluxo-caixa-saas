@@ -333,12 +333,30 @@ revoke all on function public.prod_importar_ordens(uuid, jsonb), public.prod_imp
 grant execute on function public.prod_importar_ordens(uuid, jsonb), public.prod_importar_apontamentos(uuid, jsonb), public.pode_pcp(uuid), public.pode_apontar(uuid),
   public.ve_producao(uuid), public.meu_operador(uuid) to authenticated;
 
+-- ---------- planta da fábrica (tela de acompanhamento) ----------
+-- tipo de desenho, posição (metros, canto da máquina) e giro de cada máquina; os demais elementos (setores, corredores,
+-- áreas, portões, setas de fluxo) ficam num JSON por empresa, montado no editor da tela Planta da fábrica.
+alter table public.prod_maquinas add column if not exists tipo_visual text not null default 'generica'
+  check (tipo_visual in ('extrusora', 'impressora', 'corte_solda', 'rebobinadeira', 'aglutinador', 'generica'));
+alter table public.prod_maquinas add column if not exists pos_x numeric(7,2);
+alter table public.prod_maquinas add column if not exists pos_y numeric(7,2);
+alter table public.prod_maquinas add column if not exists rotacao smallint not null default 0 check (rotacao in (0, 90));
+create table if not exists public.prod_planta (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null unique references public.empresas(id) on delete cascade,
+  largura_m numeric(7,2) not null default 60 check (largura_m between 5 and 500),
+  profundidade_m numeric(7,2) not null default 30 check (profundidade_m between 5 and 500),
+  elementos jsonb not null default '[]'::jsonb,
+  atualizado_em timestamptz not null default now(),
+  atualizado_por uuid default auth.uid()
+);
+
 -- ---------- acesso ----------
 do $$
 declare t text;
 begin
   -- cadastros e OPs: leitura de quem vê produção; escrita do PCP
-  foreach t in array array['prod_setores', 'prod_maquinas', 'prod_motivos', 'prod_operadores', 'prod_roteiros', 'prod_ferramentas', 'prod_ordens', 'prod_ordem_etapas'] loop
+  foreach t in array array['prod_setores', 'prod_maquinas', 'prod_motivos', 'prod_operadores', 'prod_roteiros', 'prod_ferramentas', 'prod_ordens', 'prod_ordem_etapas', 'prod_planta'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists %I on public.%I', t || '_sel', t);
     execute format('drop policy if exists %I on public.%I', t || '_all', t);
@@ -374,7 +392,7 @@ do $$
 declare t text;
 begin
   foreach t in array array['prod_setores', 'prod_maquinas', 'prod_motivos', 'prod_operadores', 'prod_roteiros', 'prod_ferramentas', 'prod_ordens', 'prod_ordem_etapas',
-                           'prod_apontamentos', 'prod_paradas', 'prod_bobinas', 'prod_consumos'] loop
+                           'prod_apontamentos', 'prod_paradas', 'prod_bobinas', 'prod_consumos', 'prod_planta'] loop
     execute format('drop trigger if exists zz_auditoria on public.%I', t);
     execute format('create trigger zz_auditoria after insert or update or delete on public.%I for each row execute function public._auditar()', t);
   end loop;

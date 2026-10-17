@@ -28,6 +28,7 @@ const routes = {
   'producao/terminal': () => import(`./pages/producao-terminal.js?v=${V}`),
   'producao/cadastros': () => import(`./pages/producao-cadastros.js?v=${V}`),
   'producao/importar': () => import(`./pages/producao-importar.js?v=${V}`),
+  'producao/planta': () => import(`./pages/producao-planta.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),

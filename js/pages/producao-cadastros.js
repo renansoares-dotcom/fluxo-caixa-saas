@@ -4,6 +4,7 @@ import { $, $$, esc, fail, toast, modal, confirmDialog } from '../lib/ui.js';
 import { cadProducao, limparCadProducao, podePCP, TIPOS_FERR } from '../lib/producao.js';
 import { carregarProdutos, datalistProdutos, acharProduto } from '../lib/produtos.js';
 import { qtd, inp, num } from '../lib/compras.js';
+import { TIPOS_VISUAIS } from '../lib/planta.js';
 
 export const title = 'Cadastros de produção';
 const ui = { aba: 'setores', prod: '' };
@@ -11,7 +12,7 @@ let C = null, PRODS = [], MEMB = [];
 
 const ABAS = {
   setores: { t: 'Setores', tab: 'prod_setores', cols: [['nome', 'Nome', 'text', true], ['ordem', 'Ordem no fluxo', 'num'], ['horas_dia', 'Horas produtivas/dia', 'num'], ['ativo', 'Ativo', 'bool']], ordem: 'ordem' },
-  maquinas: { t: 'Máquinas', tab: 'prod_maquinas', cols: [['codigo', 'Código', 'text', true], ['nome', 'Nome', 'text', true], ['setor_id', 'Setor', 'setor', true], ['capacidade_kg_h', 'Capacidade (kg/h)', 'num'], ['ativo', 'Ativa', 'bool'], ['observacao', 'Observação', 'text']], ordem: 'codigo' },
+  maquinas: { t: 'Máquinas', tab: 'prod_maquinas', cols: [['codigo', 'Código', 'text', true], ['nome', 'Nome', 'text', true], ['setor_id', 'Setor', 'setor', true], ['capacidade_kg_h', 'Capacidade (kg/h)', 'num'], ['tipo_visual', 'Desenho na planta', 'tipo_vis'], ['ativo', 'Ativa', 'bool'], ['observacao', 'Observação', 'text']], ordem: 'codigo' },
   motivos: { t: 'Motivos', tab: 'prod_motivos', cols: [['tipo', 'Tipo', 'tipo_motivo', true], ['nome', 'Nome', 'text', true], ['planejada', 'Parada planejada', 'bool'], ['ativo', 'Ativo', 'bool']], ordem: 'nome' },
   operadores: { t: 'Operadores', tab: 'prod_operadores', cols: [['nome', 'Nome', 'text', true], ['matricula', 'Matrícula', 'text'], ['user_id', 'Usuário (perfil Produção)', 'usuario'], ['setores', 'Setores', 'setores'], ['ativo', 'Ativo', 'bool']], ordem: 'nome' },
   ferramentas: { t: 'Clichês, cilindros e facas', tab: 'prod_ferramentas', cols: [['tipo', 'Tipo', 'tipo_ferr', true], ['codigo', 'Código', 'text', true], ['descricao', 'Descrição', 'text'], ['produto_id', 'Produto', 'produto'],
@@ -45,6 +46,7 @@ function valorTxt(c, v) {
   if (c[2] === 'usuario') return MEMB.find(x => x.user_id === v)?.email || 'usuário';
   if (c[2] === 'setores') return (v || []).map(id => C.setorById[id]?.nome).filter(Boolean).join(', ') || 'todos';
   if (c[2] === 'tipo_ferr') return TIPOS_FERR[v] || v;
+  if (c[2] === 'tipo_vis') return TIPOS_VISUAIS[v]?.t || v;
   if (c[2] === 'num') return qtd(v);
   return String(v);
 }
@@ -71,6 +73,7 @@ function campo(c, v) {
     case 'setor': return `<label>${c[1]}<select id="${id}">${C.setores.map(s => `<option value="${s.id}" ${v === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></label>`;
     case 'tipo_motivo': return `<label>${c[1]}<select id="${id}"><option value="parada" ${v === 'parada' ? 'selected' : ''}>Parada</option><option value="refugo" ${v === 'refugo' ? 'selected' : ''}>Refugo / apara</option></select></label>`;
     case 'tipo_ferr': return `<label>${c[1]}<select id="${id}">${Object.entries(TIPOS_FERR).map(([k, t]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+    case 'tipo_vis': return `<label>${c[1]}<select id="${id}">${Object.entries(TIPOS_VISUAIS).map(([k, x]) => `<option value="${k}" ${(v || 'generica') === k ? 'selected' : ''}>${x.t}</option>`).join('')}</select></label>`;
     case 'sit_ferr': return `<label>${c[1]}<select id="${id}">${['ativa', 'manutencao', 'descartada'].map(k => `<option value="${k}" ${(v || 'ativa') === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>`;
     case 'produto': { const p = PRODS.find(x => x.id === v); return `<label class="span2">${c[1]}<input id="${id}" list="dl-pr" value="${p ? esc(`${p.codigo} — ${p.descricao}`) : ''}">${datalistProdutos('dl-pr', PRODS)}</label>`; }
     case 'usuario': return `<label>${c[1]}<select id="${id}"><option value="">—</option>${MEMB.filter(x => x.papel === 'producao' || x.user_id === v).map(x => `<option value="${x.user_id}" ${v === x.user_id ? 'selected' : ''}>${esc(x.email)}</option>`).join('')}</select></label>`;
