@@ -557,3 +557,15 @@ td.rc-st{white-space:normal;min-width:200px}
 .pg-tab td{vertical-align:top;white-space:normal;min-width:130px}.pg-cel.pg-cheia{background:var(--neg-soft)}
 .pg-item{border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:6px;padding:4px 6px;margin-bottom:4px;background:var(--surface);cursor:pointer;font-size:12px}
 .pg-item.pg-atr{border-left-color:var(--neg)}
+
+/* ---- menu lateral em uma cor só (paleta da logo) e logo centralizada/responsiva ---- */
+.nav-area,.nav-area[data-area],.trilha[data-area]{--area:var(--brand-navy)}
+.sidebar nav a.active{background:color-mix(in srgb,var(--brand-blue) 12%,transparent);color:var(--brand-blue)}
+.sidebar nav a:hover,.nav-area-tit:hover{background:color-mix(in srgb,var(--brand-blue) 7%,transparent)}
+.nav-area .nav-itens{border-left-color:color-mix(in srgb,var(--brand-blue) 30%,var(--border))}
+.brand-logo{align-items:center;text-align:center;width:100%}
+.brand-logo img{height:auto;width:clamp(120px,70%,180px);max-height:56px;object-fit:contain;margin:0 auto}
+.brand-logo.big img{width:clamp(160px,60vw,260px);max-height:96px}
+.brand-logo .brand-sub{padding-left:0}
+.sidebar .brand-logo{padding:4px 0 2px}
+@media (max-width:900px){.sidebar .brand-logo img{width:clamp(120px,55%,170px)}}
