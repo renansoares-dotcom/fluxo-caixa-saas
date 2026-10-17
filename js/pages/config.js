@@ -2,7 +2,7 @@ import { sb, state, q, fetchAll, isAdmin, podeEditar, loadCadastros, AREAS } fro
 import { $, esc, options, formData, toast, fail, parseNum, dateBR, money, exportXLSX } from '../lib/ui.js';
 
 export const title = 'Empresa e usuários';
-const PAPEIS = [['admin', 'Administrador — tudo, inclusive usuários'], ['financeiro', 'Financeiro — lança e edita'], ['diretor', 'Diretor — consulta e aprova autorizações'], ['leitura', 'Leitura — só consulta'], ['compras', 'Compras — módulo Compras, estoque e pagamentos antecipados (os próprios)'], ['vendas', 'Vendas — representante: só a área Comercial e a própria carteira']];
+const PAPEIS = [['admin', 'Administrador — tudo, inclusive usuários'], ['financeiro', 'Financeiro — lança e edita'], ['diretor', 'Diretor — consulta e aprova autorizações'], ['leitura', 'Leitura — só consulta'], ['compras', 'Compras — módulo Compras, estoque e pagamentos antecipados (os próprios)'], ['vendas', 'Vendas — representante: só a área Comercial e a própria carteira'], ['producao', 'Produção — operador: terminal do setor e ordens de produção']];
 
 export async function render(root) {
   const e = state.empresa, adm = isAdmin();
@@ -108,6 +108,7 @@ async function membros(root) {
       if (r.papel === 'admin') return '<span class="muted small">Todas (administrador)</span>';
       if (r.papel === 'compras') return '<span class="muted small">Compras e pagamentos antecipados</span>';
       if (r.papel === 'vendas') return '<span class="muted small">Comercial (própria carteira)</span>';
+      if (r.papel === 'producao') return '<span class="muted small">Terminal de produção</span>';
       const tem = (a) => !r.areas || r.areas.includes(a);
       if (!adm || r.user_id === state.user.id || !comAreas) return esc(AREAS.filter(([a]) => tem(a)).map(([, n]) => n).join(', '));
       return `<div class="areas-chk">${AREAS.map(([a, n]) => `<label class="chk"><input type="checkbox" class="ar" value="${a}" ${tem(a) ? 'checked' : ''}> ${n}</label>`).join('')}</div>`;

@@ -22,6 +22,12 @@ const routes = {
   'comercial/funil': () => import(`./pages/comercial-funil.js?v=${V}`),
   'comercial/vendedores': () => import(`./pages/comercial-vendedores.js?v=${V}`),
   'portal-clientes': () => import(`./pages/portal-admin.js?v=${V}`),
+  'producao': () => import(`./pages/producao.js?v=${V}`),
+  'producao/ordens': () => import(`./pages/producao-ordens.js?v=${V}`),
+  'producao/programacao': () => import(`./pages/producao-programacao.js?v=${V}`),
+  'producao/terminal': () => import(`./pages/producao-terminal.js?v=${V}`),
+  'producao/cadastros': () => import(`./pages/producao-cadastros.js?v=${V}`),
+  'producao/importar': () => import(`./pages/producao-importar.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),
@@ -182,7 +188,7 @@ $('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'
 
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
 function aplicarAreas() {
-  $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'com', 'cmp', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
+  $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'com', 'cmp', 'prd', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
   for (const r of ['dashboard', 'hoje', 'decisoes', 'executivo']) { const a = $(`#nav a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
   const pain = $('#nav .nav-area[data-area="pain"]'); if (pain) pain.hidden = !temArea('fin');
 }
@@ -209,9 +215,11 @@ async function entrarEmpresa(emp, papel, areas) {
   // papel "compras": só a tela de paraquedas (o banco também não deixa ler o resto)
   document.body.classList.toggle('so-compras', papel === 'compras');
   document.body.classList.toggle('so-vendas', papel === 'vendas');
+  document.body.classList.toggle('so-producao', papel === 'producao');
   $$('#nav .nav-audit').forEach(el => el.hidden = !['admin', 'diretor'].includes(papel));
   if (papel === 'compras') { if (!rotaDeCompras(location.hash.replace(/^#\//, ''))) location.hash = '#/compras'; else render(); return; }
   if (papel === 'vendas') { if (!rotaDeVendas(location.hash.replace(/^#\//, ''))) location.hash = '#/comercial'; else render(); return; }
+  if (papel === 'producao') { if (!rotaDeProducao(location.hash.replace(/^#\//, ''))) location.hash = '#/producao/terminal'; else render(); return; }
   if (!location.hash || location.hash === '#/') location.hash = '#/' + (temArea('fin') ? 'hoje' : primeiraRota()); else render();
 }
 
@@ -236,6 +244,8 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // ---------- Roteamento ----------
 // perfil compras: Pagamentos Antecipados e o módulo Compras
 // perfil vendas (representante): só a área Comercial
+// perfil producao (operador no terminal do setor)
+const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens'].includes(r);
 const rotaDeVendas = (r) => r === 'comercial' || ['comercial/carteira', 'comercial/funil'].includes(r);
 const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
@@ -246,7 +256,8 @@ async function render() {
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
   if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
   if (state.papel === 'vendas' && !rotaDeVendas(route)) { location.hash = '#/comercial'; return; }
-  { const ar = routes[route] ? areaDaRota(route) : 'fin'; if (['fin', 'com', 'cmp', 'cpd', 'cont'].includes(ar) && !temArea(ar)) { location.hash = '#/' + primeiraRota(); return; } }
+  if (state.papel === 'producao' && !rotaDeProducao(route)) { location.hash = '#/producao/terminal'; return; }
+  { const ar = routes[route] ? areaDaRota(route) : 'fin'; if (['fin', 'com', 'cmp', 'prd', 'cpd', 'cont'].includes(ar) && !temArea(ar)) { location.hash = '#/' + primeiraRota(); return; } }
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
   // menu em cascata: abre o grupo da página atual

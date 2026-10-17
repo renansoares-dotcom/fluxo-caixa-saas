@@ -18,7 +18,7 @@ export const state = {
 export const podeEditar = () => ['admin', 'financeiro'].includes(state.papel);
 export const isAdmin = () => state.papel === 'admin';
 // acesso por área (Financeiro, CPD, Contabilidade): administrador vê todas; sem marcação = todas
-export const AREAS = [['fin', 'Financeiro'], ['com', 'Comercial'], ['cmp', 'Compras'], ['cpd', 'CPD'], ['cont', 'Contabilidade']];
+export const AREAS = [['fin', 'Financeiro'], ['com', 'Comercial'], ['cmp', 'Compras'], ['prd', 'Produção'], ['cpd', 'CPD'], ['cont', 'Contabilidade']];
 export const temArea = (a) => state.papel === 'admin' || !state.areas || state.areas.includes(a);
 
 export async function q(promise) {
