@@ -354,6 +354,8 @@ export function desenharBaixa(planta, maquinas, S, opts = {}) {
     if (el.t === 'doca') g(r(el, 'rgba(255,211,77,.16)', sel === el.id ? '#2a1f6f' : '#e0a800', '.5 .3') + nome(el.nome || 'Doca', '#a07400'));
     if (el.t === 'vaga') g(r(el, 'rgba(148,163,184,.12)', sel === el.id ? '#2a1f6f' : '#94a3b8') + nome(el.nome || 'Vaga', '#5d6790'));
     if (el.t === 'parede') g(r(el, '#2a1f6f', sel === el.id ? '#0ea5e9' : '#2a1f6f'));
+    if (el.t === 'telao') g(r(el, '#1b2240', sel === el.id ? '#0ea5e9' : '#1b2240') + `<text x="${el.x + el.w / 2}" y="${el.y + el.d / 2 + .2}" font-size="${Math.min(.55, el.d * .8 + .2)}" text-anchor="middle" fill="#6ea8ec" font-weight="700">TELÃO</text>`);
+    if (el.t === 'arvore') g(`<circle cx="${el.x + el.w / 2}" cy="${el.y + el.d / 2}" r="${Math.min(el.w, el.d) / 2}" fill="#8fcf9b" stroke="${sel === el.id ? '#2a1f6f' : '#5fa96f'}" stroke-width=".1"/>`);
     if (el.t === 'guarita') g(r(el, '#5d6790', sel === el.id ? '#2a1f6f' : '#4a5280') + `<text x="${el.x + el.w / 2}" y="${el.y + el.d / 2 + .2}" font-size=".55" text-anchor="middle" fill="#fff" font-weight="700">GUARITA</text>`);
     if (el.t === 'portao') g(r(el, '#3f63c6', sel === el.id ? '#2a1f6f' : '#2f4fa8') + `<text x="${el.x + el.w / 2}" y="${el.y + el.d / 2 + .22}" font-size=".6" text-anchor="middle" fill="#fff" font-weight="700">PORTÃO</text>`);
   }

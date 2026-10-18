@@ -6,6 +6,8 @@ import { podePCP, limparCadProducao } from '../lib/producao.js';
 import { TIPOS_VISUAIS, TIPOS_AREA, COR, ROTULO_ST, pegada, uid, carregarPlanta, carregarSituacao, desenharIso, desenharBaixa, rascunho, textoMaquina, dur, COR_V, ROT_V, lugaresCaminhoes, textoVeiculo, capKg } from '../lib/planta.js';
 import { qtd } from '../lib/compras.js';
 import { TIPOS_VEICULO } from '../lib/logistica.js';
+import { criarPlanta3D } from '../lib/planta3d.js';
+let V3 = null, falhou3d = false;
 
 export const title = 'Planta da fábrica';
 const ui = { sel: null, editando: false };
@@ -48,7 +50,19 @@ export async function render(root) {
     if (!temPlanta) return;
     if (!ui.sel || (!C.maqById[ui.sel] && !String(ui.sel).startsWith('v:'))) ui.sel = (C.maquinas.find(m => S.maq[m.id]?.st === 'parada' && m.pos_x != null) || C.maquinas.find(m => m.pos_x != null))?.id || null;
     const maqs = C.maquinas.filter(m => m.ativo);
-    $('#pl-cv', root).innerHTML = celular() && !document.body.classList.contains('pl-tv') ? desenharBaixa(planta, maqs, S, { modo: 'situacao', sel: String(ui.sel).startsWith('v:') ? ui.sel : 'm:' + ui.sel }) : desenharIso(planta, maqs, S, { sel: ui.sel });
+    const cvEl = $('#pl-cv', root), selK = String(ui.sel).startsWith('v:') ? ui.sel : 'm:' + ui.sel;
+    if (celular() && !document.body.classList.contains('pl-tv')) { V3 = null; cvEl.innerHTML = desenharBaixa(planta, maqs, S, { modo: 'situacao', sel: selK }); }
+    else if (!falhou3d) {
+      if (!V3 || !cvEl.querySelector('.p3-wrap')) {
+        cvEl.classList.add('pl-cv3');
+        criarPlanta3D(cvEl, { aoClicar: (s) => { ui.sel = s.startsWith('m:') ? s.slice(2) : s; pintar(); } })
+          .then(v => { V3 = v; V3.montar(planta, maqs, S, selK); detalhe(root, C, S); })
+          .catch(() => { falhou3d = true; V3 = null; cvEl.classList.remove('pl-cv3'); pintar(); });
+        detalhe(root, C, S); return;
+      }
+      V3.montar(planta, maqs, S, selK); detalhe(root, C, S); return;
+    }
+    else cvEl.innerHTML = desenharIso(planta, maqs, S, { sel: ui.sel });
     $$('[data-m]', $('#pl-cv', root)).forEach(g => g.onclick = () => { ui.sel = g.dataset.m; pintar(); });
     $$('[data-v]', $('#pl-cv', root)).forEach(g => g.onclick = () => { ui.sel = 'v:' + g.dataset.v; pintar(); });
     detalhe(root, C, S);
@@ -127,6 +141,9 @@ async function editor(root, C, planta) {
         <button class="btn small" data-add="parede">▮ Parede</button><button class="btn small" data-add="doca">⇥ Doca</button>
         <button class="btn small" data-add="vaga">▯ Vaga de garagem</button><button class="btn small" data-add="patio">▩ Pátio</button>
         <button class="btn small" data-add="rua">═ Rua / acesso</button><button class="btn small" data-add="guarita">⌂ Guarita</button></div>
+      <h3>Cenário</h3><div class="pe-bts">
+        <button class="btn small" data-add="telao_p">▣ Telão de produção</button><button class="btn small" data-add="telao_l">▣ Telão de logística</button>
+        <button class="btn small" data-add="arvore">✿ Árvore</button></div>
       <h3>Máquinas sem lugar (${sem.length})</h3><div class="pe-lista">${sem.map(m => `<button class="pe-item" data-por="${m.id}"><b>${esc(m.codigo)}</b> ${esc(m.nome)}<span class="small muted">${esc(C.setorById[m.setor_id]?.nome || '')} · ${esc(TIPOS_VISUAIS[m.tipo_visual]?.t || '')}</span></button>`).join('') || '<div class="muted small">Todas as máquinas ativas estão na planta.</div>'}</div>
       <button class="btn small" id="pe-nova" style="width:100%;margin-top:8px">+ Nova máquina</button>
       <h3>Atalhos</h3><button class="btn ghost small" id="pe-rasc" style="width:100%">Rascunho automático</button>
@@ -144,7 +161,7 @@ async function editor(root, C, planta) {
 
   function adicionar(tipo) {
     if (tipo === 'seta') return novaSeta();
-    const dims = { setor: [10, 8], corredor: [14, 2.5], portao: [4, 1], paletes: [6, 4], estoque: [8, 4], expedicao: [8, 5], parede: [20, .3], doca: [9, 3.2], vaga: [3, 8.4], patio: [20, 14], rua: [30, 4], guarita: [2.5, 2] }[tipo];
+    const dims = { setor: [10, 8], corredor: [14, 2.5], portao: [4, 1], paletes: [6, 4], estoque: [8, 4], expedicao: [8, 5], parede: [20, .3], doca: [9, 3.2], vaga: [3, 8.4], patio: [20, 14], rua: [30, 4], guarita: [2.5, 2], telao_p: [5, .5], telao_l: [5, .5], arvore: [2.5, 2.5] }[tipo];
     const c = centroVisivel(...dims), base = { id: uid(), x: c.x, y: c.y, w: dims[0], d: dims[1] };
     let el;
     if (tipo === 'setor') el = { ...base, t: 'setor', nome: 'Novo setor', setor_id: null };
@@ -152,6 +169,7 @@ async function editor(root, C, planta) {
     else if (tipo === 'doca') el = { ...base, t: 'doca', nome: 'Doca ' + (D.els.filter(e => e.t === 'doca').length + 1) };
     else if (tipo === 'vaga') el = { ...base, t: 'vaga', nome: 'Vaga ' + (D.els.filter(e => e.t === 'vaga').length + 1), veiculo_id: null };
     else if (tipo === 'parede') el = { ...base, t: 'parede', altura: 3 };
+    else if (tipo === 'telao_p' || tipo === 'telao_l') el = { ...base, t: 'telao', tipo: tipo === 'telao_p' ? 'producao' : 'logistica', giro: 0 };
     else el = { ...base, t: tipo };
     D.els.push(el); sel = el.id; marcar(); tudo();
   }
@@ -213,13 +231,15 @@ async function editor(root, C, planta) {
       el.innerHTML = `<h3>Seta de fluxo</h3><div class="grid-form" style="grid-template-columns:1fr"><label>De<select id="pp-de">${opts(e.de)}</select></label><label>Para<select id="pp-para">${opts(e.para)}</select></label></div>${del}`;
       $('#pp-de', el).onchange = (ev) => { e.de = ev.target.value; marcar(); tudo(); }; $('#pp-para', el).onchange = (ev) => { e.para = ev.target.value; marcar(); tudo(); };
     } else {
-      const titulo = { setor: 'Setor', area: 'Área', corredor: 'Corredor', portao: 'Portão', parede: 'Parede', doca: 'Doca', vaga: 'Vaga de garagem', patio: 'Pátio', rua: 'Rua / acesso', guarita: 'Guarita' }[e.t];
+      const titulo = { setor: 'Setor', area: 'Área', corredor: 'Corredor', portao: 'Portão', parede: 'Parede', doca: 'Doca', vaga: 'Vaga de garagem', patio: 'Pátio', rua: 'Rua / acesso', guarita: 'Guarita', telao: 'Telão', arvore: 'Árvore' }[e.t];
       el.innerHTML = `<h3>${titulo}</h3><div class="grid-form" style="grid-template-columns:1fr">
         ${['setor', 'area', 'doca', 'vaga', 'rua'].includes(e.t) ? `<label>Nome<input id="pp-n" value="${esc(e.nome || '')}"></label>` : ''}
         ${e.t === 'parede' ? `<label>Altura (m)<input type="number" step=".5" min=".3" id="pp-alt" value="${e.altura ?? 3}"></label><p class="small muted" style="margin:0">Paredes da frente ficam melhores baixas (0,5 m), para não esconder o que está dentro no 3D.</p>` : ''}
         ${e.t === 'vaga' ? `<label>Caminhão fixo desta vaga<select id="pp-vv"><option value="">— qualquer —</option>${VEIC.map(v => `<option value="${v.id}" ${e.veiculo_id === v.id ? 'selected' : ''}>${esc(v.codigo)}${v.placa ? ' · ' + esc(v.placa) : ''}</option>`).join('')}</select></label>` : ''}
         ${e.t === 'doca' ? '<p class="small muted" style="margin:0">O caminhão aparece aqui enquanto a carga está carregando ou pronta.</p>' : ''}
         ${e.t === 'rua' ? '<p class="small muted" style="margin:0">Caminhões em rota aparecem aqui.</p>' : ''}
+        ${e.t === 'telao' ? `<label>Mostra<select id="pp-tl"><option value="producao" ${e.tipo === 'producao' ? 'selected' : ''}>Números da produção</option><option value="logistica" ${e.tipo === 'logistica' ? 'selected' : ''}>Números da logística</option></select></label>
+          <button class="btn small" id="pp-gt" type="button">↻ Girar 45°</button>` : ''}
         ${e.t === 'setor' ? `<label>Setor do cadastro<select id="pp-s"><option value="">— nenhum —</option>${C.setores.map(s => `<option value="${s.id}" ${e.setor_id === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></label>
           <p class="small muted" style="margin:0">Ligar ao cadastro faz a seta mostrar o material parado entre as etapas.</p>` : ''}
         ${e.t === 'area' ? `<label>Tipo<select id="pp-ta">${Object.entries(TIPOS_AREA).map(([k, t]) => `<option value="${k}" ${e.tipo === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
@@ -228,6 +248,8 @@ async function editor(root, C, planta) {
       $('#pp-s', el) && ($('#pp-s', el).onchange = (ev) => { e.setor_id = ev.target.value || null; if (e.setor_id && (!e.nome || e.nome === 'Novo setor')) { e.nome = C.setorById[e.setor_id].nome; } marcar(); tudo(); });
       $('#pp-alt', el) && ($('#pp-alt', el).onchange = (ev) => { e.altura = Math.max(.3, +ev.target.value || 3); marcar(); desenhar(); });
       $('#pp-vv', el) && ($('#pp-vv', el).onchange = (ev) => { e.veiculo_id = ev.target.value || null; marcar(); });
+      $('#pp-tl', el) && ($('#pp-tl', el).onchange = (ev) => { e.tipo = ev.target.value; marcar(); });
+      $('#pp-gt', el) && ($('#pp-gt', el).onclick = () => { e.giro = ((e.giro || 0) + 1) % 8; marcar(); });
       $('#pp-ta', el) && ($('#pp-ta', el).onchange = (ev) => { e.tipo = ev.target.value; marcar(); tudo(); });
       $('#pp-w', el).onchange = (ev) => { e.w = Math.max(.5, snap(+ev.target.value)); marcar(); tudo(); };
       $('#pp-d', el).onchange = (ev) => { e.d = Math.max(.5, snap(+ev.target.value)); marcar(); tudo(); };
@@ -243,7 +265,7 @@ async function editor(root, C, planta) {
   // ---- desenho e arrastar
   function desenhar() {
     const plt = { largura_m: D.L, profundidade_m: D.Pf, elementos: D.els };
-    if (ver3d) { cv.innerHTML = desenharIso(plt, D.maqs.filter(m => m.ativo), null, {}); return; }
+    if (ver3d) { const maqs = D.maqs.filter(m => m.ativo); if (cv.querySelector('.p3-wrap')) return; criarPlanta3D(cv).then(v => v.montar(plt, maqs, null, null)).catch(() => { cv.innerHTML = desenharIso(plt, maqs, null, {}); }); return; }
     cv.innerHTML = desenharBaixa(plt, D.maqs.filter(m => m.ativo), null, { modo: 'editor', sel });
   }
   function tudo() { desenhar(); paleta(); propriedades(); $('#pe-3d', root).textContent = ver3d ? 'Voltar a editar' : 'Ver em 3D'; }
