@@ -3,8 +3,9 @@
 import { sb, state, q } from '../lib/data.js';
 import { $, $$, esc, dateBR, fail, toast, modal, confirmDialog } from '../lib/ui.js';
 import { podePCP, limparCadProducao } from '../lib/producao.js';
-import { TIPOS_VISUAIS, TIPOS_AREA, COR, ROTULO_ST, pegada, uid, carregarPlanta, carregarSituacao, desenharIso, desenharBaixa, rascunho, textoMaquina, dur } from '../lib/planta.js';
+import { TIPOS_VISUAIS, TIPOS_AREA, COR, ROTULO_ST, pegada, uid, carregarPlanta, carregarSituacao, desenharIso, desenharBaixa, rascunho, textoMaquina, dur, COR_V, ROT_V, lugaresCaminhoes, textoVeiculo, capKg } from '../lib/planta.js';
 import { qtd } from '../lib/compras.js';
+import { TIPOS_VEICULO } from '../lib/logistica.js';
 
 export const title = 'Planta da fábrica';
 const ui = { sel: null, editando: false };
@@ -18,6 +19,7 @@ export async function render(root) {
   root.innerHTML = '<div class="loading">Carregando…</div>';
   let C, planta;
   try { ({ C, planta } = await carregarPlanta()); } catch (err) { fail(err); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Se a migração 044 ainda não rodou, rode-a antes.</div></div>'; return; }
+  _els = planta.elementos || [];
   if (ui.editando) return editor(root, C, planta);
   const temPlanta = (planta.elementos || []).length || C.maquinas.some(m => m.pos_x != null);
   root.innerHTML = `<div class="pl-pagina">
@@ -41,13 +43,14 @@ export async function render(root) {
     $('#pl-at', root).textContent = `Atualizado às ${S.atualizado.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · atualiza sozinho a cada 30 s`;
     const K = S.kpi;
     $('#pl-kpis', root).innerHTML = [['Produzindo', `${K.produzindo} de ${K.total}`, ''], ['Paradas agora', String(K.paradas), K.paradas ? 'neg' : ''], ['Em setup', String(K.setup), ''],
-      ['Kg bons hoje', kg(K.kgDia), ''], ['Apara hoje', pctTxt(K.apara), K.apara > .08 ? 'warn' : ''], ['OPs atrasadas', String(K.atrasadas), K.atrasadas ? 'neg' : '']]
+      ['Kg bons hoje', kg(K.kgDia), ''], ['Apara hoje', pctTxt(K.apara), K.apara > .08 ? 'warn' : ''], ['OPs atrasadas', String(K.atrasadas), K.atrasadas ? 'neg' : ''], ...(S.frota ? [['Cargas hoje', `${S.frota.cargasHoje} · ${(S.frota.kgHoje / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} t`, '']] : [])]
       .map(([t, v, c]) => `<div class="pl-k"><span>${t}</span><b class="${c}">${v}</b></div>`).join('');
     if (!temPlanta) return;
-    if (!ui.sel || !C.maqById[ui.sel]) ui.sel = (C.maquinas.find(m => S.maq[m.id]?.st === 'parada' && m.pos_x != null) || C.maquinas.find(m => m.pos_x != null))?.id || null;
+    if (!ui.sel || (!C.maqById[ui.sel] && !String(ui.sel).startsWith('v:'))) ui.sel = (C.maquinas.find(m => S.maq[m.id]?.st === 'parada' && m.pos_x != null) || C.maquinas.find(m => m.pos_x != null))?.id || null;
     const maqs = C.maquinas.filter(m => m.ativo);
-    $('#pl-cv', root).innerHTML = celular() && !document.body.classList.contains('pl-tv') ? desenharBaixa(planta, maqs, S, { modo: 'situacao', sel: 'm:' + ui.sel }) : desenharIso(planta, maqs, S, { sel: ui.sel });
+    $('#pl-cv', root).innerHTML = celular() && !document.body.classList.contains('pl-tv') ? desenharBaixa(planta, maqs, S, { modo: 'situacao', sel: String(ui.sel).startsWith('v:') ? ui.sel : 'm:' + ui.sel }) : desenharIso(planta, maqs, S, { sel: ui.sel });
     $$('[data-m]', $('#pl-cv', root)).forEach(g => g.onclick = () => { ui.sel = g.dataset.m; pintar(); });
+    $$('[data-v]', $('#pl-cv', root)).forEach(g => g.onclick = () => { ui.sel = 'v:' + g.dataset.v; pintar(); });
     detalhe(root, C, S);
   };
   const atualizar = async () => { try { S = await carregarSituacao(C); pintar(); } catch (err) { if (root.isConnected) fail(err); } };
@@ -57,6 +60,7 @@ export async function render(root) {
 
 function detalhe(root, C, S) {
   const el = $('#pl-det', root); if (!el) return;
+  if (String(ui.sel).startsWith('v:')) return detalheVeiculo(el, planta_els(), S);
   const m = C.maqById[ui.sel];
   if (!m) { el.innerHTML = '<div class="muted small">Toque numa máquina para ver o resumo.</div>'; return; }
   const x = S.maq[m.id], op = x.op, feito = x.etapa ? +x.etapa.qtd_boa : 0;
@@ -72,6 +76,21 @@ function detalhe(root, C, S) {
   $('#pl-op', el) && ($('#pl-op', el).onclick = () => { state.abrir = { tipo: 'op', id: op.id }; location.hash = '#/producao/ordens'; });
 }
 
+let _els = [];
+const planta_els = () => _els;
+function detalheVeiculo(el, els, S) {
+  const x = lugaresCaminhoes(els, S.frota).find(i => 'v:' + i.v.id === ui.sel);
+  if (!x) { el.innerHTML = '<div class="muted small">Caminhão não encontrado.</div>'; return; }
+  const v = x.v, c = x.c, pct = c?.peso_kg ? Math.round(+c.peso_kg / +v.carga_kg * 100) : null;
+  el.innerHTML = `<div class="pl-det-g"><div><div class="muted small">Frota · ${esc(TIPOS_VEICULO[v.tipo] || v.tipo || '')}${v.placa ? ' · ' + esc(v.placa) : ''}</div><h3 style="margin:2px 0 6px">${esc(v.codigo)}</h3>
+      <span class="pl-tag" style="background:${COR_V[x.est]}">${esc(ROT_V[x.est])}</span>
+      ${pct != null ? `<div class="small muted" style="margin:12px 0 4px">Ocupação: ${pct}% do peso (${kg(c.peso_kg)} de ${kg(v.carga_kg)} kg)</div><div class="pl-bar"><i style="width:${Math.min(100, pct)}%"></i></div>` : ''}
+      <div style="margin-top:12px"><button class="btn small" id="pl-carga">Abrir cargas</button></div></div>
+    <dl class="pl-dl"><dt>Situação</dt><dd>${esc(textoVeiculo(x))}</dd>${c ? `<dt>Carga</dt><dd>nº ${c.numero} · ${dateBR(c.data)}</dd>${c.km_previsto ? `<dt>Trajeto</dt><dd>${kg(c.km_previsto)} km previstos</dd>` : ''}` : '<dt>Carga</dt><dd>Nenhuma hoje</dd>'}
+      <dt>Motorista</dt><dd>${esc(c?.motorista || v.motorista || '–')}</dd><dt>Capacidade</dt><dd>${kg(v.carga_kg)} kg</dd></dl></div>`;
+  $('#pl-carga', el).onclick = () => { location.hash = '#/logistica'; };
+}
+
 function modoTV(on) {
   document.body.classList.toggle('pl-tv', on);
   try { if (on && !document.fullscreenElement) document.documentElement.requestFullscreen?.(); if (!on && document.fullscreenElement) document.exitFullscreen?.(); } catch {}
@@ -80,7 +99,9 @@ function modoTV(on) {
 }
 
 // ====================================================================== editor
-function editor(root, C, planta) {
+let VEIC = [];
+async function editor(root, C, planta) {
+  try { VEIC = await q(sb.from('log_veiculos').select('id,codigo,placa').eq('empresa_id', state.empresa.id).order('codigo')); } catch { VEIC = []; }
   const orig = Object.fromEntries(C.maquinas.map(m => [m.id, { pos_x: m.pos_x, pos_y: m.pos_y, rotacao: m.rotacao || 0, tipo_visual: m.tipo_visual || 'generica' }]));
   const D = { L: +planta.largura_m || 60, Pf: +planta.profundidade_m || 30, els: JSON.parse(JSON.stringify(planta.elementos || [])), maqs: C.maquinas.map(m => ({ ...m, rotacao: m.rotacao || 0, tipo_visual: m.tipo_visual || 'generica' })) };
   let sel = null, sujo = false, ver3d = false;
@@ -102,6 +123,10 @@ function editor(root, C, planta) {
         <button class="btn small" data-add="paletes">▦ Área de paletes</button><button class="btn small" data-add="estoque">▦ Estoque de MP</button>
         <button class="btn small" data-add="expedicao">▦ Expedição</button><button class="btn small" data-add="portao">▬ Portão</button>
         <button class="btn small" data-add="seta">→ Seta de fluxo</button></div>
+      <h3>Galpão e pátio</h3><div class="pe-bts">
+        <button class="btn small" data-add="parede">▮ Parede</button><button class="btn small" data-add="doca">⇥ Doca</button>
+        <button class="btn small" data-add="vaga">▯ Vaga de garagem</button><button class="btn small" data-add="patio">▩ Pátio</button>
+        <button class="btn small" data-add="rua">═ Rua / acesso</button><button class="btn small" data-add="guarita">⌂ Guarita</button></div>
       <h3>Máquinas sem lugar (${sem.length})</h3><div class="pe-lista">${sem.map(m => `<button class="pe-item" data-por="${m.id}"><b>${esc(m.codigo)}</b> ${esc(m.nome)}<span class="small muted">${esc(C.setorById[m.setor_id]?.nome || '')} · ${esc(TIPOS_VISUAIS[m.tipo_visual]?.t || '')}</span></button>`).join('') || '<div class="muted small">Todas as máquinas ativas estão na planta.</div>'}</div>
       <button class="btn small" id="pe-nova" style="width:100%;margin-top:8px">+ Nova máquina</button>
       <h3>Atalhos</h3><button class="btn ghost small" id="pe-rasc" style="width:100%">Rascunho automático</button>
@@ -119,11 +144,14 @@ function editor(root, C, planta) {
 
   function adicionar(tipo) {
     if (tipo === 'seta') return novaSeta();
-    const dims = { setor: [10, 8], corredor: [14, 2.5], portao: [4, 1], paletes: [6, 4], estoque: [8, 4], expedicao: [8, 5] }[tipo];
+    const dims = { setor: [10, 8], corredor: [14, 2.5], portao: [4, 1], paletes: [6, 4], estoque: [8, 4], expedicao: [8, 5], parede: [20, .3], doca: [9, 3.2], vaga: [3, 8.4], patio: [20, 14], rua: [30, 4], guarita: [2.5, 2] }[tipo];
     const c = centroVisivel(...dims), base = { id: uid(), x: c.x, y: c.y, w: dims[0], d: dims[1] };
     let el;
     if (tipo === 'setor') el = { ...base, t: 'setor', nome: 'Novo setor', setor_id: null };
     else if (['paletes', 'estoque', 'expedicao'].includes(tipo)) el = { ...base, t: 'area', tipo, nome: TIPOS_AREA[tipo] };
+    else if (tipo === 'doca') el = { ...base, t: 'doca', nome: 'Doca ' + (D.els.filter(e => e.t === 'doca').length + 1) };
+    else if (tipo === 'vaga') el = { ...base, t: 'vaga', nome: 'Vaga ' + (D.els.filter(e => e.t === 'vaga').length + 1), veiculo_id: null };
+    else if (tipo === 'parede') el = { ...base, t: 'parede', altura: 3 };
     else el = { ...base, t: tipo };
     D.els.push(el); sel = el.id; marcar(); tudo();
   }
@@ -185,15 +213,21 @@ function editor(root, C, planta) {
       el.innerHTML = `<h3>Seta de fluxo</h3><div class="grid-form" style="grid-template-columns:1fr"><label>De<select id="pp-de">${opts(e.de)}</select></label><label>Para<select id="pp-para">${opts(e.para)}</select></label></div>${del}`;
       $('#pp-de', el).onchange = (ev) => { e.de = ev.target.value; marcar(); tudo(); }; $('#pp-para', el).onchange = (ev) => { e.para = ev.target.value; marcar(); tudo(); };
     } else {
-      const titulo = { setor: 'Setor', area: 'Área', corredor: 'Corredor', portao: 'Portão' }[e.t];
+      const titulo = { setor: 'Setor', area: 'Área', corredor: 'Corredor', portao: 'Portão', parede: 'Parede', doca: 'Doca', vaga: 'Vaga de garagem', patio: 'Pátio', rua: 'Rua / acesso', guarita: 'Guarita' }[e.t];
       el.innerHTML = `<h3>${titulo}</h3><div class="grid-form" style="grid-template-columns:1fr">
-        ${e.t === 'setor' || e.t === 'area' ? `<label>Nome<input id="pp-n" value="${esc(e.nome || '')}"></label>` : ''}
+        ${['setor', 'area', 'doca', 'vaga', 'rua'].includes(e.t) ? `<label>Nome<input id="pp-n" value="${esc(e.nome || '')}"></label>` : ''}
+        ${e.t === 'parede' ? `<label>Altura (m)<input type="number" step=".5" min=".3" id="pp-alt" value="${e.altura ?? 3}"></label><p class="small muted" style="margin:0">Paredes da frente ficam melhores baixas (0,5 m), para não esconder o que está dentro no 3D.</p>` : ''}
+        ${e.t === 'vaga' ? `<label>Caminhão fixo desta vaga<select id="pp-vv"><option value="">— qualquer —</option>${VEIC.map(v => `<option value="${v.id}" ${e.veiculo_id === v.id ? 'selected' : ''}>${esc(v.codigo)}${v.placa ? ' · ' + esc(v.placa) : ''}</option>`).join('')}</select></label>` : ''}
+        ${e.t === 'doca' ? '<p class="small muted" style="margin:0">O caminhão aparece aqui enquanto a carga está carregando ou pronta.</p>' : ''}
+        ${e.t === 'rua' ? '<p class="small muted" style="margin:0">Caminhões em rota aparecem aqui.</p>' : ''}
         ${e.t === 'setor' ? `<label>Setor do cadastro<select id="pp-s"><option value="">— nenhum —</option>${C.setores.map(s => `<option value="${s.id}" ${e.setor_id === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></label>
           <p class="small muted" style="margin:0">Ligar ao cadastro faz a seta mostrar o material parado entre as etapas.</p>` : ''}
         ${e.t === 'area' ? `<label>Tipo<select id="pp-ta">${Object.entries(TIPOS_AREA).map(([k, t]) => `<option value="${k}" ${e.tipo === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
         <div style="display:flex;gap:8px">${tam(e)}</div></div>${del}`;
       $('#pp-n', el) && ($('#pp-n', el).oninput = (ev) => { e.nome = ev.target.value; marcar(); desenhar(); });
       $('#pp-s', el) && ($('#pp-s', el).onchange = (ev) => { e.setor_id = ev.target.value || null; if (e.setor_id && (!e.nome || e.nome === 'Novo setor')) { e.nome = C.setorById[e.setor_id].nome; } marcar(); tudo(); });
+      $('#pp-alt', el) && ($('#pp-alt', el).onchange = (ev) => { e.altura = Math.max(.3, +ev.target.value || 3); marcar(); desenhar(); });
+      $('#pp-vv', el) && ($('#pp-vv', el).onchange = (ev) => { e.veiculo_id = ev.target.value || null; marcar(); });
       $('#pp-ta', el) && ($('#pp-ta', el).onchange = (ev) => { e.tipo = ev.target.value; marcar(); tudo(); });
       $('#pp-w', el).onchange = (ev) => { e.w = Math.max(.5, snap(+ev.target.value)); marcar(); tudo(); };
       $('#pp-d', el).onchange = (ev) => { e.d = Math.max(.5, snap(+ev.target.value)); marcar(); tudo(); };

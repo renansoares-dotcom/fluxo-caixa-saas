@@ -29,6 +29,8 @@ const routes = {
   'producao/cadastros': () => import(`./pages/producao-cadastros.js?v=${V}`),
   'producao/importar': () => import(`./pages/producao-importar.js?v=${V}`),
   'producao/planta': () => import(`./pages/producao-planta.js?v=${V}`),
+  'logistica': () => import(`./pages/logistica.js?v=${V}`),
+  'logistica/frota': () => import(`./pages/logistica-frota.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),
@@ -189,7 +191,7 @@ $('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'
 
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
 function aplicarAreas() {
-  $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'com', 'cmp', 'prd', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
+  $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'com', 'cmp', 'prd', 'log', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
   for (const r of ['dashboard', 'hoje', 'decisoes', 'executivo']) { const a = $(`#nav a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
   const pain = $('#nav .nav-area[data-area="pain"]'); if (pain) pain.hidden = !temArea('fin');
 }
@@ -258,7 +260,7 @@ async function render() {
   if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
   if (state.papel === 'vendas' && !rotaDeVendas(route)) { location.hash = '#/comercial'; return; }
   if (state.papel === 'producao' && !rotaDeProducao(route)) { location.hash = '#/producao/terminal'; return; }
-  { const ar = routes[route] ? areaDaRota(route) : 'fin'; if (['fin', 'com', 'cmp', 'prd', 'cpd', 'cont'].includes(ar) && !temArea(ar)) { location.hash = '#/' + primeiraRota(); return; } }
+  { const ar = routes[route] ? areaDaRota(route) : 'fin'; if (['fin', 'com', 'cmp', 'prd', 'log', 'cpd', 'cont'].includes(ar) && !temArea(ar)) { location.hash = '#/' + primeiraRota(); return; } }
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
   // menu em cascata: abre o grupo da página atual

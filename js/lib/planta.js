@@ -16,6 +16,9 @@ export const TIPOS_VISUAIS = {
 export const TIPOS_AREA = { paletes: 'Área de paletes', estoque: 'Estoque de matéria-prima', expedicao: 'Expedição', outro: 'Outra área' };
 export const COR = { prod: '#22c55e', setup: '#f59e0b', parada: '#ef4444', livre: '#94a3b8', imp: '#64748b' };
 export const ROTULO_ST = { prod: 'Produzindo', setup: 'Setup / parada planejada', parada: 'Parada', livre: 'Livre', imp: 'Só Iniflex' };
+export const COR_V = { carr: '#2563eb', pronto: '#22c55e', rota: '#7c3aed', plan: '#0ea5e9', garagem: '#94a3b8', manut: '#ef4444' };
+export const ROT_V = { carr: 'Carregando', pronto: 'Pronto para sair', rota: 'Em rota', plan: 'Carga planejada', garagem: 'Na garagem', manut: 'Em manutenção' };
+const TXT_V = { carr: '#1d4ed8', pronto: '#15803d', rota: '#6d28d9', plan: '#0369a1', garagem: '#5d6790', manut: '#dc2626' };
 const TXT_ST = { prod: '#15803d', setup: '#b45309', parada: '#dc2626', livre: '#5d6790', imp: '#475569' };
 
 export const pegada = (m) => { const T = TIPOS_VISUAIS[m.tipo_visual] || TIPOS_VISUAIS.generica; return +m.rotacao === 90 ? { w: T.d, d: T.w } : { w: T.w, d: T.d }; };
@@ -84,7 +87,17 @@ export async function carregarSituacao(C) {
   const ativas = C.maquinas.filter(m => m.ativo);
   const kgDia = Object.values(maq).reduce((t, x) => t + x.kgDia, 0), refDia = Object.values(maq).reduce((t, x) => t + x.refDia, 0);
   const hojeStr = hoje;
-  return { maq, wip, saidaSetor, atualizado: new Date(), kpi: {
+  let frota = null;
+  try {
+    const [veiculos, ativas, doDiaC] = await Promise.all([q(sb.from('log_veiculos').select('*').eq('empresa_id', e).order('codigo')),
+      q(sb.from('log_cargas').select('*').eq('empresa_id', e).in('status', ['carregando', 'pronta', 'em_rota'])),
+      q(sb.from('log_cargas').select('*').eq('empresa_id', e).eq('data', hoje).neq('status', 'cancelada'))]);
+    const cargas = [...ativas, ...doDiaC.filter(c => !ativas.some(a => a.id === c.id))];
+    const peso = { em_rota: 4, carregando: 3, pronta: 3, planejada: 2, concluida: 1 };
+    const porVeiculo = {}; for (const c of cargas) { if (!c.veiculo_id) continue; const at = porVeiculo[c.veiculo_id]; if (!at || (peso[c.status] || 0) > (peso[at.status] || 0)) porVeiculo[c.veiculo_id] = c; }
+    frota = { veiculos, cargas, porVeiculo, cargasHoje: doDiaC.length, kgHoje: doDiaC.reduce((s, c) => s + (+c.peso_kg || 0), 0) };
+  } catch { frota = null; }
+  return { maq, wip, saidaSetor, frota, atualizado: new Date(), kpi: {
     produzindo: ativas.filter(m => maq[m.id].st === 'prod').length, total: ativas.length,
     paradas: ativas.filter(m => maq[m.id].st === 'parada').length, setup: ativas.filter(m => maq[m.id].st === 'setup').length,
     kgDia, apara: kgDia + refDia ? refDia / (kgDia + refDia) : null,
@@ -98,6 +111,45 @@ export function textoMaquina(m, S) {
   if (x.st === 'setup') return `${x.motivo || 'Setup'} ${dur(x.desde)}`;
   if (x.st === 'imp') return `Iniflex · ${hora(x.desde)}`;
   return x.desde ? `Livre há ${dur(x.desde)}` : 'Livre';
+}
+
+// ---------------------------------------------------------------- caminhões na planta
+export const capKg = (v) => +v.carga_kg * (+v.ocupacao_max_pct || 100) / 100;
+export const pequenoV = (v) => v.pequeno || ['vuc', 'utilitario', 'tres_quartos'].includes(v.tipo) || +v.carga_kg <= 4000;
+// onde cada caminhão aparece: doca (carregando/pronto), rua (em rota) ou vaga da garagem
+export function lugaresCaminhoes(els, frota) {
+  if (!frota?.veiculos?.length) return [];
+  const docas = els.filter(e => e.t === 'doca'), vagas = els.filter(e => e.t === 'vaga'), ruas = els.filter(e => e.t === 'rua');
+  const usD = new Set(), usV = new Set(), res = []; let nRua = 0;
+  const ativos = frota.veiculos.filter(v => v.situacao !== 'inativo');
+  const ordem = [...ativos].sort((a, b) => (vagas.some(g => g.veiculo_id === b.id) ? 1 : 0) - (vagas.some(g => g.veiculo_id === a.id) ? 1 : 0));
+  for (const v of ordem) {
+    const c = frota.porVeiculo[v.id], st = c?.status; let lugar = null, est = 'garagem', idx = 0;
+    if (v.situacao === 'manutencao') est = 'manut';
+    else if (st === 'carregando' || st === 'pronta') { est = st === 'pronta' ? 'pronto' : 'carr'; lugar = docas.find(d => !usD.has(d.id)) || null; if (lugar) usD.add(lugar.id); }
+    else if (st === 'em_rota') { est = 'rota'; lugar = ruas[0] || null; idx = nRua++; }
+    else if (st === 'planejada') est = 'plan';
+    if (!lugar && est !== 'rota') { lugar = vagas.find(g => g.veiculo_id === v.id && !usV.has(g.id)) || vagas.find(g => !g.veiculo_id && !usV.has(g.id)) || null; if (lugar) usV.add(lugar.id); }
+    res.push({ v, c, lugar, est, idx });
+  }
+  return res;
+}
+export function textoVeiculo(x) {
+  const pct = x.c?.peso_kg ? Math.round(+x.c.peso_kg / +x.v.carga_kg * 100) : null;
+  if (x.est === 'carr') return `Carregando${pct != null ? ' · ' + pct + '%' : ''}`;
+  if (x.est === 'pronto') return `Pronto${pct != null ? ' · ' + pct + '%' : ''}`;
+  if (x.est === 'rota') return `Em rota${x.c?.saida_em ? ' · saiu ' + hora(x.c.saida_em) : ''}`;
+  if (x.est === 'plan') return `Carga planejada${pct != null ? ' · ' + pct + '%' : ''}`;
+  if (x.est === 'manut') return 'Manutenção';
+  return 'Na garagem';
+}
+// retângulo ocupado pelo caminhão dentro do lugar (ao longo do lado maior)
+export function geoCaminhao(x) {
+  const el = x.lugar; if (!el) return null;
+  const aoX = el.w >= el.d, longo = aoX ? el.w : el.d, curto = aoX ? el.d : el.w;
+  const L = Math.max(3, Math.min(pequenoV(x.v) ? 5.2 : 7.6, longo - .3)), w = Math.max(1.4, Math.min(2.4, curto - .2));
+  const off = x.est === 'rota' ? Math.min(x.idx * (L + 1.5), Math.max(0, longo - L - .3)) : 0;
+  return aoX ? { X: el.x + .15 + off, Y: el.y + (el.d - w) / 2, L, w, aoX } : { X: el.x + (el.w - w) / 2, Y: el.y + .15 + off, L, w, aoX };
 }
 
 // ---------------------------------------------------------------- geometria auxiliar
@@ -167,12 +219,24 @@ export function desenharIso(planta, maquinas, S, opts = {}) {
     if (el.t === 'portao') { piso(el, 'rgba(47,79,168,.55)', '#fff', '', 1); textoPiso(el.x + .2, el.y + el.d - .2, 'Portão', '#fff', 11); }
     if (el.t === 'setor') { piso(el, 'rgba(255,255,255,.16)', 'rgba(255,255,255,.85)', '7 5', 1.6); }
     if (el.t === 'area') { piso(el, 'rgba(255,255,255,.12)', 'rgba(255,255,255,.7)', '3 4', 1.2); }
+    if (el.t === 'patio') piso(el, 'rgba(60,72,130,.30)', 'rgba(255,255,255,.35)', '', 1);
+    if (el.t === 'rua') { piso(el, 'rgba(45,55,105,.5)', 'none', '', 0); const aoX = el.w >= el.d;
+      if (aoX) for (let x = el.x + .5; x < el.x + el.w - 1; x += 3) seg(P(x, el.y + el.d / 2), P(Math.min(x + 1.5, el.x + el.w), el.y + el.d / 2), '#ffd34d', 2);
+      else for (let y = el.y + .5; y < el.y + el.d - 1; y += 3) seg(P(el.x + el.w / 2, y), P(el.x + el.w / 2, Math.min(y + 1.5, el.y + el.d)), '#ffd34d', 2); }
+    if (el.t === 'doca') piso(el, 'rgba(255,211,77,.10)', '#ffd34d', '9 6', 2);
+    if (el.t === 'vaga') piso(el, 'rgba(255,255,255,.05)', '#fff', '', 1.4);
   }
   for (const el of els) if (el.t === 'setor' || el.t === 'area') textoPiso(el.x + .4, el.y + el.d - .5, el.nome || '');
+  for (const el of els) if (el.t === 'doca' || el.t === 'vaga') textoPiso(el.x + .3, el.y + el.d - .3, el.nome || '', el.t === 'doca' ? '#ffd34d' : '#fff', 9);
+  for (const el of els) if (el.t === 'rua' && el.nome) textoPiso(el.x + .4, el.y + el.d - .3, el.nome, 'rgba(255,255,255,.8)', 11);
   // objetos com altura, pintados de trás para frente
   const objs = [];
   for (const el of els) if (el.t === 'area' && ['paletes', 'expedicao', 'estoque'].includes(el.tipo)) objs.push({ prof: el.x + el.y + 1, f: () => decorArea(el) });
   for (const m of maquinas) { if (m.pos_x == null || m.pos_y == null) continue; const pg = pegada(m); objs.push({ prof: +m.pos_x + +m.pos_y + (pg.w + pg.d) / 2, f: () => maquina(m) }); }
+  for (const el of els) if (el.t === 'parede') objs.push({ prof: el.x + el.y + (el.w + el.d) / 2, f: () => box(el.x, el.y, 0, el.w, el.d, +el.altura || 3, 'p') });
+  for (const el of els) if (el.t === 'guarita') objs.push({ prof: el.x + el.y + (el.w + el.d) / 2, f: () => { box(el.x, el.y, 0, el.w, el.d, 2.3, 'w'); box(el.x - .1, el.y - .1, 2.3, el.w + .2, el.d + .2, .18, 'd'); box(el.x + el.w * .25, el.y + el.d, .9, el.w * .5, .02, .6, 'c'); } });
+  const cams = lugaresCaminhoes(els, S?.frota);
+  for (const x of cams) { const g = geoCaminhao(x); if (!g) continue; objs.push({ prof: g.X + g.Y + (g.aoX ? g.L + g.w : g.w + g.L) / 2, f: () => caminhao(x, g) }); }
   const setas = els.filter(x => x.t === 'seta').map(el => ({ el, g: geometriaSeta(el, porId), tx: textoSeta(el, porId, S) })).filter(x => x.g);
   for (const s of setas) if (s.tx?.n) { const m = [(s.g.a[0] + s.g.b[0]) / 2, (s.g.a[1] + s.g.b[1]) / 2], nrm = [-s.g.u[1], s.g.u[0]];
     const px = m[0] + nrm[0] * 1.2 - .65, py = m[1] + nrm[1] * 1.2 - .55; objs.push({ prof: px + py + 1, f: () => palete(px, py, Math.min(9, s.tx.n)) }); }
@@ -193,6 +257,22 @@ export function desenharIso(planta, maquinas, S, opts = {}) {
   }
   function palete(x, y, n) { box(x, y, 0, 1.3, 1.1, .14, 'm'); for (let i = 0; i < n; i++) { const c = i % 3, r = Math.floor(i / 3); cyl('y', x + .25 + c * .4, y + .05, .32 + r * .36, .18, .18, 1, 'f'); } }
 
+  function caminhao(x, g) {
+    const { X, Y, L, w } = g, rot = !g.aoX, st = x.est;
+    const B = (a, b, z, ww, dd, h, k) => rot ? box(X + b, Y + a, z, dd, ww, h, k) : box(X + a, Y + b, z, ww, dd, h, k);
+    const Cy = (ax, cx, cy, cz, r0, r1, Lc, k) => rot ? cyl(ax === 'x' ? 'y' : ax === 'y' ? 'x' : 'z', X + cy, Y + cx, cz, r0, r1, Lc, k) : cyl(ax, X + cx, Y + cy, cz, r0, r1, Lc, k);
+    const Pl = (a, b, z) => rot ? P(X + b, Y + a, z) : P(X + a, Y + b, z);
+    const fw = rot ? w : L, fd = rot ? L : w;
+    out.push(`<g class="pl-maq" data-v="${x.v.id}" style="cursor:pointer"><polygon points="${pp([P(X - .3, Y - .3), P(X + fw + .3, Y - .3), P(X + fw + .3, Y + fd + .3), P(X - .3, Y + fd + .3)])}" fill="${COR_V[st]}" opacity="${st === 'garagem' ? .12 : .4}" filter="url(#pl-bl)"/>`);
+    B(0, 0, .45, L - 1.9, w, .25, 'd'); B(0, 0, .7, L - 2.1, w, 2.6, 'w'); B(L - 1.9, 0, .45, 1.9, w, 2.05, 'b'); B(L - .03, .15, 1.45, .03, w - .3, .75, 'c');
+    [.9, 2.1, L - 1].forEach(a => Cy('y', a, w, .45, .42, .42, .16, 'd'));
+    out.push('</g>');
+    const b = Pl((L - 2.1) / 2, w / 2, 3.3), t2 = textoVeiculo(x), wd = Math.max(x.v.codigo.length * 7.4, t2.length * 5.9) + 18, sel = opts.sel === 'v:' + x.v.id;
+    pts.push([b[0] - wd / 2, b[1] - 46]);
+    tarde.push(`<g class="pl-maq" data-v="${x.v.id}" style="cursor:pointer"><g transform="translate(${(b[0] - wd / 2).toFixed(1)},${(b[1] - 44).toFixed(1)})"><rect width="${wd}" height="32" rx="6" fill="#fff" stroke="${sel ? '#2a1f6f' : COR_V[st]}" stroke-width="${sel ? 3 : 2}"/>
+      <text x="9" y="13" fill="#1b2350" font-size="11.5" font-weight="700">${esc(x.v.codigo)}</text><text x="9" y="26" fill="${TXT_V[st]}" font-size="10" font-weight="600">${esc(t2)}</text></g>
+      <line x1="${b[0].toFixed(1)}" y1="${(b[1] - 12).toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${COR_V[st]}"/></g>`);
+  }
   function maquina(m) {
     const st = S?.maq?.[m.id]?.st || 'livre', X = +m.pos_x, Y = +m.pos_y, rot = +m.rotacao === 90;
     // desenho local (giro 0) transposto quando giro 90
@@ -268,6 +348,12 @@ export function desenharBaixa(planta, maquinas, S, opts = {}) {
     if (el.t === 'setor') g(r(el, 'rgba(43,85,152,.06)', sel === el.id ? '#2a1f6f' : '#2b5598', '.5 .3') + nome(el.nome, '#2a1f6f'));
     if (el.t === 'area') g(r(el, 'rgba(217,168,106,.14)', sel === el.id ? '#2a1f6f' : '#b9874b', '.25 .25') + nome(el.nome || TIPOS_AREA[el.tipo], '#8a6232'));
     if (el.t === 'corredor') g(r(el, 'rgba(255,211,77,.18)', sel === el.id ? '#2a1f6f' : '#e0a800', '.6 .4') + (ed ? nome('Corredor', '#a07400') : ''));
+    if (el.t === 'patio') g(r(el, 'rgba(93,103,144,.16)', sel === el.id ? '#2a1f6f' : '#8a93b8') + (ed ? nome('Pátio', '#5d6790') : ''));
+    if (el.t === 'rua') g(r(el, '#5d6790', sel === el.id ? '#2a1f6f' : '#4a5280') + `<line x1="${el.w >= el.d ? el.x + .3 : el.x + el.w / 2}" y1="${el.w >= el.d ? el.y + el.d / 2 : el.y + .3}" x2="${el.w >= el.d ? el.x + el.w - .3 : el.x + el.w / 2}" y2="${el.w >= el.d ? el.y + el.d / 2 : el.y + el.d - .3}" stroke="#ffd34d" stroke-width=".15" stroke-dasharray="1 .8"/>` + (el.nome ? `<text x="${el.x + .35}" y="${el.y + .8}" font-size=".6" fill="#fff" font-weight="700">${esc(el.nome)}</text>` : ''));
+    if (el.t === 'doca') g(r(el, 'rgba(255,211,77,.16)', sel === el.id ? '#2a1f6f' : '#e0a800', '.5 .3') + nome(el.nome || 'Doca', '#a07400'));
+    if (el.t === 'vaga') g(r(el, 'rgba(148,163,184,.12)', sel === el.id ? '#2a1f6f' : '#94a3b8') + nome(el.nome || 'Vaga', '#5d6790'));
+    if (el.t === 'parede') g(r(el, '#2a1f6f', sel === el.id ? '#0ea5e9' : '#2a1f6f'));
+    if (el.t === 'guarita') g(r(el, '#5d6790', sel === el.id ? '#2a1f6f' : '#4a5280') + `<text x="${el.x + el.w / 2}" y="${el.y + el.d / 2 + .2}" font-size=".55" text-anchor="middle" fill="#fff" font-weight="700">GUARITA</text>`);
     if (el.t === 'portao') g(r(el, '#3f63c6', sel === el.id ? '#2a1f6f' : '#2f4fa8') + `<text x="${el.x + el.w / 2}" y="${el.y + el.d / 2 + .22}" font-size=".6" text-anchor="middle" fill="#fff" font-weight="700">PORTÃO</text>`);
   }
   for (const el of els.filter(x => x.t === 'seta')) {
@@ -277,6 +363,11 @@ export function desenharBaixa(planta, maquinas, S, opts = {}) {
     partes.push(`<g class="pl-el ${sel === el.id ? 'sel' : ''}" data-el="${el.id}"><line x1="${gm.a[0]}" y1="${gm.a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${sel === el.id ? '#2a1f6f' : '#2b5598'}" stroke-width=".22" stroke-dasharray=".6 .35"/>
       <polygon points="${h.map(p => p.join(',')).join(' ')}" fill="${sel === el.id ? '#2a1f6f' : '#2b5598'}"/>${tx && !ed ? `<text x="${mid[0]}" y="${mid[1] - .5}" font-size=".62" text-anchor="middle" fill="#2a1f6f" font-weight="700">${esc(tx.l1)}</text>` : ''}
       <line x1="${gm.a[0]}" y1="${gm.a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="transparent" stroke-width="1.2"/></g>`);
+  }
+  if (!ed) for (const x of lugaresCaminhoes(els, S?.frota)) {
+    const gm = geoCaminhao(x); if (!gm) continue; const fw = gm.aoX ? gm.L : gm.w, fd = gm.aoX ? gm.w : gm.L;
+    partes.push(`<g class="pl-el pl-maq" data-v="${x.v.id}"><rect x="${gm.X}" y="${gm.Y}" width="${fw}" height="${fd}" rx=".25" fill="${COR_V[x.est]}" stroke="${sel === 'v:' + x.v.id ? '#2a1f6f' : 'rgba(0,0,0,.25)'}" stroke-width="${sel === 'v:' + x.v.id ? .2 : .08}"/>
+      <text x="${gm.X + fw / 2}" y="${gm.Y + fd / 2 + .2}" font-size="${Math.min(.75, Math.min(fw, fd) / 2.2)}" text-anchor="middle" font-weight="800" fill="#fff">${esc(x.v.codigo)}</text></g>`);
   }
   for (const m of maquinas) {
     if (m.pos_x == null || m.pos_y == null) continue; const pg = pegada(m), st = S?.maq?.[m.id]?.st || 'livre', x = +m.pos_x, y = +m.pos_y;

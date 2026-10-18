@@ -20,7 +20,7 @@ const rotaLiberada = (route) => {
   if (compras() && !a.classList.contains('nav-compras')) return false;
   if (state.papel === 'vendas' && !a.classList.contains('nav-vendas')) return false;
   if (state.papel === 'producao' && !a.classList.contains('nav-producao')) return false;
-  return !['fin', 'com', 'cmp', 'prd', 'cpd', 'cont'].includes(ar) || temArea(ar);
+  return !['fin', 'com', 'cmp', 'prd', 'log', 'cpd', 'cont'].includes(ar) || temArea(ar);
 };
 const ir = (route, abrir) => { if (abrir) state.abrir = abrir; if (location.hash === '#/' + route) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + route; };
 
