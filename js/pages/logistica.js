@@ -8,7 +8,7 @@ import { carregarBase, municipios, paradas, ordenar, metricas, montarCargas, cap
 
 export const title = 'Logística — cargas';
 const ui = { data: null, de: null, ate: null };
-let B, M, origem, PEND = [], SALVAS = [], PROP = null;
+let B, M, origem, PEND = [], SALVAS = [], PROP = null, BAIXAS = [];
 const kg = (v) => Math.round(+v || 0).toLocaleString('pt-BR');
 const t1 = (v) => (+v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
 const money = (v) => v == null ? '–' : 'R$ ' + Math.round(v).toLocaleString('pt-BR');
@@ -17,7 +17,7 @@ const soDig = (s) => String(s || '').replace(/\D/g, '');
 const ATIVAS = ['carregando', 'pronta', 'em_rota'];
 
 export async function render(root) {
-  ui.data ||= today(); ui.ate ||= today(); ui.de ||= addDias(today(), -45);
+  ui.data ||= today(); ui.ate ||= today(); ui.de ||= addDias(today(), -7);
   root.innerHTML = '<div class="loading">Carregando…</div>';
   try {
     [B, M] = await Promise.all([carregarBase(), municipios()]);
@@ -43,7 +43,9 @@ async function recarregar(root) {
     if (cmunO) { try { localStorage.setItem('lg-origem', cmunO); } catch {} }
     origem = cmunO ? M[cmunO] : null;
     PEND = paradas(notas, B, M, origem);
-    const cargas = [...doDia, ...ativas.filter(a => !doDia.some(d => d.id === a.id))];
+    const ehBaixa = (c) => c.status === 'concluida' && !c.veiculo_id && String(c.observacao || '').startsWith('Baixa inicial');
+    BAIXAS = doDia.filter(ehBaixa);
+    const cargas = [...doDia.filter(c => !ehBaixa(c)), ...ativas.filter(a => !doDia.some(d => d.id === a.id))];
     const linhas = cargas.length ? await q(sb.rpc('log_notas_das_cargas', { p_empresa: e, p_cargas: cargas.map(c => c.id) })) : [];
     SALVAS = cargas.map(c => {
       const v = B.veiculos.find(x => x.id === c.veiculo_id) || null, stops = [];
@@ -74,7 +76,8 @@ function pintar(root) {
       ['Cargas do dia', String(todas.length), ''], ['Ocupação média', ocMed == null ? '–' : Math.round(ocMed * 100) + '%', ''], ['Frete previsto', frete ? money(frete) : '–', ''],
       ['Para transportadora', String(longe.length), longe.length ? 'warn' : '']].map(([t, v, c]) => `<div class="pl-k"><span>${t}</span><b class="${c}">${v}</b></div>`).join('')}</div>
     <div class="lg-grade">
-      <div class="card lg-pend" data-alvo="pend"><div class="card-head"><h2 style="margin:0">Pendentes de carga</h2></div>
+      <div class="card lg-pend" data-alvo="pend"><div class="card-head"><h2 style="margin:0">Pendentes de carga</h2>${ed && PEND.length ? '<button class="btn ghost small" id="lg-baixa" title="Para notas que já foram entregues antes de usar a plataforma">Baixa inicial…</button>' : ''}</div>
+        ${BAIXAS.map(c => `<div class="small muted" style="margin-bottom:8px">Baixa inicial feita hoje (${kg(c.peso_kg)} kg). ${ed ? `<a href="#" data-desf="${c.id}">Desfazer</a>` : ''}</div>`).join('')}
         <div class="lg-lista">${PEND.map(s => itemPend(s)).join('') || '<div class="empty">Nenhuma nota pendente de entrega no período.</div>'}</div></div>
       <div>
         ${ed ? `<div class="lg-acoes"><button class="btn primary" id="lg-auto" ${!disp.length || !origem ? 'disabled' : ''}>Montar cargas automaticamente</button><button class="btn" id="lg-nova" ${!disp.length ? 'disabled' : ''}>Nova carga</button>
@@ -141,6 +144,25 @@ function ligar(root) {
     if (!PROP.cargas.length) { toast('Nada coube nos veículos livres (verifique capacidade e jornada)', true); PROP = null; return; }
     PEND = PEND.filter(s => !PROP.cargas.some(c => c.stops.includes(s)));
     pintar(root);
+  });
+  $$('[data-desf]', corpo).forEach(a => a.onclick = async (ev) => { ev.preventDefault(); if (!await confirmDialog('Desfazer a baixa inicial? As notas voltam para pendentes.')) return;
+    try { await q(sb.from('log_cargas').delete().eq('id', a.dataset.desf)); await recarregar(root); } catch (err) { fail(err); } });
+  $('#lg-baixa', corpo) && ($('#lg-baixa', corpo).onclick = () => {
+    const md = modal({ title: 'Baixa inicial de entregas', body: `<p>Use uma vez, no começo, para tirar da lista as notas que <b>já foram entregues</b> antes da plataforma. Elas ficam registradas como entregues numa carga de baixa (sem veículo), e dá para desfazer excluindo essa carga.</p>
+      <div class="grid-form"><label>Dar baixa nas notas emitidas até<input type="date" id="bi-ate" value="${addDias(today(), -1)}"></label></div>
+      <p class="small muted" id="bi-info"></p>`, foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="bi-ok">Dar baixa</button>' });
+    const alvo = () => PEND.filter(s => !PROP?.cargas.some(c => c.stops.includes(s))).flatMap(s => s.notas).filter(n => n.emissao <= $('#bi-ate', md.el).value);
+    const info = () => { const a = alvo(); $('#bi-info', md.el).textContent = `${a.length} nota(s) · ${kg(a.reduce((t, n) => t + n.kg, 0))} kg no período carregado (${dateBR(ui.de)} a ${dateBR(ui.ate)}). Para notas mais antigas, aumente o período antes.`; };
+    $('#bi-ate', md.el).onchange = info; info();
+    $('#bi-ok', md.el).onclick = async (ev) => {
+      const a = alvo(); if (!a.length) return toast('Nenhuma nota até essa data', true);
+      ev.target.disabled = true;
+      try {
+        const [c] = await q(sb.from('log_cargas').insert({ empresa_id: state.empresa.id, data: today(), status: 'concluida', peso_kg: a.reduce((t, n) => t + n.kg, 0), observacao: `Baixa inicial — entregas anteriores ao uso da plataforma (notas até ${dateBR($('#bi-ate', md.el).value)})` }).select());
+        for (let i = 0; i < a.length; i += 200) await q(sb.from('log_carga_notas').insert(a.slice(i, i + 200).map((n, k) => ({ empresa_id: state.empresa.id, carga_id: c.id, nota_id: n.id, seq: i + k + 1, peso_kg: n.kg, volume_m3: n.m3, situacao: 'entregue' }))));
+        md.close(); toast(`${a.length} nota(s) baixadas`); PROP = null; await recarregar(root);
+      } catch (err) { fail(err); ev.target.disabled = false; }
+    };
   });
   $('#lg-desc', corpo) && ($('#lg-desc', corpo).onclick = () => { PROP = null; recarregar(root); });
   $('#lg-salvar', corpo) && ($('#lg-salvar', corpo).onclick = async (ev) => {

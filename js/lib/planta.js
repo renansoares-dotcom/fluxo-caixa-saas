@@ -92,6 +92,7 @@ export async function carregarSituacao(C) {
     const [veiculos, ativas, doDiaC] = await Promise.all([q(sb.from('log_veiculos').select('*').eq('empresa_id', e).order('codigo')),
       q(sb.from('log_cargas').select('*').eq('empresa_id', e).in('status', ['carregando', 'pronta', 'em_rota'])),
       q(sb.from('log_cargas').select('*').eq('empresa_id', e).eq('data', hoje).neq('status', 'cancelada'))]);
+    doDiaC.splice(0, doDiaC.length, ...doDiaC.filter(c => c.veiculo_id));
     const cargas = [...ativas, ...doDiaC.filter(c => !ativas.some(a => a.id === c.id))];
     const peso = { em_rota: 4, carregando: 3, pronta: 3, planejada: 2, concluida: 1 };
     const porVeiculo = {}; for (const c of cargas) { if (!c.veiculo_id) continue; const at = porVeiculo[c.veiculo_id]; if (!at || (peso[c.status] || 0) > (peso[at.status] || 0)) porVeiculo[c.veiculo_id] = c; }
