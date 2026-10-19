@@ -298,7 +298,7 @@ function pintar() {
       <div class="kpi"><div class="k-label">Pagos sem conta no mês</div><div class="k-value ${D.semConta.length ? 'neg' : ''}">${D.semConta.length}</div><div class="k-sub">${D.semConta.length ? `${money0(D.semConta.reduce((s, l) => s + +l.valor, 0))} fora do saldo das contas` : 'nenhum'}</div></div>
     </div>
     <div class="card flush">
-      <div class="cf-head noprint"><div class="cf-leg">${['ok', 'erro', 'alerta', 'semext'].map(s => `<span><i class="cf-c ${s}">${ICONE[s]}</i>${DESC[s]}</span>`).join('')}<span><i class="cf-c ok conf">✔</i>conferido</span><span title="Visto dado num dia que tinha aviso ou diferença, com a explicação na observação"><i class="cf-c alerta conf">✔</i>conferido com ressalva</span><span><i class="cf-c ok trav">✔</i>travado</span></div>
+      <div class="cf-head noprint"><div class="cf-leg">${['ok', 'erro', 'alerta', 'semext'].map(s => `<span><i class="cf-c ${s}">${ICONE[s]}</i>${DESC[s]}</span>`).join('')}<span><i class="cf-c ok conf">✔</i>conferido</span><span title="Visto dado num dia que tinha aviso ou diferença, com a explicação na observação"><i class="cf-c ok conf just">✔</i>conferido com justificativa</span><span><i class="cf-c ok trav">✔</i>travado</span></div>
         ${podeEditar() && D.vistosOk && prontos.length ? `<button class="btn small primary" id="cflote">Dar visto nos ${prontos.length} dia(s) que batem</button>` : ''}</div>
       <div class="table-wrap cf-wrap"><table class="cf-grid"><thead><tr><th class="cf-conta">Conta</th>
         ${D.dias.map(d => { const w = new Date(d + 'T12:00:00').getDay(); return `<th class="${w === 0 || w === 6 ? 'fds' : ''}">${+d.slice(8)}<div>${SEM[w].charAt(0).toUpperCase()}</div></th>`; }).join('')}
@@ -326,7 +326,7 @@ function celula(x, ri, di) {
   const w = new Date(x.d + 'T12:00:00').getDay(), fds = w === 0 || w === 6;
   if (x.st === 'vazio') return `<td class="cf-td ${fds ? 'fds' : ''}" data-r="${ri}" data-d="${di}" tabindex="-1"><i class="cf-c vazio"></i></td>`;
   const ressalva = x.v?.situacao === 'ressalva' || (x.v && (x.st === 'erro' || x.st === 'alerta'));
-  const k = x.conferido ? (ressalva ? 'alerta conf' : `ok ${x.v ? 'conf' : 'trav'}`) : x.st;
+  const k = x.conferido ? `ok ${x.v ? 'conf' : 'trav'}${ressalva ? ' just' : ''}` : x.st;   // ressalva com visto = justificada (verde)
   const pd = x.probs.find(p => p.t === 'dif'), pn = x.probs.find(p => p.t === 'neg'), ps = x.probs.find(p => p.t === 'saldo');
   const txt = x.conferido ? '✔' : x.st === 'erro' ? (pn ? kfmt(x.fim) : pd ? kfmt(x.ent + x.sai - x.extMov) : ps ? (x.arrasta ? '…' : kfmt(x.difSaldo)) : '✕') : ICONE[x.st];
   const tip = [`${x.ct.nome} · ${SEM[w]} ${dateBR(x.d)}`, `${x.dl.length} lançamento(s): entradas ${money(x.ent)} · saídas ${money(x.sai)} · saldo ${money(x.fim)}`,
@@ -399,10 +399,10 @@ function pintarDia() {
       ${x.banco != null || x.v?.saldo_informado != null ? `<div class="kpi"><div class="k-label">Saldo no banco</div><div class="k-value">${money(x.banco ?? +x.v.saldo_informado)}</div><div class="k-sub">${x.banco != null ? 'pelo extrato importado' : 'informado no visto'} · diferença <strong class="${Math.abs(x.difSaldo || 0) > TOL ? 'neg' : 'pos'}">${money(x.difSaldo || 0)}</strong></div></div>` : ''}
       ${x.temExt ? `<div class="kpi"><div class="k-label">Extrato do dia</div><div class="k-value">${money(x.extMov)}</div><div class="k-sub">diferença <strong class="${Math.abs(mov - x.extMov) > TOL ? 'neg' : 'pos'}">${money(mov - x.extMov)}</strong></div></div>` : ''}
     </div>
-    <div class="cf-sit">${x.probs.map(p => `<div class="cf-msg erro">✕ ${esc(p.msg)}</div>`).join('')}
-      ${x.naoConc.length ? `<div class="cf-msg alerta">! ${x.naoConc.length} lançamento(s) sem conciliação com o extrato (${money(x.naoConc.reduce((s, l) => s + l.sinal, 0))}).</div>` : ''}
-      ${(x.datas || []).map(t => `<div class="cf-msg alerta">! ${esc(t)}</div>`).join('')}
-      ${x.al.length ? `<div class="cf-msg alerta">! ${x.al.length} aviso(s) nos lançamentos abaixo (marcados em amarelo).</div>` : ''}
+    <div class="cf-sit">${x.probs.map(p => `<div class="cf-msg ${v ? 'ok' : 'erro'}">${v ? '✔' : '✕'} ${esc(p.msg)}</div>`).join('')}
+      ${x.naoConc.length ? `<div class="cf-msg ${v ? 'ok' : 'alerta'}">${v ? '✔' : '!'} ${x.naoConc.length} lançamento(s) sem conciliação com o extrato (${money(x.naoConc.reduce((s, l) => s + l.sinal, 0))}).</div>` : ''}
+      ${(x.datas || []).map(t => `<div class="cf-msg ${v ? 'ok' : 'alerta'}">${v ? '✔' : '!'} ${esc(t)}</div>`).join('')}
+      ${x.al.length ? `<div class="cf-msg ${v ? 'ok' : 'alerta'}">${v ? '✔' : '!'} ${x.al.length} aviso(s) nos lançamentos abaixo (marcados em amarelo).</div>` : ''}
       ${!x.probs.length && !x.al.length && !x.naoConc.length && !(x.datas || []).length ? `<div class="cf-msg ok">${x.temExt ? '✓ Movimento igual ao extrato e tudo conciliado.' : 'Falta extrato: importe o extrato (OFX ou relatório do ERP) ou confira com o extrato do banco / a contagem do caixa e informe o saldo real abaixo.'}</div>` : ''}
       ${v ? `<div class="cf-msg conf">✔ Visto de ${esc(v.conferido_email || 'usuário')} em ${new Date(v.conferido_em).toLocaleString('pt-BR')}${v.saldo_informado != null ? ` · saldo informado ${money(v.saldo_informado)}` : ''}${v.observacao ? ` · “${esc(v.observacao)}”` : ''}</div>` : x.travado ? `<div class="cf-msg conf">🔒 Conta travada até ${dateBR(D.linhas[M.r].trava?.ate)}: data, valor, conta e situação destes lançamentos não mudam mais.</div>` : ''}
     </div>
