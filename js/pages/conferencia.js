@@ -38,7 +38,7 @@ export async function render(root) {
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
       <div><h2 style="margin:0">Conferência do dia</h2>
-        <p class="muted small" style="margin:4px 0 0">Cada quadradinho é uma conta num dia. Verde = bate; vermelho = diferença; amarelo = algo para olhar; cinza = sem extrato, confira à mão. Clique para abrir o dia, conferir e dar o visto.</p></div>
+        <p class="muted small" style="margin:4px 0 0">Cada quadradinho é uma conta num dia. Verde = saldo e movimento batem com o extrato; vermelho = diverge (mostra a diferença; “…” = diferença que vem de um dia anterior); amarelo = algo para olhar; amarelo tracejado = falta extrato. Clique para abrir o dia, conferir e dar o visto.</p></div>
       <div class="toolbar noprint" style="margin:0" id="cflt">
         <label>Mês<input type="month" name="mes" value="${ui.mes}"></label>
         <label class="chk"><input type="checkbox" name="soProb" ${ui.soProb ? 'checked' : ''}> só com problema</label>
@@ -101,10 +101,23 @@ async function montar(mes) {
       .eq('empresa_id', e).eq('status', 'Pago').not('conta_id', 'is', null).gte('data', iniW).lte('data', fimW).order('data').order('id')),
     fetchAll(() => sb.from('lancamentos').select('id,data,valor').eq('empresa_id', e).eq('status', 'Pago').is('conta_id', null).gte('data', ini).lte('data', fim).order('id')),
     fetchAll(() => sb.from('extrato_itens').select('id,conta_id,data,valor,status,descricao,documento').eq('empresa_id', e).gte('data', ini).lte('data', fim).order('data').order('id')),
-    q(sb.from('extrato_importacoes').select('conta_id,dt_inicio,dt_fim').eq('empresa_id', e)),
+    q(sb.from('extrato_importacoes').select('conta_id,dt_inicio,dt_fim,saldo_final,saldo_data,created_at').eq('empresa_id', e)),
     q(sb.from('contas_travas').select('conta_id,ate,saldo_banco').eq('empresa_id', e).eq('ativo', true)).catch(() => []),
     q(sb.from('conferencias_dia').select('*').eq('empresa_id', e).gte('data', ini).lte('data', fim)).catch(() => null), // null = tabela ainda não instalada
   ]);
+  // saldo do banco no fim de cada dia: parte do saldo final de uma importação (OFX: LEDGERBAL; ERP: saldo no fim do
+  // período) e desconta o movimento do extrato depois do dia. Âncora = importação que cobre o dia, com saldo, mais próxima depois dele.
+  // Bradesco às vezes manda o saldo zerado (LEDGERBAL vazio): havendo outra importação da mesma conta e data com saldo, vale a mais recente com saldo.
+  const porAnc = new Map();
+  for (const i of (imps || []).filter(i => i.saldo_final != null && i.saldo_data && i.dt_inicio && i.saldo_data >= ini && i.dt_inicio <= fim)) {
+    const k = `${i.conta_id}|${i.saldo_data}`, o = porAnc.get(k);
+    const melhor = !o || (Math.abs(+o.saldo_final) < 0.005 && Math.abs(+i.saldo_final) >= 0.005) || ((Math.abs(+i.saldo_final) >= 0.005) === (Math.abs(+o.saldo_final) >= 0.005) && i.created_at > o.created_at);
+    if (melhor) porAnc.set(k, { ...i, dt_inicio: o && o.dt_inicio < i.dt_inicio ? o.dt_inicio : i.dt_inicio });
+    else if (i.dt_inicio < o.dt_inicio) o.dt_inicio = i.dt_inicio;
+  }
+  const ancoras = [...porAnc.values()];
+  const fimAnc = ancoras.reduce((m, i) => (i.saldo_data > m ? i.saldo_data : m), fim);
+  const extDepois = fimAnc > fim ? await fetchAll(() => sb.from('extrato_itens').select('id,conta_id,data,valor').eq('empresa_id', e).gt('data', fim).lte('data', fimAnc).order('data').order('id')) : [];
   // transferência única vira duas pontas (origem e destino); daqui em diante tudo é por ponta
   const lancs = pontas(lancsRaw);
   // conciliações dos itens do extrato do mês e notas ligadas aos lançamentos do mês
@@ -175,13 +188,22 @@ async function montar(mes) {
   for (const l of lMes) { if (!porConta.has(l.conta_id)) porConta.set(l.conta_id, []); porConta.get(l.conta_id).push(l); }
   const extConta = new Map();
   for (const x of ext) { if (!extConta.has(x.conta_id)) extConta.set(x.conta_id, []); extConta.get(x.conta_id).push(x); }
+  // movimento do extrato por conta e dia (todas as linhas, inclusive ignoradas: o banco as tem no saldo)
+  const movExt = new Map();
+  for (const x of [...ext, ...extDepois]) { const k = `${x.conta_id}|${x.data}`; movExt.set(k, (movExt.get(k) || 0) + +x.valor); }
+  const saldoBanco = (cid, d) => {
+    const a = ancoras.filter(i => i.conta_id === cid && i.dt_inicio <= d && d <= i.saldo_data).sort((p, q2) => p.saldo_data.localeCompare(q2.saldo_data))[0];
+    if (!a) return null;
+    let s = +a.saldo_final; for (let k = addDias(d, 1); k <= a.saldo_data; k = addDias(k, 1)) s -= movExt.get(`${cid}|${k}`) || 0;
+    return Math.round(s * 100) / 100;
+  };
   const ativas = cad.contas.filter(ct => ct.ativo !== false);
   const linhas = [];
   for (const ct of ativas) {
     const ls = porConta.get(ct.id) || [], xs = extConta.get(ct.id) || [];
     const s0 = saldoAnt.get(ct.id) ?? +ct.saldo_inicial ?? 0;
     const semNeg = SEM_NEGATIVO.test(ct.tipo || ''), trava = trv.get(ct.id) || null;
-    let saldo = s0; const cel = [];
+    let saldo = s0; const cel = []; let difAnt = 0, difDesde = null;
     for (const d of dias) {
       const dl = ls.filter(l => l.data === d), dx = xs.filter(x => x.data === d);
       const ent = dl.reduce((s, l) => s + Math.max(0, sinal(l)), 0), sai = dl.reduce((s, l) => s + Math.min(0, sinal(l)), 0);
@@ -198,6 +220,21 @@ async function montar(mes) {
       if (semNeg && saldo < -TOL) probs.push({ t: 'neg', msg: `Caixa em espécie terminou o dia NEGATIVO (${money(saldo)}): falta lançar entrada (saque/suprimento) ou há saída a mais.` });
       if (temExt && Math.abs((ent + sai) - extMov) > TOL) probs.push({ t: 'dif', msg: `Movimento do sistema (${money(ent + sai)}) diferente do extrato (${money(extMov)}): diferença ${money(ent + sai - extMov)}.` });
       if (pend.length) probs.push({ t: 'pend', msg: `${pend.length} linha(s) do extrato sem lançamento conciliado (${money(pend.reduce((s, x) => s + +x.valor, 0))}).` });
+      // saldo do sistema × saldo do banco no fim do dia (extrato importado ou saldo informado no visto)
+      const banco = temExt ? saldoBanco(ct.id, d) : null;
+      const ref = banco ?? (v?.saldo_informado != null ? +v.saldo_informado : null);
+      let difSaldo = null, arrasta = false;
+      if (ref != null) {
+        difSaldo = Math.round((saldo - ref) * 100) / 100;
+        if (Math.abs(difSaldo) > TOL) {
+          arrasta = Math.abs(difSaldo - difAnt) <= TOL && difDesde;
+          if (!arrasta) difDesde = d;
+          if (banco != null && (ativo || !arrasta)) probs.push({ t: 'saldo', msg: arrasta
+            ? `Saldo do sistema ${money(saldo)} × banco ${money(banco)}: diferença de ${money(difSaldo)} que vem de ${dateBR(difDesde)} (o dia em si bate).`
+            : `Saldo do sistema ${money(saldo)} × banco ${money(banco)}: diferença de ${money(difSaldo)} começa neste dia.` });
+        } else difDesde = null;
+        difAnt = Math.abs(difSaldo) > TOL ? difSaldo : 0;
+      }
       if (v?.saldo_informado != null && Math.abs(+v.saldo_informado - saldo) > TOL) probs.push({ t: 'inf', msg: `Saldo informado no visto (${money(v.saldo_informado)}) diferente do sistema (${money(saldo)}).` });
       let st;
       if (!ativo && !probs.length) st = 'vazio';
@@ -206,7 +243,7 @@ async function montar(mes) {
       else if (temExt) st = 'ok';
       else st = 'semext';
       const conferido = !!v || (travado && (st === 'ok' || st === 'semext'));
-      cel.push({ d, ct, dl, dx, ent, sai, ini: ini_, fim: saldo, temExt, extMov, pend, naoConc, al, probs, st, v, travado, conferido });
+      cel.push({ d, ct, dl, dx, ent, sai, ini: ini_, fim: saldo, temExt, extMov, pend, naoConc, al, probs, st, v, travado, conferido, banco, difSaldo, arrasta });
     }
     const usada = ls.length || xs.length || Math.abs(s0) > TOL || Math.abs(saldo) > TOL;
     linhas.push({ ct, cel, s0, sFim: saldo, trava, usada });
@@ -219,13 +256,14 @@ async function montar(mes) {
 // Mapa do mês
 // ---------------------------------------------------------------------------------------------
 const ICONE = { erro: '✕', alerta: '!', ok: '✓', semext: '?', vazio: '' };
-const DESC = { erro: 'diferença / pendência', alerta: 'algo para olhar', ok: 'bate', semext: 'sem extrato: conferir à mão', vazio: 'sem movimento' };
+const DESC = { erro: 'diverge (saldo ou movimento)', alerta: 'algo para olhar', ok: 'bate com o extrato', semext: 'falta extrato', vazio: 'sem movimento' };
 
 function pintar() {
   const c = $('#ccorpo', rootEl); if (!c || !D) return;
   const linhas = D.linhas.filter(r => ui.todas || r.usada).filter(r => !ui.soProb || r.cel.some(x => x.st === 'erro' || x.st === 'alerta'));
   const cels = D.linhas.flatMap(r => r.cel).filter(x => x.st !== 'vazio');
   const conf = cels.filter(x => x.conferido).length, erro = cels.filter(x => x.st === 'erro' && !x.v).length, alerta = cels.filter(x => x.st === 'alerta' && !x.v).length;
+  const falta = cels.filter(x => x.st === 'semext' && !x.conferido).length;
   const prontos = cels.filter(x => x.st === 'ok' && !x.conferido);
   const pct = cels.length ? Math.round(conf / cels.length * 100) : 100;
   c.innerHTML = `
@@ -233,7 +271,8 @@ function pintar() {
     <div class="kpis">
       <div class="kpi"><div class="k-label">Conferência de ${esc(nomeMes(D.mes))}</div><div class="k-value ${pct === 100 ? 'pos' : ''}">${pct}%</div>
         <div class="k-sub">${conf} de ${cels.length} dias-conta conferidos</div><div class="cf-prog"><span style="width:${pct}%"></span></div></div>
-      <div class="kpi"><div class="k-label">Com diferença</div><div class="k-value ${erro ? 'neg' : ''}">${erro}</div><div class="k-sub">extrato não bate ou caixa negativo</div></div>
+      <div class="kpi"><div class="k-label">Divergem</div><div class="k-value ${erro ? 'neg' : ''}">${erro}</div><div class="k-sub">saldo ou movimento ≠ extrato, ou caixa negativo</div></div>
+      <div class="kpi"><div class="k-label">Falta extrato</div><div class="k-value ${falta ? 'warn' : ''}">${falta}</div><div class="k-sub">dias com movimento sem extrato nem saldo informado</div></div>
       <div class="kpi"><div class="k-label">Para olhar</div><div class="k-value ${alerta ? 'warn' : ''}">${alerta}</div><div class="k-sub">duplicidade, classificação, transferência</div></div>
       <div class="kpi"><div class="k-label">Pagos sem conta no mês</div><div class="k-value ${D.semConta.length ? 'neg' : ''}">${D.semConta.length}</div><div class="k-sub">${D.semConta.length ? `${money0(D.semConta.reduce((s, l) => s + +l.valor, 0))} fora do saldo das contas` : 'nenhum'}</div></div>
     </div>
@@ -247,7 +286,7 @@ function pintar() {
         ${r.cel.map((x, di) => celula(x, ri, di)).join('')}
         <td class="num ${(SEM_NEGATIVO.test(r.ct.tipo || '') && r.sFim < -TOL) ? 'neg' : cls(r.sFim)}">${money(r.sFim)}</td></tr>`).join('') || `<tr><td colspan="${D.dias.length + 2}" class="muted">${ui.soProb ? 'Nenhuma conta com problema no mês. 🎉' : 'Nenhuma conta com movimento no mês.'}</td></tr>`}
       </tbody></table></div>
-      <p class="small muted" style="padding:0 12px 10px">Bate = movimento do dia no sistema igual ao extrato importado, sem linha pendente (contas com OFX). Contas sem extrato (inclusive FIDC e escrow) ficam cinza até você conferir e dar o visto, de preferência informando o saldo real do dia. Dias até a data da trava já contam como conferidos quando batem. Saldo não é regra para nenhuma conta, exceto o caixa em espécie (tipo Caixa), que fica vermelho em todo dia em que terminar negativo.</p>
+      <p class="small muted" style="padding:0 12px 10px">Bate = movimento do dia e saldo no fim do dia iguais aos do extrato importado (OFX do banco ou relatório do ERP), sem linha pendente. O saldo do banco vem do saldo final do extrato importado, descontado o movimento dos dias seguintes. Diverge = o saldo ou o movimento não batem: o primeiro dia mostra a diferença e os seguintes, “…”, enquanto a mesma diferença continuar. Falta extrato = dia com movimento sem extrato importado: importe o extrato ou dê o visto informando o saldo real do dia. Caixa em espécie (tipo Caixa) também fica vermelho em todo dia em que terminar negativo.</p>
     </div>
     <p class="muted small">Conferido em ${new Date().toLocaleString('pt-BR')} · ${esc(state.empresa.nome || '')}</p>`;
   // abre o dia: clique ou Enter no quadradinho
@@ -267,9 +306,10 @@ function celula(x, ri, di) {
   if (x.st === 'vazio') return `<td class="cf-td ${fds ? 'fds' : ''}" data-r="${ri}" data-d="${di}" tabindex="-1"><i class="cf-c vazio"></i></td>`;
   const ressalva = x.v?.situacao === 'ressalva' || (x.v && (x.st === 'erro' || x.st === 'alerta'));
   const k = x.conferido ? (ressalva ? 'alerta conf' : `ok ${x.v ? 'conf' : 'trav'}`) : x.st;
-  const txt = x.conferido ? '✔' : x.st === 'erro' ? (x.probs.find(p => p.t === 'dif' || p.t === 'neg') ? kfmt(x.probs.find(p => p.t === 'neg') ? x.fim : (x.ent + x.sai - x.extMov)) : '✕') : ICONE[x.st];
+  const pd = x.probs.find(p => p.t === 'dif'), pn = x.probs.find(p => p.t === 'neg'), ps = x.probs.find(p => p.t === 'saldo');
+  const txt = x.conferido ? '✔' : x.st === 'erro' ? (pn ? kfmt(x.fim) : pd ? kfmt(x.ent + x.sai - x.extMov) : ps ? (x.arrasta ? '…' : kfmt(x.difSaldo)) : '✕') : ICONE[x.st];
   const tip = [`${x.ct.nome} · ${SEM[w]} ${dateBR(x.d)}`, `${x.dl.length} lançamento(s): entradas ${money(x.ent)} · saídas ${money(x.sai)} · saldo ${money(x.fim)}`,
-    x.temExt ? `extrato: ${x.dx.length} linha(s), movimento ${money(x.extMov)}` : 'sem extrato importado',
+    x.temExt ? `extrato: ${x.dx.length} linha(s), movimento ${money(x.extMov)}${x.banco != null ? ` · saldo no banco ${money(x.banco)}` : ''}` : 'falta extrato (importe o OFX/relatório do ERP ou informe o saldo real no visto)',
     ...x.probs.map(p => '✕ ' + p.msg), ...[...new Set(x.al.map(a => '! ' + a.msg))].slice(0, 3), x.naoConc.length ? `! ${x.naoConc.length} lançamento(s) não conciliados com o extrato` : '',
     x.v ? `✔ visto de ${x.v.conferido_email || 'usuário'} em ${new Date(x.v.conferido_em).toLocaleString('pt-BR')}` : x.travado ? '🔒 conta travada até ' + dateBR(x.ct && D.linhas.find(r => r.ct.id === x.ct.id)?.trava?.ate) : ''].filter(Boolean).join('\n');
   return `<td class="cf-td ${fds ? 'fds' : ''}" data-r="${ri}" data-d="${di}" tabindex="0" title="${esc(tip)}"><i class="cf-c ${k}">${txt}</i></td>`;
@@ -335,12 +375,13 @@ function pintarDia() {
       <div class="kpi"><div class="k-label">Entradas</div><div class="k-value pos">${money(x.ent)}</div></div>
       <div class="kpi"><div class="k-label">Saídas</div><div class="k-value neg">${money(x.sai)}</div></div>
       <div class="kpi"><div class="k-label">Saldo final (sistema)</div><div class="k-value ${SEM_NEGATIVO.test(ct.tipo || '') && x.fim < -TOL ? 'neg' : ''}">${money(x.fim)}</div>${SEM_NEGATIVO.test(ct.tipo || '') ? '<div class="k-sub">caixa em espécie: não pode ficar negativo</div>' : ''}</div>
+      ${x.banco != null || x.v?.saldo_informado != null ? `<div class="kpi"><div class="k-label">Saldo no banco</div><div class="k-value">${money(x.banco ?? +x.v.saldo_informado)}</div><div class="k-sub">${x.banco != null ? 'pelo extrato importado' : 'informado no visto'} · diferença <strong class="${Math.abs(x.difSaldo || 0) > TOL ? 'neg' : 'pos'}">${money(x.difSaldo || 0)}</strong></div></div>` : ''}
       ${x.temExt ? `<div class="kpi"><div class="k-label">Extrato do dia</div><div class="k-value">${money(x.extMov)}</div><div class="k-sub">diferença <strong class="${Math.abs(mov - x.extMov) > TOL ? 'neg' : 'pos'}">${money(mov - x.extMov)}</strong></div></div>` : ''}
     </div>
     <div class="cf-sit">${x.probs.map(p => `<div class="cf-msg erro">✕ ${esc(p.msg)}</div>`).join('')}
       ${x.naoConc.length ? `<div class="cf-msg alerta">! ${x.naoConc.length} lançamento(s) sem conciliação com o extrato (${money(x.naoConc.reduce((s, l) => s + l.sinal, 0))}).</div>` : ''}
       ${x.al.length ? `<div class="cf-msg alerta">! ${x.al.length} aviso(s) nos lançamentos abaixo (marcados em amarelo).</div>` : ''}
-      ${!x.probs.length && !x.al.length && !x.naoConc.length ? `<div class="cf-msg ok">${x.temExt ? '✓ Movimento igual ao extrato e tudo conciliado.' : 'Conta sem extrato importado: confira com o extrato do banco (ou a contagem do caixa) e informe o saldo real abaixo.'}</div>` : ''}
+      ${!x.probs.length && !x.al.length && !x.naoConc.length ? `<div class="cf-msg ok">${x.temExt ? '✓ Movimento igual ao extrato e tudo conciliado.' : 'Falta extrato: importe o extrato (OFX ou relatório do ERP) ou confira com o extrato do banco / a contagem do caixa e informe o saldo real abaixo.'}</div>` : ''}
       ${v ? `<div class="cf-msg conf">✔ Visto de ${esc(v.conferido_email || 'usuário')} em ${new Date(v.conferido_em).toLocaleString('pt-BR')}${v.saldo_informado != null ? ` · saldo informado ${money(v.saldo_informado)}` : ''}${v.observacao ? ` · “${esc(v.observacao)}”` : ''}</div>` : x.travado ? `<div class="cf-msg conf">🔒 Conta travada até ${dateBR(D.linhas[M.r].trava?.ate)}: data, valor, conta e situação destes lançamentos não mudam mais.</div>` : ''}
     </div>
     <div class="conc-grid">
@@ -354,7 +395,7 @@ function pintarDia() {
       <div class="cf-nav"><button class="btn small" data-p="0,-1" title="Dia anterior (←)">‹ dia</button><button class="btn small" data-p="0,1" title="Próximo dia (→)">dia ›</button>
         <button class="btn small" data-p="-1,0" title="Conta de cima (↑)">↑ conta</button><button class="btn small" data-p="1,0" title="Conta de baixo (↓)">↓ conta</button></div>
       ${podeEditar() && D.vistosOk ? `<div class="cf-visto">
-        ${semExt ? `<label>Saldo real do dia<input id="cfsal" inputmode="decimal" placeholder="${money(x.fim)}" value="${v?.saldo_informado != null ? money(v.saldo_informado) : ''}"></label>` : ''}
+        ${semExt ? `<label>Saldo real do dia *<input id="cfsal" inputmode="decimal" placeholder="${money(x.fim)}" value="${v?.saldo_informado != null ? money(v.saldo_informado) : ''}"></label>` : ''}
         <label class="grow">Observação${x.probs.length || x.al.length || x.naoConc.length ? ' (obrigatória: explique a ressalva)' : ''}<input id="cfobs" value="${esc(v?.observacao || '')}" placeholder="${x.probs.length || x.al.length ? 'ex.: duplicidade verificada, são dois pedidos' : 'opcional'}"></label>
         ${v ? '<button class="btn small ghost" id="cfdes">Desfazer visto</button>' : ''}
         <button class="btn primary" id="cfvis">${v ? 'Atualizar visto' : 'Dia conferido ✔'}</button></div>`
@@ -398,6 +439,7 @@ async function darVisto(x) {
   const problema = x.probs.length || x.al.length || x.naoConc.length;
   if (problema && !obs) { toast('Este dia tem pendência: explique na observação antes de dar o visto (ou corrija primeiro).', true); $('#cfobs', M.el)?.focus(); return; }
   const tSal = $('#cfsal', M.el)?.value.trim();
+  if (!x.temExt && !tSal) { toast('Dia sem extrato: informe o saldo real do dia (extrato do banco ou contagem do caixa) para dar o visto.', true); $('#cfsal', M.el)?.focus(); return; }
   const sal = tSal ? parseNum(tSal) : null;
   if (tSal && (sal == null || isNaN(sal))) return toast('Saldo informado inválido', true);
   if (sal != null && Math.abs(sal - x.fim) > TOL && !confirm(`O saldo informado (${money(sal)}) é diferente do sistema (${money(x.fim)}): diferença de ${money(sal - x.fim)}.\n\nO ideal é lançar o que falta antes. Registrar o visto com essa diferença (fica vermelho até corrigir)?`)) return;
