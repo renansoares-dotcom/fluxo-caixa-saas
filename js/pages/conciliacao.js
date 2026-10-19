@@ -6,6 +6,7 @@ import { $, esc, money, cls, dateBR, options, fail, toast, modal } from '../lib/
 import { abrirLancamento } from '../lib/lanc-form.js';
 import { lerOFX, decodificarOFX } from '../lib/ofx.js';
 import { lerRelatorioERP } from '../lib/erp-extrato.js';
+import { lerVExpenses } from '../lib/vexpenses.js';
 import { normTxt } from '../lib/nf-titulos.js';
 
 export const title = 'Conciliação bancária';
@@ -40,7 +41,7 @@ export async function render(root) {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" id="hist">Importações</button>
-        ${podeEditar() ? '<button class="btn" id="aceitar" disabled>Aceitar sugestões</button><button class="btn" id="imperp" title="Relatório RFLX036 (Extrato de Contas por Data Efetivação) exportado do ERP em XLSX ou CSV">Importar relatório do ERP</button><button class="btn primary" id="imp">Importar extrato OFX</button>' : ''}
+        ${podeEditar() ? '<button class="btn" id="aceitar" disabled>Aceitar sugestões</button><button class="btn" id="imperp" title="Relatório RFLX036 do ERP (XLSX ou CSV) ou Extrato de Pagamentos da VExpenses (PDF)">Importar relatório (ERP / VExpenses)</button><button class="btn primary" id="imp">Importar extrato OFX</button>' : ''}
       </div></div></div>
     <div class="kpis" id="kpis"></div>
     <div class="conc-grid">
@@ -146,9 +147,28 @@ function grupoDoDia(pend, sug, usados) {
     const ls = D.lancs.filter(l => !usados.has(l.id) && l.data === d && Math.sign(sinal(l)) === sg);
     if (!its.length || !ls.length || (its.length === 1 && ls.length === 1)) continue;
     if (cent(its.reduce((s, i) => s + +i.valor, 0)) !== cent(ls.reduce((s, l) => s + sinal(l), 0))) continue;
-    const erp = its.every(i => String(i.fitid || '').startsWith('erp:'));
+    const erp = its.every(i => /^(erp|vx):/.test(String(i.fitid || ''))); // relatórios (ERP/VExpenses): soma exata basta
     const g = { tipo: 'grupo', itens: its.map(i => i.id), ids: ls.map(l => l.id), conferir: !erp && its.length > 1 };
     for (const i of its) sug[i.id] = g; ls.forEach(l => usados.add(l.id));
+  }
+  // VExpenses: o sistema costuma lançar a soma dos gastos do dia de cada colaborador numa linha só
+  // ("DESPESAS COM VIAGENS JEFFERSON" = três compras no cartão dele). Agrupa por pessoa e dia.
+  const semAc = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  const porPessoa = {};
+  for (const i of pend) {
+    if (sug[i.id] || !String(i.fitid || '').startsWith('vx:')) continue;
+    const nome = semAc(String(i.descricao || '').split(' — ').pop()).trim(); if (!nome) continue;
+    (porPessoa[`${i.data}|${Math.sign(i.valor)}|${nome}`] ||= []).push(i);
+  }
+  for (const [k, its] of Object.entries(porPessoa)) {
+    if (its.length < 2) continue;
+    const [d, sg, nome] = k.split('|'); const tot = cent(its.reduce((s, i) => s + +i.valor, 0));
+    const cands = D.lancs.filter(l => !usados.has(l.id) && l.data === d && Math.sign(sinal(l)) === +sg && cent(sinal(l)) === tot);
+    if (!cands.length) continue;
+    const prim = nome.split(/\s+/)[0];
+    const l = cands.find(c => semAc(c.descricao).includes(prim)) || (cands.length === 1 ? cands[0] : null); if (!l) continue;
+    const g = { tipo: 'grupo', itens: its.map(i => i.id), ids: [l.id], conferir: false };
+    for (const i of its) sug[i.id] = g; usados.add(l.id);
   }
 }
 
@@ -575,22 +595,23 @@ function contaDoERP(banco) {
 
 function importarERP(root) {
   let lidos = [];
-  const m = modal({ title: 'Importar relatório do ERP', wide: true,
+  const m = modal({ title: 'Importar relatório (ERP / VExpenses)', wide: true,
     body: `<p class="small muted" style="margin-top:0">No ERP, gere o <strong>RFLX036 — Extrato de Contas por Quebra por Data Efetivação</strong> da conta (um ou mais meses) e exporte em <strong>XLSX</strong> (ou CSV).
+      Para a <strong>VExpenses</strong>, use o PDF do <strong>Extrato de Pagamentos</strong>: entram os gastos e estornos dos cartões; cargas e devoluções entre a carteira da empresa e os cartões são internas e ficam só no resumo.
       Pode selecionar vários arquivos. Importar de novo o mesmo período não duplica: só entram as linhas novas. Depois, o sistema sugere a conciliação com os lançamentos; nada é conciliado sem a sua confirmação.</p>
-      <input type="file" id="arq" accept=".xlsx,.xls,.ods,.csv" multiple><div id="res" style="margin-top:12px"></div>`,
+      <input type="file" id="arq" accept=".xlsx,.xls,.ods,.csv,.pdf" multiple><div id="res" style="margin-top:12px"></div>`,
     foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="ok" disabled>Importar</button>' });
   $('#arq', m.el).onchange = async (e) => {
     lidos = []; const erros = [];
     for (const f of e.target.files) {
-      try { const st = lerRelatorioERP(await f.arrayBuffer(), f.name); lidos.push({ arquivo: f.name, ...st, contaId: contaDoERP(st.banco)?.id || (e.target.files.length === 1 ? ui.conta : '') }); }
+      try { const st = /\.pdf$/i.test(f.name) ? await lerVExpenses(await f.arrayBuffer(), f.name) : lerRelatorioERP(await f.arrayBuffer(), f.name); lidos.push({ arquivo: f.name, ...st, contaId: contaDoERP(st.banco)?.id || (e.target.files.length === 1 ? ui.conta : '') }); }
       catch (err) { erros.push(`${f.name}: ${err.message || err}`); }
     }
     // linhas que já estão no sistema por importações anteriores do ERP e não vieram no arquivo novo (o relatório mudou)
     for (const s of lidos) s.sumiram = [];
     try {
       for (const s of lidos) if (s.contaId && s.inicio && s.fim) {
-        const ex = await fetchAll(() => sb.from('extrato_itens').select('id,fitid,data,valor,descricao,status').eq('empresa_id', state.empresa.id).eq('conta_id', s.contaId).gte('data', s.inicio).lte('data', s.fim).like('fitid', 'erp:%').order('id'));
+        const ex = await fetchAll(() => sb.from('extrato_itens').select('id,fitid,data,valor,descricao,status').eq('empresa_id', state.empresa.id).eq('conta_id', s.contaId).gte('data', s.inicio).lte('data', s.fim).like('fitid', s.origem === 'vexpenses' ? 'vx:%' : 'erp:%').order('id'));
         const novos = new Set(s.itens.map(i => i.fitid)); s.sumiram = ex.filter(x => !novos.has(x.fitid));
       }
     } catch { /* só aviso */ }
@@ -598,8 +619,8 @@ function importarERP(root) {
     $('#res', m.el).innerHTML = (erros.length ? `<div class="cf-msg neg small">${erros.map(esc).join('<br>')}</div>` : '') + (lidos.length ? `<div class="table-wrap"><table><thead><tr><th>Arquivo</th><th>Banco no ERP</th><th>Período</th><th class="num">Linhas</th><th class="num">Créditos</th><th class="num">Débitos</th><th>Total geral</th><th class="num">Saldo final</th><th>Conta no sistema</th></tr></thead><tbody>
       ${lidos.map((s, k) => `<tr data-k="${k}"><td class="small wrap">${esc(s.arquivo)}</td><td class="small">${esc(s.banco || '—')}</td><td class="small">${dateBR(s.inicio)} a ${dateBR(s.fim)}</td><td class="num">${s.itens.length}</td>
         <td class="num pos">${money(s.totalCred)}</td><td class="num neg">${money(-s.totalDeb)}</td>
-        <td class="small">${s.totalGeral ? (s.confere ? '<span class="badge pago">confere</span>' : `<span class="badge vencido" title="Relatório: ${money(s.totalGeral.cred)} / ${money(s.totalGeral.deb)}">não confere</span>`) : '—'}</td>
-        <td class="num">${money(s.saldo)}<div class="small muted">${dateBR(s.saldoData)}</div></td>
+        <td class="small">${s.origem === 'vexpenses' ? `<span class="small muted" title="Internas (carteira ↔ cartões), não entram no extrato">cargas ${money(s.resumo.cargas.v)} · devoluções ${money(s.resumo.devolucoes.v)}</span>` : s.totalGeral ? (s.confere ? '<span class="badge pago">confere</span>' : `<span class="badge vencido" title="Relatório: ${money(s.totalGeral.cred)} / ${money(s.totalGeral.deb)}">não confere</span>`) : '—'}</td>
+        <td class="num">${s.saldo == null ? `<span class="small muted" title="Movimento dos cartões no período (cargas − devoluções − gastos)">cartões ${money(s.movCartoes)}</span>` : `${money(s.saldo)}<div class="small muted">${dateBR(s.saldoData)}</div>`}</td>
         <td><select data-conta>${options(cs, { empty: 'Selecione…', selected: s.contaId })}</select></td></tr>`).join('')}</tbody></table></div>
       ${lidos.some(s => s.sumiram.length) ? `<div class="small" style="margin-top:8px">${lidos.filter(s => s.sumiram.length).map(s => `<strong>${esc(s.arquivo)}</strong>: ${s.sumiram.length} linha(s) importada(s) antes não estão mais no relatório (${s.sumiram.filter(x => x.status !== 'conciliado').length} pendente(s)).`).join('<br>')}</div>
         <label style="flex-direction:row;align-items:center;gap:6px;margin-top:4px"><input type="checkbox" id="limpar" checked> Remover do extrato as linhas que saíram do relatório (só as não conciliadas)</label>` : ''}` : (erros.length ? '' : '<div class="empty">Nenhum relatório lido.</div>'));
@@ -614,7 +635,7 @@ function importarERP(root) {
       for (const s of lidos) {
         atual = s.arquivo;
         if (limpar) { const ids = s.sumiram.filter(x => x.status !== 'conciliado').map(x => x.id); for (let i = 0; i < ids.length; i += 200) await q(sb.from('extrato_itens').delete().in('id', ids.slice(i, i + 200))); removidos += ids.length; }
-        const imp = await q(sb.from('extrato_importacoes').insert({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: `ERP ${s.banco || ''}`.trim(), agencia: null, conta_ofx: null,
+        const imp = await q(sb.from('extrato_importacoes').insert({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: s.origem === 'vexpenses' ? 'VEXPENSES (Extrato de Pagamentos)' : `ERP ${s.banco || ''}`.trim(), agencia: null, conta_ofx: null,
           dt_inicio: s.inicio, dt_fim: s.fim, saldo_final: s.saldo, saldo_data: s.saldoData || s.fim, qtd: s.itens.length }).select().single());
         const n = await gravarItens(s, imp.id);
         await q(sb.from('extrato_importacoes').update({ novos: n }).eq('id', imp.id));
