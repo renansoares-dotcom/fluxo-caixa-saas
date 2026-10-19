@@ -101,15 +101,18 @@ async function montar(mes) {
       .eq('empresa_id', e).eq('status', 'Pago').not('conta_id', 'is', null).gte('data', iniW).lte('data', fimW).order('data').order('id')),
     fetchAll(() => sb.from('lancamentos').select('id,data,valor').eq('empresa_id', e).eq('status', 'Pago').is('conta_id', null).gte('data', ini).lte('data', fim).order('id')),
     fetchAll(() => sb.from('extrato_itens').select('id,conta_id,data,valor,status,descricao,documento').eq('empresa_id', e).gte('data', ini).lte('data', fim).order('data').order('id')),
-    q(sb.from('extrato_importacoes').select('conta_id,dt_inicio,dt_fim,saldo_final,saldo_data,created_at').eq('empresa_id', e)),
+    q(sb.from('extrato_importacoes').select('conta_id,dt_inicio,dt_fim,saldo_final,saldo_data,created_at,banco').eq('empresa_id', e)),
     q(sb.from('contas_travas').select('conta_id,ate,saldo_banco').eq('empresa_id', e).eq('ativo', true)).catch(() => []),
     q(sb.from('conferencias_dia').select('*').eq('empresa_id', e).gte('data', ini).lte('data', fim)).catch(() => null), // null = tabela ainda não instalada
   ]);
   // saldo do banco no fim de cada dia: parte do saldo final de uma importação (OFX: LEDGERBAL; ERP: saldo no fim do
   // período) e desconta o movimento do extrato depois do dia. Âncora = importação que cobre o dia, com saldo, mais próxima depois dele.
-  // Bradesco às vezes manda o saldo zerado (LEDGERBAL vazio): havendo outra importação da mesma conta e data com saldo, vale a mais recente com saldo.
+  // O saldo do OFX do Bradesco (237) não serve de referência: vem zerado ou com valor que não é o saldo da conta
+  // (diferença constante desde o 1º dia do arquivo). Nessa conta vale só a comparação do movimento do dia.
+  // Havendo outra importação da mesma conta e data com saldo, vale a mais recente com saldo.
+  const SALDO_OFX_NAO_CONFIAVEL = /^0*237$/;
   const porAnc = new Map();
-  for (const i of (imps || []).filter(i => i.saldo_final != null && i.saldo_data && i.dt_inicio && i.saldo_data >= ini && i.dt_inicio <= fim)) {
+  for (const i of (imps || []).filter(i => i.saldo_final != null && i.saldo_data && i.dt_inicio && i.saldo_data >= ini && i.dt_inicio <= fim && !SALDO_OFX_NAO_CONFIAVEL.test(String(i.banco || '').trim()))) {
     const k = `${i.conta_id}|${i.saldo_data}`, o = porAnc.get(k);
     const melhor = !o || (Math.abs(+o.saldo_final) < 0.005 && Math.abs(+i.saldo_final) >= 0.005) || ((Math.abs(+i.saldo_final) >= 0.005) === (Math.abs(+o.saldo_final) >= 0.005) && i.created_at > o.created_at);
     if (melhor) porAnc.set(k, { ...i, dt_inicio: o && o.dt_inicio < i.dt_inicio ? o.dt_inicio : i.dt_inicio });
