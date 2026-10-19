@@ -612,7 +612,11 @@ function importarERP(root) {
     try {
       for (const s of lidos) if (s.contaId && s.inicio && s.fim) {
         const ex = await fetchAll(() => sb.from('extrato_itens').select('id,fitid,data,valor,descricao,status').eq('empresa_id', state.empresa.id).eq('conta_id', s.contaId).gte('data', s.inicio).lte('data', s.fim).like('fitid', s.origem === 'vexpenses' ? 'vx:%' : 'erp:%').order('id'));
-        const novos = new Set(s.itens.map(i => i.fitid)); s.sumiram = ex.filter(x => !novos.has(x.fitid));
+        const novos = new Set(s.itens.map(i => i.fitid));
+        // VExpenses: o relatório dos cartões (gastos) e o da empresa (depósitos) são arquivos diferentes do mesmo período;
+        // um nunca "apaga" as linhas do outro
+        const ehDep = (f) => /\|deposito#/.test(f || ''), temDep = s.itens.some(i => ehDep(i.fitid)), temGasto = s.itens.some(i => !ehDep(i.fitid));
+        s.sumiram = ex.filter(x => !novos.has(x.fitid) && (s.origem !== 'vexpenses' || (ehDep(x.fitid) ? temDep : temGasto)));
       }
     } catch { /* só aviso */ }
     const cs = state.cad.contas.filter(c => c.ativo !== false);
