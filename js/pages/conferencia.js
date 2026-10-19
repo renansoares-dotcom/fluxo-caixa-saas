@@ -133,6 +133,8 @@ async function montar(mes) {
   const ck = (id, conta) => `${id}|${conta}`;   // a mesma transferência é conciliada uma vez em cada conta
   const concL = new Map(); for (const k of conc) concL.set(ck(k.lancamento_id, k.conta_id), k.extrato_id);
   const concX = new Map(); for (const k of conc) { if (!concX.has(k.extrato_id)) concX.set(k.extrato_id, []); concX.get(k.extrato_id).push(k.lancamento_id); }
+  const lancPorPonta = new Map(lancs.map(l => [ck(l.id, l.conta_id), l]));
+  const extById = new Map([...ext, ...extDepois].map(x => [x.id, x]));
   const notaL = new Map(); for (const v of vinc) if (v.n) notaL.set(v.lancamento_id, v.n);
   const sinal = (l) => l.sinal;
 
@@ -221,7 +223,23 @@ async function montar(mes) {
       const ativo = dl.length || dx.length;
       const probs = [];
       if (semNeg && saldo < -TOL) probs.push({ t: 'neg', msg: `Caixa em espécie terminou o dia NEGATIVO (${money(saldo)}): falta lançar entrada (saque/suprimento) ou há saída a mais.` });
-      if (temExt && Math.abs((ent + sai) - extMov) > TOL) probs.push({ t: 'dif', msg: `Movimento do sistema (${money(ent + sai)}) diferente do extrato (${money(extMov)}): diferença ${money(ent + sai - extMov)}.` });
+      // diferença de data: item do extrato conciliado com lançamento de outro dia (ex.: PIX de sábado que o banco lança na segunda)
+      const datas = [];
+      let desloc = 0;
+      for (const x of dx) {
+        if (x.status !== 'conciliado') continue;
+        const outros = (concX.get(x.id) || []).map(id => lancPorPonta.get(ck(id, ct.id))).filter(l => l && l.data !== d);
+        if (outros.length && outros.length === (concX.get(x.id) || []).length) { desloc -= +x.valor; datas.push(`Extrato de ${money(x.valor)} conciliado com lançamento de ${[...new Set(outros.map(l => dateBR(l.data)))].join(', ')}.`); }
+      }
+      for (const l of dl) {
+        const x = extById.get(concL.get(ck(l.id, l.conta_id)));
+        if (x && x.data !== d) { desloc += sinal(l); datas.push(`Lançamento de ${money(sinal(l))} conciliado com o extrato de ${dateBR(x.data)}.`); }
+      }
+      const difMov = (ent + sai) - extMov;
+      if (temExt && Math.abs(difMov) > TOL) {
+        if (Math.abs(difMov - desloc) <= TOL) datas.unshift(`Diferença de ${money(difMov)} só de data (conciliado em outro dia).`);
+        else probs.push({ t: 'dif', msg: `Movimento do sistema (${money(ent + sai)}) diferente do extrato (${money(extMov)}): diferença ${money(difMov)}.` });
+      } else if (Math.abs(desloc) <= TOL) datas.length = 0;
       if (pend.length) probs.push({ t: 'pend', msg: `${pend.length} linha(s) do extrato sem lançamento conciliado (${money(pend.reduce((s, x) => s + +x.valor, 0))}).` });
       // saldo do sistema × saldo do banco no fim do dia (extrato importado ou saldo informado no visto)
       const banco = temExt ? saldoBanco(ct.id, d) : null;
@@ -242,11 +260,11 @@ async function montar(mes) {
       let st;
       if (!ativo && !probs.length) st = 'vazio';
       else if (probs.length) st = 'erro';
-      else if (al.length || naoConc.length) st = 'alerta';
+      else if (al.length || naoConc.length || datas.length) st = 'alerta';
       else if (temExt) st = 'ok';
       else st = 'semext';
       const conferido = !!v || (travado && (st === 'ok' || st === 'semext'));
-      cel.push({ d, ct, dl, dx, ent, sai, ini: ini_, fim: saldo, temExt, extMov, pend, naoConc, al, probs, st, v, travado, conferido, banco, difSaldo, arrasta });
+      cel.push({ d, ct, dl, dx, ent, sai, ini: ini_, fim: saldo, temExt, extMov, pend, naoConc, al, datas, probs, st, v, travado, conferido, banco, difSaldo, arrasta });
     }
     const usada = ls.length || xs.length || Math.abs(s0) > TOL || Math.abs(saldo) > TOL;
     linhas.push({ ct, cel, s0, sFim: saldo, trava, usada });
@@ -313,7 +331,7 @@ function celula(x, ri, di) {
   const txt = x.conferido ? '✔' : x.st === 'erro' ? (pn ? kfmt(x.fim) : pd ? kfmt(x.ent + x.sai - x.extMov) : ps ? (x.arrasta ? '…' : kfmt(x.difSaldo)) : '✕') : ICONE[x.st];
   const tip = [`${x.ct.nome} · ${SEM[w]} ${dateBR(x.d)}`, `${x.dl.length} lançamento(s): entradas ${money(x.ent)} · saídas ${money(x.sai)} · saldo ${money(x.fim)}`,
     x.temExt ? `extrato: ${x.dx.length} linha(s), movimento ${money(x.extMov)}${x.banco != null ? ` · saldo no banco ${money(x.banco)}` : ''}` : 'falta extrato (importe o OFX/relatório do ERP ou informe o saldo real no visto)',
-    ...x.probs.map(p => '✕ ' + p.msg), ...[...new Set(x.al.map(a => '! ' + a.msg))].slice(0, 3), x.naoConc.length ? `! ${x.naoConc.length} lançamento(s) não conciliados com o extrato` : '',
+    ...x.probs.map(p => '✕ ' + p.msg), ...(x.datas || []).slice(0, 2).map(t => '! ' + t), ...[...new Set(x.al.map(a => '! ' + a.msg))].slice(0, 3), x.naoConc.length ? `! ${x.naoConc.length} lançamento(s) não conciliados com o extrato` : '',
     x.v ? `✔ visto de ${x.v.conferido_email || 'usuário'} em ${new Date(x.v.conferido_em).toLocaleString('pt-BR')}` : x.travado ? '🔒 conta travada até ' + dateBR(x.ct && D.linhas.find(r => r.ct.id === x.ct.id)?.trava?.ate) : ''].filter(Boolean).join('\n');
   return `<td class="cf-td ${fds ? 'fds' : ''}" data-r="${ri}" data-d="${di}" tabindex="0" title="${esc(tip)}"><i class="cf-c ${k}">${txt}</i></td>`;
 }
@@ -383,8 +401,9 @@ function pintarDia() {
     </div>
     <div class="cf-sit">${x.probs.map(p => `<div class="cf-msg erro">✕ ${esc(p.msg)}</div>`).join('')}
       ${x.naoConc.length ? `<div class="cf-msg alerta">! ${x.naoConc.length} lançamento(s) sem conciliação com o extrato (${money(x.naoConc.reduce((s, l) => s + l.sinal, 0))}).</div>` : ''}
+      ${(x.datas || []).map(t => `<div class="cf-msg alerta">! ${esc(t)}</div>`).join('')}
       ${x.al.length ? `<div class="cf-msg alerta">! ${x.al.length} aviso(s) nos lançamentos abaixo (marcados em amarelo).</div>` : ''}
-      ${!x.probs.length && !x.al.length && !x.naoConc.length ? `<div class="cf-msg ok">${x.temExt ? '✓ Movimento igual ao extrato e tudo conciliado.' : 'Falta extrato: importe o extrato (OFX ou relatório do ERP) ou confira com o extrato do banco / a contagem do caixa e informe o saldo real abaixo.'}</div>` : ''}
+      ${!x.probs.length && !x.al.length && !x.naoConc.length && !(x.datas || []).length ? `<div class="cf-msg ok">${x.temExt ? '✓ Movimento igual ao extrato e tudo conciliado.' : 'Falta extrato: importe o extrato (OFX ou relatório do ERP) ou confira com o extrato do banco / a contagem do caixa e informe o saldo real abaixo.'}</div>` : ''}
       ${v ? `<div class="cf-msg conf">✔ Visto de ${esc(v.conferido_email || 'usuário')} em ${new Date(v.conferido_em).toLocaleString('pt-BR')}${v.saldo_informado != null ? ` · saldo informado ${money(v.saldo_informado)}` : ''}${v.observacao ? ` · “${esc(v.observacao)}”` : ''}</div>` : x.travado ? `<div class="cf-msg conf">🔒 Conta travada até ${dateBR(D.linhas[M.r].trava?.ate)}: data, valor, conta e situação destes lançamentos não mudam mais.</div>` : ''}
     </div>
     <div class="conc-grid">
@@ -439,7 +458,7 @@ async function recarregarMantendo() {
 
 async function darVisto(x) {
   const obs = $('#cfobs', M.el)?.value.trim() || '';
-  const problema = x.probs.length || x.al.length || x.naoConc.length;
+  const problema = x.probs.length || x.al.length || x.naoConc.length || (x.datas || []).length;
   if (problema && !obs) { toast('Este dia tem pendência: explique na observação antes de dar o visto (ou corrija primeiro).', true); $('#cfobs', M.el)?.focus(); return; }
   const tSal = $('#cfsal', M.el)?.value.trim();
   if (!x.temExt && !tSal) { toast('Dia sem extrato: informe o saldo real do dia (extrato do banco ou contagem do caixa) para dar o visto.', true); $('#cfsal', M.el)?.focus(); return; }
