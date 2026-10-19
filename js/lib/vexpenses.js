@@ -33,7 +33,7 @@ export async function linhasPdf(buf, pdfjs) {
       const y = Math.round(it.transform[5]); let k = [...porY.keys()].find(v => Math.abs(v - y) <= 2); if (k == null) { k = y; porY.set(k, []); }
       porY.get(k).push({ x: it.transform[4], str: it.str });
     }
-    for (const y of [...porY.keys()].sort((a, b) => b - a)) out.push(porY.get(y).sort((a, b) => a.x - b.x));
+    for (const y of [...porY.keys()].sort((a, b) => b - a)) { const l = porY.get(y).sort((a, b) => a.x - b.x); l.y = y; l.pg = p; out.push(l); }
   }
   return out;
 }
@@ -46,31 +46,26 @@ export function interpretarVExpenses(linhas) {
   const cab = linhas.find(l => l.some(p => /^data$/i.test(p.str.trim())) && l.some(p => /^valor$/i.test(p.str.trim())));
   const xs = {}; if (cab) for (const p of cab) { const n = norm(p.str); if (n === 'nome') xs.nome = p.x; if (n.startsWith('descricao')) xs.desc = p.x; if (n === 'valor') xs.valor = p.x; if (n.startsWith('numero')) xs.cartao = p.x; if (n === 'grupo') xs.grupo = p.x; }
   const rows = [];
-  // pedaços de uma coluna nas linhas vizinhas (o relatório quebra nome e valor em até três linhas)
-  const naColuna = (l, x0, x1) => (l || []).filter(p => p.x >= x0 - 2 && p.x < x1 - 2 && !/^\d{2}\/\d{2}\/\d{4}$/.test(p.str.trim()));
-  for (let li = 0; li < linhas.length; li++) {
-    const l = linhas[li];
-    const m = l[0]?.str.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if (!m) continue;
-    let vi = l.findIndex(p => /BRL/.test(p.str)); let vs;
-    if (vi >= 0) { vs = l[vi].str.replace(/.*BRL/, '').trim(); if (!vs && l[vi + 1]) vs = l[vi + 1].str.trim(); }
-    else if (xs.valor != null) { // valor em cima/embaixo da linha da data ("BRL" numa linha, número na outra)
-      const viz = [linhas[li - 1], linhas[li + 1]].filter(v => v && !/^\d{2}\/\d{2}\/\d{4}$/.test(v[0]?.str.trim()));
-      vs = viz.flatMap(v => naColuna(v, xs.valor, xs.grupo ?? 1e9)).map(p => p.str.trim()).join(' ').replace(/.*BRL/, '').trim();
-    }
-    const v = parseFloat(String(vs || '').replace(/\./g, '').replace(',', '.')); if (!isFinite(v)) continue;
-    const meio = l.slice(1, vi >= 0 ? vi : undefined).filter(p => p.str.trim() !== '-' && (xs.valor == null || p.x < xs.valor - 2));
-    let nome, desc;
-    if (xs.desc != null) { nome = meio.filter(p => p.x < xs.desc - 2).map(p => p.str.trim()).join(' '); desc = meio.filter(p => p.x >= xs.desc - 2).map(p => p.str.trim()).join(' '); }
-    else { nome = meio[0]?.str.trim() || ''; desc = meio.slice(1).map(p => p.str.trim()).join(' '); }
-    if (!nome && xs.nome != null && xs.desc != null) { // nome quebrado nas linhas vizinhas
-      const viz = [linhas[li - 1], linhas[li + 1]].filter(v => v && !/^\d{2}\/\d{2}\/\d{4}$/.test(v[0]?.str.trim()));
-      nome = viz.flatMap(v => naColuna(v, xs.nome, xs.desc)).map(p => p.str.trim()).join(' ');
-    }
-    if (!desc && xs.desc != null) { // descrição quebrada nas linhas vizinhas
-      const viz = [linhas[li - 1], linhas[li + 1]].filter(v => v && !/^\d{2}\/\d{2}\/\d{4}$/.test(v[0]?.str.trim()));
-      desc = viz.flatMap(v => naColuna(v, xs.desc, xs.valor ?? 1e9)).map(p => p.str.trim()).join(' ');
-    }
-    rows.push({ data: `${m[3]}-${m[2]}-${m[1]}`, nome: nome.replace(/\s+/g, ' ').trim(), desc: desc.replace(/\s+/g, ' ').trim(), valor: r2(v) });
+  // Cada registro ocupa até três linhas no PDF (nome, descrição e valor quebram: "BRL -" numa linha e "1.000,00" na
+  // outra). Cada linha solta vai para a linha com data mais próxima na vertical, na mesma página.
+  const ehData = (l) => /^\d{2}\/\d{2}\/\d{4}$/.test(l[0]?.str.trim() || '');
+  const ehCab = (l) => l.some(p => /extrato de pagamentos|^data$|^cart[aã]o$|^n[uú]mero do$|^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/i.test(p.str.trim()));
+  const regs = linhas.map((l, i) => ehData(l) ? { i, l, extra: [] } : null).filter(Boolean);
+  linhas.forEach((l, i) => {
+    if (ehData(l) || ehCab(l)) return;
+    let best = null, dist = Infinity;
+    for (const r of regs) { if (r.l.pg !== l.pg) continue; const d = Math.abs(r.l.y - l.y); if (d < dist) { dist = d; best = r; } }
+    if (best && dist <= 14) best.extra.push(l);
+  });
+  const xV = xs.valor ?? 1e9, xG = xs.grupo ?? 1e9, xD = xs.desc ?? xV, xN = xs.nome ?? xD;
+  for (const r of regs) {
+    const pcs = [r.l, ...r.extra].sort((a, b) => b.y - a.y).flatMap(l => l.map(p => ({ ...p, y: l.y })));
+    const col = (x0, x1) => pcs.filter(p => p.x >= x0 - 8 && p.x < x1 - 2 && !/^\d{2}\/\d{2}\/\d{4}$/.test(p.str.trim())).map(p => p.str.trim()).join(' ').replace(/\s+/g, ' ').trim();
+    const m = r.l[0].str.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const vs = col(xV, xG).replace(/.*BRL/, '').replace(/\s+/g, '');
+    const v = parseFloat(vs.replace(/\./g, '').replace(',', '.')); if (!isFinite(v)) continue;
+    const nome = col(xN, xD).replace(/^-$/, ''), desc = col(xD, xV).replace(/^-$/, '');
+    rows.push({ data: `${m[3]}-${m[2]}-${m[1]}`, nome, desc, valor: r2(v) });
   }
   if (!rows.length) throw new Error('Nenhuma linha de pagamento encontrada no PDF.');
   // "Transf. Deposito": recarga da carteira da empresa (vem do banco) · "Movimentação do Dia": resumo das distribuições, ignorado
@@ -92,11 +87,13 @@ export function interpretarVExpenses(linhas) {
   }
   // movimento da carteira da empresa por dia, visto pelos cartões: −cargas + devoluções
   const carteiraDia = {};
+  // "Movimentação do Dia" (relatório da empresa) = saldo da carteira no fim do dia
+  const saldoCarteiraDia = {}; for (const r of rows) if (tipo(r) === 'movdia') saldoCarteiraDia[r.data] = r.valor;
   for (const r of rows) { const t = tipo(r); if (t === 'carga' || t === 'devolucao') carteiraDia[r.data] = r2((carteiraDia[r.data] || 0) - r.valor); }
   const datas = rows.map(r => r.data).sort();
   const saldoCartoes = r2(rows.filter(r => !['deposito', 'movdia'].includes(tipo(r))).reduce((s, r) => s + r.valor, 0));
   return { origem: 'vexpenses', banco: 'VEXPENSES', agencia: null, conta: null, inicio: datas[0], fim: datas[datas.length - 1], saldo: null, saldoData: datas[datas.length - 1],
-    linhas: rows.length, resumo: res, carteiraDia, porPessoa, movCartoes: res.gastos.n || res.cargas.n ? saldoCartoes : null, totalCred: r2(itens.filter(i => i.valor > 0).reduce((s, i) => s + i.valor, 0)), totalDeb: r2(-itens.filter(i => i.valor < 0).reduce((s, i) => s + i.valor, 0)),
+    linhas: rows.length, resumo: res, carteiraDia, saldoCarteiraDia, porPessoa, movCartoes: res.gastos.n || res.cargas.n ? saldoCartoes : null, totalCred: r2(itens.filter(i => i.valor > 0).reduce((s, i) => s + i.valor, 0)), totalDeb: r2(-itens.filter(i => i.valor < 0).reduce((s, i) => s + i.valor, 0)),
     confere: true, itens };
 }
 
