@@ -1,9 +1,11 @@
-// Conciliação bancária: importa o extrato OFX, sugere os vínculos com os lançamentos e registra a conciliação.
+// Conciliação bancária: importa o extrato (OFX do banco ou relatório RFLX036 do ERP), sugere os vínculos com os
+// lançamentos e registra a conciliação.
 // Extrato à esquerda, lançamentos do sistema à direita (mesmo padrão das propostas de borderô).
 import { sb, state, q, fetchAll, podeEditar, daConta } from '../lib/data.js';
 import { $, esc, money, cls, dateBR, options, fail, toast, modal } from '../lib/ui.js';
 import { abrirLancamento } from '../lib/lanc-form.js';
 import { lerOFX, decodificarOFX } from '../lib/ofx.js';
+import { lerRelatorioERP } from '../lib/erp-extrato.js';
 import { normTxt } from '../lib/nf-titulos.js';
 
 export const title = 'Conciliação bancária';
@@ -38,7 +40,7 @@ export async function render(root) {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" id="hist">Importações</button>
-        ${podeEditar() ? '<button class="btn" id="aceitar" disabled>Aceitar sugestões</button><button class="btn primary" id="imp">Importar extrato OFX</button>' : ''}
+        ${podeEditar() ? '<button class="btn" id="aceitar" disabled>Aceitar sugestões</button><button class="btn" id="imperp" title="Relatório RFLX036 (Extrato de Contas por Data Efetivação) exportado do ERP em XLSX ou CSV">Importar relatório do ERP</button><button class="btn primary" id="imp">Importar extrato OFX</button>' : ''}
       </div></div></div>
     <div class="kpis" id="kpis"></div>
     <div class="conc-grid">
@@ -47,6 +49,7 @@ export async function render(root) {
     </div>`;
   $('#flt', root).addEventListener('change', (e) => { ui[e.target.name] = e.target.value; ui.sels.clear(); ui.marcados.clear(); ui.manual = false; carregar(root); });
   $('#imp', root) && ($('#imp', root).onclick = () => importar(root));
+  $('#imperp', root) && ($('#imperp', root).onclick = () => importarERP(root));
   $('#hist', root).onclick = () => historico(root);
   $('#aceitar', root) && ($('#aceitar', root).onclick = () => aceitarTodas(root));
   await carregar(root);
@@ -100,7 +103,13 @@ const afinidade = (i, l) => { const t = textoLanc(l); return palavras(i.descrica
 function sugerir() {
   const sug = {}; const usados = new Set(D.lancLig);
   const pend = D.itens.filter(i => i.status === 'pendente');
-  const docOk = (i, l) => { const d = dig(l.documento).replace(/^0+/, ''); return d.length >= 3 && (dig(i.documento).replace(/^0+/, '') === d || dig(i.descricao).includes(d)); };
+  const docOk = (i, l) => {
+    const d = dig(l.documento).replace(/^0+/, '');
+    if (d.length >= 3 && (dig(i.documento).replace(/^0+/, '') === d || dig(i.descricao).includes(d))) return true;
+    // número do documento do extrato citado no lançamento (ex.: ERP "1193" ↔ "Borderô/demonstrativo nº 1193")
+    const di = dig(i.documento).replace(/^0+/, '');
+    return di.length >= 3 && new RegExp(`(^|\\D)0*${di}(\\D|$)`).test(`${l.descricao || ''} ${l.documento || ''}`);
+  };
   const casar = (lista, maxDias, tipo) => {
     const pares = []; const cand = {};
     for (const i of pend) if (!sug[i.id]) for (const l of lista) {
@@ -115,6 +124,8 @@ function sugerir() {
       sug[p.i.id] = { tipo, ids: [p.l.id], conferir: outros && p.af === 0 }; usados.add(p.l.id);
     }
   };
+  casar(D.lancs, 0, 'exato');   // primeiro o mesmo dia
+  grupoDoDia(pend, sug, usados);
   casar(D.lancs, 3, 'exato');
   for (const i of pend) {
     if (sug[i.id]) continue;
@@ -123,6 +134,22 @@ function sugerir() {
   }
   casar(D.abertos, 7, 'baixa');
   return sug;
+}
+
+// Vários movimentos ↔ vários lançamentos no mesmo dia e mesmo sentido, quando as somas fecham no centavo.
+// Caso típico: relatório do ERP de FIDC, onde o fomento vem numa linha por operação e o sistema tem um lançamento
+// por título/parcela. Vale também para um movimento ↔ vários lançamentos.
+function grupoDoDia(pend, sug, usados) {
+  const dias = [...new Set(pend.filter(i => !sug[i.id]).map(i => i.data))];
+  for (const d of dias) for (const sg of [1, -1]) {
+    const its = pend.filter(i => !sug[i.id] && i.data === d && Math.sign(i.valor) === sg);
+    const ls = D.lancs.filter(l => !usados.has(l.id) && l.data === d && Math.sign(sinal(l)) === sg);
+    if (!its.length || !ls.length || (its.length === 1 && ls.length === 1)) continue;
+    if (cent(its.reduce((s, i) => s + +i.valor, 0)) !== cent(ls.reduce((s, l) => s + sinal(l), 0))) continue;
+    const erp = its.every(i => String(i.fitid || '').startsWith('erp:'));
+    const g = { tipo: 'grupo', itens: its.map(i => i.id), ids: ls.map(l => l.id), conferir: !erp && its.length > 1 };
+    for (const i of its) sug[i.id] = g; ls.forEach(l => usados.add(l.id));
+  }
 }
 
 const ROT_SUG = { exato: 'sugestão', grupo: 'sugestão (vários)', baixa: 'baixar título' };
@@ -157,11 +184,13 @@ function pintarExtrato(root) {
         <td class="wrap">${esc(i.descricao || i.tipo || '')}${i.documento ? `<div class="small muted">doc. ${esc(i.documento)}</div>` : ''}${i.status === 'ignorado' && i.observacao ? `<div class="small muted">${esc(i.observacao)}</div>` : ''}</td>
         <td class="num ${cls(i.valor)}">${money(i.valor)}</td>
         <td class="small">${i.status === 'conciliado' ? `<span class="badge pago">conciliado${i.grupo_id ? ' (grupo)' : ''}</span>` : i.status === 'ignorado' ? '<span class="badge">ignorado</span>' : s ? `<span class="badge ${s.conferir ? 'vencido' : 'aberto'}" title="${s.conferir ? 'Há outro lançamento de mesmo valor e o texto não confirma: confira antes' : ''}">${ROT_SUG[s.tipo]}${s.conferir ? ' · conferir' : ''}</span>` : ''}</td></tr>`; }).join('')}
-      </tbody></table>` : `<div class="empty">${D.itens.length ? 'Nada neste filtro.' : 'Nenhum movimento importado para esta conta neste mês. Use “Importar extrato OFX”.'}</div>`}</div>`;
+      </tbody></table>` : `<div class="empty">${D.itens.length ? 'Nada neste filtro.' : 'Nenhum movimento importado para esta conta neste mês. Use “Importar extrato OFX” ou “Importar relatório do ERP”.'}</div>`}</div>`;
   $('#fx', c).onclick = (e) => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { ui.filtro = f; pintarExtrato(root); } };
   const mudou = () => {
     const sel = [...ui.sels]; const um = sel.length === 1 ? sel[0] : null;
     if (!ui.manual || !ui.marcados.size) { ui.manual = false; ui.marcados = new Set(um ? D.sug[um]?.ids || [] : []); }
+    // sugestão de grupo com vários movimentos (ex.: fomentos do dia no relatório do ERP): seleciona o grupo inteiro
+    const sg = um && D.sug[um]; if (sg?.itens?.length > 1 && !ui.manual) { ui.sels = new Set(sg.itens); ui.marcados = new Set(sg.ids); }
     ui.busca = '';
     if (sel.length) { ui.lf.sinal = 'mesmo'; ui.lf.ordem = 'prox'; }
     if (um && D.sug[um]?.tipo === 'baixa') ui.abertos = true;
@@ -365,7 +394,7 @@ async function conciliar(grupos, root) {
 }
 
 // vários movimentos ↔ vários lançamentos: mesmo grupo_id; vínculos no primeiro movimento
-async function conciliarGrupo(itens, ids, root) {
+async function conciliarGrupo(itens, ids, root, semRecarregar = false) {
   const agora = new Date().toISOString(), uid = state.user?.id || null;
   const g = globalThis.crypto?.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => { const r = Math.random() * 16 | 0; return (ch === 'x' ? r : (r & 3 | 8)).toString(16); });
   const ord = [...itens].sort((a, b) => a.data.localeCompare(b.data)); const ult = ord[ord.length - 1].data;
@@ -374,13 +403,16 @@ async function conciliarGrupo(itens, ids, root) {
     if (abertos.length) await q(sb.from('lancamentos').update({ status: 'Pago', data: ult, conta_id: ui.conta }).in('id', abertos));
     await q(sb.from('conciliacoes').insert(ids.map(id => ({ empresa_id: state.empresa.id, conta_id: ui.conta, extrato_id: ord[0].id, lancamento_id: id, grupo_id: g }))));
     await q(sb.from('extrato_itens').update({ status: 'conciliado', conciliado_em: agora, conciliado_por: uid, grupo_id: g }).in('id', itens.map(i => i.id)));
+    if (semRecarregar) return;
     toast(`${itens.length} movimento(s) conciliado(s) com ${ids.length} lançamento(s)`);
     ui.sels.clear(); ui.marcados.clear(); ui.manual = false; await carregar(root);
   } catch (e) { fail(String(e.message || e).includes('duplicate') ? new Error('Algum lançamento já estava conciliado com outro movimento. Atualize a página.') : e); }
 }
 
 function aceitarTodas(root) {
-  const g = Object.entries(D.sug).map(([id, s]) => ({ item: D.itens.find(i => i.id === id), ids: s.ids, tipo: s.tipo, conferir: s.conferir })).filter(x => x.item);
+  const vistos = new Set();
+  const g = Object.entries(D.sug).filter(([, s]) => { if (vistos.has(s)) return false; vistos.add(s); return true; })
+    .map(([id, s]) => ({ item: D.itens.find(i => i.id === id), itens: s.itens ? s.itens.map(x => D.itens.find(i => i.id === x)).filter(Boolean) : null, ids: s.ids, tipo: s.tipo, conferir: s.conferir })).filter(x => x.item);
   const nb = g.filter(x => x.tipo === 'baixa').length, nc = g.filter(x => x.conferir).length;
   const m = modal({ title: 'Aceitar sugestões', body: `<p>Conciliar <strong>${g.length - nc}</strong> movimento(s) do extrato com os lançamentos sugeridos?</p>
     ${nc ? `<p class="small">${nc} sugestão(ões) marcadas <strong>conferir</strong> ficam de fora: há outro lançamento de mesmo valor e o histórico do banco não confirma qual é (ex.: saques e PIX de mesmo valor no mesmo dia). Confira uma a uma.</p><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="sc"> Incluir mesmo assim as ${nc} a conferir</label>` : ''}
@@ -388,7 +420,12 @@ function aceitarTodas(root) {
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Conciliar</button>' });
   $('#ok', m.el).onclick = () => {
     const baixas = $('#sb', m.el)?.checked !== false, conf = !!$('#sc', m.el)?.checked; m.close();
-    const sel = g.filter(x => (baixas || x.tipo !== 'baixa') && (conf || !x.conferir)); if (sel.length) conciliar(sel, root);
+    const sel = g.filter(x => (baixas || x.tipo !== 'baixa') && (conf || !x.conferir));
+    const multi = sel.filter(x => x.itens && x.itens.length > 1), simples = sel.filter(x => !(x.itens && x.itens.length > 1));
+    (async () => {
+      for (const x of multi) await conciliarGrupo(x.itens, x.ids, root, true);
+      if (simples.length) await conciliar(simples, root); else { ui.sels.clear(); await carregar(root); }
+    })();
   };
 }
 
@@ -481,23 +518,7 @@ function importar(root) {
         atual = s.arquivo;
         const imp = await q(sb.from('extrato_importacoes').insert({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: s.banco, agencia: s.agencia, conta_ofx: s.conta,
           dt_inicio: s.inicio, dt_fim: s.fim, saldo_final: s.saldo, saldo_data: s.saldoData || s.fim, qtd: s.itens.length }).select().single());
-        let n = 0;
-        // Bancos (ex.: Bradesco) mudam o FITID a cada exportação: um movimento que já está no sistema com outro FITID
-        // (mesma data, valor, documento e descrição) não entra de novo. Conta por ocorrência, para não perder dois
-        // movimentos iguais legítimos no mesmo dia.
-        const chave = (x) => `${x.data}|${(+x.valor).toFixed(2)}|${(x.documento || '').trim()}|${(x.descricao || '').trim().toUpperCase()}`;
-        const jaTem = new Map(), fitids = new Set();
-        if (s.itens.length) {
-          const ds = s.itens.map(x => x.data).sort();
-          const ex = await fetchAll(() => sb.from('extrato_itens').select('id,data,valor,documento,descricao,fitid').eq('empresa_id', e).eq('conta_id', s.contaId).gte('data', ds[0]).lte('data', ds[ds.length - 1]).order('id'));
-          for (const x of ex) { fitids.add(x.fitid); jaTem.set(chave(x), (jaTem.get(chave(x)) || 0) + 1); }
-        }
-        const itens = s.itens.filter(x => { if (fitids.has(x.fitid)) return false; const k = chave(x), c = jaTem.get(k) || 0; if (c > 0) { jaTem.set(k, c - 1); return false; } return true; });
-        for (let i = 0; i < itens.length; i += 500) {
-          const rows = itens.slice(i, i + 500).map(x => ({ ...x, empresa_id: e, conta_id: s.contaId, importacao_id: imp.id }));
-          const ins = await q(sb.from('extrato_itens').upsert(rows, { onConflict: 'empresa_id,conta_id,fitid', ignoreDuplicates: true }).select('id'));
-          n += ins?.length || 0;
-        }
+        const n = await gravarItens(s, imp.id);
         await q(sb.from('extrato_importacoes').update({ novos: n }).eq('id', imp.id));
         novos += n; total += s.itens.length;
         const ct = state.cad.contaById[s.contaId];
@@ -506,6 +527,101 @@ function importar(root) {
       toast(`${novos} movimento(s) novo(s) de ${total} lido(s)${total - novos ? ` · ${total - novos} já existiam` : ''}`);
       const ult = lidos[lidos.length - 1]; ui.conta = ult.contaId;
       // abre no mês com mais movimentos (o Bradesco acrescenta os lançamentos dos últimos dias ao extrato do período)
+      const pm = {}; for (const i of ult.itens) pm[i.data.slice(0, 7)] = (pm[i.data.slice(0, 7)] || 0) + 1;
+      const mm = Object.entries(pm).sort((a, b) => b[1] - a[1])[0]?.[0]; if (mm) ui.mes = mm;
+      ui.sels.clear(); ui.filtro = 'pendente'; m.close(); render(root);
+    } catch (err) { fail(new Error(`Falha ao importar ${atual}: ${err.message || err}`)); btn.disabled = false; }
+  };
+}
+
+// grava os movimentos de um extrato lido (OFX ou ERP) sem duplicar os que já estão no sistema; devolve quantos entraram
+async function gravarItens(s, impId) {
+  const e = state.empresa.id;
+  let n = 0;
+  // Bancos (ex.: Bradesco) mudam o FITID a cada exportação: um movimento que já está no sistema com outro FITID
+  // (mesma data, valor, documento e descrição) não entra de novo. Conta por ocorrência, para não perder dois
+  // movimentos iguais legítimos no mesmo dia.
+  const chave = (x) => `${x.data}|${(+x.valor).toFixed(2)}|${(x.documento || '').trim()}|${(x.descricao || '').trim().toUpperCase()}`;
+  const jaTem = new Map(), fitids = new Set();
+  if (s.itens.length) {
+    const ds = s.itens.map(x => x.data).sort();
+    const ex = await fetchAll(() => sb.from('extrato_itens').select('id,data,valor,documento,descricao,fitid').eq('empresa_id', e).eq('conta_id', s.contaId).gte('data', ds[0]).lte('data', ds[ds.length - 1]).order('id'));
+    for (const x of ex) { fitids.add(x.fitid); jaTem.set(chave(x), (jaTem.get(chave(x)) || 0) + 1); }
+  }
+  const itens = s.itens.filter(x => { if (fitids.has(x.fitid)) return false; const k = chave(x), c = jaTem.get(k) || 0; if (c > 0) { jaTem.set(k, c - 1); return false; } return true; });
+  for (let i = 0; i < itens.length; i += 500) {
+    const rows = itens.slice(i, i + 500).map(x => ({ ...x, empresa_id: e, conta_id: s.contaId, importacao_id: impId }));
+    const ins = await q(sb.from('extrato_itens').upsert(rows, { onConflict: 'empresa_id,conta_id,fitid', ignoreDuplicates: true }).select('id'));
+    n += ins?.length || 0;
+  }
+  return n;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Importação do relatório do ERP (RFLX036 — Extrato de Contas por Quebra por Data Efetivação, em XLSX/CSV)
+// ---------------------------------------------------------------------------------------------
+// conta do sistema pelo "Banco:" do relatório (ex.: "902 - FS (FIDC)" → conta FS); na dúvida, o usuário escolhe
+function contaDoERP(banco) {
+  const cs = state.cad.contas.filter(c => c.ativo !== false);
+  const rot = normTxt(String(banco || '').replace(/^\s*\d+\s*-\s*/, '')).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!rot) return null;
+  const pal = (t) => normTxt(t).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const exato = cs.filter(c => pal(c.nome) === rot); if (exato.length === 1) return exato[0];
+  // nome da conta como palavra(s) inteira(s) dentro do rótulo do ERP, ou o contrário; fica com o mais específico
+  const cand = cs.map(c => ({ c, n: pal(c.nome) })).filter(({ n }) => n && (` ${rot} `.includes(` ${n} `) || ` ${n} `.includes(` ${rot} `)))
+    .sort((a, b) => b.n.length - a.n.length);
+  return cand.length === 1 || (cand.length > 1 && cand[0].n.length > cand[1].n.length) ? cand[0].c : null;
+}
+
+function importarERP(root) {
+  let lidos = [];
+  const m = modal({ title: 'Importar relatório do ERP', wide: true,
+    body: `<p class="small muted" style="margin-top:0">No ERP, gere o <strong>RFLX036 — Extrato de Contas por Quebra por Data Efetivação</strong> da conta (um ou mais meses) e exporte em <strong>XLSX</strong> (ou CSV).
+      Pode selecionar vários arquivos. Importar de novo o mesmo período não duplica: só entram as linhas novas. Depois, o sistema sugere a conciliação com os lançamentos; nada é conciliado sem a sua confirmação.</p>
+      <input type="file" id="arq" accept=".xlsx,.xls,.ods,.csv" multiple><div id="res" style="margin-top:12px"></div>`,
+    foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="ok" disabled>Importar</button>' });
+  $('#arq', m.el).onchange = async (e) => {
+    lidos = []; const erros = [];
+    for (const f of e.target.files) {
+      try { const st = lerRelatorioERP(await f.arrayBuffer(), f.name); lidos.push({ arquivo: f.name, ...st, contaId: contaDoERP(st.banco)?.id || (e.target.files.length === 1 ? ui.conta : '') }); }
+      catch (err) { erros.push(`${f.name}: ${err.message || err}`); }
+    }
+    // linhas que já estão no sistema por importações anteriores do ERP e não vieram no arquivo novo (o relatório mudou)
+    for (const s of lidos) s.sumiram = [];
+    try {
+      for (const s of lidos) if (s.contaId && s.inicio && s.fim) {
+        const ex = await fetchAll(() => sb.from('extrato_itens').select('id,fitid,data,valor,descricao,status').eq('empresa_id', state.empresa.id).eq('conta_id', s.contaId).gte('data', s.inicio).lte('data', s.fim).like('fitid', 'erp:%').order('id'));
+        const novos = new Set(s.itens.map(i => i.fitid)); s.sumiram = ex.filter(x => !novos.has(x.fitid));
+      }
+    } catch { /* só aviso */ }
+    const cs = state.cad.contas.filter(c => c.ativo !== false);
+    $('#res', m.el).innerHTML = (erros.length ? `<div class="cf-msg neg small">${erros.map(esc).join('<br>')}</div>` : '') + (lidos.length ? `<div class="table-wrap"><table><thead><tr><th>Arquivo</th><th>Banco no ERP</th><th>Período</th><th class="num">Linhas</th><th class="num">Créditos</th><th class="num">Débitos</th><th>Total geral</th><th class="num">Saldo final</th><th>Conta no sistema</th></tr></thead><tbody>
+      ${lidos.map((s, k) => `<tr data-k="${k}"><td class="small wrap">${esc(s.arquivo)}</td><td class="small">${esc(s.banco || '—')}</td><td class="small">${dateBR(s.inicio)} a ${dateBR(s.fim)}</td><td class="num">${s.itens.length}</td>
+        <td class="num pos">${money(s.totalCred)}</td><td class="num neg">${money(-s.totalDeb)}</td>
+        <td class="small">${s.totalGeral ? (s.confere ? '<span class="badge pago">confere</span>' : `<span class="badge vencido" title="Relatório: ${money(s.totalGeral.cred)} / ${money(s.totalGeral.deb)}">não confere</span>`) : '—'}</td>
+        <td class="num">${money(s.saldo)}<div class="small muted">${dateBR(s.saldoData)}</div></td>
+        <td><select data-conta>${options(cs, { empty: 'Selecione…', selected: s.contaId })}</select></td></tr>`).join('')}</tbody></table></div>
+      ${lidos.some(s => s.sumiram.length) ? `<div class="small" style="margin-top:8px">${lidos.filter(s => s.sumiram.length).map(s => `<strong>${esc(s.arquivo)}</strong>: ${s.sumiram.length} linha(s) importada(s) antes não estão mais no relatório (${s.sumiram.filter(x => x.status !== 'conciliado').length} pendente(s)).`).join('<br>')}</div>
+        <label style="flex-direction:row;align-items:center;gap:6px;margin-top:4px"><input type="checkbox" id="limpar" checked> Remover do extrato as linhas que saíram do relatório (só as não conciliadas)</label>` : ''}` : (erros.length ? '' : '<div class="empty">Nenhum relatório lido.</div>'));
+    const ok = () => { $('#ok', m.el).disabled = !lidos.length || lidos.some(s => !s.contaId || !s.confere); };
+    $('#res', m.el).onchange = (ev) => { const tr = ev.target.closest('tr[data-k]'); if (tr && ev.target.matches('[data-conta]')) { lidos[+tr.dataset.k].contaId = ev.target.value; ok(); } };
+    ok();
+  };
+  $('#ok', m.el).onclick = async () => {
+    const btn = $('#ok', m.el); btn.disabled = true; const e = state.empresa.id; let novos = 0, total = 0, removidos = 0, atual = '';
+    const limpar = !!$('#limpar', m.el)?.checked;
+    try {
+      for (const s of lidos) {
+        atual = s.arquivo;
+        if (limpar) { const ids = s.sumiram.filter(x => x.status !== 'conciliado').map(x => x.id); for (let i = 0; i < ids.length; i += 200) await q(sb.from('extrato_itens').delete().in('id', ids.slice(i, i + 200))); removidos += ids.length; }
+        const imp = await q(sb.from('extrato_importacoes').insert({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: `ERP ${s.banco || ''}`.trim(), agencia: null, conta_ofx: null,
+          dt_inicio: s.inicio, dt_fim: s.fim, saldo_final: s.saldo, saldo_data: s.saldoData || s.fim, qtd: s.itens.length }).select().single());
+        const n = await gravarItens(s, imp.id);
+        await q(sb.from('extrato_importacoes').update({ novos: n }).eq('id', imp.id));
+        novos += n; total += s.itens.length;
+      }
+      toast(`${novos} linha(s) nova(s) de ${total} lida(s)${total - novos ? ` · ${total - novos} já existiam` : ''}${removidos ? ` · ${removidos} removida(s)` : ''}`);
+      const ult = lidos[lidos.length - 1]; ui.conta = ult.contaId;
       const pm = {}; for (const i of ult.itens) pm[i.data.slice(0, 7)] = (pm[i.data.slice(0, 7)] || 0) + 1;
       const mm = Object.entries(pm).sort((a, b) => b[1] - a[1])[0]?.[0]; if (mm) ui.mes = mm;
       ui.sels.clear(); ui.filtro = 'pendente'; m.close(); render(root);
