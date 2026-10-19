@@ -69,7 +69,8 @@ export function lerRelatorioERP(buf, nome = '') {
     }
     const tg = cel.findIndex(c => /^total geral:?$/.test(c));
     if (tg >= 0) { const vs = r.slice(tg + 1).map(num).filter(isFinite); if (vs.length >= 2) totalGeral = { cred: r2(vs[0]), deb: r2(vs[1]) }; continue; }
-    if (!idx || cel.some(c => /^total data efetivacao:?$/.test(c) || /^data efetivacao:?$/.test(c))) { ult = null; continue; }
+    // quebras do relatório (por data de efetivação ou por conta pagamento) e seus totais: não são lançamentos
+    if (!idx || cel.some(c => /^total (data efetivacao|conta pagamento)/.test(c) || /^(data efetivacao|conta pagamento):?/.test(c) || /^total\b.*:$/.test(c))) { ult = null; continue; }
     // cabeçalho repetido a cada página (título, rotina, data/hora, página, filtros): não é continuação de linha
     if (cel.some(c => /extrato de contas|^rotina:?$|^rflx036$|^pagina:?$|^data:$|^hora:?$|^primeira quebra|^periodo:?$|^saldo anterior|^grupo empresa|^classificacao:?$|^tipo movimentacao|^banco:?$/.test(c))) { ult = null; continue; }
     const d = data(pega(r, 'data'));
