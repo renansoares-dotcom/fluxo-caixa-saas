@@ -673,3 +673,6 @@ tr.dd-off td{opacity:.45;text-decoration:line-through}
 tr.dd-off td:first-child{opacity:1;text-decoration:none}
 @media (max-width:700px){.dd-dias{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{.dd-chips,#dd-reset,#dd-print{display:none}}
+.dd-reg textarea{width:100%;resize:vertical}
+td.warn{color:var(--warn)}
+@media print{.dd-reg .toolbar button,.dd-reg input{display:none}}

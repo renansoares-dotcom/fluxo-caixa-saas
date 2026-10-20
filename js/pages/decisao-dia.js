@@ -3,9 +3,11 @@
 // Entradas: borderôs pendentes de aprovação (líquido na conta de crédito), recebimentos em aberto, o que já entrou (pago).
 // Saídas: compromissos em aberto (contas a pagar), pagamentos antecipados aguardando autorização, o que já saiu (pago).
 // Cada item pode ser ligado/desligado para simular a decisão; o saldo projetado (total e por banco) recalcula na hora.
-// Fase 1: só leitura e simulação (nada é gravado).
-import { sb, state, q, fetchAll, pontas } from '../lib/data.js';
-import { $, $$, esc, money, cls, dateBR, today, fail, parseNum, loading } from '../lib/ui.js';
+// Fase 2: "Registrar decisão" grava a simulação (decisoes_dia), envia ao diretor para aprovar e, passado o dia,
+// compara o decidido com o realizado (lançamentos pagos no dia, PAs, borderôs) e o saldo real dos bancos.
+import { sb, state, q, fetchAll, pontas, podeEditar } from '../lib/data.js';
+import { $, $$, esc, money, cls, dateBR, today, fail, parseNum, loading, toast } from '../lib/ui.js';
+import { dispararAvisos } from '../lib/notif.js';
 
 export const title = 'Decisão do Dia';
 
@@ -37,6 +39,9 @@ async function carregar() {
       .eq('empresa_id', e).in('status', ['Pendente', 'Rascunho']).gte('data_operacao', addDias(d0, -7)).lte('data_operacao', dN).order('data_operacao'))),
     seguro(q(sb.from('fidc_fundos').select('id,nome,conta_credito_id').eq('empresa_id', e))),
   ]);
+  // decisão registrada do dia (a mais recente) e as últimas decisões; null = tabela ainda não criada
+  const decs = await Promise.resolve(sb.from('decisoes_dia').select('*').eq('empresa_id', e).order('data', { ascending: false }).order('numero', { ascending: false }).limit(40))
+    .then(r => (r.error ? null : r.data)).catch(() => null);
   const fundo = Object.fromEntries(fundos.map(f => [f.id, f]));
   const itens = [];
   const daPonta = (l, origem) => {
@@ -52,14 +57,17 @@ async function carregar() {
   for (const l of venc) if (l.tipo === 'S' || l.tipo === 'E') daPonta(l, 'venc');
   for (const p of pas) itens.push({ key: `pa:${p.id}`, dia: p.data_pagamento < d0 ? d0 : p.data_pagamento, venc: p.data_pagamento < d0 ? p.data_pagamento : null,
     conta: p.conta_id || SEM, valor: -+p.valor, fonte: 'pa', desc: `PA nº ${p.numero} · ${p.descricao || ''}`.trim(), fav: p.razao_social || '',
-    prio: p.prioridade || '', fixo: false, st: p.status });
+    prio: p.prioridade || '', fixo: false, st: p.status, ref: p.id });
   for (const p of props) {
     const f = fundo[p.fundo_id] || {};
     itens.push({ key: `bd:${p.id}`, dia: p.data_operacao < d0 ? d0 : p.data_operacao, venc: p.data_operacao < d0 ? p.data_operacao : null,
       conta: p.conta_credito_id || f.conta_credito_id || SEM, valor: +p.liquido || 0, fonte: 'bordero', desc: `Proposta de borderô nº ${p.numero} · ${p.qtd_titulos || 0} título(s), face ${money(p.valor_face)}`,
-      fav: f.nome || '', prio: '', fixo: false, st: p.status });
+      fav: f.nome || '', prio: '', fixo: false, st: p.status, ref: p.id });
   }
-  return { d0, dias: Array.from({ length: DIAS }, (_, i) => addDias(d0, i)), saldos, itens };
+    const dec = decs ? decs.find(x => x.data === d0) || null : null;
+  let real = null;
+  if (dec && d0 < today()) real = await realizado(dec).catch(() => null);
+  return { d0, dias: Array.from({ length: DIAS }, (_, i) => addDias(d0, i)), saldos, itens, decs, dec, real };
 }
 
 // item está valendo na simulação?
@@ -100,6 +108,7 @@ function calcular() {
 }
 
 export async function render(root) {
+  { const m = location.hash.match(/[?&]dia=(\d{4}-\d{2}-\d{2})/); if (m) { ui.dia = m[1]; ui.restaurado = null; } }
   ui.dia ||= today();
   root.innerHTML = `
     <div class="card">
@@ -116,7 +125,7 @@ export async function render(root) {
       Nada é gravado: é a simulação da decisão. Borderô em rascunho e títulos vencidos entram desmarcados.</p>
     </div>
     <div id="dd-corpo"></div>`;
-  $('#dd-dia', root).onchange = (ev) => { ui.dia = ev.target.value || today(); ui.off.clear(); ui.on.clear(); recarregar(root); };
+  $('#dd-dia', root).onchange = (ev) => { ui.dia = ev.target.value || today(); ui.off.clear(); ui.on.clear(); ui.restaurado = null; recarregar(root); };
   $('#dd-min', root).onchange = (ev) => { ui.minimo = parseNum(ev.target.value) || 0; ls.set('nc-min', ui.minimo); ev.target.value = money(ui.minimo); pintar(root); };
   $('#dd-venc', root).onchange = (ev) => { ui.vencidos = ev.target.checked; pintar(root); };
   $('#dd-reset', root).onclick = () => { ui.off.clear(); ui.on.clear(); pintar(root); };
@@ -128,6 +137,12 @@ async function recarregar(root) {
   loading($('#dd-corpo', root));
   try { D = await carregar(); } catch (e) { fail(e); $('#dd-corpo', root).innerHTML = '<div class="card muted">Não foi possível carregar.</div>'; return; }
   const cad = state.cad.contaById || {};
+  if (D.dec && ui.restaurado !== D.dec.id) {   // abre a simulação como foi registrada
+    ui.restaurado = D.dec.id; ui.off.clear(); ui.on.clear();
+    for (const it of D.dec.itens || []) (it.decisao === 'adiar' ? ui.off : ui.on).add(it.key);
+    if (D.dec.contas?.length) ui.contas = D.dec.contas.filter(id => D.saldos.some(s => s.conta_id === id));
+    if (+D.dec.minimo) ui.minimo = +D.dec.minimo;
+  }
   if (!ui.contas) ui.contas = ls.get('dd-contas', null)?.filter(id => D.saldos.some(s => s.conta_id === id)) || D.saldos.filter(s => PADRAO(cad[s.conta_id])).map(s => s.conta_id);
   pintar(root);
 }
@@ -201,6 +216,7 @@ function pintar(root) {
       <div class="kpi"><div class="k-label">Saídas</div><div class="k-value neg">${money(d0.sai)}</div><div class="k-sub">${sai.filter(ligado).length} item(ns) considerados</div></div>
       <div class="kpi"><div class="k-label">Saldo projetado no fim do dia</div><div class="k-value ${corBase(d0.fim)}">${money(d0.fim)}</div><div class="k-sub">mínimo ${money(min)} · ${d0.fim >= min ? 'sobra' : 'falta'} ${money(Math.abs(d0.fim - min))}</div></div>
     </div>
+    ${painelDecisao(R)}
     <div class="card dd-sug"><h2>Decisão sugerida</h2><ul>${sug.map(s => `<li>${s}</li>`).join('')}</ul></div>
     <div class="card flush"><div style="padding:14px 16px 0"><h2>Saldos por banco · ${dateBR(D.d0)}</h2></div><div class="table-wrap">${tabBancos}</div></div>
     <div class="grid2 dd-listas">
@@ -211,7 +227,9 @@ function pintar(root) {
         ${grupo('Compromissos do dia (a pagar)', porF(sai, 'aberto'))}${grupo('Pagamentos antecipados', porF(sai, 'pa'))}${grupo('Vencidos em aberto', porF(sai, 'vencido'))}${grupo('Já saiu (realizado)', porF(sai, 'pago'))}
         ${sai.length ? '' : '<tr><td class="muted">Nenhuma saída prevista.</td></tr>'}</tbody></table></div></div>
     </div>
-    ${trf.length ? `<div class="card flush"><div style="padding:14px 16px 0"><h2>Transferências entre contas</h2><p class="small muted" style="margin:4px 0 0">Não mudam o total, só o saldo de cada banco.</p></div><div class="table-wrap"><table><tbody>${trf.map(linha).join('')}</tbody></table></div></div>` : ''}`;
+    ${trf.length ? `<div class="card flush"><div style="padding:14px 16px 0"><h2>Transferências entre contas</h2><p class="small muted" style="margin:4px 0 0">Não mudam o total, só o saldo de cada banco.</p></div><div class="table-wrap"><table><tbody>${trf.map(linha).join('')}</tbody></table></div></div>` : ''}
+    ${painelRealizado()}${painelHistorico()}`;
+  ligarPainel(root, R);
   $$('#dd-corpo button[data-g]', root).forEach(b => b.onclick = () => { const g = b.dataset.g; ui.abertos.has(g) ? ui.abertos.delete(g) : ui.abertos.add(g); pintar(root); });
   $$('#dd-corpo input[data-k]', root).forEach(i => i.onchange = () => {
     const it = D.itens.find(x => x.key === i.dataset.k); if (!it) return;
@@ -220,4 +238,117 @@ function pintar(root) {
     for (const k of chaves) { ui.off.delete(k); ui.on.delete(k); (i.checked ? ui.on : ui.off).add(k); }
     pintar(root);
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Decidido × realizado (dia que já passou): situação atual de cada item da decisão
+async function realizado(dec) {
+  const its = dec.itens || [];
+  const lids = [...new Set(its.filter(i => i.lanc).map(i => i.lanc))];
+  const pids = its.filter(i => i.fonte === 'pa' && i.ref).map(i => i.ref), bids = its.filter(i => i.fonte === 'bordero' && i.ref).map(i => i.ref);
+  const [ls_, pas, bds, sal] = await Promise.all([
+    lids.length ? q(sb.from('lancamentos').select('id,status,data').in('id', lids)) : [],
+    pids.length ? q(sb.from('paraquedas').select('id,status,lancamento_id,data_pagamento').in('id', pids)) : [],
+    bids.length ? q(sb.from('fidc_propostas').select('id,status,data_operacao').in('id', bids)) : [],
+    q(sb.rpc('saldos_contas', { p_empresa: dec.empresa_id, p_ate: dec.data })),
+  ]);
+  const L = Object.fromEntries(ls_.map(l => [l.id, l])), P = Object.fromEntries(pas.map(x => [x.id, x])), B = Object.fromEntries(bds.map(x => [x.id, x]));
+  const plids = pas.map(x => x.lancamento_id).filter(Boolean);
+  const PL = plids.length ? Object.fromEntries((await q(sb.from('lancamentos').select('id,status,data').in('id', plids))).map(l => [l.id, l])) : {};
+  const feito = (it) => {
+    if (it.fixo) return true;
+    if (it.lanc) { const l = L[it.lanc]; return !!l && l.status === 'Pago' && l.data === dec.data; }
+    if (it.fonte === 'pa') { const x = P[it.ref]; const l = x?.lancamento_id && PL[x.lancamento_id]; return !!l && l.status === 'Pago' && l.data === dec.data; }
+    if (it.fonte === 'bordero') { const x = B[it.ref]; return !!x && x.status === 'Aprovada' && x.data_operacao === dec.data; }
+    return false;
+  };
+  const linhas = its.filter(it => !it.fixo).map(it => ({ ...it, feito: feito(it) }));
+  const saldoReal = sal.filter(x => (dec.contas || []).includes(x.conta_id)).reduce((a, x) => a + (+x.saldo_pago || 0), 0);
+  return { linhas, saldoReal };
+}
+
+function itensParaGravar() {
+  const contasSel = new Set(ui.contas);
+  return D.itens.filter(it => it.dia === D.d0 && (it.conta === SEM || contasSel.has(it.conta)))
+    .map(it => ({ key: it.key, fonte: it.fonte, ref: it.ref || null, lanc: it.lanc || null, conta: it.conta, valor: Math.round(it.valor * 100) / 100,
+      desc: it.desc, fav: it.fav, prio: it.prio, fixo: !!it.fixo, venc: it.venc || null, decisao: ligado(it) ? 'incluir' : 'adiar' }));
+}
+
+function resumoTexto(R) {
+  const d0 = R.dias[0], its = itensParaGravar(), nomeConta = (id) => id === SEM ? 'sem banco' : (state.cad.contaById[id]?.nome || '?');
+  const sec = (tit, arr) => arr.length ? `\n*${tit}*\n` + arr.map(i => `• ${i.fav || i.desc} — ${money(Math.abs(i.valor))} (${nomeConta(i.conta)})`).join('\n') : '';
+  const inc = its.filter(i => i.decisao === 'incluir' && !i.fixo), adi = its.filter(i => i.decisao === 'adiar');
+  return `*Decisão do dia ${dateBR(D.d0)}* — ${state.empresa.nome || ''}
+Abertura: ${money(d0.ini)}
+Entradas: ${money(d0.ent)}
+Saídas: ${money(d0.sai)}
+*Saldo projetado: ${money(d0.fim)}* (mínimo ${money(ui.minimo)})`
+    + sec('Entra', inc.filter(i => i.valor > 0)) + sec('Paga', inc.filter(i => i.valor < 0)) + sec('Fica para depois', adi)
+    + ($('#dd-obs')?.value ? `\n\nObs.: ${$('#dd-obs').value}` : '');
+}
+
+async function gravar(root, R, status) {
+  const d0 = R.dias[0];
+  const row = { empresa_id: state.empresa.id, data: D.d0, status, contas: ui.contas, minimo: ui.minimo, abertura: +d0.ini.toFixed(2), entradas: +d0.ent.toFixed(2),
+    saidas: +d0.sai.toFixed(2), saldo_fim: +d0.fim.toFixed(2), itens: itensParaGravar(), observacao: $('#dd-obs', root)?.value || null };
+  try {
+    if (D.dec && ['Rascunho', 'Pendente', 'Rejeitada'].includes(D.dec.status)) await q(sb.from('decisoes_dia').update(row).eq('id', D.dec.id));
+    else await q(sb.from('decisoes_dia').insert(row));
+    toast(status === 'Pendente' ? 'Decisão enviada para aprovação do diretor' : 'Decisão salva');
+    if (status === 'Pendente') dispararAvisos();
+    ui.restaurado = null; await recarregar(root);
+  } catch (e) { fail(e); }
+}
+
+function painelDecisao(R) {
+  if (D.decs === null) return `<div class="card" style="border-color:var(--warn)"><strong>Registrar decisão:</strong> <span class="small">falta criar a tabela no banco — rodar o SQL <code>20261020000046_decisao_dia.sql</code>.</span></div>`;
+  const dec = D.dec, ed = podeEditar(), dir = ['diretor', 'admin'].includes(state.papel);
+  const st = dec?.status || 'Nova', bcls = { Aprovada: 'pago', Pendente: 'aberto', Rejeitada: 'vencido', Rascunho: '' }[st] || '';
+  const podeMexer = ed && (!dec || ['Rascunho', 'Pendente', 'Rejeitada'].includes(dec.status));
+  const info = dec ? `nº ${dec.numero} · <span class="badge ${bcls}">${esc(st)}</span>${dec.enviado_em ? ` · enviada ${new Date(dec.enviado_em).toLocaleString('pt-BR')}` : ''}${dec.decidido_em ? ` · ${st.toLowerCase()} em ${new Date(dec.decidido_em).toLocaleString('pt-BR')}` : ''}${dec.motivo ? ` · “${esc(dec.motivo)}”` : ''}
+    ${Math.abs(+dec.saldo_fim - R.dias[0].fim) > 0.005 ? `<div class="small" style="color:var(--warn)">A simulação atual (${money(R.dias[0].fim)}) difere da registrada (${money(dec.saldo_fim)}). ${podeMexer ? 'Salve de novo para atualizar.' : ''}</div>` : ''}` : '<span class="muted">ainda não registrada</span>';
+  return `<div class="card dd-reg"><div class="toolbar" style="align-items:flex-start">
+      <div class="grow"><h2 style="margin:0 0 4px">Registro da decisão</h2><div class="small">${info}</div></div>
+      <button class="btn small" id="dd-copiar">Copiar resumo (WhatsApp)</button>
+    </div>
+    <label class="grow" style="display:block;margin-top:8px">Observação<textarea id="dd-obs" rows="2" ${podeMexer ? '' : 'disabled'} placeholder="ex.: adiar Kratos para sexta; borderô Negocial aprovado por telefone">${esc(dec?.observacao || '')}</textarea></label>
+    <div class="toolbar" style="margin-top:8px">
+      ${podeMexer ? `<button class="btn" id="dd-salvar">Salvar rascunho</button><button class="btn primary" id="dd-enviar">${dec?.status === 'Pendente' ? 'Atualizar e reenviar' : 'Enviar para aprovação'}</button>` : ''}
+      ${ed && dec && ['Rascunho', 'Rejeitada'].includes(dec.status) ? '<button class="btn ghost" id="dd-excluir">Excluir</button>' : ''}
+      ${dir && dec?.status === 'Pendente' ? `<span class="spacer"></span><input id="dd-mot" placeholder="motivo / comentário (opcional)" style="min-width:240px"><button class="btn" id="dd-rej">Rejeitar</button><button class="btn primary" id="dd-apr">Aprovar</button>` : ''}
+      ${dir && dec?.status === 'Aprovada' ? '<span class="spacer"></span><button class="btn small ghost" id="dd-reabrir">Reabrir (rejeitar)</button>' : ''}
+    </div></div>`;
+}
+
+function painelRealizado() {
+  const r = D.real; if (!r || !D.dec) return '';
+  const dec = D.dec, nomeConta = (id) => id === SEM ? 'sem banco' : (state.cad.contaById[id]?.nome || '?');
+  const sit = (l) => l.decisao === 'incluir' ? (l.feito ? ['✔ feito', 'pos'] : ['✕ não feito', 'neg']) : (l.feito ? ['! feito, mas estava adiado', 'warn'] : ['✔ adiado', '']);
+  const ok = r.linhas.filter(l => (l.decisao === 'incluir') === l.feito).length;
+  return `<div class="card flush"><div style="padding:14px 16px 0"><h2>Decidido × realizado · ${dateBR(dec.data)}</h2>
+    <p class="small muted" style="margin:4px 0 0">${ok} de ${r.linhas.length} item(ns) saíram como decidido · saldo projetado ${money(dec.saldo_fim)} × saldo real dos bancos no fim do dia <strong class="${r.saldoReal < dec.saldo_fim - 0.005 ? 'neg' : 'pos'}">${money(r.saldoReal)}</strong> (diferença ${money(r.saldoReal - dec.saldo_fim)})</p></div>
+    <div class="table-wrap"><table><thead><tr><th>Item</th><th>Banco</th><th class="num">Valor</th><th>Decidido</th><th>Realizado</th></tr></thead><tbody>
+    ${r.linhas.sort((a, b) => (((a.decisao === 'incluir') === a.feito) - ((b.decisao === 'incluir') === b.feito)) || Math.abs(b.valor) - Math.abs(a.valor)).map(l => { const [t, c] = sit(l);
+      return `<tr><td class="wrap">${esc(l.fav || l.desc)}<div class="small muted">${esc(l.fav ? l.desc : '')}</div></td><td class="small">${esc(nomeConta(l.conta))}</td><td class="num ${cls(l.valor)}">${money(l.valor)}</td><td>${l.decisao === 'incluir' ? 'fazer' : 'adiar'}</td><td class="${c}">${t}</td></tr>`; }).join('')}
+    </tbody></table></div></div>`;
+}
+
+function painelHistorico() {
+  if (!D.decs?.length) return '';
+  const bcls = { Aprovada: 'pago', Pendente: 'aberto', Rejeitada: 'vencido', Rascunho: '' };
+  return `<div class="card flush"><div style="padding:14px 16px 0"><h2>Decisões registradas</h2></div><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Dia</th><th>Situação</th><th class="num">Saldo projetado</th><th>Observação</th></tr></thead><tbody>
+    ${D.decs.slice(0, 20).map(x => `<tr class="clickable" data-dia="${x.data}"><td>${x.numero}</td><td>${dateBR(x.data)}</td><td><span class="badge ${bcls[x.status] || ''}">${esc(x.status)}</span></td><td class="num ${cls(x.saldo_fim)}">${money(x.saldo_fim)}</td><td class="small wrap">${esc(x.observacao || '')}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+function ligarPainel(root, R) {
+  const on = (id, fn) => { const el = $('#' + id, root); if (el) el.onclick = fn; };
+  on('dd-salvar', () => gravar(root, R, 'Rascunho'));
+  on('dd-enviar', () => gravar(root, R, 'Pendente'));
+  on('dd-copiar', async () => { const t = resumoTexto(R); try { await navigator.clipboard.writeText(t); toast('Resumo copiado: cole no WhatsApp'); } catch { window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank'); } });
+  on('dd-excluir', async () => { if (!confirm(`Excluir a decisão nº ${D.dec.numero}?`)) return; try { await q(sb.from('decisoes_dia').delete().eq('id', D.dec.id)); toast('Decisão excluída'); ui.restaurado = null; await recarregar(root); } catch (e) { fail(e); } });
+  const decidir = async (apr) => { try { await q(sb.rpc('decidir_decisao_dia', { p_id: D.dec.id, p_aprovar: apr, p_motivo: $('#dd-mot', root)?.value || null })); toast(apr ? 'Decisão aprovada' : 'Decisão rejeitada'); dispararAvisos(); ui.restaurado = null; await recarregar(root); } catch (e) { fail(e); } };
+  on('dd-apr', () => decidir(true)); on('dd-rej', () => decidir(false));
+  on('dd-reabrir', () => { if (confirm('Reabrir a decisão aprovada? Ela volta como rejeitada para ser refeita.')) decidir(false); });
+  $$('#dd-corpo tr[data-dia]', root).forEach(tr => tr.onclick = () => { ui.dia = tr.dataset.dia; $('#dd-dia', root).value = ui.dia; ui.off.clear(); ui.on.clear(); ui.restaurado = null; recarregar(root); window.scrollTo(0, 0); });
 }
