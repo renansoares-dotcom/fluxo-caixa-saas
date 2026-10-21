@@ -528,7 +528,7 @@ function importar(root) {
         <td><select data-conta>${options(state.cad.contas.filter(c => c.ativo !== false), { empty: 'Selecione…', selected: s.contaId })}</select></td></tr>`).join('')}</tbody></table></div>
       <label style="flex-direction:row;align-items:center;gap:6px;margin-top:8px"><input type="checkbox" id="lembrar" checked> Lembrar a conta do OFX no cadastro da conta bancária</label>` : '<div class="empty">Nenhum extrato lido.</div>';
     const ok = () => { $('#ok', m.el).disabled = !lidos.length || lidos.some(s => !s.contaId); };
-    $('#res', m.el).onchange = (ev) => { const tr = ev.target.closest('tr[data-k]'); if (tr && ev.target.matches('[data-conta]')) { lidos[+tr.dataset.k].contaId = ev.target.value; ok(); } };
+    $('#res', m.el).onchange = (ev) => { const tr = ev.target.closest('tr[data-k]'); if (tr && ev.target.matches('[data-conta]')) { lidos[+tr.dataset.k].contaId = ev.target.value; lidos[+tr.dataset.k].temOFX = false; ok(); } };
     ok();
   };
   $('#ok', m.el).onclick = async () => {
@@ -619,8 +619,16 @@ function importarERP(root) {
         s.sumiram = ex.filter(x => !novos.has(x.fitid) && (s.origem !== 'vexpenses' || (ehDep(x.fitid) ? temDep : temGasto)));
       }
     } catch { /* só aviso */ }
+    // conta que já tem extrato do banco (OFX) no período: o relatório do ERP aqui viraria extrato duplicado
+    for (const s of lidos) s.temOFX = false;
+    try {
+      for (const s of lidos) if (s.contaId && s.inicio && s.fim && s.origem === 'erp') {
+        const ofx = await q(sb.from('extrato_itens').select('id').eq('empresa_id', state.empresa.id).eq('conta_id', s.contaId).gte('data', s.inicio).lte('data', s.fim).not('fitid', 'like', 'erp:%').limit(1));
+        s.temOFX = ofx.length > 0;
+      }
+    } catch { /* só aviso */ }
     const cs = state.cad.contas.filter(c => c.ativo !== false);
-    $('#res', m.el).innerHTML = (erros.length ? `<div class="cf-msg neg small">${erros.map(esc).join('<br>')}</div>` : '') + (lidos.length ? `<div class="table-wrap"><table><thead><tr><th>Arquivo</th><th>Banco no ERP</th><th>Período</th><th class="num">Linhas</th><th class="num">Créditos</th><th class="num">Débitos</th><th>Total geral</th><th class="num">Saldo final</th><th>Conta no sistema</th></tr></thead><tbody>
+    $('#res', m.el).innerHTML = (lidos.some(s => s.temOFX) ? `<div class="cf-msg neg small" style="margin-bottom:8px">⚠ ${lidos.filter(s => s.temOFX).map(s => esc(state.cad.contaById[s.contaId]?.nome || s.arquivo)).join(', ')}: a conta já tem o extrato do banco (OFX) neste período. Aqui o relatório do ERP entra como <strong>extrato</strong> e duplicaria os movimentos. Para criar os <strong>lançamentos</strong> a partir do ERP, use Lançamentos › <strong>Importar do ERP</strong>.</div>` : '') + (erros.length ? `<div class="cf-msg neg small">${erros.map(esc).join('<br>')}</div>` : '') + (lidos.length ? `<div class="table-wrap"><table><thead><tr><th>Arquivo</th><th>Banco no ERP</th><th>Período</th><th class="num">Linhas</th><th class="num">Créditos</th><th class="num">Débitos</th><th>Total geral</th><th class="num">Saldo final</th><th>Conta no sistema</th></tr></thead><tbody>
       ${lidos.map((s, k) => `<tr data-k="${k}"><td class="small wrap">${esc(s.arquivo)}</td><td class="small">${esc(s.banco || '—')}</td><td class="small">${dateBR(s.inicio)} a ${dateBR(s.fim)}</td><td class="num">${s.itens.length}</td>
         <td class="num pos">${money(s.totalCred)}</td><td class="num neg">${money(-s.totalDeb)}</td>
         <td class="small">${s.origem === 'vexpenses' ? `<span class="small muted" title="Internas (carteira ↔ cartões), não entram no extrato">${s.resumo.depositos.n ? `recargas da carteira ${money(s.resumo.depositos.v)} (${s.resumo.depositos.n}) · ` : ''}cargas ${money(s.resumo.cargas.v)} · devoluções ${money(s.resumo.devolucoes.v)}</span>` : s.totalGeral ? (s.confere ? '<span class="badge pago">confere</span>' : `<span class="badge vencido" title="Relatório: ${money(s.totalGeral.cred)} / ${money(s.totalGeral.deb)}">não confere</span>`) : '—'}</td>
@@ -628,8 +636,8 @@ function importarERP(root) {
         <td><select data-conta>${options(cs, { empty: 'Selecione…', selected: s.contaId })}</select></td></tr>`).join('')}</tbody></table></div>
       ${lidos.some(s => s.sumiram.length) ? `<div class="small" style="margin-top:8px">${lidos.filter(s => s.sumiram.length).map(s => `<strong>${esc(s.arquivo)}</strong>: ${s.sumiram.length} linha(s) importada(s) antes não estão mais no relatório (${s.sumiram.filter(x => x.status !== 'conciliado').length} pendente(s)).`).join('<br>')}</div>
         <label style="flex-direction:row;align-items:center;gap:6px;margin-top:4px"><input type="checkbox" id="limpar" checked> Remover do extrato as linhas que saíram do relatório (só as não conciliadas)</label>` : ''}` : (erros.length ? '' : '<div class="empty">Nenhum relatório lido.</div>'));
-    const ok = () => { $('#ok', m.el).disabled = !lidos.length || lidos.some(s => !s.contaId || !s.confere); };
-    $('#res', m.el).onchange = (ev) => { const tr = ev.target.closest('tr[data-k]'); if (tr && ev.target.matches('[data-conta]')) { lidos[+tr.dataset.k].contaId = ev.target.value; ok(); } };
+    const ok = () => { $('#ok', m.el).disabled = !lidos.length || lidos.some(s => !s.contaId || !s.confere || s.temOFX); };
+    $('#res', m.el).onchange = (ev) => { const tr = ev.target.closest('tr[data-k]'); if (tr && ev.target.matches('[data-conta]')) { lidos[+tr.dataset.k].contaId = ev.target.value; lidos[+tr.dataset.k].temOFX = false; ok(); } };
     ok();
   };
   $('#ok', m.el).onclick = async () => {

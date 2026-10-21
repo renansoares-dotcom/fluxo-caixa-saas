@@ -3,6 +3,7 @@
 // "Banco: 902 - FS (FIDC)", o período e o saldo anterior; cada linha traz data, operação, documento,
 // emitente, observações, crédito, débito e saldo acumulado.
 // Retorna no mesmo formato do lerOFX, para entrar no mesmo fluxo de importação/conciliação:
+// Com { detalhe: true }, cada item traz também contaErp (quebra "Conta Pagamento"), operacao, emitente e obs.
 // { origem:'erp', banco, inicio, fim, saldoAnterior, saldo, saldoData, totalCred, totalDeb, totalGeral, saldosDia, itens:[{ fitid, data, valor, tipo, descricao, documento }] }
 // Usa o SheetJS (global XLSX, carregado no index.html).
 
@@ -33,7 +34,7 @@ function data(v) {
 const COLS = { emp: /^emp\.?$/, data: /^data$/, operacao: /^operacao$/, documento: /^documento$/, emitente: /^emitente$/, obs: /^observacoes$/, credito: /^credito$/, debito: /^debito$/, saldo: /^saldo$/ };
 
 /** Lê o arquivo (ArrayBuffer) e devolve o extrato. `nome` decide CSV x planilha. */
-export function lerRelatorioERP(buf, nome = '') {
+export function lerRelatorioERP(buf, nome = '', { detalhe = false } = {}) {
   if (typeof XLSX === 'undefined') throw new Error('Leitor de planilhas não carregado: recarregue a página.');
   if (/\.pdf$/i.test(nome)) throw new Error('PDF não é aceito: no ERP, exporte o relatório em XLSX (ou CSV).');
   let wb;
@@ -54,7 +55,7 @@ export function lerRelatorioERP(buf, nome = '') {
   const per = String(depois(/^periodo:?$/) || '').match(/(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}\/\d{2}\/\d{4})/);
   const saldoAnterior = num(depois(/^saldo anterior:?$/)); const sa = isFinite(saldoAnterior) ? r2(saldoAnterior) : 0;
 
-  let idx = null; const itens = []; let totalGeral = null; let ult = null;
+  let idx = null; const itens = []; let totalGeral = null; let ult = null; let contaPg = null;
   const pega = (r, k) => { // valor da coluna k: primeira célula preenchida entre o início da coluna e o início da próxima
     const ini = idx[k]; if (ini == null) return null;
     const prox = Math.min(...Object.values(idx).filter(x => x != null && x > ini), r.length);
@@ -70,6 +71,12 @@ export function lerRelatorioERP(buf, nome = '') {
     const tg = cel.findIndex(c => /^total geral:?$/.test(c));
     if (tg >= 0) { const vs = r.slice(tg + 1).map(num).filter(isFinite); if (vs.length >= 2) totalGeral = { cred: r2(vs[0]), deb: r2(vs[1]) }; continue; }
     // quebras do relatório (por data de efetivação ou por conta pagamento) e seus totais: não são lançamentos
+    // relatório "por Quebra por Conta Pagamento": a quebra diz a conta do plano do ERP das linhas seguintes
+    const qc = cel.findIndex(c => /^conta pagamento:/.test(c));
+    if (qc >= 0) {
+      const mesma = String(r[qc]).replace(/^\s*conta pagamento:\s*/i, '').trim();
+      contaPg = mesma || String(r.slice(qc + 1).find(v => v != null && String(v).trim() !== '') ?? '').trim() || null; ult = null; continue;
+    }
     if (!idx || cel.some(c => /^total (data efetivacao|conta pagamento)/.test(c) || /^(data efetivacao|conta pagamento):?/.test(c) || /^total\b.*:$/.test(c))) { ult = null; continue; }
     // cabeçalho repetido a cada página (título, rotina, data/hora, página, filtros): não é continuação de linha
     if (cel.some(c => /extrato de contas|^rotina:?$|^rflx036$|^pagina:?$|^data:$|^hora:?$|^primeira quebra|^periodo:?$|^saldo anterior|^grupo empresa|^classificacao:?$|^tipo movimentacao|^banco:?$/.test(c))) { ult = null; continue; }
@@ -79,7 +86,7 @@ export function lerRelatorioERP(buf, nome = '') {
       const s = num(pega(r, 'saldo'));
       ult = { data: d, cred: isFinite(c) ? r2(c) : 0, deb: isFinite(db) ? r2(db) : 0, saldo: isFinite(s) ? r2(s) : null,
         operacao: String(pega(r, 'operacao') ?? '').trim(), documento: String(pega(r, 'documento') ?? '').trim(),
-        emitente: String(pega(r, 'emitente') ?? '').trim(), obs: String(pega(r, 'obs') ?? '').trim() };
+        emitente: String(pega(r, 'emitente') ?? '').trim(), obs: String(pega(r, 'obs') ?? '').trim(), contaErp: contaPg };
       itens.push(ult);
     } else if (ult && !d) { // linha de continuação (texto quebrado em duas linhas no relatório)
       for (const k of ['operacao', 'documento', 'emitente', 'obs']) { const v = String(pega(r, k) ?? '').trim(); if (v) ult[k] = `${ult[k]} ${v}`.trim(); }
@@ -94,7 +101,10 @@ export function lerRelatorioERP(buf, nome = '') {
     const descricao = [x.operacao, x.obs, x.emitente].filter((t, i, a) => t && a.indexOf(t) === i).join(' — ') || null;
     const base = `erp:${x.data}|${valor.toFixed(2)}|${x.documento}|${norm(descricao).replace(/[^a-z0-9]/g, '').slice(0, 60)}`;
     vistos[base] = (vistos[base] || 0) + 1;
-    return { fitid: `${base}#${vistos[base]}`, data: x.data, valor, tipo: 'ERP', descricao, documento: x.documento || null, _saldo: x.saldo };
+    const it = { fitid: `${base}#${vistos[base]}`, data: x.data, valor, tipo: 'ERP', descricao, documento: x.documento || null, _saldo: x.saldo };
+    // para a importação de LANÇAMENTOS: conta do plano no ERP e os campos separados (não vão para o extrato)
+    if (detalhe) Object.assign(it, { contaErp: x.contaErp, operacao: x.operacao, emitente: x.emitente, obs: x.obs });
+    return it;
   }).filter(i => i.valor !== 0);
 
   const totalCred = r2(itens.reduce((s, x) => s + x.cred, 0)), totalDeb = r2(itens.reduce((s, x) => s + x.deb, 0));

@@ -2,6 +2,7 @@ import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, $$, esc, money, cls, dateBR, options, MESES_CURTO, debounce, exportXLSX, fail, toast } from '../lib/ui.js';
 import { abrirLancamento } from '../lib/lanc-form.js';
 import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
+import { importarLancamentosERP } from '../lib/erp-lancamentos.js';
 
 export const title = 'Lançamentos';
 const PAGE = 100;
@@ -17,7 +18,7 @@ export async function render(root) {
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="exp">Exportar Excel</button>
           <a class="btn" href="#/conciliacao" title="Importar o extrato OFX do banco e conciliar com os lançamentos">Conciliação bancária (OFX)</a>
-          ${podeEditar() ? '<button class="btn" id="lanc-nf" title="Títulos a receber por NF, com parcelas">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar XML das NFs</button><button class="btn primary" id="novo">+ Novo lançamento</button>' : ''}
+          ${podeEditar() ? '<button class="btn" id="lanc-nf" title="Títulos a receber por NF, com parcelas">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar XML das NFs</button><button class="btn" id="imp-erp" title="Relatório RFLX036 do ERP por Conta Pagamento: cada linha vira lançamento Pago na conta">Importar do ERP</button><button class="btn primary" id="novo">+ Novo lançamento</button>' : ''}
         </div>
       </div>
       <div class="toolbar" id="flt">
@@ -49,6 +50,7 @@ export async function render(root) {
   $('#exp', root).onclick = () => exportar();
   $('#lanc-nf', root) && ($('#lanc-nf', root).onclick = () => lancarNFs(() => load(root)));
   $('#imp-nf', root) && ($('#imp-nf', root).onclick = () => importarNFs(() => load(root)));
+  $('#imp-erp', root) && ($('#imp-erp', root).onclick = () => importarLancamentosERP(() => load(root)));
   if (podeEditar()) {
     $('#baixar', root).onclick = async () => {
       const ids = selecionados(root); if (!ids.length) return;
