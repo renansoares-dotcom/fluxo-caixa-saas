@@ -15,7 +15,8 @@ const chaveSac = (cnpj, nome) => { const d = String(cnpj || '').replace(/\D/g, '
 const hojeISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
 const dias = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
 const num1 = (v) => (+v || 0).toFixed(1).replace('.', ',');
-const ehDiretor = () => state.papel === 'diretor';
+// aprova/rejeita: diretor ou admin (SQL 048)
+const ehDiretor = () => ['diretor', 'admin'].includes(state.papel);
 const sacadoDe = (t) => state.cad.favById[t.favorecido_id]?.nome || t.descricao || '(sem cliente)';
 const cnpjDe = (t) => state.cad.favById[t.favorecido_id]?.documento || '';
 function descCustos(c, fu, n) {
