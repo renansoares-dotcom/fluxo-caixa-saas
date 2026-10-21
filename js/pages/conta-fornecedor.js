@@ -112,7 +112,7 @@ async function carregar(root, favId) {
         cli ? q(sb.from('nfe_fidc_vinculos').select('nota_id,parcela_id,t:fidc_titulos(fundo,bordero,valor,data_operacao)').in('nota_id', c)) : Promise.resolve([])]);
       itens.push(...it); parcelas.push(...pa); vinc.push(...vi); fidc.push(...fi);
     }
-    if (creds?.length) for (const c of chunks(creds.map(x => x.id))) usos.push(...await q(sb.from('creditos_usos').select('id,credito_id,nota_id,parcela_id,valor,data,observacao').in('credito_id', c)));
+    if (creds?.length) for (const c of chunks(creds.map(x => x.id))) { let u; try { u = await q(sb.from('creditos_usos').select('id,credito_id,nota_id,parcela_id,lancamento_id,valor,data,observacao').in('credito_id', c)); } catch { u = await q(sb.from('creditos_usos').select('id,credito_id,nota_id,parcela_id,valor,data,observacao').in('credito_id', c)); } usos.push(...u); }
     // pagamentos/recebimentos ligados a alguma nota (de qualquer cadastro)
     const lancNota = new Set();
     for (const c of chunks(lancs.map(l => l.id))) for (const v of await q(sb.from('nfe_vinculos').select('lancamento_id').in('lancamento_id', c))) lancNota.add(v.lancamento_id);
@@ -150,7 +150,9 @@ function calcular() {
     ...validas.map(n => ({ data: n.emissao, ord: cli ? 0 : 1, tipo: 'nf', hist: `NF ${n.numero}${n.kg ? ' · ' + kgFmt(n.kg) : ''}${n.natureza ? ' · ' + n.natureza : ''}`, dinheiro: 0, nota: +n.v_nf, n })),
     ...(cli ? devol.map(n => ({ data: n.emissao, ord: 2, tipo: 'dev', hist: `Devolução NF ${n.numero}${n.natureza ? ' · ' + n.natureza : ''}`, dinheiro: 0, nota: -+n.v_nf, n })) : []),
     ...(cli ? validas.flatMap(n => n.fidcs.map(f => ({ data: f.t?.data_operacao || n.emissao, ord: 3, tipo: 'fidc', hist: `Antecipado no FIDC · ${f.t?.fundo || ''} borderô ${f.t?.bordero || ''} · NF ${n.numero}`, dinheiro: +(f.t?.valor || 0), nota: 0 }))) : []),
-    ...(cli ? usos.map(u => ({ data: u.data, ord: 4, tipo: 'cred', hist: `Crédito usado · NF ${(notas.find(n => n.id === u.nota_id) || {}).numero || ''}${u.observacao ? ' · ' + u.observacao : ''}`, dinheiro: +u.valor, nota: 0 })) : []),
+    ...(cli ? usos.filter(u => !u.lancamento_id).map(u => ({ data: u.data, ord: 4, tipo: 'cred', hist: `Crédito usado · NF ${(notas.find(n => n.id === u.nota_id) || {}).numero || ''}${u.observacao ? ' · ' + u.observacao : ''}`, dinheiro: +u.valor, nota: 0 })) : []),
+    // crédito devolvido em dinheiro (pagamento a maior que o fornecedor devolveu; crédito do cliente pago a ele)
+    ...usos.filter(u => u.lancamento_id).map(u => ({ data: u.data, ord: 5, tipo: 'din', hist: `${cli ? 'Crédito devolvido ao cliente' : 'Devolução do fornecedor (crédito)'}${u.observacao && u.observacao !== 'Devolução em dinheiro' ? ' · ' + u.observacao : ''}`, dinheiro: -u.valor, nota: 0, reg: true, l: { id: u.lancamento_id } })),
   ].sort((a, b) => a.data.localeCompare(b.data) || a.ord - b.ord);
   let s = 0; for (const x of ext) { s = r2(s + sinal * (x.dinheiro - x.nota)); x.saldo = s; }
   D.extrato = ext;

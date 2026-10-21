@@ -5,7 +5,7 @@
 import { sb, state, q, fetchAll, podeEditar } from './data.js';
 import { $, esc, money, dateBR, fail, toast } from './ui.js';
 import { CFOP_SEM_FINANCEIRO } from './nfe-fiscal.js';
-import { usosPorNota } from './creditos.js';
+import { usosPorNota, registrarPagoMaior } from './creditos.js';
 
 const R = { de: '', ate: '', lde: '', late: '', bp: '', bl: '', soSug: false, selP: new Set(), selL: new Set() };
 let P = [], L = [], SUG = [];
@@ -189,6 +189,10 @@ async function vincular(selP, selL, c, root, onMudou) {
   const tp = selP.reduce((s, n) => s + n.falta, 0), tl = selL.reduce((s, l) => s + +l.valor, 0);
   if (!perto(tp, tl) && !confirm(tl < tp ? `Os pagamentos somam ${money(tl)} e as notas ${money(tp)}. Vincular assim? A nota fica parcial (falta ${money(tp - tl)}).`
     : `Os pagamentos somam ${money(tl)}, ${money(tl - tp)} a mais que as notas (${money(tp)}). Vincular assim?`)) return;
+  // pagamento a maior: a diferença vira crédito com o fornecedor (abate as próximas notas ou é devolvida em dinheiro)
+  const sobra = +(tl - tp).toFixed(2);
+  const favCred = selP.find(n => n.favorecido_id)?.favorecido_id || selL.find(l => l.favorecido_id)?.favorecido_id || null;
+  const gerarCred = sobra > 0.05 && favCred && confirm(`Gerar crédito de ${money(sobra)} com o fornecedor (pagamento a maior)?\n\nO crédito fica em Créditos e adiantamentos e pode abater as próximas notas dele ou ser devolvido em dinheiro.\nCancelar = vincular sem gerar crédito.`);
   const outroForn = selL.filter(l => !selP.some(n => mesmoForn(n, l)));
   if (outroForn.length && !confirm(`${outroForn.length} pagamento(s) estão em outro fornecedor (${[...new Set(outroForn.map(l => l.fav_nome))].join(', ')}). Vincular mesmo assim?`)) return;
   const ns = selP.slice().sort((a, b) => a.emissao.localeCompare(b.emissao) || a.numero - b.numero).map(n => ({ n, resta: n.falta }));
@@ -202,7 +206,13 @@ async function vincular(selP, selL, c, root, onMudou) {
   }
   try {
     await q(sb.from('nfe_vinculos').insert(rows));
-    toast(`${rows.length} pagamento(s) vinculado(s)`);
+    let credTxt = '';
+    if (gerarCred) {
+      const ult = selL.slice().sort((a, b) => a.data.localeCompare(b.data)).at(-1), notaUlt = ns.at(-1).n;
+      try { await registrarPagoMaior({ favorecido_id: favCred, valor: sobra, data: ult.data, lancamento_id: ult.id, nota: notaUlt }); credTxt = ` · crédito de ${money(sobra)} gerado`; }
+      catch (e) { fail(new Error(`Vínculo gravado, mas o crédito não: ${e.message || e}`)); }
+    }
+    toast(`${rows.length} pagamento(s) vinculado(s)${credTxt}`);
     R.selP.clear(); R.selL.clear(); await carregar(c, root, onMudou); onMudou && onMudou();
   } catch (err) { fail(String(err.message || err).includes('duplicate') ? new Error('Algum pagamento já estava vinculado a outra nota. Recarregue.') : err); }
 }

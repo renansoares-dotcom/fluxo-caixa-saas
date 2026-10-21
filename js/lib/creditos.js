@@ -1,12 +1,14 @@
 // Créditos e adiantamentos de clientes e fornecedores e o uso deles nas parcelas das notas.
 // - adiantamento: o cliente pagou (ou a IPLAMM pagou ao fornecedor) antes de existir a nota
 // - devolução / desconto / acordo / outro: crédito que o cliente tem a abater
+// - pagamento a maior: o pagamento ligado à nota passou do valor dela; a diferença fica de crédito com o fornecedor
 // O uso do crédito numa parcela conta como recebido (ou pago) sem movimento de caixa — o caixa já entrou/saiu
-// quando o adiantamento foi recebido/pago.
+// quando o adiantamento foi recebido/pago. O crédito também pode ser DEVOLVIDO EM DINHEIRO: o uso fica ligado ao
+// lançamento em que o dinheiro voltou (creditos_usos.lancamento_id), sem nota.
 import { sb, state, q, fetchAll, podeEditar } from './data.js';
 import { $, esc, money, dateBR, fail, toast, modal, options, parseNum } from './ui.js';
 
-export const TIPOS = { adiantamento: 'Adiantamento', devolucao: 'Crédito por devolução', desconto: 'Desconto / abatimento', acordo: 'Acordo comercial', outro: 'Outro crédito' };
+export const TIPOS = { adiantamento: 'Adiantamento', pago_maior: 'Pagamento a maior', devolucao: 'Crédito por devolução', desconto: 'Desconto / abatimento', acordo: 'Acordo comercial', outro: 'Outro crédito' };
 const dig = (s) => String(s || '').replace(/\D/g, '');
 const chunks = (a, k = 150) => { const o = []; for (let i = 0; i < a.length; i += k) o.push(a.slice(i, i + k)); return o; };
 
@@ -122,5 +124,69 @@ export function novoCredito(preset = {}, onDone) {
         descricao: $('#ds', m.el).value.trim() || null, lancamento_id: lancSel?.id || null, nota_id: preset.nota_id || null }));
       toast('Crédito cadastrado'); m.close(); onDone && onDone();
     } catch (e) { fail(/relation|does not exist|schema cache/i.test(e.message || '') ? new Error('A estrutura de créditos ainda não foi instalada no banco (rodar o SQL de créditos e adiantamentos).') : e); }
+  };
+}
+
+const SEM_ESTRUTURA = /creditos_usos_destino|lancamento_id|pago_maior|creditos_tipo_check|null value in column "nota_id"/i;
+const erroEstrutura = (e) => SEM_ESTRUTURA.test(e?.message || '') ? new Error('Falta rodar o SQL 20261021000047_credito_pago_maior.sql no Supabase (pagamento a maior e devolução de crédito).') : e;
+
+/** Pagamento a maior: a diferença entre o pago e a nota vira crédito com o fornecedor. */
+export async function registrarPagoMaior({ favorecido_id, valor, data, lancamento_id, nota, natureza = 'fornecedor' }) {
+  try {
+    return await q(sb.from('creditos').insert({ empresa_id: state.empresa.id, favorecido_id, natureza, tipo: 'pago_maior', data, valor: +(+valor).toFixed(2),
+      descricao: `Pagamento a maior${nota ? ` na NF ${nota.numero}` : ''}`, lancamento_id: lancamento_id || null, nota_id: nota?.id || null }).select().single());
+  } catch (e) { throw erroEstrutura(e); }
+}
+
+/**
+ * Devolução do crédito em dinheiro (o fornecedor devolve o que foi pago a mais; ou a IPLAMM devolve ao cliente).
+ * Liga um lançamento que já existe (entrada do fornecedor / saída para o cliente, sem nota) ou cria um novo.
+ */
+export async function devolverCredito(c, onDone) {
+  const cad = state.cad, forn = c.natureza === 'fornecedor', f = cad.favById[c.favorecido_id];
+  const saldo = +(+c.saldo).toFixed(2);
+  if (!(saldo > 0.005)) return toast('Este crédito não tem saldo.', true);
+  const natLanc = forn ? 'C' : 'D';
+  let livres = [];
+  try {
+    const usados = new Set((await q(sb.from('creditos_usos').select('lancamento_id').eq('empresa_id', state.empresa.id).not('lancamento_id', 'is', null))).map(u => u.lancamento_id));
+    livres = (await fetchAll(() => sb.from('lancamentos').select('id,data,valor,descricao,conta_id,plano_id,v:nfe_vinculos(id)').eq('empresa_id', state.empresa.id).in('favorecido_id', mesmoGrupo(c.favorecido_id)).eq('status', 'Pago').gte('data', c.data).order('data')))
+      .filter(l => !usados.has(l.id) && !l.v?.length && cad.planoById[l.plano_id]?.natureza === natLanc && cad.planoById[l.plano_id]?.tipo !== 'T');
+  } catch (e) { return fail(erroEstrutura(e)); }
+  const planoPadrao = cad.contasPlano.find(p => p.codigo === (forn ? '1.02.09' : '2.04.04'));
+  const planos = cad.contasPlano.filter(p => p.natureza === natLanc && p.tipo !== 'T' && p.ativo !== false);
+  const m = modal({ title: `Devolver crédito em dinheiro — ${f?.nome || ''}`, wide: true, body: `
+    <p class="small muted" style="margin-top:0">${esc(TIPOS[c.tipo] || c.tipo)} de ${dateBR(c.data)} · valor ${money(c.valor)} · saldo <strong>${money(saldo)}</strong>.
+      ${forn ? 'O fornecedor devolve o valor: o dinheiro entra na conta e o crédito é baixado.' : 'A empresa devolve o valor ao cliente: o dinheiro sai da conta e o crédito é baixado.'}</p>
+    <label>Valor devolvido<input id="vl" value="${saldo.toFixed(2).replace('.', ',')}"></label>
+    <h3 style="margin:12px 0 6px">${forn ? 'Entrada' : 'Saída'} já lançada (opcional)</h3>
+    ${livres.length ? `<div class="table-wrap" style="max-height:180px"><table><tbody>${livres.map(l => `<tr><td><input type="radio" name="lx" value="${l.id}"></td><td>${dateBR(l.data)}</td><td class="num">${money(l.valor)}</td><td>${esc(cad.contaById[l.conta_id]?.nome || '—')}</td><td class="wrap small">${esc(cad.planoById[l.plano_id]?.codigo || '')} ${esc(l.descricao || '')}</td></tr>`).join('')}</tbody></table></div>`
+      : `<p class="small muted">Nenhum lançamento de ${forn ? 'entrada' : 'saída'} desse cadastro sem nota depois de ${dateBR(c.data)}.</p>`}
+    <h3 style="margin:12px 0 6px">Ou lançar agora</h3>
+    <div class="grid2">
+      <label>Data<input type="date" id="dt" value="${new Date().toISOString().slice(0, 10)}"></label>
+      <label>Conta<select id="ct">${options(cad.contas.filter(x => x.ativo !== false), { empty: 'Selecione…' })}</select></label>
+      <label class="grow">Plano de contas<select id="pl">${options(planos, { label: 'label', selected: planoPadrao?.id })}</select></label>
+      <label class="grow">Descrição<input id="ds" value="${esc(`Devolução de ${(TIPOS[c.tipo] || 'crédito').toLowerCase()}${c.descricao ? ' — ' + c.descricao : ''}`)}"></label>
+    </div>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Baixar crédito</button>' });
+  m.el.addEventListener('change', (e) => { if (e.target.name === 'lx') { const l = livres.find(x => x.id === e.target.value); if (l) $('#vl', m.el).value = Math.min(+l.valor, saldo).toFixed(2).replace('.', ','); } });
+  $('#ok', m.el).onclick = async () => {
+    const valor = parseNum($('#vl', m.el).value), sel = m.el.querySelector('[name=lx]:checked')?.value;
+    if (!(valor > 0)) return toast('Informe o valor devolvido', true);
+    if (valor > saldo + 0.005) return toast('O valor passa do saldo do crédito', true);
+    let lancId = sel || null, data = $('#dt', m.el).value;
+    try {
+      if (!lancId) {
+        const conta = $('#ct', m.el).value, plano = $('#pl', m.el).value;
+        if (!conta || !plano) return toast('Escolha um lançamento já feito ou informe conta e plano para lançar agora', true);
+        const l = await q(sb.from('lancamentos').insert({ empresa_id: state.empresa.id, data, plano_id: plano, conta_id: conta, status: 'Pago', valor: +valor.toFixed(2),
+          favorecido_id: c.favorecido_id, descricao: $('#ds', m.el).value.trim() || null, origem: `credito:${c.id}` }).select().single());
+        lancId = l.id;
+      } else data = livres.find(x => x.id === lancId)?.data || data;
+      try { await q(sb.from('creditos_usos').insert({ empresa_id: state.empresa.id, credito_id: c.id, nota_id: null, lancamento_id: lancId, data, valor: +valor.toFixed(2), observacao: 'Devolução em dinheiro' })); }
+      catch (e) { if (!sel) await sb.from('lancamentos').delete().eq('id', lancId); throw e; }   // não deixa o lançamento novo solto
+      toast(`Crédito baixado: ${money(valor)} devolvido${sel ? '' : ' (lançamento criado)'}`); m.close(); onDone && onDone();
+    } catch (e) { fail(erroEstrutura(e)); }
   };
 }
