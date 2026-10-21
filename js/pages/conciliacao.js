@@ -562,13 +562,29 @@ async function gravarItens(s, impId) {
   // (mesma data, valor, documento e descrição) não entra de novo. Conta por ocorrência, para não perder dois
   // movimentos iguais legítimos no mesmo dia.
   const chave = (x) => `${x.data}|${(+x.valor).toFixed(2)}|${(x.documento || '').trim()}|${(x.descricao || '').trim().toUpperCase()}`;
-  const jaTem = new Map(), fitids = new Set();
+  const jaTem = new Map(), fitids = new Set(), fimImp = new Map(); let ex = [];
   if (s.itens.length) {
     const ds = s.itens.map(x => x.data).sort();
-    const ex = await fetchAll(() => sb.from('extrato_itens').select('id,data,valor,documento,descricao,fitid').eq('empresa_id', e).eq('conta_id', s.contaId).gte('data', ds[0]).lte('data', ds[ds.length - 1]).order('id'));
+    ex = await fetchAll(() => sb.from('extrato_itens').select('id,data,valor,documento,descricao,fitid,importacao_id').eq('empresa_id', e).eq('conta_id', s.contaId).gte('data', ds[0]).lte('data', ds[ds.length - 1]).order('id'));
     for (const x of ex) { fitids.add(x.fitid); jaTem.set(chave(x), (jaTem.get(chave(x)) || 0) + 1); }
+    // último dia de cada importação anterior: um extrato tirado no meio do dia traz o histórico mais curto
+    // ("PAGTO ELETRON COBRANCA" × "PAGTO ELETRON COBRANCA MSF SOLUCOES…"; "…REMET.FS F. I. E. D. C. N" × "…REMET.FS FUNDO DE INVESTIM")
+    const ids = [...new Set(ex.map(x => x.importacao_id).filter(Boolean))];
+    if (ids.length) for (const i of await q(sb.from('extrato_importacoes').select('id,dt_fim').in('id', ids))) fimImp.set(i.id, i.dt_fim);
   }
-  const itens = s.itens.filter(x => { if (fitids.has(x.fitid)) return false; const k = chave(x), c = jaTem.get(k) || 0; if (c > 0) { jaTem.set(k, c - 1); return false; } return true; });
+  const usadosParcial = new Set();
+  const norm = (t) => String(t || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const prefixo = (a, b) => { a = norm(a); b = norm(b); let k = 0; while (k < a.length && k < b.length && a[k] === b[k]) k++; return k; };
+  const itens = s.itens.filter(x => {
+    if (fitids.has(x.fitid)) return false;
+    const k = chave(x), c = jaTem.get(k) || 0; if (c > 0) { jaTem.set(k, c - 1); return false; }
+    // mesmo movimento do último dia de uma importação anterior, com o histórico cortado: mesma data, valor e documento e
+    // início do histórico igual (20+ caracteres)
+    const par = ex.find(o => !usadosParcial.has(o.id) && o.data === x.data && Math.abs(+o.valor - +x.valor) < 0.005 && (o.documento || '').trim() === (x.documento || '').trim()
+      && fimImp.get(o.importacao_id) === x.data && norm(o.descricao) !== norm(x.descricao) && prefixo(o.descricao, x.descricao) >= 20);
+    if (par) { usadosParcial.add(par.id); return false; }
+    return true;
+  });
   for (let i = 0; i < itens.length; i += 500) {
     const rows = itens.slice(i, i + 500).map(x => ({ ...x, empresa_id: e, conta_id: s.contaId, importacao_id: impId }));
     const ins = await q(sb.from('extrato_itens').upsert(rows, { onConflict: 'empresa_id,conta_id,fitid', ignoreDuplicates: true }).select('id'));
