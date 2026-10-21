@@ -1,7 +1,7 @@
 // Auditoria: quem incluiu, alterou ou excluiu, quando, e o que mudou (antes → depois)
 // Leitura só para administrador e diretor (o banco também restringe). Grava a partir da migração 038.
 import { sb, state, q } from '../lib/data.js';
-import { $, $$, esc, money, dateBR, fail, loading, modal, options, exportXLSX, today } from '../lib/ui.js';
+import { $, $$, esc, money, dateBR, fail, loading, modal, options, exportXLSX, today, toast } from '../lib/ui.js';
 
 export const title = 'Auditoria';
 
@@ -70,10 +70,22 @@ export function detalhe(a) {
   const campos = a.acao === 'alterou' ? a.campos : Object.keys(a.antes || a.depois || {}).filter(k => k !== 'empresa_id');
   const linhas = campos.map(k => `<tr><td>${esc(CAMPOS[k] || k)}</td>
     ${a.acao !== 'incluiu' ? `<td>${fmt(k, a.antes?.[k])}</td>` : ''}${a.acao !== 'excluiu' ? `<td>${fmt(k, a.depois?.[k])}</td>` : ''}</tr>`).join('');
-  modal({ title: `${ACOES[a.acao]} · ${TABELAS[a.tabela] || a.tabela}`, wide: true, body: `
+  const pode = ['admin', 'diretor'].includes(state.papel);
+  const m = modal({ title: `${ACOES[a.acao]} · ${TABELAS[a.tabela] || a.tabela}`, wide: true, body: `
     <p class="small muted" style="margin-top:0">${quando(a.criado_em)} · ${quem(a)}${resumo(a) ? ' · ' + esc(resumo(a)) : ''}</p>
+    ${a.operacao ? `<p class="small" style="margin-top:0">Faz parte da operação <strong>${esc(a.operacao_nome || '')}</strong>: desfazer volta a operação inteira.</p>` : ''}
     <div class="table-wrap"><table><thead><tr><th>Campo</th>${a.acao !== 'incluiu' ? '<th>Antes</th>' : ''}${a.acao !== 'excluiu' ? '<th>Depois</th>' : ''}</tr></thead>
-    <tbody>${linhas || '<tr><td colspan="3" class="empty">Sem campos.</td></tr>'}</tbody></table></div>` });
+    <tbody>${linhas || '<tr><td colspan="3" class="empty">Sem campos.</td></tr>'}</tbody></table></div>`,
+    foot: `<button class="btn" data-close>Fechar</button>${pode ? '<button class="btn danger" id="au-desf">Desfazer</button>' : ''}` });
+  const b = $('#au-desf', m.el);
+  if (b) b.onclick = async () => {
+    if (!confirm(a.operacao ? `Desfazer a operação "${a.operacao_nome || ''}" inteira?` : 'Desfazer esta alteração?')) return;
+    b.disabled = true;
+    try {
+      const r = a.operacao ? await q(sb.rpc('desfazer_operacao', { p_operacao: a.operacao })) : await q(sb.rpc('desfazer_auditoria', { p_id: a.id }));
+      toast(a.operacao ? `Operação desfeita (${(r || []).length} passo(s))` : `Desfeito: ${r}`); m.close();
+    } catch (err) { fail(err); b.disabled = false; }
+  };
 }
 
 async function carregarEmails() {
