@@ -51,14 +51,20 @@ export const condicaoDoFundo = (fu) => ({ id: `fundo:${fu.id}`, nome: fu.nome, l
   dias_compensacao: +fu.dias_compensacao || 0, rola_dia_util: false, prazo_min_cobrado: null, tarifa_operacao: +fu.tarifa_operacao || 0, custo_assinatura: +fu.custo_assinatura || 0,
   tarifa_titulo: +fu.tarifa_titulo || 0, custo_consulta: +fu.custo_consulta || 0, ad_valorem_pct: +fu.ad_valorem_pct || 0, iof_pct: +fu.iof_pct || 0 });
 
-/** Prazo (dias) e prazo cobrado de um título: vencimento + compensação, rolando para dia útil; respeita prazo mínimo cobrado */
-export function prazos(cond, dataOp, venc) {
+/** Recesso do fundo em que a data cai: [{de, ate, cobra_ate}] (SQL 051) */
+export const recessoEm = (recessos, data) => (Array.isArray(recessos) ? recessos : []).find(r => r && r.de && r.ate && data >= r.de && data <= r.ate) || null;
+
+/** Prazo (dias) e prazo cobrado de um título: vencimento + compensação, rolando para dia útil; se cair no recesso do fundo,
+ *  cobra até o fim do recesso; respeita prazo mínimo cobrado. Devolve também a data cobrada e o recesso aplicado. */
+export function prazos(cond, dataOp, venc, recessos = []) {
   const prazo = Math.max(1, diasEntre(dataOp, venc));
   let alvo = addDias(venc, +cond.dias_compensacao || 0);
   if (cond.rola_dia_util) alvo = proximoUtil(alvo);
+  const rec = recessoEm(recessos, alvo);
+  if (rec) alvo = rec.cobra_ate || rec.ate;
   let pc = Math.max(1, diasEntre(dataOp, alvo));
   if (cond.prazo_min_cobrado) pc = Math.max(pc, +cond.prazo_min_cobrado);
-  return { prazo, pc };
+  return { prazo, pc, cobradoAte: alvo, recesso: rec };
 }
 
 /** Deságio de um título pela condição */

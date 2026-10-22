@@ -8,7 +8,7 @@ import { condicaoDe, condicaoDoFundo, prazos, desagioTitulo } from '../lib/fidc-
 
 export const title = 'Propostas de borderô';
 
-const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', campoData: 'emissao', propostaEdit: null, pf: { status: '', fundo: '', mes: '', busca: '' } };
+const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', campoData: 'emissao', propostaEdit: null, vencAj: {}, pf: { status: '', fundo: '', mes: '', busca: '' } };
 let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [], condicoes = [];
 // sacado: raiz do CNPJ (8 dígitos) quando houver; senão o nome normalizado (os borderôs cortam o nome em ~40 letras)
 const chaveSac = (cnpj, nome) => { const d = String(cnpj || '').replace(/\D/g, ''); return d.length >= 8 ? 'c' + d.slice(0, 8) : 'n' + String(nome || '').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 25); };
@@ -95,10 +95,11 @@ function simGrupo(fu, cond, tits, dataOp, recompras = 0) {
   const face = tits.reduce((s, t) => s + +t.valor, 0);
   let desagio = 0, fp = 0, fpc = 0; const itens = [];
   for (const t of tits) {
-    const { prazo, pc } = prazos(cond, dataOp, t.data);
+    const { prazo, pc, cobradoAte, recesso } = prazos(cond, dataOp, t.data, fu.recessos);
     const d = desagioTitulo(cond, t.valor, pc);
+    const extraRec = recesso ? d - desagioTitulo(cond, t.valor, prazos(cond, dataOp, t.data, []).pc) : 0;
     desagio += d; fp += +t.valor * prazo; fpc += +t.valor * pc;
-    itens.push({ t, prazo, pc, custo: d, cond });
+    itens.push({ t, prazo, pc, custo: d, cond, cobradoAte, recesso, extraRec });
   }
   const ad = face * (+cond.ad_valorem_pct || 0) / 100;
   // custos da operação: TED/fixo e assinatura por borderô, boleto por título, Serasa por sacado novo no fundo
@@ -210,8 +211,11 @@ function abaTitulos(c, root) {
   }).catch(() => {});
 }
 
+// título com o vencimento ajustado na proposta (o original fica em venc_orig)
+const comVenc = (t) => ui.vencAj[t.id] && ui.vencAj[t.id] !== t.data ? { ...t, data: ui.vencAj[t.id], venc_orig: t.data } : t;
+
 function painel(el, root) {
-  const tits = titulos.filter(t => ui.sel.has(t.id));
+  const tits = titulos.filter(t => ui.sel.has(t.id)).map(comVenc);
   const ativos = fundos.filter(f => f.ativo);
   if (!tits.length) { el.innerHTML = `<div class="card"><h2>Nova proposta</h2><div class="empty">Marque os títulos ao lado para simular o borderô.</div>
     ${!ativos.length ? '<p class="small neg">Cadastre as condições dos fundos antes (aba “Condições dos fundos”).</p>' : ''}</div>`; return; }
@@ -271,6 +275,17 @@ function painel(el, root) {
       <div><h3>Sacados na proposta</h3><div class="table-wrap"><table><tbody>${sacOrd.slice(0, 8).map(([k, v]) => `<tr><td class="wrap">${esc(k)}</td><td class="num">${money0(v)}</td><td class="num${v / S.face > .3 ? ' neg' : ''}">${pct(v / S.face)}</td></tr>`).join('')}${sacOrd.length > 8 ? `<tr class="muted"><td>Demais (${sacOrd.length - 8})</td><td class="num">${money0(sacOrd.slice(8).reduce((s, [, v]) => s + v, 0))}</td><td></td></tr>` : ''}</tbody></table></div></div>
       <div><h3>Prazos</h3><div class="table-wrap"><table><tbody>${['até 30 dias', '31 a 45', '46 a 60', '61 a 90', 'acima de 90'].filter(k => vencs[k]).map(k => `<tr><td>${k}</td><td class="num">${money0(vencs[k])}</td><td class="num">${pct(vencs[k] / S.face)}</td></tr>`).join('')}</tbody></table></div></div>
     </div>
+    ${(() => { const rec = S.itens.filter(x => x.recesso); const ex = rec.reduce((s, x) => s + x.extraRec, 0); const r0 = rec[0]?.recesso;
+      return rec.length ? `<div class="alert-row atencao" style="margin-top:12px"><span class="alert-tag">⚠ Recesso</span><div><strong>${rec.length} título(s) caem no recesso do ${esc(S.fu.nome)} (${dateBR(r0.de)} a ${dateBR(r0.ate)})</strong>
+        <div class="small muted">São cobrados até ${dateBR(r0.cobra_ate || r0.ate)}: ${money(ex)} a mais de deságio. Ajuste o vencimento abaixo para simular outra data.</div></div></div>` : ''; })()}
+    <h3 style="margin-top:16px">Títulos e vencimentos</h3>
+    <div class="toolbar" style="padding:0;margin-bottom:6px"><label>Vencimento para todos<input type="date" id="v-todos"></label><button class="btn small" id="v-aplica">Aplicar</button>
+      ${Object.keys(ui.vencAj).some(id => ui.sel.has(id)) ? '<button class="btn small" id="v-volta">Voltar os vencimentos das notas</button>' : ''}
+      <span class="muted small">O vencimento ajustado vale para a simulação e vai para a carteira do fundo na aprovação; a nota não muda.</span></div>
+    <div class="table-wrap" style="max-height:320px"><table class="small" id="v-tab"><thead><tr><th>NF / parcela</th><th>Sacado</th><th>Condição</th><th>Vencimento</th><th class="num">Prazo</th><th>Cobrado até</th><th class="num">Valor</th><th class="num">Deságio</th></tr></thead><tbody>
+      ${S.itens.slice().sort((a, b) => a.t.data.localeCompare(b.t.data) || String(a.t.documento).localeCompare(String(b.t.documento))).map(x => `<tr data-vid="${x.t.id}"><td>${esc(x.t.documento || '')}</td><td class="wrap">${esc(sacadoDe(x.t))}</td><td class="small">${esc(x.cond.legado ? '—' : x.cond.nome)}</td>
+        <td><input type="date" data-venc value="${x.t.data}" style="width:140px">${x.t.venc_orig ? `<div class="muted">nota: ${dateBR(x.t.venc_orig)}</div>` : ''}</td><td class="num">${x.prazo}</td>
+        <td>${dateBR(x.cobradoAte)}${x.recesso ? ' <span class="badge vencido">recesso</span>' : ''}</td><td class="num">${money(x.t.valor)}</td><td class="num">${money(x.custo)}</td></tr>`).join('')}</tbody></table></div>
     <label class="span2" style="margin-top:12px">Observação para o diretor<textarea id="obs" rows="2">${esc(ui.obs)}</textarea></label>
     <div class="toolbar" style="margin-top:12px;justify-content:flex-end">
       ${ui.propostaEdit ? '<button class="btn" id="cancel-ed">Cancelar edição</button>' : ''}
@@ -285,6 +300,11 @@ function painel(el, root) {
   $('#pf', el).addEventListener('change', (e) => { ui[e.target.name] = e.target.value; if (e.target.name === 'dataOp') return abaTitulos($('#corpo', root), root); painel(el, root); });
   if (!S) return;
   $('#obs', el).oninput = (e) => { ui.obs = e.target.value; };
+  const origDe = (id) => titulos.find(t => t.id === id)?.data;
+  $('#v-tab', el).addEventListener('change', (e) => { const tr = e.target.closest('tr[data-vid]'); if (!tr || !e.target.matches('[data-venc]') || !e.target.value) return;
+    const id = tr.dataset.vid; if (e.target.value === origDe(id)) delete ui.vencAj[id]; else ui.vencAj[id] = e.target.value; painel(el, root); });
+  $('#v-aplica', el).onclick = () => { const v = $('#v-todos', el).value; if (!v) return toast('Escolha a data', true); for (const id of ui.sel) { if (v === origDe(id)) delete ui.vencAj[id]; else ui.vencAj[id] = v; } painel(el, root); };
+  $('#v-volta', el) && ($('#v-volta', el).onclick = () => { for (const id of ui.sel) delete ui.vencAj[id]; painel(el, root); });
   $('#cancel-ed', el) && ($('#cancel-ed', el).onclick = () => { ui.propostaEdit = null; ui.sel.clear(); abaTitulos($('#corpo', root), root); });
 }
 
@@ -299,7 +319,7 @@ async function salvarProposta(root, S, tits, chk, sims, status) {
     for (const g of gs) feitas.push(await gravarProposta(g, chk, sims, status));
   } catch (err) { fail(err); if (!feitas.length) return; }
   toast(status === 'Pendente' ? `Proposta${feitas.length > 1 ? 's' : ''} nº ${feitas.map(p => p.numero).join(', ')} enviada${feitas.length > 1 ? 's' : ''} para aprovação` : `Rascunho${feitas.length > 1 ? 's' : ''} nº ${feitas.map(p => p.numero).join(', ')} salvo${feitas.length > 1 ? 's' : ''}`);
-  ui.sel.clear(); ui.soSel = false; ui.fundoId = ''; ui.obs = ''; ui.recompras = ''; ui.propostaEdit = null; ui.aba = 'propostas';
+  ui.sel.clear(); ui.vencAj = {}; ui.soSel = false; ui.fundoId = ''; ui.obs = ''; ui.recompras = ''; ui.propostaEdit = null; ui.aba = 'propostas';
   render(root);
 }
 
@@ -320,7 +340,7 @@ async function gravarProposta(S, chk, sims, status) {
       await q(sb.from('fidc_proposta_itens').delete().eq('proposta_id', p.id));
     } else p = await q(sb.from('fidc_propostas').insert(row).select().single());
     const itens = S.itens.map(x => ({ proposta_id: p.id, empresa_id: e, lancamento_id: x.t.id, documento: x.t.documento, sacado: sacadoDe(x.t), cnpj: cnpjDe(x.t) || null,
-      emissao: x.t.emissao, vencimento: x.t.data, valor: x.t.valor, prazo: x.prazo, custo_estimado: +x.custo.toFixed(2) }));
+      emissao: x.t.emissao, vencimento: x.t.data, valor: x.t.valor, prazo: x.prazo, custo_estimado: +x.custo.toFixed(2), ...(x.t.venc_orig ? { vencimento_original: x.t.venc_orig } : {}) }));
     for (let i = 0; i < itens.length; i += 500) await q(sb.from('fidc_proposta_itens').insert(itens.slice(i, i + 500)));
     return p;
   }
@@ -427,6 +447,7 @@ async function detalhe(p, root) {
   $('#del', m.el) && ($('#del', m.el).onclick = () => { if (confirm(`Excluir a proposta nº ${p.numero}?`)) act(() => q(sb.from('fidc_propostas').delete().eq('id', p.id)), 'Proposta excluída'); });
   $('#edit', m.el) && ($('#edit', m.el).onclick = () => {
     ui.propostaEdit = p; ui.sel = new Set(itens.map(i => i.lancamento_id).filter(Boolean)); ui.fundoId = p.fundo_id; ui.dataOp = p.data_operacao;
+    ui.vencAj = Object.fromEntries(itens.filter(i => i.lancamento_id && i.vencimento_original && i.vencimento !== i.vencimento_original).map(i => [i.lancamento_id, i.vencimento]));
     ui.recompras = p.recompras ? String(p.recompras).replace('.', ',') : ''; ui.obs = p.observacao || ''; ui.aba = 'titulos';
     for (const id of ui.sel) delete emProposta[id];
     m.close(); render(root);
@@ -517,7 +538,7 @@ function abaFundos(c, root) {
   c.innerHTML = `<div class="card flush"><div class="card-head"><div><h2>Condições dos fundos</h2><p class="muted small">Usadas para simular as propostas. Os valores iniciais vieram da média dos borderôs de jul–set/2026; ajuste conforme o contrato de cada fundo. Prazo cobrado = prazo real + dias de compensação. FS conferida com o borderô 001226 (06/10): 2,46% a.m. em juros simples sobre a face, prazo + 3 dias. Assinatura, boletos e consultas Serasa entram no custo do borderô (FS e Negocial conferidos com os borderôs de set/2026); a consulta só é cobrada para sacado que ainda não teve título no fundo.</p></div>
     ${ed ? '<button class="btn" id="novo-f">+ Fundo</button>' : ''}</div>
     <div class="table-wrap"><table><thead><tr><th>Fundo</th><th>Conta do fundo</th><th>Crédito do líquido</th>${campos.map(([, n]) => `<th class="num">${n}</th>`).join('')}<th>Deságio</th><th>Ativo</th></tr></thead><tbody>
-      ${fundos.map(f => `<tr class="${ed ? 'clickable' : ''}" data-id="${f.id}"><td><strong>${esc(f.nome)}</strong></td><td>${esc(state.cad.contaById[f.conta_id]?.nome || '—')}</td><td>${esc(state.cad.contaById[f.conta_credito_id]?.nome || '—')}</td>
+      ${fundos.map(f => `<tr class="${ed ? 'clickable' : ''}" data-id="${f.id}"><td><strong>${esc(f.nome)}</strong>${(f.recessos || []).map(r => `<div class="muted small">recesso ${dateBR(r.de)}–${dateBR(r.ate)}</div>`).join('')}</td><td>${esc(state.cad.contaById[f.conta_id]?.nome || '—')}</td><td>${esc(state.cad.contaById[f.conta_credito_id]?.nome || '—')}</td>
         ${campos.map(([k]) => `<td class="num">${f[k] == null ? '–' : ['tarifa_operacao', 'custo_assinatura', 'tarifa_titulo', 'custo_consulta', 'limite_credito'].includes(k) ? money(f[k]) : String(f[k]).replace('.', ',')}</td>`).join('')}<td class="small">${f.metodo_desagio === 'simples' ? 'juros simples' : 'por dentro'}</td><td>${f.ativo ? 'sim' : 'não'}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   blocoCondicoes(c, root);
@@ -532,6 +553,8 @@ function abaFundos(c, root) {
         ${campos.map(([k, n]) => `<label>${n}<input name="${k}" inputmode="decimal" value="${f[k] == null ? '' : String(f[k]).replace('.', ',')}"></label>`).join('')}
         <label>Cálculo do deságio<select name="metodo_desagio"><option value="fator" ${f.metodo_desagio !== 'simples' ? 'selected' : ''}>Por dentro — v·k/(1+k)</option><option value="simples" ${f.metodo_desagio === 'simples' ? 'selected' : ''}>Juros simples sobre a face — v × taxa × dias/30</option></select></label>
         <label>Ativo<select name="ativo"><option value="1" ${f.ativo !== false ? 'selected' : ''}>sim</option><option value="0" ${f.ativo === false ? 'selected' : ''}>não</option></select></label>
+        <label class="span2">Recessos — períodos sem expediente do fundo, um por linha: "20/12/2026 a 07/01/2027" (cobra até o último dia; para outra data, acrescente "cobra 08/01/2027")
+          <textarea name="recessos" rows="2">${esc((f.recessos || []).map(r => `${dateBR(r.de)} a ${dateBR(r.ate)}${r.cobra_ate && r.cobra_ate !== r.ate ? ` cobra ${dateBR(r.cobra_ate)}` : ''}`).join('\n'))}</textarea></label>
         <label class="span2">Observação<input name="observacao" value="${esc(f.observacao || '')}"></label></form>`,
       foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="fs">Salvar</button>',
     });
@@ -539,6 +562,10 @@ function abaFundos(c, root) {
       const form = $('#ff', m.el); if (!form.reportValidity()) return; const d = formData(form);
       const row = { empresa_id: state.empresa.id, nome: d.nome.trim(), conta_id: d.conta_id || null, conta_credito_id: d.conta_credito_id || null, ativo: d.ativo === '1', metodo_desagio: d.metodo_desagio || 'fator', observacao: d.observacao || null, updated_at: new Date().toISOString() };
       for (const [k] of campos) { const v = String(d[k] ?? '').trim(); row[k] = v === '' ? (['prazo_min', 'prazo_max', 'limite_credito', 'limite_sacado_pct'].includes(k) ? null : 0) : parseNum(v); }
+      const iso = (x) => { const m = String(x || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+      const recs = String(d.recessos || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => { const ds = [...l.matchAll(/\d{2}\/\d{2}\/\d{4}/g)].map(m => iso(m[0])); return ds.length >= 2 ? { de: ds[0], ate: ds[1], ...(ds[2] ? { cobra_ate: ds[2] } : {}) } : null; });
+      if (recs.some(r => !r || r.de > r.ate)) return toast('Recesso: use "dd/mm/aaaa a dd/mm/aaaa" em cada linha', true);
+      if (recs.length || (f.recessos || []).length) row.recessos = recs;
       try { if (f.id) await q(sb.from('fidc_fundos').update(row).eq('id', f.id)); else await q(sb.from('fidc_fundos').insert(row)); toast('Condições salvas'); m.close(); await carregar(); desenhar(root); } catch (e) { fail(e); }
     };
   };
