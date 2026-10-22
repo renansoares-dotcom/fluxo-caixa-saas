@@ -4,11 +4,12 @@ import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.j
 import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
 import { notasSemTitulo, gerarContasReceber } from '../lib/nfe-receb.js';
 import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formData, parseNum, exportXLSX, loading, MESES_CURTO, logoPNG } from '../lib/ui.js';
+import { condicaoDe, condicaoDoFundo, prazos, desagioTitulo } from '../lib/fidc-condicoes.js';
 
 export const title = 'Propostas de borderô';
 
 const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', campoData: 'emissao', propostaEdit: null, pf: { status: '', fundo: '', mes: '', busca: '' } };
-let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [];
+let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [], condicoes = [];
 // sacado: raiz do CNPJ (8 dígitos) quando houver; senão o nome normalizado (os borderôs cortam o nome em ~40 letras)
 const chaveSac = (cnpj, nome) => { const d = String(cnpj || '').replace(/\D/g, ''); return d.length >= 8 ? 'c' + d.slice(0, 8) : 'n' + String(nome || '').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 25); };
 
@@ -68,6 +69,8 @@ async function carregar() {
     q(sb.from('fidc_proposta_itens').select('lancamento_id, proposta_id, fidc_propostas!inner(numero,status)').eq('empresa_id', e).in('fidc_propostas.status', ['Rascunho', 'Pendente'])),
     fetchAll(() => sb.from('fidc_titulos').select('fundo,valor,vencimento,sacado_agrupado,sacado,cnpj_sacado').eq('empresa_id', e)),
   ]);
+  // condições por grupo de sacados (SQL 050); sem a tabela, cada fundo usa os próprios campos
+  try { condicoes = await q(sb.from('fidc_fundo_condicoes').select('*').eq('empresa_id', e).order('nome')); } catch { condicoes = []; }
   const hj = hojeISO(); carteira = historico.filter(t => t.vencimento > hj);
   emProposta = {};
   for (const i of itensAbertos || []) emProposta[i.lancamento_id] = i.fidc_propostas;
@@ -84,30 +87,50 @@ function desenhar(root) {
 // ======================================================================
 // Simulação
 // ======================================================================
-function simular(fu, tits, dataOp, recompras = 0) {
+// Condição de cada título no fundo: a do grupo do sacado (CNPJ raiz) ou a de "demais"; sem condições, a do próprio fundo.
+const condTit = (fu, t, dataOp) => condicaoDe(condicoes, fu.id, cnpjDe(t), dataOp) || condicaoDoFundo(fu);
+
+// Um borderô = uma condição (a FS nunca junta Grupo Total e demais sacados na mesma operação).
+function simGrupo(fu, cond, tits, dataOp, recompras = 0) {
   const face = tits.reduce((s, t) => s + +t.valor, 0);
   let desagio = 0, fp = 0, fpc = 0; const itens = [];
   for (const t of tits) {
-    const prazo = Math.max(1, dias(dataOp, t.data)); const pc = prazo + (+fu.dias_compensacao || 0);
-    // simples = juros sobre a face (FS); fator = por dentro, v·k/(1+k)
-    const k = (+fu.taxa_am / 100) * pc / 30; const d = fu.metodo_desagio === 'simples' ? +t.valor * k : +t.valor * k / (1 + k);
+    const { prazo, pc } = prazos(cond, dataOp, t.data);
+    const d = desagioTitulo(cond, t.valor, pc);
     desagio += d; fp += +t.valor * prazo; fpc += +t.valor * pc;
-    itens.push({ t, prazo, pc, custo: d });
+    itens.push({ t, prazo, pc, custo: d, cond });
   }
-  const ad = face * (+fu.ad_valorem_pct || 0) / 100;
+  const ad = face * (+cond.ad_valorem_pct || 0) / 100;
   // custos da operação: TED/fixo e assinatura por borderô, boleto por título, Serasa por sacado novo no fundo
   const jaNoFundo = new Set(historico.filter(h => h.fundo === fu.nome).map(h => chaveSac(h.cnpj_sacado, h.sacado)));
   const sacs = new Set(tits.map(t => chaveSac(cnpjDe(t), sacadoDe(t))));
   const novos = [...sacs].filter(k => !jaNoFundo.has(k)).length;
-  const custos = tits.length ? { ted: +fu.tarifa_operacao || 0, assinatura: +fu.custo_assinatura || 0, boletos: tits.length * (+fu.tarifa_titulo || 0), consultas: novos * (+fu.custo_consulta || 0), novos } : { ted: 0, assinatura: 0, boletos: 0, consultas: 0, novos: 0 };
+  const custos = tits.length ? { ted: +cond.tarifa_operacao || 0, assinatura: +cond.custo_assinatura || 0, boletos: tits.length * (+cond.tarifa_titulo || 0), consultas: novos * (+cond.custo_consulta || 0), novos } : { ted: 0, assinatura: 0, boletos: 0, consultas: 0, novos: 0 };
   const tar = custos.ted + custos.assinatura + custos.boletos + custos.consultas;
-  const iof = face * (+fu.iof_pct || 0) / 100;
+  const iof = face * (+cond.iof_pct || 0) / 100;
   const custo = desagio + ad + tar + iof;
   const prazo = face ? fp / face : 0, prazoC = face ? fpc / face : 0;
   const taxaEf = face && prazoC && face - custo ? custo / (face - custo) / prazoC * 30 : 0;
   const liquido = face - custo - (+recompras || 0);
-  return { fu, face, desagio, ad, tar, custos, iof, custo, prazo, prazoC, taxaEf, liquido, itens, n: tits.length };
+  return { fu, cond, face, desagio, ad, tar, custos, iof, custo, prazo, prazoC, taxaEf, liquido, itens, n: tits.length, tits };
 }
+
+function simular(fu, tits, dataOp, recompras = 0) {
+  const porCond = new Map();
+  for (const t of tits) { const c = condTit(fu, t, dataOp); if (!porCond.has(c.id)) porCond.set(c.id, { cond: c, tits: [] }); porCond.get(c.id).tits.push(t); }
+  const gs = [...porCond.values()];
+  // recompras descontadas no primeiro borderô
+  const grupos = gs.map((g, i) => simGrupo(fu, g.cond, g.tits, dataOp, i === 0 ? recompras : 0));
+  if (grupos.length <= 1) return { ...(grupos[0] || simGrupo(fu, condicaoDoFundo(fu), [], dataOp, recompras)), grupos };
+  const soma = (k) => grupos.reduce((s, g) => s + g[k], 0);
+  const face = soma('face'), custo = soma('custo');
+  const fp = grupos.reduce((s, g) => s + g.prazo * g.face, 0), fpc = grupos.reduce((s, g) => s + g.prazoC * g.face, 0);
+  const prazoC = face ? fpc / face : 0;
+  const custos = ['ted', 'assinatura', 'boletos', 'consultas', 'novos'].reduce((o, k) => ({ ...o, [k]: grupos.reduce((s, g) => s + g.custos[k], 0) }), {});
+  return { fu, cond: null, face, desagio: soma('desagio'), ad: soma('ad'), tar: soma('tar'), custos, iof: soma('iof'), custo, prazo: face ? fp / face : 0, prazoC,
+    taxaEf: face && prazoC && face - custo ? custo / (face - custo) / prazoC * 30 : 0, liquido: soma('liquido'), itens: grupos.flatMap(g => g.itens), n: tits.length, grupos, tits };
+}
+const taxasTxt = (s) => (s.grupos?.length ? s.grupos.map(g => g.cond) : [condicaoDoFundo(s.fu)]).map(c => pct(+c.taxa_am / 100, 2)).join(' / ');
 
 // Verificações de limite e concentração para um fundo
 function checagens(sim, tits, dataOp) {
@@ -198,7 +221,7 @@ function painel(el, root) {
   // melhor fundo por título (distribuição ótima)
   let otimo = 0; const porFundoOt = {};
   for (const t of tits) {
-    const best = ativos.map(fu => ({ fu, c: simular(fu, [t], ui.dataOp).desagio + t.valor * (+fu.ad_valorem_pct || 0) / 100 + (+fu.tarifa_titulo || 0) })).sort((a, b) => a.c - b.c)[0];
+    const best = ativos.map(fu => { const c = condTit(fu, t, ui.dataOp); return { fu, c: simular(fu, [t], ui.dataOp).desagio + t.valor * (+c.ad_valorem_pct || 0) / 100 + (+c.tarifa_titulo || 0) }; }).sort((a, b) => a.c - b.c)[0];
     otimo += best.c; porFundoOt[best.fu.nome] = (porFundoOt[best.fu.nome] || 0) + +t.valor;
   }
   const fixosOt = Object.keys(porFundoOt).reduce((s, n) => { const f = ativos.find(x => x.nome === n); return s + (+f.tarifa_operacao || 0) + (+f.custo_assinatura || 0); }, 0); otimo += fixosOt;
@@ -206,7 +229,7 @@ function painel(el, root) {
   const ROT = { atencao: ['⚠', 'Atenção'], info: ['ℹ', 'Info'], ok: ['✓', 'OK'] };
   const comparacao = `<h3 style="margin-top:16px">Comparação entre fundos para estes títulos</h3>
     <div class="table-wrap"><table class="cmp-fundos"><thead><tr><th>Fundo</th><th class="num">Taxa cad.</th><th class="num">Deságio</th><th class="num">Tarifas / IOF</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Taxa efetiva</th><th class="num">Dif. vs. + barato</th></tr></thead><tbody>
-      ${sims.map(s => `<tr class="clickable ${S && s.fu.id === S.fu.id ? 'row-sel' : ''}" data-fu="${s.fu.id}" title="Usar ${esc(s.fu.nome)} nesta proposta"><td><strong>${esc(s.fu.nome)}</strong></td><td class="num">${pct(s.fu.taxa_am / 100, 2)}</td><td class="num">${money0(s.desagio)}</td><td class="num">${money0(s.ad + s.tar + s.iof)}</td><td class="num"><strong>${money0(s.custo)}</strong></td><td class="num">${money0(s.liquido)}</td><td class="num">${pct(s.taxaEf, 2)}</td><td class="num">${s === melhor ? '<span class="badge pago">menor custo</span>' : '+' + money0(s.custo - melhor.custo)}</td></tr>`).join('')}
+      ${sims.map(s => `<tr class="clickable ${S && s.fu.id === S.fu.id ? 'row-sel' : ''}" data-fu="${s.fu.id}" title="Usar ${esc(s.fu.nome)} nesta proposta"><td><strong>${esc(s.fu.nome)}</strong>${s.grupos.length > 1 ? ` <span class="badge aberto" title="Condições diferentes: vira ${s.grupos.length} borderôs">${s.grupos.length} borderôs</span>` : ''}</td><td class="num">${taxasTxt(s)}</td><td class="num">${money0(s.desagio)}</td><td class="num">${money0(s.ad + s.tar + s.iof)}</td><td class="num"><strong>${money0(s.custo)}</strong></td><td class="num">${money0(s.liquido)}</td><td class="num">${pct(s.taxaEf, 2)}</td><td class="num">${s === melhor ? '<span class="badge pago">menor custo</span>' : '+' + money0(s.custo - melhor.custo)}</td></tr>`).join('')}
     </tbody></table></div>
     ${Object.keys(porFundoOt).length > 1 && otimo < melhor.custo - 1 ? `<p class="small" style="margin:8px 0 0">💡 Dividindo os títulos entre fundos (cada título no mais barato) o custo seria <strong>${money0(otimo)}</strong>, ${money0(melhor.custo - otimo)} a menos: ${Object.entries(porFundoOt).map(([n, v]) => `${esc(n)} ${money0(v)}`).join(' · ')}.</p>` : ''}`;
   const escolha = `<div class="fundo-pick" id="fpick" role="radiogroup" aria-label="Fundo da operação">
@@ -235,7 +258,12 @@ function painel(el, root) {
       <div class="kpi"><div class="k-label">Líquido estimado</div><div class="k-value">${money0(S.liquido)}</div><div class="k-sub">crédito em ${esc(state.cad.contaById[S.fu.conta_credito_id]?.nome || '—')}</div></div>
       <div class="kpi"><div class="k-label">Taxa a.m.</div><div class="k-value">${pct(S.taxaEf, 2)}</div><div class="k-sub">prazo ${num1(S.prazo)} d · cobrado ${num1(S.prazoC)} d</div></div>
     </div>
-    <p class="small muted" style="margin:8px 0 0">Custos da operação no ${esc(S.fu.nome)}: ${descCustos(S.custos, S.fu, S.n)}.</p>
+    ${S.grupos.length > 1 ? `<div class="alert-row atencao" style="margin-top:10px"><span class="alert-tag">⚠ Atenção</span><div><strong>O ${esc(S.fu.nome)} não junta estas condições no mesmo borderô</strong>
+      <div class="small muted">Os títulos serão enviados em ${S.grupos.length} propostas separadas, uma por condição (como o fundo opera):</div>
+      <div class="table-wrap"><table class="small"><thead><tr><th>Condição</th><th class="num">Títulos</th><th class="num">Face</th><th class="num">Taxa</th><th class="num">Custo</th><th class="num">Líquido</th></tr></thead><tbody>
+      ${S.grupos.map(g => `<tr><td>${esc(g.cond.nome)}${g.cond.fora_vigencia ? ' <span class="badge vencido">fora de vigência</span>' : ''}</td><td class="num">${g.n}</td><td class="num">${money0(g.face)}</td><td class="num">${pct(+g.cond.taxa_am / 100, 2)}</td><td class="num">${money0(g.custo)}</td><td class="num">${money0(g.liquido)}</td></tr>`).join('')}</tbody></table></div></div></div>`
+      : `<p class="small muted" style="margin:8px 0 0">Condição: <strong>${esc(S.cond?.legado ? 'cadastro do fundo' : S.cond?.nome || '')}</strong>${S.cond && !S.cond.legado ? ` — ${pct(+S.cond.taxa_am / 100, 2)} a.m., vencimento + ${S.cond.dias_compensacao} dia(s)${S.cond.rola_dia_util ? ' (próximo dia útil)' : ''}` : ''}.${S.cond?.fora_vigencia ? ' <span class="neg">Condição fora de vigência — cadastre a do contrato atual.</span>' : ''}</p>`}
+    <p class="small muted" style="margin:8px 0 0">Custos da operação no ${esc(S.fu.nome)}: ${S.grupos.length > 1 ? S.grupos.map(g => `${esc(g.cond.nome)}: ${descCustos(g.custos, g.cond, g.n)}`).join(' · ') : descCustos(S.custos, S.cond || S.fu, S.n)}.</p>
     ${comparacao}
     <h3 style="margin-top:16px">Verificações — ${esc(S.fu.nome)}</h3>
     <div class="alert-list">${chk.map(([st, t, d]) => `<div class="alert-row ${st}"><span class="alert-tag">${ROT[st][0]} ${ROT[st][1]}</span><div><strong>${esc(t)}</strong><div class="small muted">${esc(d)}</div></div></div>`).join('')}</div>
@@ -246,7 +274,7 @@ function painel(el, root) {
     <label class="span2" style="margin-top:12px">Observação para o diretor<textarea id="obs" rows="2">${esc(ui.obs)}</textarea></label>
     <div class="toolbar" style="margin-top:12px;justify-content:flex-end">
       ${ui.propostaEdit ? '<button class="btn" id="cancel-ed">Cancelar edição</button>' : ''}
-      <button class="btn" id="salvar">Salvar rascunho</button><button class="btn primary" id="enviar">Enviar para aprovação — ${esc(S.fu.nome)}</button></div>
+      <button class="btn" id="salvar">Salvar rascunho${S.grupos.length > 1 ? `s (${S.grupos.length})` : ''}</button><button class="btn primary" id="enviar">Enviar ${S.grupos.length > 1 ? `${S.grupos.length} propostas` : 'para aprovação'} — ${esc(S.fu.nome)}</button></div>
   </div>`;
     $('#salvar', el).onclick = () => salvarProposta(root, S, tits, chk, sims, 'Rascunho');
     $('#enviar', el).onclick = () => salvarProposta(root, S, tits, chk, sims, 'Pendente');
@@ -261,16 +289,31 @@ function painel(el, root) {
 }
 
 async function salvarProposta(root, S, tits, chk, sims, status) {
-  if (status === 'Pendente' && !confirm(`Enviar a proposta (${S.fu.nome}, ${tits.length} títulos, ${money0(S.face)}) para aprovação do diretor?`)) return;
-  const e = state.empresa.id;
+  const gs = S.grupos?.length ? S.grupos : [S];
+  if (gs.length > 1 && ui.propostaEdit) return toast(`Na edição a proposta nº ${ui.propostaEdit.numero} não pode virar ${gs.length}: deixe só títulos de uma condição`, true);
+  if (status === 'Pendente' && !confirm(gs.length > 1
+    ? `Enviar ${gs.length} propostas (${S.fu.nome}: ${gs.map(g => `${g.cond.nome} ${g.n} títulos ${money0(g.face)}`).join(' · ')}) para aprovação do diretor?`
+    : `Enviar a proposta (${S.fu.nome}, ${tits.length} títulos, ${money0(S.face)}) para aprovação do diretor?`)) return;
+  const feitas = [];
+  try {
+    for (const g of gs) feitas.push(await gravarProposta(g, chk, sims, status));
+  } catch (err) { fail(err); if (!feitas.length) return; }
+  toast(status === 'Pendente' ? `Proposta${feitas.length > 1 ? 's' : ''} nº ${feitas.map(p => p.numero).join(', ')} enviada${feitas.length > 1 ? 's' : ''} para aprovação` : `Rascunho${feitas.length > 1 ? 's' : ''} nº ${feitas.map(p => p.numero).join(', ')} salvo${feitas.length > 1 ? 's' : ''}`);
+  ui.sel.clear(); ui.soSel = false; ui.fundoId = ''; ui.obs = ''; ui.recompras = ''; ui.propostaEdit = null; ui.aba = 'propostas';
+  render(root);
+}
+
+async function gravarProposta(S, chk, sims, status) {
+  const e = state.empresa.id; const cd = S.cond || condicaoDoFundo(S.fu);
   const row = { empresa_id: e, fundo_id: S.fu.id, data_operacao: ui.dataOp, status, qtd_titulos: S.n, valor_face: +S.face.toFixed(2),
     prazo_medio: +S.prazo.toFixed(2), prazo_cobrado: +S.prazoC.toFixed(2), taxa_am: +(S.taxaEf * 100).toFixed(4), desagio: +S.desagio.toFixed(2), ad_valorem: +S.ad.toFixed(2),
-    tarifas: +S.tar.toFixed(2), iof: +S.iof.toFixed(2), recompras: parseNum(ui.recompras) || 0, liquido: +S.liquido.toFixed(2), conta_credito_id: S.fu.conta_credito_id,
+    tarifas: +S.tar.toFixed(2), iof: +S.iof.toFixed(2), recompras: +(S.face - S.custo - S.liquido).toFixed(2), liquido: +S.liquido.toFixed(2), conta_credito_id: S.fu.conta_credito_id,
     observacao: ui.obs || null, enviado_em: status === 'Pendente' ? new Date().toISOString() : null,
     analise: { checagens: chk, comparacao: sims.map(s => ({ fundo: s.fu.nome, taxa_cad: +s.fu.taxa_am, custo: +s.custo.toFixed(2), liquido: +s.liquido.toFixed(2), taxa: +(s.taxaEf * 100).toFixed(4) })),
       custos: Object.fromEntries(Object.entries(S.custos).map(([k, v]) => [k, +(+v).toFixed(2)])),
-      condicoes: { taxa_am: +S.fu.taxa_am, ad_valorem_pct: +S.fu.ad_valorem_pct, tarifa_operacao: +S.fu.tarifa_operacao, custo_assinatura: +S.fu.custo_assinatura, tarifa_titulo: +S.fu.tarifa_titulo, custo_consulta: +S.fu.custo_consulta, iof_pct: +S.fu.iof_pct, dias_compensacao: S.fu.dias_compensacao, metodo_desagio: S.fu.metodo_desagio || 'fator' } } };
-  try {
+      condicoes: { nome: cd.legado ? null : cd.nome, taxa_am: +cd.taxa_am, ad_valorem_pct: +cd.ad_valorem_pct, tarifa_operacao: +cd.tarifa_operacao, custo_assinatura: +cd.custo_assinatura, tarifa_titulo: +cd.tarifa_titulo, custo_consulta: +cd.custo_consulta, iof_pct: +cd.iof_pct, dias_compensacao: cd.dias_compensacao, rola_dia_util: !!cd.rola_dia_util, metodo_desagio: cd.metodo_desagio || 'fator' } } };
+  if (!cd.legado) row.condicao_id = cd.id;
+  {
     let p;
     if (ui.propostaEdit) {
       p = await q(sb.from('fidc_propostas').update(row).eq('id', ui.propostaEdit.id).select().single());
@@ -279,10 +322,8 @@ async function salvarProposta(root, S, tits, chk, sims, status) {
     const itens = S.itens.map(x => ({ proposta_id: p.id, empresa_id: e, lancamento_id: x.t.id, documento: x.t.documento, sacado: sacadoDe(x.t), cnpj: cnpjDe(x.t) || null,
       emissao: x.t.emissao, vencimento: x.t.data, valor: x.t.valor, prazo: x.prazo, custo_estimado: +x.custo.toFixed(2) }));
     for (let i = 0; i < itens.length; i += 500) await q(sb.from('fidc_proposta_itens').insert(itens.slice(i, i + 500)));
-    toast(status === 'Pendente' ? `Proposta nº ${p.numero} enviada para aprovação` : `Rascunho nº ${p.numero} salvo`);
-    ui.sel.clear(); ui.soSel = false; ui.fundoId = ''; ui.obs = ''; ui.recompras = ''; ui.propostaEdit = null; ui.aba = 'propostas';
-    render(root);
-  } catch (err) { fail(err); }
+    return p;
+  }
 }
 
 // ======================================================================
@@ -479,6 +520,7 @@ function abaFundos(c, root) {
       ${fundos.map(f => `<tr class="${ed ? 'clickable' : ''}" data-id="${f.id}"><td><strong>${esc(f.nome)}</strong></td><td>${esc(state.cad.contaById[f.conta_id]?.nome || '—')}</td><td>${esc(state.cad.contaById[f.conta_credito_id]?.nome || '—')}</td>
         ${campos.map(([k]) => `<td class="num">${f[k] == null ? '–' : ['tarifa_operacao', 'custo_assinatura', 'tarifa_titulo', 'custo_consulta', 'limite_credito'].includes(k) ? money(f[k]) : String(f[k]).replace('.', ',')}</td>`).join('')}<td class="small">${f.metodo_desagio === 'simples' ? 'juros simples' : 'por dentro'}</td><td>${f.ativo ? 'sim' : 'não'}</td></tr>`).join('')}
     </tbody></table></div></div>`;
+  blocoCondicoes(c, root);
   if (!ed) return;
   const editar = (f) => {
     const m = modal({
@@ -502,6 +544,53 @@ function abaFundos(c, root) {
   };
   $('table', c).onclick = (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) editar(fundos.find(f => f.id === tr.dataset.id)); };
   $('#novo-f', c).onclick = () => editar({ ativo: true });
+}
+
+// Condições por grupo de sacados (SQL 050): uma taxa para um grupo (CNPJ raiz) e outra para os demais; cada uma vira seu borderô
+const fmtRaiz = (r) => r.length === 8 ? `${r.slice(0, 2)}.${r.slice(2, 5)}.${r.slice(5, 8)}` : r;
+function blocoCondicoes(c, root) {
+  const ed = podeEditar();
+  const fuNome = (id) => fundos.find(f => f.id === id)?.nome || '—';
+  const el = document.createElement('div'); el.className = 'card flush'; el.style.marginTop = '12px';
+  const L = condicoes.slice().sort((a, b) => fuNome(a.fundo_id).localeCompare(fuNome(b.fundo_id)) || (a.sacados_raiz?.length ? 0 : 1) - (b.sacados_raiz?.length ? 0 : 1) || String(a.vigencia_ini || '').localeCompare(String(b.vigencia_ini || '')));
+  el.innerHTML = `<div class="card-head"><div><h2>Condições por grupo de sacados</h2><p class="muted small">Quando o fundo cobra taxas diferentes por sacado (ex.: FS — Grupo Total × demais). Cada título usa a condição do seu sacado (CNPJ raiz); sem grupo informado = demais sacados.
+      Títulos de condições diferentes nunca vão no mesmo borderô: a proposta é dividida em uma por condição. Prazo cobrado = vencimento + dias, rolando para o próximo dia útil (feriados nacionais). Fundo sem condição cadastrada usa a linha do fundo acima.</p></div>
+    ${ed ? '<button class="btn" id="nova-cond">+ Condição</button>' : ''}</div>
+    <div class="table-wrap">${L.length ? `<table><thead><tr><th>Fundo</th><th>Condição</th><th>Sacados (CNPJ raiz)</th><th class="num">Taxa a.m.</th><th class="num">Venc. +</th><th class="num">Tarifas (borderô / título / consulta)</th><th>Vigência</th><th>Ativa</th></tr></thead><tbody>
+      ${L.map(k => `<tr class="${ed ? 'clickable' : ''}" data-cid="${k.id}"><td><strong>${esc(fuNome(k.fundo_id))}</strong></td><td>${esc(k.nome)}</td><td class="small">${k.sacados_raiz?.length ? k.sacados_raiz.map(fmtRaiz).join(', ') : '<span class="muted">demais sacados</span>'}</td>
+        <td class="num">${pct(+k.taxa_am / 100, 2)}</td><td class="num">${k.dias_compensacao} d${k.rola_dia_util ? ' → dia útil' : ''}${k.prazo_min_cobrado ? ` · mín. ${k.prazo_min_cobrado} d` : ''}</td>
+        <td class="num">${money(+k.tarifa_operacao + +k.custo_assinatura)} / ${money(k.tarifa_titulo)} / ${money(k.custo_consulta)}</td>
+        <td class="small">${k.vigencia_ini ? dateBR(k.vigencia_ini) : 'início'} → ${k.vigencia_fim ? dateBR(k.vigencia_fim) : 'em vigor'}</td><td>${k.ativo ? 'sim' : 'não'}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty">Nenhuma condição por grupo. Todos os fundos usam a linha do fundo.</div>'}</div>`;
+  c.appendChild(el);
+  if (!ed) return;
+  const NUM = [['taxa_am', 'Taxa a.m. (%)'], ['dias_compensacao', 'Dias após o vencimento'], ['prazo_min_cobrado', 'Prazo mínimo cobrado (dias)'], ['tarifa_operacao', 'TED / tarifa por borderô (R$)'],
+    ['custo_assinatura', 'Assinatura por borderô (R$)'], ['tarifa_titulo', 'Boleto por título (R$)'], ['custo_consulta', 'Consulta de sacado novo (R$)'], ['ad_valorem_pct', 'Ad valorem (% face)'], ['iof_pct', 'IOF (% face)']];
+  const editar = (k) => {
+    const m = modal({ title: k.id ? `Condição — ${k.nome}` : 'Nova condição', wide: true, body: `<form id="fc" class="grid-form">
+      <label>Fundo<select name="fundo_id" required>${options(fundos, { empty: 'Selecione…', selected: k.fundo_id })}</select></label>
+      <label>Nome<input name="nome" value="${esc(k.nome || '')}" required placeholder="ex.: Grupo Total / Demais sacados"></label>
+      <label class="span2">Sacados do grupo — CNPJ (ou só a raiz, 8 dígitos), separados por vírgula; vazio = demais sacados<input name="sacados" value="${esc((k.sacados_raiz || []).map(fmtRaiz).join(', '))}"></label>
+      ${NUM.map(([n, r]) => `<label>${r}<input name="${n}" inputmode="decimal" value="${k[n] == null ? '' : String(k[n]).replace('.', ',')}"></label>`).join('')}
+      <label>Cálculo do deságio<select name="metodo_desagio"><option value="simples" ${k.metodo_desagio !== 'fator' ? 'selected' : ''}>Juros simples sobre a face</option><option value="fator" ${k.metodo_desagio === 'fator' ? 'selected' : ''}>Por dentro — v·k/(1+k)</option></select></label>
+      <label>Fim de semana / feriado<select name="rola_dia_util"><option value="1" ${k.rola_dia_util !== false ? 'selected' : ''}>rola para o próximo dia útil</option><option value="0" ${k.rola_dia_util === false ? 'selected' : ''}>conta dias corridos</option></select></label>
+      <label>Vigência de<input type="date" name="vigencia_ini" value="${k.vigencia_ini || ''}"></label><label>até<input type="date" name="vigencia_fim" value="${k.vigencia_fim || ''}"></label>
+      <label>Ativa<select name="ativo"><option value="1" ${k.ativo !== false ? 'selected' : ''}>sim</option><option value="0" ${k.ativo === false ? 'selected' : ''}>não</option></select></label>
+      <label class="span2">Observação<input name="observacao" value="${esc(k.observacao || '')}"></label></form>`,
+      foot: `${k.id ? '<button class="btn danger" id="cdel" style="margin-right:auto">Excluir</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="cok">Salvar</button>` });
+    $('#cok', m.el).onclick = async () => {
+      const form = $('#fc', m.el); if (!form.reportValidity()) return; const d = formData(form);
+      const raizes = [...new Set(String(d.sacados || '').split(/[,;\s]+/).map(x => x.replace(/\D/g, '')).filter(x => x.length >= 8).map(x => x.slice(0, 8)))];
+      const row = { empresa_id: state.empresa.id, fundo_id: d.fundo_id, nome: d.nome.trim(), sacados_raiz: raizes, metodo_desagio: d.metodo_desagio, rola_dia_util: d.rola_dia_util === '1',
+        vigencia_ini: d.vigencia_ini || null, vigencia_fim: d.vigencia_fim || null, ativo: d.ativo === '1', observacao: d.observacao || null, updated_at: new Date().toISOString() };
+      for (const [n] of NUM) { const v = String(d[n] ?? '').trim(); row[n] = v === '' ? (n === 'prazo_min_cobrado' ? null : 0) : parseNum(v); }
+      if (!(row.taxa_am > 0)) return toast('Informe a taxa', true);
+      try { if (k.id) await q(sb.from('fidc_fundo_condicoes').update(row).eq('id', k.id)); else await q(sb.from('fidc_fundo_condicoes').insert(row)); toast('Condição salva'); m.close(); await carregar(); desenhar(root); } catch (e) { fail(e); }
+    };
+    $('#cdel', m.el) && ($('#cdel', m.el).onclick = async () => { if (!confirm(`Excluir a condição "${k.nome}"? As propostas já feitas não mudam.`)) return; try { await q(sb.from('fidc_fundo_condicoes').delete().eq('id', k.id)); m.close(); await carregar(); desenhar(root); } catch (e) { fail(e); } });
+  };
+  $('table', el) && ($('table', el).onclick = (e) => { const tr = e.target.closest('tr[data-cid]'); if (tr) editar(condicoes.find(x => x.id === tr.dataset.cid)); });
+  $('#nova-cond', el).onclick = () => editar({ ativo: true, rola_dia_util: true, metodo_desagio: 'simples' });
 }
 
 // ======================================================================
