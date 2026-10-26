@@ -381,7 +381,7 @@ function pintarConta(c) {
     if (dif != null && Math.abs(dif) > TOL) difAnt = dif;
     const outros = x.probs.filter(p => p.t !== 'saldo' && p.t !== 'inf').length + x.al.length + x.naoConc.length;
     const banco = x.banco != null ? `<span title="pelo extrato importado">${money(x.banco)}</span>`
-      : ed ? `<input class="cf-sal-in" data-di="${di}" inputmode="decimal" value="${x.v?.saldo_informado != null ? money(x.v.saldo_informado) : ''}" placeholder="digite" style="width:120px;text-align:right">`
+      : ed ? `<input class="cf-sal-in" data-di="${di}" inputmode="decimal" value="${x.v?.saldo_informado != null ? money(x.v.saldo_informado) : ''}" placeholder="${money(x.fim)}" style="width:120px;text-align:right">`
       : (x.v?.saldo_informado != null ? money(x.v.saldo_informado) : '—');
     return `<tr class="${dif != null && Math.abs(dif) > TOL ? 'cf-row-al' : ''}"><td class="nowrap">${dateBR(x.d).slice(0, 5)} <span class="muted small">${SEM[w]}</span></td>
       <td class="num">${money(x.ini)}</td><td class="num pos">${x.ent ? money(x.ent) : ''}</td><td class="num neg">${x.sai ? money(x.sai) : ''}</td>
