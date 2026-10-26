@@ -12,7 +12,7 @@ export const title = 'Conferência do dia';
 
 const LS = 'fc-conf-mes';
 const mesAnt = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-const ui = { mes: (() => { try { return localStorage.getItem(LS) || mesAnt(); } catch { return mesAnt(); } })(), soProb: false, todas: false };
+const ui = { mes: (() => { try { return localStorage.getItem(LS) || mesAnt(); } catch { return mesAnt(); } })(), soProb: false, todas: false, visao: 'mapa', conta: '', saldos: false };
 let D = null;      // dados do mês carregado
 let rootEl = null;
 
@@ -28,6 +28,7 @@ const difDias = (a, b) => Math.round((Date.parse(a + 'T12:00:00') - Date.parse(b
 const fimMes = (m) => { const [a, mm] = m.split('-').map(Number); return new Date(Date.UTC(a, mm, 0)).toISOString().slice(0, 10); };
 const chunks = (arr, k = 150) => { const o = []; for (let i = 0; i < arr.length; i += k) o.push(arr.slice(i, i + k)); return o; };
 const nomeMes = (m) => { const [a, mm] = m.split('-'); const n = MESES[+mm - 1]; return `${n.charAt(0)}${n.slice(1).toLowerCase()}/${a}`; };
+const kval = (v) => { const a = Math.abs(v); const s = a >= 1e6 ? (a / 1e6).toFixed(1).replace('.', ',') + 'mi' : a >= 1e3 ? (a / 1e3).toFixed(a >= 1e4 ? 0 : 1).replace('.', ',') + 'k' : Math.round(a) + ''; return (v < -0.005 ? '−' : '') + s; };
 const kfmt = (v) => { const a = Math.abs(v); const s = a >= 1e6 ? (a / 1e6).toFixed(1).replace('.', ',') + 'mi' : a >= 1e3 ? Math.round(a / 1e3) + 'k' : Math.round(a) + ''; return (v < 0 ? '−' : '+') + s; };
 
 // ---------------------------------------------------------------------------------------------
@@ -41,15 +42,27 @@ export async function render(root) {
         <p class="muted small" style="margin:4px 0 0">Cada quadradinho é uma conta num dia. Verde = saldo e movimento batem com o extrato; vermelho = diverge (mostra a diferença; “…” = diferença que vem de um dia anterior); amarelo = algo para olhar; amarelo tracejado = falta extrato. Clique para abrir o dia, conferir e dar o visto.</p></div>
       <div class="toolbar noprint" style="margin:0" id="cflt">
         <label>Mês<input type="month" name="mes" value="${ui.mes}"></label>
+        <span class="chips" style="margin:0"><button type="button" class="chip ${ui.visao === 'mapa' ? 'on' : ''}" data-visao="mapa">Mapa do mês</button><button type="button" class="chip ${ui.visao === 'conta' ? 'on' : ''}" data-visao="conta">Saldos da conta</button></span>
+        <label id="cf-lconta" ${ui.visao === 'conta' ? '' : 'hidden'}>Conta<select name="conta"></select></label>
+        <span id="cf-opmapa" style="display:${ui.visao === 'mapa' ? 'contents' : 'none'}">
+        <label class="chk"><input type="checkbox" name="saldos" ${ui.saldos ? 'checked' : ''}> mostrar saldos</label>
         <label class="chk"><input type="checkbox" name="soProb" ${ui.soProb ? 'checked' : ''}> só com problema</label>
-        <label class="chk"><input type="checkbox" name="todas" ${ui.todas ? 'checked' : ''}> todas as contas</label>
+        <label class="chk"><input type="checkbox" name="todas" ${ui.todas ? 'checked' : ''}> todas as contas</label></span>
         <button class="btn" id="cimp" type="button">Imprimir / PDF</button>
       </div></div></div>
     <div id="ccorpo"><div class="loading">Conferindo o mês…</div></div>`;
   $('#cflt', root).addEventListener('change', (e) => {
     const t = e.target; if (!t.name) return;
     if (t.name === 'mes') { if (!t.value) return; ui.mes = t.value; try { localStorage.setItem(LS, ui.mes); } catch {} carregar(); }
+    else if (t.name === 'conta') { ui.conta = t.value; pintar(); }
     else { ui[t.name] = t.checked; pintar(); }
+  });
+  $('#cflt', root).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-visao]'); if (!b) return;
+    ui.visao = b.dataset.visao;
+    $$('[data-visao]', root).forEach(x => x.classList.toggle('on', x.dataset.visao === ui.visao));
+    $('#cf-lconta', root).hidden = ui.visao !== 'conta'; $('#cf-opmapa', root).style.display = ui.visao === 'mapa' ? 'contents' : 'none';
+    pintar();
   });
   $('#cimp', root).onclick = imprimir;
   await carregar();
@@ -281,6 +294,14 @@ const DESC = { erro: 'diverge (saldo ou movimento)', alerta: 'algo para olhar', 
 
 function pintar() {
   const c = $('#ccorpo', rootEl); if (!c || !D) return;
+  // lista de contas do seletor (as usadas no mês primeiro)
+  const sel = $('#cflt select[name=conta]', rootEl);
+  if (sel) {
+    const us = D.linhas.filter(r => r.usada);
+    if (!ui.conta || !D.linhas.some(r => r.ct.id === ui.conta)) ui.conta = us[0]?.ct.id || D.linhas[0]?.ct.id || '';
+    sel.innerHTML = D.linhas.filter(r => r.usada || r.ct.id === ui.conta).map(r => `<option value="${r.ct.id}" ${r.ct.id === ui.conta ? 'selected' : ''}>${esc(r.ct.nome)}</option>`).join('');
+  }
+  if (ui.visao === 'conta') return pintarConta(c);
   const linhas = D.linhas.filter(r => ui.todas || r.usada).filter(r => !ui.soProb || r.cel.some(x => x.st === 'erro' || x.st === 'alerta'));
   const cels = D.linhas.flatMap(r => r.cel).filter(x => x.st !== 'vazio');
   const conf = cels.filter(x => x.conferido).length, erro = cels.filter(x => x.st === 'erro' && !x.v).length, alerta = cels.filter(x => x.st === 'alerta' && !x.v).length;
@@ -298,7 +319,7 @@ function pintar() {
       <div class="kpi"><div class="k-label">Pagos sem conta no mês</div><div class="k-value ${D.semConta.length ? 'neg' : ''}">${D.semConta.length}</div><div class="k-sub">${D.semConta.length ? `${money0(D.semConta.reduce((s, l) => s + +l.valor, 0))} fora do saldo das contas` : 'nenhum'}</div></div>
     </div>
     <div class="card flush">
-      <div class="cf-head noprint"><div class="cf-leg">${['ok', 'erro', 'alerta', 'semext'].map(s => `<span><i class="cf-c ${s}">${ICONE[s]}</i>${DESC[s]}</span>`).join('')}<span><i class="cf-c ok conf">✔</i>conferido</span><span title="Visto dado num dia que tinha aviso ou diferença, com a explicação na observação"><i class="cf-c ok conf just">✔</i>conferido com justificativa</span><span><i class="cf-c ok trav">✔</i>travado</span></div>
+      <div class="cf-head noprint"><div class="cf-leg">${['ok', 'erro', 'alerta', 'semext'].map(s => `<span><i class="cf-c ${s}">${ICONE[s]}</i>${DESC[s]}</span>`).join('')}<span><i class="cf-c ok conf">✔</i>conferido</span><span title="Visto dado num dia que tinha aviso ou diferença, com a explicação na observação"><i class="cf-c ok conf just">✔</i>conferido com justificativa</span><span><i class="cf-c ok trav">✔</i>travado</span><span title="Visto dado com o saldo do banco diferente da plataforma: mostra a diferença (banco − plataforma) até corrigir"><i class="cf-c alerta conf">±</i>conferido com diferença de saldo</span></div>
         ${podeEditar() && D.vistosOk && prontos.length ? `<button class="btn small primary" id="cflote">Dar visto nos ${prontos.length} dia(s) que batem</button>` : ''}</div>
       <div class="table-wrap cf-wrap"><table class="cf-grid"><thead><tr><th class="cf-conta">Conta</th>
         ${D.dias.map(d => { const w = new Date(d + 'T12:00:00').getDay(); return `<th class="${w === 0 || w === 6 ? 'fds' : ''}">${+d.slice(8)}<div>${SEM[w].charAt(0).toUpperCase()}</div></th>`; }).join('')}
@@ -326,14 +347,83 @@ function celula(x, ri, di) {
   const w = new Date(x.d + 'T12:00:00').getDay(), fds = w === 0 || w === 6;
   if (x.st === 'vazio') return `<td class="cf-td ${fds ? 'fds' : ''}" data-r="${ri}" data-d="${di}" tabindex="-1"><i class="cf-c vazio"></i></td>`;
   const ressalva = x.v?.situacao === 'ressalva' || (x.v && (x.st === 'erro' || x.st === 'alerta'));
-  const k = x.conferido ? `ok ${x.v ? 'conf' : 'trav'}${ressalva ? ' just' : ''}` : x.st;   // ressalva com visto = justificada (verde)
+  // visto dado com saldo diferente do banco: não fica verde — fica amarelo com a diferença até corrigir
+  const difConf = x.conferido && x.difSaldo != null && Math.abs(x.difSaldo) > TOL;
+  const k = difConf ? 'alerta conf' : x.conferido ? `ok ${x.v ? 'conf' : 'trav'}${ressalva ? ' just' : ''}` : x.st;   // ressalva com visto = justificada (verde)
   const pd = x.probs.find(p => p.t === 'dif'), pn = x.probs.find(p => p.t === 'neg'), ps = x.probs.find(p => p.t === 'saldo');
-  const txt = x.conferido ? '✔' : x.st === 'erro' ? (pn ? kfmt(x.fim) : pd ? kfmt(x.ent + x.sai - x.extMov) : ps ? (x.arrasta ? '…' : kfmt(x.difSaldo)) : '✕') : ICONE[x.st];
+  const txt = ui.saldos ? kval(x.fim) : difConf ? (x.arrasta ? '…' : kfmt(-x.difSaldo)) : x.conferido ? '✔' : x.st === 'erro' ? (pn ? kfmt(x.fim) : pd ? kfmt(x.ent + x.sai - x.extMov) : ps ? (x.arrasta ? '…' : kfmt(x.difSaldo)) : '✕') : ICONE[x.st];
   const tip = [`${x.ct.nome} · ${SEM[w]} ${dateBR(x.d)}`, `${x.dl.length} lançamento(s): entradas ${money(x.ent)} · saídas ${money(x.sai)} · saldo ${money(x.fim)}`,
     x.temExt ? `extrato: ${x.dx.length} linha(s), movimento ${money(x.extMov)}${x.banco != null ? ` · saldo no banco ${money(x.banco)}` : ''}` : 'falta extrato (importe o OFX/relatório do ERP ou informe o saldo real no visto)',
     ...x.probs.map(p => '✕ ' + p.msg), ...(x.datas || []).slice(0, 2).map(t => '! ' + t), ...[...new Set(x.al.map(a => '! ' + a.msg))].slice(0, 3), x.naoConc.length ? `! ${x.naoConc.length} lançamento(s) não conciliados com o extrato` : '',
     x.v ? `✔ visto de ${x.v.conferido_email || 'usuário'} em ${new Date(x.v.conferido_em).toLocaleString('pt-BR')}` : x.travado ? '🔒 conta travada até ' + dateBR(x.ct && D.linhas.find(r => r.ct.id === x.ct.id)?.trava?.ate) : ''].filter(Boolean).join('\n');
-  return `<td class="cf-td ${fds ? 'fds' : ''}" data-r="${ri}" data-d="${di}" tabindex="0" title="${esc(tip)}"><i class="cf-c ${k}">${txt}</i></td>`;
+  return `<td class="cf-td ${fds ? 'fds' : ''}" data-r="${ri}" data-d="${di}" tabindex="0" title="${esc(tip)}"><i class="cf-c ${k}${ui.saldos ? ' sld' : ''}">${txt}</i></td>`;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Saldos da conta: uma linha por dia, com o saldo do banco digitável na própria linha
+// ---------------------------------------------------------------------------------------------
+function pintarConta(c) {
+  const ri = D.linhas.findIndex(r => r.ct.id === ui.conta); const r = D.linhas[ri];
+  if (!r) { c.innerHTML = '<div class="card"><div class="empty">Escolha a conta.</div></div>'; return; }
+  const ed = podeEditar() && D.vistosOk;
+  // dias úteis + qualquer dia com movimento, extrato ou visto
+  const dias = r.cel.map((x, di) => ({ x, di })).filter(({ x }) => { const w = new Date(x.d + 'T12:00:00').getDay(); return (w !== 0 && w !== 6) || x.st !== 'vazio' || x.v; });
+  let difAnt = null, desde = null;
+  const linhas = dias.map(({ x, di }) => {
+    const w = new Date(x.d + 'T12:00:00').getDay();
+    const ref = x.banco ?? (x.v?.saldo_informado != null ? +x.v.saldo_informado : null);
+    const dif = ref == null ? null : Math.round((ref - x.fim) * 100) / 100;
+    let sit = '';
+    if (dif == null) { sit = x.st === 'vazio' && !x.dl.length ? '<span class="muted">sem movimento</span>' : '<span class="warn">falta o saldo do banco</span>'; }
+    else if (Math.abs(dif) <= TOL) { sit = '<span class="pos">✓ bate</span>'; difAnt = null; desde = null; }
+    else if (difAnt != null && Math.abs(dif - difAnt) <= TOL) sit = `<span class="warn">… vem de ${dateBR(desde).slice(0, 5)}</span>`;
+    else { sit = '<strong class="neg">começa aqui</strong>'; desde = x.d; }
+    if (dif != null && Math.abs(dif) > TOL) difAnt = dif;
+    const outros = x.probs.filter(p => p.t !== 'saldo' && p.t !== 'inf').length + x.al.length + x.naoConc.length;
+    const banco = x.banco != null ? `<span title="pelo extrato importado">${money(x.banco)}</span>`
+      : ed ? `<input class="cf-sal-in" data-di="${di}" inputmode="decimal" value="${x.v?.saldo_informado != null ? money(x.v.saldo_informado) : ''}" placeholder="digite" style="width:120px;text-align:right">`
+      : (x.v?.saldo_informado != null ? money(x.v.saldo_informado) : '—');
+    return `<tr class="${dif != null && Math.abs(dif) > TOL ? 'cf-row-al' : ''}"><td class="nowrap">${dateBR(x.d).slice(0, 5)} <span class="muted small">${SEM[w]}</span></td>
+      <td class="num">${money(x.ini)}</td><td class="num pos">${x.ent ? money(x.ent) : ''}</td><td class="num neg">${x.sai ? money(x.sai) : ''}</td>
+      <td class="num"><strong>${money(x.fim)}</strong></td><td class="num">${banco}</td>
+      <td class="num ${dif != null && Math.abs(dif) > TOL ? 'neg' : ''}">${dif == null ? '' : money(dif)}</td>
+      <td class="small">${sit}${x.conferido ? ' <span class="badge pago" title="dia conferido">✔</span>' : ''}${outros ? ` <span class="badge aberto" title="avisos no dia (lançamentos, conciliação, duplicidade)">! ${outros}</span>` : ''}</td>
+      <td class="noprint"><button class="btn ghost icon small" data-dia="${di}" title="Abrir o dia">›</button></td></tr>`;
+  });
+  const ent = r.cel.reduce((s, x) => s + x.ent, 0), sai = r.cel.reduce((s, x) => s + x.sai, 0);
+  const ult = [...r.cel].reverse().find(x => x.banco != null || x.v?.saldo_informado != null);
+  const refUlt = ult ? (ult.banco ?? +ult.v.saldo_informado) : null;
+  const prontos = r.cel.filter(x => x.st === 'ok' && !x.conferido);
+  c.innerHTML = `<div class="card flush"><div class="card-head" style="padding:12px 12px 0"><div><h2 style="margin:0">${esc(r.ct.nome)} — ${esc(nomeMes(D.mes))}</h2>
+      <p class="muted small" style="margin:4px 0 0">Uma linha por dia. ${ed ? 'Digite o saldo do extrato do banco na coluna “Saldo no banco” e tecle Enter: o dia fica conferido e o cursor vai para o próximo. ' : ''}Diferença = banco − plataforma; o primeiro dia de uma diferença aparece como “começa aqui” e os seguintes, enquanto for a mesma, como “…”.</p></div>
+      ${ed && prontos.length ? `<button class="btn small primary" id="cflote2">Dar visto nos ${prontos.length} dia(s) que batem com o extrato</button>` : ''}</div>
+    <div class="table-wrap"><table class="cf-saldos"><thead><tr><th>Dia</th><th class="num">Saldo inicial</th><th class="num">Entradas</th><th class="num">Saídas</th><th class="num">Saldo final (plataforma)</th><th class="num">Saldo no banco</th><th class="num">Diferença</th><th>Situação</th><th></th></tr></thead>
+      <tbody>${linhas.join('')}</tbody>
+      <tfoot><tr><th>Mês</th><th class="num">${money(r.s0)}</th><th class="num pos">${money(ent)}</th><th class="num neg">${money(sai)}</th><th class="num">${money(r.sFim)}</th>
+        <th class="num">${refUlt != null ? money(refUlt) : '—'}</th><th class="num ${refUlt != null && Math.abs(refUlt - (ult?.fim ?? 0)) > TOL ? 'neg' : ''}">${refUlt != null ? money(refUlt - ult.fim) : ''}</th><th class="small muted">${ult ? `último saldo do banco: ${dateBR(ult.d)}` : 'nenhum saldo do banco no mês'}</th><th></th></tr></tfoot></table></div></div>`;
+  $$('[data-dia]', c).forEach(b => b.onclick = () => abrirDia(ri, +b.dataset.di));
+  $('#cflote2', c) && ($('#cflote2', c).onclick = () => vistoLote(prontos));
+  const ins = $$('.cf-sal-in', c);
+  ins.forEach((inp, i) => {
+    const salvar = async (ir) => {
+      const x = r.cel[+inp.dataset.di]; const t = inp.value.trim();
+      const atual = x.v?.saldo_informado != null ? +x.v.saldo_informado : null;
+      if (!t) { if (ir) ins[i + 1]?.focus(); return; }
+      const sal = parseNum(t); if (sal == null || isNaN(sal)) { toast('Saldo inválido', true); return; }
+      if (atual != null && Math.abs(atual - sal) < 0.005) { if (ir) ins[i + 1]?.focus(); return; }
+      const problema = x.probs.some(p => p.t !== 'saldo' && p.t !== 'inf') || x.al.length || x.naoConc.length;
+      const reg = { empresa_id: state.empresa.id, conta_id: x.ct.id, data: x.d, situacao: problema || Math.abs(sal - x.fim) > TOL ? 'ressalva' : 'ok', saldo_sistema: x.fim, saldo_informado: sal,
+        observacao: x.v?.observacao || null };
+      try {
+        await q(sb.from('conferencias_dia').upsert(reg, { onConflict: 'conta_id,data' }));
+        const proxDi = ins[i + 1]?.dataset.di;
+        D = await montar(D.mes); pintar();
+        if (ir && proxDi != null) $(`.cf-sal-in[data-di="${proxDi}"]`, c)?.focus();
+      } catch (e) { fail(e); }
+    };
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.dataset.ok = '1'; salvar(true); } });
+    inp.addEventListener('change', () => { if (!inp.dataset.ok && inp.isConnected) salvar(false); });
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
