@@ -3,6 +3,7 @@ import { $, $$, esc, toast, fail, formData, loading, lerCores, modal } from './l
 import { SUPABASE_URL } from './config.js';
 import { iniciarNotificacoes, pararNotificacoes } from './lib/notif.js';
 import { iniciarBusca } from './lib/busca.js';
+import { iniciarSelectBusca } from './lib/select-busca.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -210,6 +211,7 @@ async function entrarEmpresa(emp, papel, areas) {
   aplicarAreas();
   iniciarNotificacoes();
   iniciarBusca();
+  iniciarSelectBusca();
   try { localStorage.setItem('fc-empresa', emp.id); } catch {}
   $('#empresa-switch').textContent = emp.nome + ' ▾';
   $('#user-email').textContent = state.user.email;
