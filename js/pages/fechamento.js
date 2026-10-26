@@ -31,9 +31,9 @@ async function carregar(root) {
   try { R = await conferir(ui.mes); } catch (e) { fail(e); c.innerHTML = '<div class="card"><div class="empty">Não foi possível conferir o mês.</div></div>'; return; }
   pintar(c, R);
   const rv = $('[data-rev]', c); if (rv) rv.onclick = () => revisarSemConta(() => carregar(root));
-  $$('[data-travar]', c).forEach(b => b.onclick = () => travar(R, b.dataset.travar, b.dataset.bate === '1', root));
+  $$('[data-travar]', c).forEach(b => b.onclick = () => fecharConta(R, b.dataset.travar, root));
   $$('[data-destravar]', c).forEach(b => b.onclick = () => destravar(R, b.dataset.destravar, root));
-  $$('[data-fechar]', c).forEach(b => b.onclick = () => fecharSemExtrato(R, b.dataset.fechar, root));
+  $$('[data-fechar]', c).forEach(b => b.onclick = () => fecharConta(R, b.dataset.fechar, root));
 }
 
 async function conferir(mes) {
@@ -176,8 +176,8 @@ function cardContas(R) {
       ${adm ? `<button class="btn small ghost noprint" data-destravar="${x.trava.id}">Destravar</button>` : ''}`
     : !R.travaInstalada ? '<span class="muted small">—</span>'
     : !adm ? '<span class="muted small">aberta</span>'
-    : x.temExt ? `<button class="btn small ${x.bate ? 'primary' : ''} noprint" data-travar="${x.ct.id}" data-bate="${x.bate ? 1 : 0}">Travar até ${dateBR(R.fim)}</button>`
-    : `<button class="btn small primary noprint" data-fechar="${x.ct.id}" title="Para conta sem extrato OFX (caixa, cofre…): informe o saldo contado/conferido em ${dateBR(R.fim)} e trave">Fechar com saldo informado</button>`;
+    : x.temExt ? `<button class="btn small ${x.bate ? 'primary' : ''} noprint" data-travar="${x.ct.id}" title="Escolha a data de fechamento desta conta">Fechar / travar…</button>`
+    : `<button class="btn small primary noprint" data-fechar="${x.ct.id}" title="Conta sem extrato OFX: escolha a data, informe o saldo conferido e trave">Fechar com saldo informado…</button>`;
   return `<div class="card flush"><div style="padding:12px 12px 0"><h2 style="margin:0">Contas em ${dateBR(R.fim)}: conciliação e trava</h2>
     <p class="muted small" style="margin:4px 0 0">Batendo = extrato importado até o fim do mês, nenhum movimento pendente e o movimento do mês no extrato igual ao do sistema. Conta sem extrato (caixa, cofre…): use “Fechar com saldo informado” — você informa o saldo conferido e, se bater, a conta é travada. Travar impede mudar data, valor, conta, situação ou excluir lançamentos da conta até a data (classificação, descrição e centro de custo continuam livres).${R.travaInstalada ? '' : ' <strong>A trava ainda não foi instalada no banco de dados.</strong>'}</p></div>
     <div class="table-wrap"><table><thead><tr><th>Conta</th><th>Situação</th><th class="num">Movimento no extrato</th><th class="num">Movimento no sistema</th><th class="num">Saldo no sistema</th><th>Trava</th></tr></thead><tbody>
@@ -185,46 +185,71 @@ function cardContas(R) {
     </tbody></table></div></div>`;
 }
 
-async function travar(R, contaId, bate, root) {
-  const x = R.contas.find(c => c.ct.id === contaId); if (!x) return;
-  const msg = `Travar a conta ${x.ct.nome} até ${dateBR(R.fim)}?\n\nDepois disso, os lançamentos pagos dessa conta até ${dateBR(R.fim)} não poderão ter data, valor, conta ou situação alterados, nem ser excluídos ou incluídos — só classificação, descrição e centro de custo.`
-    + (bate ? '' : `\n\nATENÇÃO: a conta NÃO está batendo com o extrato (${x.temExt ? (x.pend ? `${x.pend} pendente(s)` : `diferença ${money(x.dif)}`) : 'sem extrato'}). Travar mesmo assim?`);
-  if (!confirm(msg)) return;
-  try {
-    if (x.trava) await q(sb.from('contas_travas').update({ ativo: false, desfeito_por: state.user?.id, desfeito_em: new Date().toISOString() }).eq('id', x.trava.id));
-    await q(sb.from('contas_travas').insert({ empresa_id: state.empresa.id, conta_id: contaId, ate: R.fim, saldo_sistema: x.saldo, observacao: bate ? 'conciliado e batendo' : 'travada sem bater com o extrato' }));
-    toast(`${x.ct.nome} travada até ${dateBR(R.fim)}`); carregar(root);
-  } catch (e) { fail(e); }
-}
 async function destravar(R, travaId, root) {
   const x = R.contas.find(c => c.trava?.id === travaId); if (!x) return;
   if (!confirm(`Destravar a conta ${x.ct.nome}? Os lançamentos até ${dateBR(x.trava.ate)} voltam a poder ser alterados. Fica registrado quem destravou e quando.`)) return;
   try { await q(sb.from('contas_travas').update({ ativo: false, desfeito_por: state.user?.id, desfeito_em: new Date().toISOString() }).eq('id', travaId)); toast(`${x.ct.nome} destravada`); carregar(root); } catch (e) { fail(e); }
 }
 
-// Conta sem extrato OFX (caixa carteira, cofre…): o usuário informa o saldo conferido no fim do mês; se bater com o
-// sistema, a conta é fechada (travada) com o saldo registrado; se não bater, mostra a diferença e pede confirmação.
-function fecharSemExtrato(R, contaId, root) {
+// Fechar / travar uma conta numa data escolhida (cada banco pode fechar numa data diferente).
+// Com extrato: confere se há movimento do extrato pendente até a data e se o saldo do banco (último extrato) bate.
+// Sem extrato (caixa, cofre, conta sem OFX): o usuário informa o saldo conferido na data.
+// Depois de travada, os lançamentos pagos da conta até a data não mudam data, valor, conta nem situação.
+function fecharConta(R, contaId, root) {
   const x = R.contas.find(c => c.ct.id === contaId); if (!x) return;
-  const m = modal({ title: `Fechar ${x.ct.nome} em ${dateBR(R.fim)}`, body: `
-    <p class="small muted" style="margin-top:0">Conta sem extrato bancário: confira o saldo real (contagem do caixa, extrato em papel, relatório do banco) e informe abaixo. Se bater com o sistema, a conta fica travada até ${dateBR(R.fim)}.</p>
-    <div class="kpis" style="margin:0 0 10px"><div class="kpi"><div class="k-label">Saldo no sistema em ${dateBR(R.fim)}</div><div class="k-value">${money(x.saldo)}</div><div class="k-sub">movimento do mês ${money(x.mS)}</div></div></div>
-    <label>Saldo conferido em ${dateBR(R.fim)}<input id="sb" placeholder="0,00" autofocus></label>
-    <p id="dif" class="small"></p>
-    <label>Como foi conferido<input id="ob" placeholder="ex.: contagem do caixa em 30/09 por Fulano; extrato do banco"></label>`,
-    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Fechar conta</button>' });
+  const hoje = new Date().toISOString().slice(0, 10);
+  const sug = x.temExt && x.ultExt ? (x.ultExt < R.fim ? x.ultExt : R.fim) : R.fim;
+  const m = modal({ title: `Fechar ${x.ct.nome}`, body: `
+    <p class="small muted" style="margin-top:0">Escolha até que dia esta conta está fechada. ${x.temExt ? `Extrato importado até ${dateBR(x.ultExt)}.` : 'Conta sem extrato: informe o saldo conferido (extrato em papel, contagem do caixa) nessa data.'}
+      Depois de travada, os lançamentos pagos desta conta até a data não podem ter data, valor, conta ou situação alterados, nem ser excluídos ou incluídos — só classificação, descrição e centro de custo.</p>
+    <div class="toolbar" style="padding:0"><label>Fechada até<input type="date" id="fd" value="${sug}" max="${hoje}"></label>
+      <label class="grow">Saldo no banco em <span id="fdl">${dateBR(sug)}</span>${x.temExt ? ' (opcional)' : ' *'}<input id="sb" inputmode="decimal" placeholder="0,00"></label></div>
+    <div id="fi" class="small" style="margin:8px 0"><span class="muted">Conferindo…</span></div>
+    <label>Observação<input id="ob" placeholder="ex.: conferido com o extrato do banco; contagem do caixa por Fulano"></label>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Fechar e travar</button>' });
+  let info = null, seq = 0;
   const val = () => { const t = $('#sb', m.el).value.trim(); return t === '' ? null : parseNum(t); };
-  $('#sb', m.el).oninput = () => { const v = val(); const d = v == null ? null : v - (x.saldo || 0);
-    $('#dif', m.el).innerHTML = d == null ? '' : Math.abs(d) <= 0.05 ? '<span class="pos">✔ Bate com o sistema.</span>' : `<span class="neg">Diferença de ${money(d)}</span> — ${d > 0 ? 'há mais dinheiro do que o sistema mostra (falta lançar entrada ou sobra lançada saída)' : 'há menos dinheiro do que o sistema mostra (falta lançar saída)'}.`; };
+  const mostra = () => {
+    if (!info) return;
+    const v = val(), d = v == null ? null : v - info.saldo;
+    $('#fi', m.el).innerHTML = `<div class="kpis" style="margin:0"><div class="kpi"><div class="k-label">Saldo no sistema em ${dateBR(info.data)}</div><div class="k-value ${info.saldo < 0 ? 'neg' : ''}">${money(info.saldo)}</div></div>
+      ${x.temExt ? `<div class="kpi"><div class="k-label">Extrato pendente até ${dateBR(info.data)}</div><div class="k-value ${info.pend ? 'neg' : 'pos'}">${info.pend}</div><div class="k-sub">${info.pend ? money(info.vPend) + ' sem conciliar' : 'tudo conciliado'}${info.semExt ? ` · <span class="neg">extrato só até ${dateBR(x.ultExt)}</span>` : ''}</div></div>` : ''}
+      ${d == null ? '' : `<div class="kpi"><div class="k-label">Banco − sistema</div><div class="k-value ${Math.abs(d) <= 0.05 ? 'pos' : 'neg'}">${money(d)}</div><div class="k-sub">${Math.abs(d) <= 0.05 ? '✔ bate' : 'diferença'}</div></div>`}</div>`;
+  };
+  const conferirData = async () => {
+    const dt = $('#fd', m.el).value; if (!dt) return;
+    $('#fdl', m.el).textContent = dateBR(dt);
+    const k = ++seq; $('#fi', m.el).innerHTML = '<span class="muted">Conferindo…</span>';
+    try {
+      const [sal, pend] = await Promise.all([
+        q(sb.rpc('saldos_contas', { p_empresa: state.empresa.id, p_ate: dt })),
+        x.temExt ? fetchAll(() => sb.from('extrato_itens').select('id,valor').eq('empresa_id', state.empresa.id).eq('conta_id', contaId).eq('status', 'pendente').lte('data', dt).order('id')) : [],
+      ]);
+      if (k !== seq) return;
+      const s0 = sal.find(r => r.conta_id === contaId);
+      info = { data: dt, saldo: s0 ? +s0.saldo_pago : 0, pend: pend.length, vPend: pend.reduce((s, i) => s + Math.abs(+i.valor), 0), semExt: x.temExt && (!x.ultExt || x.ultExt < dt) };
+      mostra();
+    } catch (e) { fail(e); }
+  };
+  $('#fd', m.el).onchange = conferirData;
+  $('#sb', m.el).oninput = mostra;
+  conferirData();
   $('#ok', m.el).onclick = async () => {
-    const v = val(); if (v == null || isNaN(v)) return toast('Informe o saldo conferido', true);
-    const d = v - (x.saldo || 0), bate = Math.abs(d) <= 0.05;
-    if (!bate && !confirm(`O saldo informado (${money(v)}) é diferente do sistema (${money(x.saldo)}): diferença de ${money(d)}.\n\nO ideal é lançar o que falta antes de fechar. Fechar mesmo assim, registrando a diferença?`)) return;
-    const obs = [$('#ob', m.el).value.trim(), bate ? 'saldo informado bate com o sistema' : `fechada com diferença de ${money(d)}`].filter(Boolean).join(' · ');
+    if (!info || info.data !== $('#fd', m.el).value) return toast('Aguarde a conferência da data', true);
+    const v = val();
+    if (!x.temExt && (v == null || isNaN(v))) return toast('Informe o saldo conferido nessa data', true);
+    if (v != null && isNaN(v)) return toast('Saldo inválido', true);
+    const avisos = [];
+    if (info.semExt) avisos.push(`o extrato importado vai só até ${dateBR(x.ultExt)}`);
+    if (info.pend) avisos.push(`${info.pend} movimento(s) do extrato sem conciliar até a data`);
+    const d = v == null ? null : v - info.saldo;
+    if (d != null && Math.abs(d) > 0.05) avisos.push(`o saldo informado difere do sistema em ${money(d)}`);
+    if (!confirm(`Fechar e travar ${x.ct.nome} até ${dateBR(info.data)}?${avisos.length ? `\n\nATENÇÃO: ${avisos.join('; ')}. Travar mesmo assim?` : ''}`)) return;
+    const obs = [$('#ob', m.el).value.trim(), avisos.length ? `travada com pendência: ${avisos.join('; ')}` : (x.temExt ? 'conciliado e batendo' : 'saldo informado bate com o sistema')].filter(Boolean).join(' · ');
     try {
       if (x.trava) await q(sb.from('contas_travas').update({ ativo: false, desfeito_por: state.user?.id, desfeito_em: new Date().toISOString() }).eq('id', x.trava.id));
-      await q(sb.from('contas_travas').insert({ empresa_id: state.empresa.id, conta_id: contaId, ate: R.fim, saldo_sistema: x.saldo, saldo_banco: +v.toFixed(2), observacao: obs }));
-      toast(`${x.ct.nome} fechada até ${dateBR(R.fim)}`); m.close(); carregar(root);
+      await q(sb.from('contas_travas').insert({ empresa_id: state.empresa.id, conta_id: contaId, ate: info.data, saldo_sistema: +info.saldo.toFixed(2), saldo_banco: v == null ? null : +v.toFixed(2), observacao: obs }));
+      toast(`${x.ct.nome} fechada até ${dateBR(info.data)}`); m.close(); carregar(root);
     } catch (e) { fail(e); }
   };
 }
