@@ -20,6 +20,8 @@ export const isAdmin = () => state.papel === 'admin';
 // acesso por área (Financeiro, CPD, Contabilidade): administrador vê todas; sem marcação = todas
 export const AREAS = [['fin', 'Financeiro'], ['com', 'Comercial'], ['cmp', 'Compras'], ['prd', 'Produção'], ['log', 'Logística'], ['cpd', 'CPD'], ['cont', 'Contabilidade']];
 export const temArea = (a) => state.papel === 'admin' || !state.areas || state.areas.includes(a);
+// RH é exceção: só administrador ou quem tem "rh" marcado (sem marcação NÃO dá acesso — salário é sigiloso; SQL 052)
+export const temRH = () => state.papel === 'admin' || (state.areas || []).includes('rh');
 
 export async function q(promise) {
   const { data, error } = await promise;

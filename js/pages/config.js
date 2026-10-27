@@ -110,8 +110,10 @@ async function membros(root) {
       if (r.papel === 'vendas') return '<span class="muted small">Comercial (própria carteira)</span>';
       if (r.papel === 'producao') return '<span class="muted small">Terminal de produção</span>';
       const tem = (a) => !r.areas || r.areas.includes(a);
-      if (!adm || r.user_id === state.user.id || !comAreas) return esc(AREAS.filter(([a]) => tem(a)).map(([, n]) => n).join(', '));
-      return `<div class="areas-chk">${AREAS.map(([a, n]) => `<label class="chk"><input type="checkbox" class="ar" value="${a}" ${tem(a) ? 'checked' : ''}> ${n}</label>`).join('')}</div>`;
+      const rh = (r.areas || []).includes('rh');
+      if (!adm || r.user_id === state.user.id || !comAreas) return esc(AREAS.filter(([a]) => tem(a)).map(([, n]) => n).concat(rh ? ['RH'] : []).join(', '));
+      return `<div class="areas-chk">${AREAS.map(([a, n]) => `<label class="chk"><input type="checkbox" class="ar" value="${a}" ${tem(a) ? 'checked' : ''}> ${n}</label>`).join('')}
+        <label class="chk" title="Salários, folha e trabalhista: só quem for marcado aqui (além do administrador)"><input type="checkbox" class="ar-rh" ${rh ? 'checked' : ''}> <b>RH (salários)</b></label></div>`;
     };
     el.innerHTML = `<table><thead><tr><th>E-mail</th><th>Papel</th><th>Áreas</th><th></th></tr></thead><tbody>
       ${rows.map(r => `<tr data-u="${r.user_id}"><td>${esc(r.email)}</td>
@@ -119,7 +121,7 @@ async function membros(root) {
         <td>${areasTd(r)}</td>
         <td>${adm && r.user_id !== state.user.id ? '<button class="btn small danger rm">Remover</button>' : ''}</td></tr>`).join('')}</tbody></table>
       <p class="muted small" style="margin-top:8px">Áreas: o que a pessoa enxerga no menu (Financeiro inclui o Dashboard; Cadastros aparecem para todos).
-      O que ela pode <strong>alterar</strong> continua definido pelo papel — para um contador só consultar, use papel <em>leitura</em> + área Contabilidade.
+      <strong>RH (salários)</strong> só vale para quem for marcado — o administrador sempre vê. O que ela pode <strong>alterar</strong> continua definido pelo papel — para um contador só consultar, use papel <em>leitura</em> + área Contabilidade.
       ${adm && !comAreas ? '<br><strong class="warn">Para liberar a escolha de áreas, rode a migration 20261014000033_membros_areas.sql.</strong>' : ''}</p>`;
     el.onchange = async (ev) => {
       const tr = ev.target.closest('tr');
@@ -127,10 +129,12 @@ async function membros(root) {
         try { await q(sb.from('membros').update({ papel: ev.target.value }).eq('empresa_id', state.empresa.id).eq('user_id', tr.dataset.u)); toast('Papel alterado'); membros(root); } catch (err) { fail(err); }
         return;
       }
-      if (!ev.target.matches('.ar')) return;
+      if (!ev.target.matches('.ar, .ar-rh')) return;
       const marcadas = [...tr.querySelectorAll('.ar:checked')].map(x => x.value);
-      if (!marcadas.length) { ev.target.checked = true; toast('Deixe ao menos uma área marcada', 'error'); return; }
-      const areas = marcadas.length === AREAS.length ? null : marcadas;   // todas marcadas = sem restrição
+      const rh = tr.querySelector('.ar-rh')?.checked;
+      if (!marcadas.length && !rh) { ev.target.checked = true; toast('Deixe ao menos uma área marcada', 'error'); return; }
+      // todas marcadas = sem restrição; RH precisa estar escrito na lista (sem marcação não dá acesso ao RH)
+      const areas = marcadas.length === AREAS.length && !rh ? null : marcadas.concat(rh ? ['rh'] : []);
       try { await q(sb.from('membros').update({ areas }).eq('empresa_id', state.empresa.id).eq('user_id', tr.dataset.u)); toast('Áreas alteradas — valem no próximo acesso da pessoa'); }
       catch (err) { ev.target.checked = !ev.target.checked; fail(err); }
     };

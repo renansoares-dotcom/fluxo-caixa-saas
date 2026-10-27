@@ -1,4 +1,4 @@
-import { sb, state, q, loadCadastros, anosSelect, temArea } from './lib/data.js';
+import { sb, state, q, loadCadastros, anosSelect, temArea, temRH } from './lib/data.js';
 import { $, $$, esc, toast, fail, formData, loading, lerCores, modal } from './lib/ui.js';
 import { SUPABASE_URL } from './config.js';
 import { iniciarNotificacoes, pararNotificacoes } from './lib/notif.js';
@@ -33,6 +33,9 @@ const routes = {
   'producao/planta': () => import(`./pages/producao-planta.js?v=${V}`),
   'logistica': () => import(`./pages/logistica.js?v=${V}`),
   'logistica/frota': () => import(`./pages/logistica-frota.js?v=${V}`),
+  'rh/colaboradores': () => import(`./pages/rh-colaboradores.js?v=${V}`),
+  'rh/folha': () => import(`./pages/rh-folha.js?v=${V}`),
+  'rh/decimo': () => import(`./pages/rh-decimo.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),
@@ -196,6 +199,8 @@ function aplicarAreas() {
   $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'com', 'cmp', 'prd', 'log', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
   for (const r of ['dashboard', 'hoje', 'decisao-dia', 'decisoes', 'executivo']) { const a = $(`#nav a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
   const pain = $('#nav .nav-area[data-area="pain"]'); if (pain) pain.hidden = !temArea('fin');
+  // RH: só administrador ou quem tem a área "rh" marcada (sem marcação não dá acesso — salário é sigiloso)
+  const rh = $('#nav .nav-area[data-area="rh"]'); if (rh) rh.hidden = !temRH();
 }
 // primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
 function primeiraRota() {
@@ -263,7 +268,7 @@ async function render() {
   if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
   if (state.papel === 'vendas' && !rotaDeVendas(route)) { location.hash = '#/comercial'; return; }
   if (state.papel === 'producao' && !rotaDeProducao(route)) { location.hash = '#/producao/terminal'; return; }
-  { const ar = routes[route] ? areaDaRota(route) : 'fin'; if (['fin', 'com', 'cmp', 'prd', 'log', 'cpd', 'cont'].includes(ar) && !temArea(ar)) { location.hash = '#/' + primeiraRota(); return; } }
+  { const ar = routes[route] ? areaDaRota(route) : 'fin'; if ((['fin', 'com', 'cmp', 'prd', 'log', 'cpd', 'cont'].includes(ar) && !temArea(ar)) || (ar === 'rh' && !temRH())) { location.hash = '#/' + primeiraRota(); return; } }
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
   // menu em cascata: abre o grupo da página atual
