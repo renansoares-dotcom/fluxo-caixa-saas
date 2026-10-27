@@ -1,7 +1,7 @@
 // RH › Colaboradores: cadastro (cargo, setor, vínculo, admissão, salário), importação da relação em planilha e setor por cargo.
 // Salário é sigiloso: a tela e o banco só abrem para administrador ou quem tem a área RH (SQL 052).
 import { sb, state, q } from '../lib/data.js';
-import { $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, exportXLSX } from '../lib/ui.js';
+import { $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, exportXLSX, logoPNG } from '../lib/ui.js';
 import { VINCULOS, SITUACOES, setorDoCargo, chaveNome } from '../lib/rh.js';
 import { temRH, podeRH, carregarBase, avisoMigracao, kpi } from '../lib/rh-dados.js';
 import { inp, num } from '../lib/compras.js';
@@ -22,7 +22,7 @@ export async function render(root) {
   const setores = [...new Set(C.map(c => c.setor).filter(Boolean))].sort();
   const semSetor = ativos.filter(c => !c.setor).length;
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Colaboradores</h2><div class="muted small">Dados sigilosos — visíveis só para quem tem acesso ao RH.</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${podeRH() ? '<button class="btn" id="rc-imp">Importar relação (planilha)</button><button class="btn" id="rc-setor">Setor por cargo</button><button class="btn primary" id="rc-novo">Incluir</button>' : ''}<button class="btn ghost" id="rc-xls">Exportar</button></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${podeRH() ? '<button class="btn" id="rc-imp">Importar relação (planilha)</button><button class="btn" id="rc-setor">Setor por cargo</button><button class="btn primary" id="rc-novo">Incluir</button>' : ''}<button class="btn" id="rc-rel" title="Relatório para imprimir ou salvar em PDF, com os filtros aplicados">Relatório (imprimir)</button><button class="btn ghost" id="rc-xls">Exportar</button></div></div>
     <div class="kpis">${kpi('Ativos', ativos.length, `${naFolha.length} na folha`)}${kpi('Salário base da folha', money(base), naFolha.length ? `média ${money(base / naFolha.length)}` : '')}
       ${kpi('Sem setor', semSetor, semSetor ? 'use "Setor por cargo"' : 'todos com setor', semSetor ? 'warn' : '')}${kpi('Sem admissão', ativos.filter(c => !c.admissao).length, 'necessária para férias e 13º proporcional')}
       ${kpi('Desligados', C.length - ativos.length)}</div>
@@ -33,11 +33,12 @@ export async function render(root) {
       <select id="rc-fv" data-nobusca><option value="">Todos os vínculos</option>${Object.entries(VINCULOS).map(([k, t]) => `<option value="${k}" ${ui.vinc === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <span class="muted small" id="rc-n"></span></div>
     <div class="card flush" style="margin-top:12px"><div class="table-wrap" id="rc-tab"></div></div>`;
-  const tabela = () => {
-    const t = norm(ui.busca);
-    const xs = C.filter(c => (ui.sit === 'todos' || (ui.sit === 'ativos') === (c.situacao !== 'desligado'))
+  const filtrados = () => { const t = norm(ui.busca);
+    return C.filter(c => (ui.sit === 'todos' || (ui.sit === 'ativos') === (c.situacao !== 'desligado'))
       && (!ui.setor || (ui.setor === '-' ? !c.setor : c.setor === ui.setor)) && (!ui.vinc || c.vinculo === ui.vinc)
-      && (!t || t.split(' ').every(p => norm(`${c.nome} ${c.cargo} ${c.matricula} ${c.setor}`).includes(p))));
+      && (!t || t.split(' ').every(p => norm(`${c.nome} ${c.cargo} ${c.matricula} ${c.setor}`).includes(p)))); };
+  const tabela = () => {
+    const xs = filtrados();
     $('#rc-n', root).textContent = `${xs.length} pessoa(s) · ${money(xs.reduce((s, c) => s + (+c.salario || 0), 0))}`;
     $('#rc-tab', root).innerHTML = `<table><thead><tr><th>Nome</th><th>Matrícula</th><th>Cargo</th><th>Setor</th><th>Vínculo</th><th>Admissão</th><th class="num">Salário</th><th>Situação</th></tr></thead><tbody>
       ${xs.map(c => `<tr class="clickable" data-id="${c.id}"><td><b>${esc(c.nome)}</b></td><td>${esc(c.matricula || '')}</td><td>${esc(c.cargo || '')}</td><td>${esc(c.setor || '') || '<span class="muted">—</span>'}</td>
@@ -51,6 +52,7 @@ export async function render(root) {
   $('#rc-fs', root).onchange = (e) => { ui.setor = e.target.value; tabela(); };
   $('#rc-fv', root).onchange = (e) => { ui.vinc = e.target.value; tabela(); };
   $('#rc-xls', root).onclick = () => exportXLSX($('#rc-tab table', root), 'colaboradores');
+  $('#rc-rel', root).onclick = () => opcoesRelatorio(filtrados());
   $('#rc-novo', root) && ($('#rc-novo', root).onclick = () => editar(null, B, root));
   $('#rc-imp', root) && ($('#rc-imp', root).onclick = () => importar(B, root));
   $('#rc-setor', root) && ($('#rc-setor', root).onclick = () => setorPorCargo(B, root));
@@ -192,4 +194,62 @@ function setorPorCargo(B, root) {
       md.close(); toast(`${n} colaborador(es) com setor atualizado`); render(root);
     } catch (err) { fail(err); ev.target.disabled = false; }
   };
+}
+
+// ---------- relatório para impressão (os filtros da tela valem: busca, situação, setor, vínculo) ----------
+const REL = { grupo: 'setor', salario: true, matricula: true, admissao: true, vinculo: true, cpf: false, assinatura: false };
+function opcoesRelatorio(xs) {
+  if (!xs.length) return toast('Nenhum colaborador com os filtros atuais', true);
+  const ck = (k, t) => `<label class="chk"><input type="checkbox" class="rl-c" value="${k}" ${REL[k] ? 'checked' : ''}> ${t}</label>`;
+  const filtros = [ui.sit === 'ativos' ? 'ativos' : ui.sit === 'desligados' ? 'desligados' : 'todos', ui.setor ? `setor ${ui.setor === '-' ? '(sem setor)' : ui.setor}` : '', ui.vinc ? VINCULOS[ui.vinc] : '', ui.busca ? `busca "${ui.busca}"` : ''].filter(Boolean).join(' · ');
+  const md = modal({ title: 'Relatório de colaboradores', body: `<p class="small muted" style="margin-top:0">${xs.length} pessoa(s) — filtros da tela: ${esc(filtros)}.</p>
+      <label>Agrupar por<select id="rl-g" data-nobusca>${[['setor', 'Setor'], ['cargo', 'Cargo'], ['vinculo', 'Vínculo'], ['', 'Sem agrupar (ordem alfabética)']].map(([k, t]) => `<option value="${k}" ${REL.grupo === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <div class="small muted" style="margin-top:10px">Colunas</div><div class="areas-chk">${ck('matricula', 'Matrícula')}${ck('vinculo', 'Vínculo')}${ck('admissao', 'Admissão')}${ck('salario', 'Salário (com subtotais)')}${ck('cpf', 'CPF (mascarado)')}${ck('assinatura', 'Coluna de assinatura')}</div>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rl-ok">Abrir para imprimir</button>' });
+  $('#rl-ok', md.el).onclick = async () => {
+    REL.grupo = $('#rl-g', md.el).value; $$('.rl-c', md.el).forEach(c => { REL[c.value] = c.checked; });
+    md.close(); await imprimirRelatorio(xs, filtros);
+  };
+}
+
+async function imprimirRelatorio(xs, filtros) {
+  const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
+  const logo = await logoPNG().catch(() => null);
+  const cpfM = (c) => c && c.length === 11 ? `***.${c.slice(3, 6)}.${c.slice(6, 9)}-**` : '';
+  const chave = (c) => REL.grupo === 'vinculo' ? (VINCULOS[c.vinculo] || c.vinculo) : REL.grupo ? (limpa(c[REL.grupo]) || `(sem ${REL.grupo})`) : '';
+  const grupos = {};
+  for (const c of [...xs].sort((a, b) => a.nome.localeCompare(b.nome))) (grupos[chave(c)] || (grupos[chave(c)] = [])).push(c);
+  const ordem = Object.keys(grupos).sort((a, b) => (a.startsWith('(sem') - b.startsWith('(sem')) || a.localeCompare(b));
+  const cols = [['#', () => ''], ['Nome', c => `<b>${esc(c.nome)}</b>`], ...(REL.matricula ? [['Matrícula', c => esc(c.matricula || '')]] : []),
+    ...(REL.cpf ? [['CPF', c => cpfM(c.cpf)]] : []), ...(REL.grupo !== 'cargo' ? [['Cargo', c => esc(c.cargo || '')]] : []), ...(REL.grupo !== 'setor' ? [['Setor', c => esc(c.setor || '')]] : []),
+    ...(REL.vinculo && REL.grupo !== 'vinculo' ? [['Vínculo', c => VINCULOS[c.vinculo] || '']] : []), ...(REL.admissao ? [['Admissão', c => dateBR(c.admissao)]] : []),
+    ...(ui.sit !== 'ativos' ? [['Situação', c => SITUACOES[c.situacao] + (c.demissao ? ' ' + dateBR(c.demissao) : '')]] : []),
+    ...(REL.salario ? [['Salário', c => money(c.salario), 'n']] : []), ...(REL.assinatura ? [['Assinatura', () => '', 'ass']] : [])];
+  const soma = (l) => l.reduce((s, c) => s + (+c.salario || 0), 0);
+  let k = 0;
+  const corpo = ordem.map(g => { const l = grupos[g];
+    return `${REL.grupo ? `<tr class="gr"><td colspan="${cols.length}">${esc(g)} <span>— ${l.length} pessoa(s)</span></td></tr>` : ''}
+      ${l.map(c => { k++; return `<tr>${cols.map(([t, f, cl], i) => `<td class="${cl || ''}">${i === 0 ? k : f(c)}</td>`).join('')}</tr>`; }).join('')}
+      ${REL.grupo && REL.salario ? `<tr class="st"><td colspan="${cols.length - 1 - (REL.assinatura ? 1 : 0)}">Subtotal ${esc(g)}</td><td class="n">${money(soma(l))}</td>${REL.assinatura ? '<td></td>' : ''}</tr>` : ''}`; }).join('');
+  const agora = new Date();
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Colaboradores — ${esc(state.empresa.nome || '')}</title><style>
+    @page{size:A4 ${cols.length > 8 ? 'landscape' : 'portrait'};margin:12mm}
+    body{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#111;margin:0}
+    .cab{display:flex;align-items:center;gap:14px;border-bottom:2px solid #111;padding-bottom:8px} .cab img{height:38px} .cab h1{font-size:16px;margin:0} .cab .d{margin-left:auto;text-align:right;font-size:10px;color:#444}
+    .res{display:flex;gap:18px;margin:8px 0 6px;font-size:11px} .res b{font-size:12px}
+    table{width:100%;border-collapse:collapse} th{background:#eee;text-align:left;font-size:10px;padding:4px 5px;border-bottom:1px solid #999} thead{display:table-header-group}
+    td{padding:3px 5px;border-bottom:1px solid #ddd;vertical-align:top} td.n,th.n{text-align:right;white-space:nowrap} td.ass{width:150px} tr{page-break-inside:avoid}
+    tr.gr td{background:#f4f4f4;font-weight:bold;font-size:11px;border-bottom:1px solid #999;padding-top:7px} tr.gr span{font-weight:normal;color:#555}
+    tr.st td{font-weight:bold;border-bottom:1px solid #999} tr.tot td{font-weight:bold;font-size:11.5px;border-top:2px solid #111;border-bottom:0}
+    .rod{margin-top:10px;font-size:9px;color:#555;border-top:1px solid #ccc;padding-top:4px}
+    @media screen{body{margin:20px auto;max-width:1000px}.bar{margin-bottom:12px}} @media print{.bar{display:none}}</style></head><body>
+    <div class="bar"><button onclick="print()">Imprimir / salvar PDF</button></div>
+    <div class="cab">${logo ? `<img src="${logo.data}">` : ''}<div><h1>Relação de colaboradores</h1><div>${esc(state.empresa.nome || '')}</div></div>
+      <div class="d">Emitido em ${agora.toLocaleDateString('pt-BR')} ${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}<br>${esc(state.user?.email || '')}</div></div>
+    <div class="res"><div>Pessoas: <b>${xs.length}</b></div>${REL.salario ? `<div>Salário base total: <b>${money(soma(xs))}</b></div><div>Média: <b>${money(soma(xs) / xs.length)}</b></div>` : ''}<div>Filtros: ${esc(filtros)}</div></div>
+    <table><thead><tr>${cols.map(([t, , cl]) => `<th class="${cl || ''}">${t}</th>`).join('')}</tr></thead><tbody>${corpo}
+      ${REL.salario ? `<tr class="tot"><td colspan="${cols.length - 1 - (REL.assinatura ? 1 : 0)}">Total geral — ${xs.length} pessoa(s)</td><td class="n">${money(soma(xs))}</td>${REL.assinatura ? '<td></td>' : ''}</tr>` : ''}</tbody></table>
+    <div class="rod">Documento confidencial — uso restrito ao RH e à direção. ${REL.salario ? 'Contém salários.' : ''}</div>
+    <script>window.onload=()=>setTimeout(()=>print(),300)</script></body></html>`);
+  w.document.close();
 }
