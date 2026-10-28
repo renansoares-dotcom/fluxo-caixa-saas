@@ -11,7 +11,11 @@ const ST = { aguardando: 'Aguardando aprovação', aprovado: 'Aprovado', rejeita
 const ST_CLS = { aguardando: 'aberto', aprovado: 'conc', rejeitado: 'vencido', cancelado: '', pago: 'aberto', nota_recebida: 'pago' };
 const PIX = { cnpj: 'CNPJ', cpf: 'CPF', email: 'E-mail', telefone: 'Telefone', aleatoria: 'Chave aleatória' };
 const ui = { aba: null, busca: '' };
-let L = [], LANC = new Map(), SEM_TABELA = false, VIS = { R: [], aba: '' };
+let L = [], LANC = new Map(), PAG = new Map(), ANX = new Map(), SEM_TABELA = false, SEM_PAG = false, VIS = { R: [], aba: '' };
+// pagamentos do PA (SQL 053): vários por PA, cada um com lançamento, adiantamento e comprovantes
+const pags = (p) => PAG.get(p.id) || [];
+const pagoDe = (p) => +pags(p).filter(x => LANC.get(x.lancamento_id)?.status === 'Pago').reduce((s, x) => s + +x.valor, 0).toFixed(2);
+const faltaDe = (p) => +(+p.valor - pagoDe(p)).toFixed(2);
 
 const dig = (s) => String(s || '').replace(/\D/g, '');
 const fmtDoc = (d) => { d = dig(d); return d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d; };
@@ -24,13 +28,14 @@ const ehMeu = (p) => p.criado_por === state.user?.id;
 /** situação na tela: "aprovado" se divide em "a programar" (sem lançamento) e "no fluxo" (com lançamento) */
 function fase(p) {
   if (p.status === 'aprovado') { const l = LANC.get(p.lancamento_id); return !p.lancamento_id ? 'programar' : l?.status === 'Pago' ? 'pago_sist' : 'fluxo'; }
+  if (p.status === 'pago' && pags(p).length && faltaDe(p) > 0.005) return 'parcial';
   if (p.status === 'pago') return p.tera_nota ? 'sem_nf' : 'sem_lastro';
   return p.status;
 }
 const ABAS = [
   ['aguardando', 'Aguardando aprovação', (p) => p.status === 'aguardando'],
   ['programar', 'Aprovados a programar', (p) => fase(p) === 'programar'],
-  ['fluxo', 'No fluxo / pagos', (p) => ['fluxo', 'pago_sist'].includes(fase(p))],
+  ['fluxo', 'No fluxo / pagos', (p) => ['fluxo', 'pago_sist', 'parcial'].includes(fase(p))],
   ['nota', 'Pagos aguardando nota', (p) => fase(p) === 'sem_nf'],
   ['semnota', 'Sem nota fiscal', (p) => !p.tera_nota && !['rejeitado', 'cancelado'].includes(p.status)],
   ['ok', 'Concluídos', (p) => p.status === 'nota_recebida'],
@@ -70,8 +75,17 @@ async function carregar(root) {
     if (/paraquedas|relation|schema cache|does not exist/i.test(e.message || '')) { SEM_TABELA = true; L = []; }
     else { fail(e); L = []; }
   }
-  LANC = new Map();
-  const ids = L.map(p => p.lancamento_id).filter(Boolean);
+  LANC = new Map(); PAG = new Map(); ANX = new Map(); SEM_PAG = false;
+  if (L.length) {
+    try {
+      const pa = L.map(p => p.id);
+      for (let i = 0; i < pa.length; i += 150) {
+        for (const x of await q(sb.from('paraquedas_pagamentos').select('*').in('paraquedas_id', pa.slice(i, i + 150)).order('data').order('criado_em'))) (PAG.get(x.paraquedas_id) || PAG.set(x.paraquedas_id, []).get(x.paraquedas_id)).push(x);
+        for (const a of await q(sb.from('paraquedas_anexos').select('*').in('paraquedas_id', pa.slice(i, i + 150)).order('enviado_em'))) (ANX.get(a.paraquedas_id) || ANX.set(a.paraquedas_id, []).get(a.paraquedas_id)).push(a);
+      }
+    } catch (e) { if (/paraquedas_(pagamentos|anexos)|relation|schema cache|does not exist/i.test(e.message || '')) SEM_PAG = true; else fail(e); }
+  }
+  const ids = [...new Set(L.map(p => p.lancamento_id).concat([...PAG.values()].flat().map(x => x.lancamento_id)).filter(Boolean))];
   if (ids.length && !compras()) for (let i = 0; i < ids.length; i += 150) for (const l of await q(sb.from('lancamentos').select('id,status,data,valor,conta_id').in('id', ids.slice(i, i + 150)))) LANC.set(l.id, l);
   pintar(root);
 }
@@ -118,6 +132,8 @@ function pintar(root) {
     else if (act === 'concluir') concluirSemNota(p, root);
     else if (act === 'comprovante') anexarComprovante(p, root);
     else if (act === 'vercomp') verComprovante(p);
+    else if (act === 'pagar') registrarPagamento(p, root);
+    else if (act === 'pagamentos') pagamentosEAnexos(p, root);
   };
   if (sel) {
     const marcados = () => [...box.querySelectorAll('[data-sel]:checked')].map(i => L.find(p => p.id === i.dataset.sel));
@@ -133,6 +149,7 @@ function linha(p, sel) {
   const f = fase(p), l = LANC.get(p.lancamento_id), ed = podeEditar();
   const sit = f === 'programar' ? '<span class="badge conc">Aprovado · a programar</span>' : f === 'fluxo' ? `<span class="badge conc">No fluxo · ${esc(l?.status || 'lançamento')}</span>`
     : f === 'pago_sist' ? '<span class="badge pago">Pago no fluxo</span>' : f === 'sem_lastro' ? '<span class="badge pago">Pago · sem nota</span>'
+    : f === 'parcial' ? `<span class="badge vencido">Pago parcialmente · falta ${money(faltaDe(p))}</span>`
     : p.status === 'nota_recebida' && !p.tera_nota ? '<span class="badge pago">Concluído sem nota</span>' : `<span class="badge ${ST_CLS[p.status]}">${ST[p.status]}</span>`;
   const atraso = f === 'sem_nf' ? dias(l?.data || p.data_pagamento) : 0;
   const acoes = [];
@@ -141,15 +158,17 @@ function linha(p, sel) {
   if (!compras() && ed && f === 'programar') acoes.push(['programar', 'Programar no fluxo']);
   if (!compras() && ed && f === 'sem_nf') acoes.push(['nota', 'Ligar nota']);
   if (!compras() && ed && f === 'sem_lastro') acoes.push(['concluir', 'Concluir']);
-  if (p.comprovante_path) acoes.push(['vercomp', '📎 Comprovante']);
-  if (!compras() && ed && ['aprovado', 'pago', 'nota_recebida'].includes(p.status)) acoes.push(['comprovante', p.comprovante_path ? 'Trocar comprovante' : 'Anexar comprovante']);
+  if (!compras() && ed && !SEM_PAG && ['aprovado', 'pago'].includes(p.status) && f !== 'pago_sist' && faltaDe(p) > 0.005) acoes.push(['pagar', pags(p).some(x => LANC.get(x.lancamento_id)?.status === 'Pago') ? 'Registrar complemento' : 'Registrar pagamento']);
+  const nAnx = (ANX.get(p.id) || []).length;
+  if (SEM_PAG) { if (p.comprovante_path) acoes.push(['vercomp', '📎 Comprovante']); if (!compras() && ed && ['aprovado', 'pago', 'nota_recebida'].includes(p.status)) acoes.push(['comprovante', p.comprovante_path ? 'Trocar comprovante' : 'Anexar comprovante']); }
+  else if (pags(p).length || nAnx || (!compras() && ed && ['aprovado', 'pago', 'nota_recebida'].includes(p.status))) acoes.push(['pagamentos', `Pagamentos e anexos${nAnx ? ` (📎 ${nAnx})` : ''}`]);
   if ((ehMeu(p) && ['aguardando', 'rejeitado'].includes(p.status)) || (ed && ['aguardando', 'rejeitado', 'aprovado'].includes(p.status) && f !== 'pago_sist')) acoes.push(['cancelar', 'Cancelar']);
   return `<tr>${sel ? `<td><input type="checkbox" data-sel="${p.id}"></td>` : ''}<td><strong>${p.numero}</strong>${p.prioridade === 'urgente' ? ' <span class="badge vencido">urgente</span>' : ''}</td>
     <td>${dateBR(p.data_pagamento)}</td>
     <td class="wrap">${esc(p.razao_social)}<div class="small muted">${esc(fmtDoc(p.cnpj))}${p.pix_chave ? ` · Pix ${esc(PIX[p.pix_tipo] || '')}: ${esc(p.pix_chave)}` : ''}${p.conta_bancaria ? ` · ${esc(p.banco || '')} ag ${esc(p.agencia || '')} cc ${esc(p.conta_bancaria)}` : ''}</div></td>
     <td class="wrap small">${esc(p.descricao)}${p.pedido ? `<div class="muted">pedido ${esc(p.pedido)}</div>` : ''}${p.solicitante ? `<div class="muted">por ${esc(p.solicitante)}</div>` : ''}${p.motivo ? `<div class="neg">${esc(p.motivo)}</div>` : ''}</td>
     <td class="small">${p.tera_nota ? `Sim${p.previsao_nota ? ` · prev. ${dateBR(p.previsao_nota)}` : ''}${atraso ? `<div class="${atraso > 30 ? 'neg' : 'muted'}">pago há ${atraso} dias</div>` : ''}` : '<span class="badge vencido">Não terá</span>'}</td>
-    <td class="num">${money(p.valor)}</td><td>${sit}</td>
+    <td class="num">${money(p.valor)}${pags(p).length > 1 || (pagoDe(p) > 0 && faltaDe(p) > 0.005) ? `<div class="small muted">pago ${money(pagoDe(p))} em ${pags(p).filter(x => LANC.get(x.lancamento_id)?.status === 'Pago').length}x</div>` : ''}</td><td>${sit}</td>
     <td style="white-space:nowrap">${acoes.map(([a, t]) => `<button class="btn ghost small" data-act="${a}" data-id="${p.id}">${t}</button>`).join('')}</td></tr>`;
 }
 
@@ -273,6 +292,7 @@ function programar(p, root) {
       const [l] = await q(sb.from('lancamentos').insert({ empresa_id: state.empresa.id, data: $('#dt', m.el).value, plano_id: pl, conta_id: $('#cta', m.el).value || null, centro_custo_id: $('#ccu', m.el).value || null,
         favorecido_id: favId, valor: +p.valor, status: 'Em aberto', descricao: `PA ${p.numero} — ${p.descricao}`.slice(0, 250), origem: 'paraquedas' }).select('id'));
       await q(sb.from('paraquedas').update({ lancamento_id: l.id, plano_id: pl, conta_id: $('#cta', m.el).value || null, centro_custo_id: $('#ccu', m.el).value || null, favorecido_id: favId }).eq('id', p.id));
+      if (!SEM_PAG) await q(sb.from('paraquedas_pagamentos').insert({ empresa_id: state.empresa.id, paraquedas_id: p.id, lancamento_id: l.id, data: $('#dt', m.el).value, valor: +p.valor, conta_id: $('#cta', m.el).value || null })).catch(() => {});
       toast(`PA nº ${p.numero} no fluxo de ${dateBR($('#dt', m.el).value)}`); m.close(); carregar(root);
     } catch (e) { btn.disabled = false; fail(e); }
   };
@@ -288,8 +308,13 @@ async function confirmarPagos(lista, root) {
       const l = LANC.get(p.lancamento_id); let credito_id = null;
       if (p.tera_nota && p.favorecido_id) {
         const [c] = await q(sb.from('creditos').insert({ empresa_id: state.empresa.id, favorecido_id: p.favorecido_id, natureza: 'fornecedor', tipo: 'adiantamento', data: l?.data || p.data_pagamento,
-          valor: +p.valor, descricao: `PA ${p.numero} — ${p.descricao}`.slice(0, 200), lancamento_id: p.lancamento_id }).select('id'));
+          valor: +(l?.valor ?? p.valor), descricao: `PA ${p.numero} — ${p.descricao}`.slice(0, 200), lancamento_id: p.lancamento_id }).select('id'));
         credito_id = c.id;
+      }
+      if (!SEM_PAG) {
+        const x = pags(p).find(y => y.lancamento_id === p.lancamento_id);
+        if (x) await q(sb.from('paraquedas_pagamentos').update({ credito_id, valor: +(l?.valor ?? x.valor), data: l?.data || x.data, conta_id: l?.conta_id || x.conta_id }).eq('id', x.id));
+        else await q(sb.from('paraquedas_pagamentos').insert({ empresa_id: state.empresa.id, paraquedas_id: p.id, lancamento_id: p.lancamento_id, credito_id, data: l?.data || p.data_pagamento, valor: +(l?.valor ?? p.valor), conta_id: l?.conta_id || p.conta_id }));
       }
       await q(sb.from('paraquedas').update({ status: 'pago', credito_id }).eq('id', p.id)); k++;
     }
@@ -313,10 +338,13 @@ async function ligarNota(p, root) {
     for (const n of notas) n.falta = +(+n.v_nf - usos.filter(u => u.nota_id === n.id).reduce((s, u) => s + +u.valor, 0)).toFixed(2);
     notas = notas.filter(n => n.falta > 0.005).sort((x, y) => Math.abs(x.falta - p.valor) - Math.abs(y.falta - p.valor));
   } catch (err) { return fail(err); }
-  let cred = null;
-  if (p.credito_id) { const [c] = await creditoSaldo(p.credito_id); cred = c; }
+  let cred = null, creds = [];
+  { const ids = [...new Set([p.credito_id, ...pags(p).map(x => x.credito_id)].filter(Boolean))];
+    for (const id of ids) creds.push(...await creditoSaldo(id));
+    creds = creds.filter(c => c.saldo > 0.005);
+    if (creds.length) cred = { saldo: +creds.reduce((s, c) => s + c.saldo, 0).toFixed(2) }; }
   const m = modal({ title: `Nota do PA nº ${p.numero}`, wide: true, body: `
-    <p class="small muted" style="margin-top:0">${esc(p.razao_social)} · pago ${money(p.valor)}${cred ? ` · saldo do adiantamento ${money(cred.saldo)}` : ''}. Escolha a nota de entrada; o valor dela abate o adiantamento. Se a nota ainda não foi importada, importe o XML em Notas Fiscais.</p>
+    <p class="small muted" style="margin-top:0">${esc(p.razao_social)} · pago ${money(SEM_PAG ? p.valor : pagoDe(p))}${!SEM_PAG && faltaDe(p) > 0.005 ? ` (falta pagar ${money(faltaDe(p))})` : ''}${cred ? ` · saldo do adiantamento ${money(cred.saldo)}` : ''}. Escolha a nota de entrada; o valor dela abate o adiantamento. Se a nota ainda não foi importada, importe o XML em Notas Fiscais.</p>
     ${notas.length ? `<div class="table-wrap" style="max-height:320px"><table><thead><tr><th></th><th>NF</th><th>Emissão</th><th>Emitente</th><th class="num">Valor</th><th class="num">Falta abater</th></tr></thead><tbody>
       ${notas.map((n, i) => `<tr><td><input type="radio" name="nt" value="${n.id}" ${i === 0 ? 'checked' : ''}></td><td>${n.numero}</td><td>${dateBR(n.emissao)}</td><td class="wrap small">${esc(n.emit_nome)}</td><td class="num">${money(n.v_nf)}</td><td class="num">${money(n.falta)}</td></tr>`).join('')}
       </tbody></table></div>` : '<div class="empty">Nenhuma nota de entrada deste fornecedor com valor a abater.</div>'}`,
@@ -325,7 +353,11 @@ async function ligarNota(p, root) {
     const n = notas.find(x => x.id === m.el.querySelector('[name=nt]:checked')?.value); if (!n) return;
     try {
       const valor = cred ? Math.min(cred.saldo, n.falta) : 0;
-      if (valor > 0.005) await q(sb.from('creditos_usos').insert({ empresa_id: e, credito_id: cred.id, nota_id: n.id, parcela_id: null, data: n.emissao, valor: +valor.toFixed(2), observacao: `PA ${p.numero}` }));
+      let resta = +valor.toFixed(2);
+      for (const c of creds) {   // um abatimento por adiantamento (um por pagamento do PA)
+        if (resta <= 0.005) break; const v = +Math.min(c.saldo, resta).toFixed(2);
+        await q(sb.from('creditos_usos').insert({ empresa_id: e, credito_id: c.id, nota_id: n.id, parcela_id: null, data: n.emissao, valor: v, observacao: `PA ${p.numero}` })); resta = +(resta - v).toFixed(2);
+      }
       await q(sb.from('paraquedas').update({ status: 'nota_recebida', nota_id: n.id }).eq('id', p.id));
       toast(`NF ${n.numero} ligada${valor > 0.005 ? ` · ${money(valor)} abatido` : ''}${cred && cred.saldo - valor > 0.005 ? ` · sobra ${money(cred.saldo - valor)} de adiantamento` : ''}`); m.close(); carregar(root);
     } catch (err) { fail(err); }
@@ -371,6 +403,127 @@ async function verComprovante(p) {
     if (error) throw error;
     if (w) w.location = data.signedUrl; else location.href = data.signedUrl;
   } catch (e) { if (w) w.close(); fail(e); }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Vários pagamentos e vários anexos por PA (SQL 053)
+// ---------------------------------------------------------------------------------------------
+const nomeArq = (n) => n.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '_').slice(-80);
+async function enviarArquivos(p, files, pagamentoId, tipo) {
+  let ultimo = null;
+  for (const f of files) {
+    if (f.size > 10 * 1024 * 1024) throw new Error(`${f.name}: maior que 10 MB`);
+    const path = `${state.empresa.id}/${p.id}/${Date.now()}-${nomeArq(f.name)}`;
+    const up = await sb.storage.from('paraquedas').upload(path, f, { contentType: f.type || 'application/octet-stream', upsert: false });
+    if (up.error) throw up.error;
+    await q(sb.from('paraquedas_anexos').insert({ empresa_id: state.empresa.id, paraquedas_id: p.id, pagamento_id: pagamentoId || null, tipo, path, nome: f.name.slice(0, 200), enviado_por: state.user?.email || null }));
+    if (tipo === 'comprovante') ultimo = { path, nome: f.name };
+  }
+  // o último comprovante também fica no PA: avisa quem lançou (notificação de comprovante)
+  if (ultimo) await q(sb.from('paraquedas').update({ comprovante_path: ultimo.path, comprovante_nome: ultimo.nome.slice(0, 200), comprovante_em: new Date().toISOString(), comprovante_por: state.user?.email || null }).eq('id', p.id));
+}
+async function abrirArquivo(path) {
+  const w = window.open('', '_blank');
+  try { const { data, error } = await sb.storage.from('paraquedas').createSignedUrl(path, 300); if (error) throw error; if (w) w.location = data.signedUrl; else location.href = data.signedUrl; }
+  catch (e) { if (w) w.close(); fail(e); }
+}
+const inputArquivos = (id) => `<input type="file" id="${id}" multiple accept="application/pdf,image/jpeg,image/png,image/webp,image/heic">`;
+
+function registrarPagamento(p, root) {
+  const cad = state.cad, falta = faltaDe(p), pago = pagoDe(p);
+  const prog = pags(p).filter(x => LANC.get(x.lancamento_id)?.status === 'Em aberto');
+  const m = modal({ title: `${pago > 0 ? 'Complemento' : 'Pagamento'} — PA nº ${p.numero}`, body: `
+    <p class="small muted" style="margin-top:0">${esc(p.razao_social)} · valor do PA ${money(p.valor)}${pago > 0 ? ` · já pago ${money(pago)}` : ''} · <strong>falta ${money(falta)}</strong></p>
+    <div class="grid2">
+      <label>Valor pago *<input id="pv" value="${falta.toFixed(2).replace('.', ',')}"></label>
+      <label>Data do pagamento *<input type="date" id="pd" value="${today()}"></label>
+      <label class="grow">Conta de saída *<select id="pc">${options(cad.contas, { selected: p.conta_id, empty: '— escolha —' })}</select></label>
+      <label class="grow">Observação<input id="po" placeholder="ex.: complemento — pago a menor no dia 27/10"></label>
+      <label class="grow">Comprovante(s) deste pagamento<br>${inputArquivos('pf')}</label>
+    </div>
+    ${prog.length ? `<p class="small">O lançamento programado em aberto (${money(prog.reduce((s, x) => s + +x.valor, 0))}) é reduzido pelo valor pago, para o fluxo não contar duas vezes.</p>` : ''}
+    <p class="small muted">Cria o lançamento pago${p.tera_nota && p.favorecido_id ? ' e o adiantamento ao fornecedor' : ''} deste pagamento. Se ainda faltar valor, o PA fica como "pago parcialmente".</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Registrar pagamento</button>' });
+  $('#ok', m.el).onclick = async () => {
+    const v = +parseNum($('#pv', m.el).value).toFixed(2), d = $('#pd', m.el).value, c = $('#pc', m.el).value;
+    if (!(v > 0)) return toast('Informe o valor pago', true);
+    if (v > falta + 0.005) return toast(`Passa do que falta (${money(falta)})`, true);
+    if (!d || !c) return toast('Informe a data e a conta de saída', true);
+    const btn = $('#ok', m.el); btn.disabled = true; btn.textContent = 'Gravando…';
+    try {
+      const id = await q(sb.rpc('pa_registrar_pagamento', { p_pa: p.id, p_data: d, p_valor: v, p_conta: c, p_obs: $('#po', m.el).value.trim() || null }));
+      const fs = [...$('#pf', m.el).files]; if (fs.length) await enviarArquivos(p, fs, id, 'comprovante');
+      toast(v < falta - 0.005 ? `Pagamento registrado · falta ${money(falta - v)}` : 'Pagamento registrado · PA quitado'); m.close(); carregar(root); dispararAvisos();
+    } catch (e) { btn.disabled = false; btn.textContent = 'Registrar pagamento'; fail(e); }
+  };
+}
+
+function pagamentosEAnexos(p, root) {
+  const ed = podeEditar() && !compras(), cad = state.cad;
+  const L2 = pags(p), A = ANX.get(p.id) || [], pago = pagoDe(p), falta = faltaDe(p);
+  const sitL = (x) => { const l = LANC.get(x.lancamento_id); return !l ? '<span class="muted">sem lançamento</span>' : l.status === 'Pago' ? '<span class="badge pago">pago</span>' : '<span class="badge aberto">programado</span>'; };
+  const anxDe = (pid) => A.filter(a => (a.pagamento_id || null) === pid);
+  const anxHtml = (lista) => lista.map(a => `<div class="small" style="display:flex;gap:6px;align-items:center;margin:2px 0">
+      <button class="btn ghost small" data-ver="${esc(a.path)}">📎 ${esc(a.nome || 'arquivo')}</button><span class="muted">${a.tipo === 'documento' ? 'documento · ' : ''}${dateBR(a.enviado_em)}${a.enviado_por ? ' · ' + esc(a.enviado_por.split('@')[0]) : ''}</span>
+      ${ed ? `<button class="btn ghost small" data-delanx="${a.id}" title="Excluir anexo">✕</button>` : ''}</div>`).join('');
+  const m = modal({ title: `PA nº ${p.numero} — pagamentos e anexos`, wide: true, body: `
+    <p style="margin-top:0"><strong>${esc(p.razao_social)}</strong> · ${esc(p.descricao)}<br>
+      <span class="small">Valor do PA <strong>${money(p.valor)}</strong> · pago <strong>${money(pago)}</strong> · ${falta > 0.005 ? `<span class="neg">falta <strong>${money(falta)}</strong></span>` : '<span class="pos">quitado</span>'}</span></p>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>Data</th><th>Conta</th><th class="num">Valor</th><th>Situação</th><th>Comprovantes</th><th></th></tr></thead><tbody>
+      ${L2.map((x, i) => `<tr data-pg="${x.id}"><td>${i + 1}</td><td>${dateBR(x.data)}</td><td>${esc(cad.contaById[x.conta_id]?.nome || '')}</td><td class="num">${money(x.valor)}</td><td>${sitL(x)}${x.observacao ? `<div class="small muted">${esc(x.observacao)}</div>` : ''}</td>
+        <td>${anxHtml(anxDe(x.id)) || '<span class="small muted">—</span>'}</td>
+        <td style="white-space:nowrap">${ed ? `<button class="btn ghost small" data-anx="${x.id}">+ Comprovante</button>${LANC.get(x.lancamento_id)?.status === 'Pago' ? `<button class="btn ghost small" data-cor="${x.id}">Corrigir valor</button>` : ''}` : ''}</td></tr>`).join('')
+        || '<tr><td colspan="7" class="empty">Nenhum pagamento registrado.</td></tr>'}
+    </tbody></table></div>
+    ${ed && falta > 0.005 && ['aprovado', 'pago'].includes(p.status) && fase(p) !== 'pago_sist' ? `<p><button class="btn primary small" id="novo-pg">${pago > 0 ? `Registrar complemento (${money(falta)})` : 'Registrar pagamento'}</button></p>` : ''}
+    <h3 style="margin:14px 0 6px">Outros anexos</h3>
+    ${anxHtml(anxDe(null)) || '<p class="small muted" style="margin:0">Nenhum (orçamento, pedido, proforma, boleto…).</p>'}
+    ${ed ? `<div class="grid2" style="margin-top:10px;align-items:end"><label class="grow">Anexar arquivos<br>${inputArquivos('nf-arq')}</label>
+      <label>Tipo<select id="nf-tipo"><option value="documento">Documento</option><option value="comprovante">Comprovante</option></select></label>
+      <label>Ligar ao pagamento<select id="nf-pg"><option value="">— nenhum —</option>${L2.map((x, i) => `<option value="${x.id}">${i + 1} · ${dateBR(x.data)} · ${money(x.valor)}</option>`).join('')}</select></label>
+      <button class="btn" id="nf-ok">Anexar</button></div>` : ''}`,
+    foot: '<button class="btn" data-close>Fechar</button>' });
+  const reabrir = async () => { m.close(); await carregar(root); const p2 = L.find(x => x.id === p.id); if (p2) pagamentosEAnexos(p2, root); };
+  m.el.addEventListener('click', async (e) => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.ver) return abrirArquivo(t.dataset.ver);
+    if (t.id === 'novo-pg') { m.close(); return registrarPagamento(p, root); }
+    if (t.dataset.delanx) {
+      const a = A.find(x => x.id === t.dataset.delanx); if (!a || !await confirmar(`Excluir o anexo "${a.nome || 'arquivo'}"?`)) return;
+      try { await q(sb.from('paraquedas_anexos').delete().eq('id', a.id)); await sb.storage.from('paraquedas').remove([a.path]);
+        if (p.comprovante_path === a.path) { const outro = A.filter(x => x.id !== a.id && x.tipo === 'comprovante').at(-1); await q(sb.from('paraquedas').update({ comprovante_path: outro?.path || null, comprovante_nome: outro?.nome || null }).eq('id', p.id)); }
+        toast('Anexo excluído'); reabrir(); } catch (err) { fail(err); }
+      return;
+    }
+    if (t.dataset.anx) {
+      const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.accept = 'application/pdf,image/jpeg,image/png,image/webp,image/heic';
+      inp.onchange = async () => { if (!inp.files.length) return; t.disabled = true; try { await enviarArquivos(p, [...inp.files], t.dataset.anx, 'comprovante'); toast(`${inp.files.length} comprovante(s) anexado(s)`); dispararAvisos(); reabrir(); } catch (err) { t.disabled = false; fail(err); } };
+      return inp.click();
+    }
+    if (t.dataset.cor) {
+      const x = L2.find(y => y.id === t.dataset.cor);
+      const md = modal({ title: `Corrigir pagamento ${L2.indexOf(x) + 1} — PA nº ${p.numero}`, body: `
+        <p class="small muted" style="margin-top:0">Registrado ${money(x.valor)} em ${dateBR(x.data)}. Informe o valor que saiu de verdade do banco: o lançamento${x.credito_id ? ' e o adiantamento ao fornecedor' : ''} mudam juntos. Lançamento já conciliado não pode mudar.</p>
+        <div class="grid2"><label>Valor correto *<input id="cv" value="${(+x.valor).toFixed(2).replace('.', ',')}"></label><label>Data<input type="date" id="cd" value="${x.data}"></label></div>`,
+        foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="cok">Corrigir</button>' });
+      $('#cok', md.el).onclick = async () => {
+        const v = +parseNum($('#cv', md.el).value).toFixed(2); if (!(v > 0)) return toast('Informe o valor', true);
+        try { await q(sb.rpc('pa_corrigir_pagamento', { p_pagamento: x.id, p_valor: v, p_data: $('#cd', md.el).value || null }));
+          toast(`Pagamento corrigido para ${money(v)}${+p.valor - (pago - +x.valor + v) > 0.005 ? ` · falta ${money(+p.valor - (pago - +x.valor + v))}` : ''}`); md.close(); reabrir(); } catch (err) { fail(err); }
+      };
+      return;
+    }
+    if (t.id === 'nf-ok') {
+      const fs = [...$('#nf-arq', m.el).files]; if (!fs.length) return toast('Escolha os arquivos', true);
+      t.disabled = true; t.textContent = 'Enviando…';
+      try { await enviarArquivos(p, fs, $('#nf-pg', m.el).value || null, $('#nf-tipo', m.el).value); toast(`${fs.length} arquivo(s) anexado(s)`); dispararAvisos(); reabrir(); }
+      catch (err) { t.disabled = false; t.textContent = 'Anexar'; fail(/bucket|not found/i.test(err.message || '') ? new Error('O espaço de comprovantes ainda não foi criado: rode a migration 20261015000036.') : err); }
+    }
+  });
+}
+function confirmar(msg) {
+  return new Promise(res => { const md = modal({ title: 'Confirmar', body: `<p>${esc(msg)}</p>`, foot: '<button class="btn" data-close>Cancelar</button><button class="btn danger" id="cf">Confirmar</button>' });
+    $('#cf', md.el).onclick = () => { md.close(); res(true); }; md.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) res(false); }); });
 }
 
 async function cancelar(p, root) {
