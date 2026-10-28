@@ -10,6 +10,7 @@ import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, c
 export const title = 'Logística — fretes e CIOT';
 const ui = { aba: 'fretes', mes: today().slice(0, 7), busca: '' };
 const PLANO_FRETE = '2.06.01';
+const MOTIVOS = { relacao_encerrada: 'Relação encerrada (histórico)', contratado_terceiro: 'Contratado por terceiro (CT-e em nome da IPLAMM)', nao_e_frete: 'Não é frete rodoviário', outro: 'Outro' };
 const soDig = (s) => String(s || '').replace(/\D/g, '');
 const fmtDoc = (d) => { d = soDig(d); return d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d; };
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -329,7 +330,11 @@ async function conformidade(corpo, root) {
   const [a, m] = ui.mes.split('-').map(Number), ini = `${ui.mes}-01`, fim = new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
   const ls = B.plano ? await fetchAll(() => sb.from('lancamentos').select('id,data,valor,status,descricao,favorecido_id,conta_id').eq('empresa_id', state.empresa.id).eq('plano_id', B.plano.id).gte('data', ini).lte('data', fim).order('data')) : [];
   const ligados = new Set(B.F.map(f => f.lancamento_id).filter(Boolean));
-  const semFicha = ls.filter(l => !ligados.has(l.id));
+  let DSP = [];
+  try { for (let i = 0; i < ls.length; i += 150) DSP.push(...await q(sb.from('log_frete_dispensas').select('*').in('lancamento_id', ls.slice(i, i + 150).map(l => l.id)))); } catch { DSP = null; }
+  const dsp = new Map((DSP || []).map(d => [d.lancamento_id, d]));
+  const semFicha = ls.filter(l => !ligados.has(l.id) && !dsp.has(l.id));
+  const dispensados = ls.filter(l => dsp.has(l.id));
   const caixa = (l) => /CAIXA/i.test(state.cad.contaById[l.conta_id]?.nome || '') || state.cad.contaById[l.conta_id]?.tipo === 'Caixa';
   const pf = (l) => soDig(state.cad.favById[l.favorecido_id]?.documento).length === 11 || /FUNDO FIXO|MOTORISTA|AUTONOMO|AUTÔNOMO/i.test(l.descricao || '');
   const F = B.F.filter(f => f.data.slice(0, 7) === ui.mes && f.status !== 'cancelado');
@@ -346,15 +351,29 @@ async function conformidade(corpo, root) {
       ${semFicha.map(l => { const al = [caixa(l) ? 'pago pelo caixa' : '', pf(l) ? 'pessoa física / autônomo?' : '', !l.favorecido_id ? 'sem favorecido' : ''].filter(Boolean);
         return `<tr><td>${dateBR(l.data)}</td><td class="wrap small">${esc(state.cad.favById[l.favorecido_id]?.nome || '')}<div class="muted">${esc(l.descricao || '')}</div></td><td class="small">${esc(state.cad.contaById[l.conta_id]?.nome || '')}</td>
           <td class="num">${money(l.valor)}</td><td class="small">${al.length ? `<span class="${caixa(l) || pf(l) ? 'neg' : 'warn'}">${al.join(' · ')}</span>` : ''}</td>
-          <td>${podeLogistica() ? `<button class="btn ghost small" data-fic="${l.id}">Criar ficha</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">Todos os fretes pagos do mês têm ficha.</td></tr>'}</tbody></table></div></div>
+          <td style="white-space:nowrap">${podeLogistica() ? `<button class="btn ghost small" data-fic="${l.id}">Criar ficha</button>${DSP ? `<button class="btn ghost small" data-dsp="${l.id}">Dispensar</button>` : ''}` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">Todos os fretes pagos do mês têm ficha ou foram dispensados.</td></tr>'}</tbody></table></div></div>
+    ${dispensados.length ? `<details class="card" style="margin-top:12px"><summary><b>Dispensados com justificativa (${dispensados.length})</b> · ${money(dispensados.reduce((s, l) => s + +l.valor, 0))}</summary>
+      <div class="table-wrap"><table><thead><tr><th>Data</th><th>Favorecido / descrição</th><th class="num">Valor</th><th>Motivo</th><th>Por</th><th></th></tr></thead><tbody>
+      ${dispensados.map(l => { const d = dsp.get(l.id); return `<tr><td>${dateBR(l.data)}</td><td class="wrap small">${esc(state.cad.favById[l.favorecido_id]?.nome || '')}<div class="muted">${esc(l.descricao || '')}</div></td><td class="num">${money(l.valor)}</td>
+        <td class="small"><b>${MOTIVOS[d.motivo]}</b><div>${esc(d.justificativa)}</div></td><td class="small">${esc((d.criado_email || '').split('@')[0])} ${dateBR(d.criado_em)}</td>
+        <td>${podeLogistica() ? `<button class="btn ghost small" data-undsp="${d.id}">Desfazer</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div></details>` : ''}
     <p class="small muted">Frete com autônomo pago pelo caixa, em dinheiro ou Pix direto ao motorista é irregular: o pagamento deve sair pela IPEF que gerou o CIOT. Crie a ficha de cada frete para registrar CIOT, MDF-e e piso — mesmo os antigos, para o histórico.</p>`;
   $('#cf-mes', corpo).onchange = (e) => { if (e.target.value) { ui.mes = e.target.value; conformidade(corpo, root); } };
-  $('#cf-rel', corpo).onclick = () => relatorio(F, semFicha, caixa, pf);
+  $('#cf-rel', corpo).onclick = () => relatorio(F, semFicha, caixa, pf, dispensados.map(l => ({ ...l, d: dsp.get(l.id) })));
+  $$('[data-dsp]', corpo).forEach(b => b.onclick = () => { const l = semFicha.find(x => x.id === b.dataset.dsp);
+    const md = modal({ title: 'Dispensar da conformidade', body: `<p class="small muted" style="margin-top:0">${dateBR(l.data)} · ${money(l.valor)} · ${esc(state.cad.favById[l.favorecido_id]?.nome || l.descricao || '')}<br>O lançamento não muda; sai dos alertas com o motivo registrado (quem e quando). Dá para desfazer.</p>
+      <label>Motivo<select id="ds-m" data-nobusca>${Object.entries(MOTIVOS).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label>
+      <label>Justificativa *<input id="ds-j" placeholder="ex.: frete Manaus contratado pelo fornecedor; CT-e em nome da IPLAMM"></label>`,
+      foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ds-ok">Dispensar</button>' });
+    $('#ds-ok', md.el).onclick = async () => { const j = $('#ds-j', md.el).value.trim(); if (!j) return toast('Escreva a justificativa', true);
+      try { await q(sb.from('log_frete_dispensas').insert({ empresa_id: state.empresa.id, lancamento_id: l.id, motivo: $('#ds-m', md.el).value, justificativa: j })); md.close(); conformidade(corpo, root); } catch (err) { fail(err); } }; });
+  $$('[data-undsp]', corpo).forEach(b => b.onclick = async () => { if (!await confirmDialog('Desfazer a dispensa? O lançamento volta para os alertas.')) return;
+    try { await q(sb.from('log_frete_dispensas').delete().eq('id', b.dataset.undsp)); conformidade(corpo, root); } catch (err) { fail(err); } });
   $$('[data-fic]', corpo).forEach(b => b.onclick = () => { const l = semFicha.find(x => x.id === b.dataset.fic); const t = B.T.find(x => x.favorecido_id && x.favorecido_id === l.favorecido_id);
     ficha(null, root, { data: l.data, valor: +l.valor, transportador_id: t?.id || null, lancamento_id: l.id, observacao: l.descricao || null }); });
 }
 
-async function relatorio(F, semFicha, caixa, pf) {
+async function relatorio(F, semFicha, caixa, pf, dispensados = []) {
   const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
   const logo = await logoPNG().catch(() => null);
   const [a, m] = ui.mes.split('-'); const mesTxt = `${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][+m - 1]}/${a}`;
@@ -377,6 +396,8 @@ async function relatorio(F, semFicha, caixa, pf) {
     <table><thead><tr><th>Nº</th><th>Data</th><th>Transportador</th><th>Destino</th><th class="n">Valor</th><th class="n">Piso</th><th>CIOT</th><th>MDF-e</th><th>Pagamento</th><th>Situação</th></tr></thead><tbody>${linhas || '<tr><td colspan="10">Nenhum frete com ficha no mês.</td></tr>'}</tbody></table>
     <h2>2. Fretes pagos sem ficha (${semFicha.length} · ${tot(semFicha)})</h2>
     <table><thead><tr><th>Data</th><th>Favorecido / descrição</th><th>Conta</th><th class="n">Valor</th><th>Alerta</th></tr></thead><tbody>${sf || '<tr><td colspan="5">Nenhum.</td></tr>'}</tbody></table>
+    <h2>3. Dispensados com justificativa (${dispensados.length} · ${tot(dispensados)})</h2>
+    <table><thead><tr><th>Data</th><th>Favorecido / descrição</th><th class="n">Valor</th><th>Motivo</th><th>Justificativa</th><th>Por</th></tr></thead><tbody>${dispensados.map(l => `<tr><td>${dateBR(l.data)}</td><td>${esc(state.cad.favById[l.favorecido_id]?.nome || l.descricao || '')}</td><td class="n">${money(l.valor)}</td><td>${MOTIVOS[l.d.motivo]}</td><td>${esc(l.d.justificativa)}</td><td>${esc((l.d.criado_email || '').split('@')[0])} ${dateBR(l.d.criado_em)}</td></tr>`).join('') || '<tr><td colspan="6">Nenhum.</td></tr>'}</tbody></table>
     <div class="rod">Base: Resolução ANTT nº 6.078/2026, MP nº 1.343/2026 e NT MDF-e 2026.001. Frete com autônomo deve ter CIOT gerado pela IPLAMM via IPEF, MDF-e com o CIOT, valor ≥ piso mínimo e pagamento pela IPEF na conta indicada pelo autônomo.</div>
     <script>window.onload=()=>setTimeout(()=>print(),300)</script></body></html>`);
   w.document.close();
