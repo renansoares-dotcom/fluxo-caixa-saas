@@ -1,0 +1,70 @@
+name: Backup diário do banco
+# Todo dia às 03:15 (Brasília): copia o banco do Supabase, RESTAURA a cópia num PostgreSQL vazio e confere tabela por
+# tabela o número de linhas. Só guarda a cópia se a restauração bater. A cópia é criptografada (AES-256) com a senha
+# do secret BACKUP_SENHA antes de sair da máquina e fica 30 dias em "Actions › Backup diário do banco".
+# Secrets necessários (Settings › Secrets and variables › Actions): SUPABASE_DB_URL e BACKUP_SENHA.
+on:
+  schedule:
+    - cron: '15 6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      pg:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: teste
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Conferir os secrets
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SENHA: ${{ secrets.BACKUP_SENHA }}
+        run: |
+          [ -n "$DB_URL" ] || { echo "::error::Cadastre o secret SUPABASE_DB_URL (veja scripts/backup/README.md)"; exit 1; }
+          [ ${#SENHA} -ge 16 ] || { echo "::error::Cadastre o secret BACKUP_SENHA com pelo menos 16 caracteres"; exit 1; }
+      - name: Instalar o cliente PostgreSQL 17
+        run: |
+          sudo apt-get install -y -qq postgresql-common >/dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-client-17 >/dev/null
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Copiar o banco e testar a restauração
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          ALVO: postgresql://postgres:teste@localhost:5432
+        run: |
+          # duas tentativas: se alguém gravar no banco entre a cópia e a contagem, a conferência pode diferir por 1 linha
+          for t in 1 2; do
+            rm -rf saida
+            scripts/backup/copiar.sh saida && scripts/backup/testar-restauracao.sh saida && exit 0
+            echo "Tentativa $t não conferiu; repetindo em 60 s"; sleep 60
+          done
+          exit 1
+      - name: Criptografar
+        env:
+          SENHA: ${{ secrets.BACKUP_SENHA }}
+        run: |
+          D=$(TZ=America/Sao_Paulo date +%Y-%m-%d)
+          echo "DATA=$D" >> "$GITHUB_ENV"
+          tar -C saida -cf backup.tar banco.dump usuarios.dump contagens.txt
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 \
+              --output "backup-$D.tar.gpg" backup.tar <<< "$SENHA"
+          rm -rf saida backup.tar
+          ls -lh "backup-$D.tar.gpg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ env.DATA }}
+          path: backup-${{ env.DATA }}.tar.gpg
+          retention-days: 30
+          if-no-files-found: error

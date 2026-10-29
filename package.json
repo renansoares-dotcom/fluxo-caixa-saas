@@ -1,0 +1,10 @@
+{
+  "name": "fluxo-caixa-saas",
+  "private": true,
+  "type": "module",
+  "description": "Plataforma IPLAMM (SPA em módulos JS + Supabase). Sem build: este arquivo existe só para os testes.",
+  "scripts": {
+    "test": "node --test "tests/*.test.js"",
+    "verificar": "node tests/verificar-sintaxe.mjs && node --test "tests/*.test.js""
+  }
+}

@@ -1,7 +1,10 @@
 -- ============================================================
 -- SETUP COMPLETO — cole tudo no SQL Editor do Supabase e clique em Run
 -- (equivale a aplicar os arquivos de supabase/migrations em ordem)
+-- Gerado por scripts/gerar-setup.sh — não edite à mão.
 -- ============================================================
+
+-- >>> 20261003000001_schema.sql
 -- =====================================================================
 -- Fluxo de Caixa SaaS — schema multiempresa (Supabase / PostgreSQL)
 -- Cada empresa (tenant) só enxerga os próprios dados via RLS.
@@ -390,6 +393,7 @@ grant select, insert, update, delete on all tables in schema public to authentic
 revoke execute on function public.is_membro(uuid), public.pode_editar(uuid), public.is_admin(uuid), public.pode_autorizar(uuid) from anon, public;
 grant execute on function public.is_membro(uuid), public.pode_editar(uuid), public.is_admin(uuid), public.pode_autorizar(uuid) to authenticated;
 
+-- >>> 20261003000002_funcoes.sql
 -- =====================================================================
 -- Funções (RPC) usadas pelo front-end
 -- =====================================================================
@@ -576,14 +580,17 @@ revoke execute on all functions in schema public from public, anon;
 grant execute on all functions in schema public to authenticated;
 revoke execute on function public.aplicar_plano_modelo(uuid) from authenticated;
 
+-- >>> 20261005000003_revoke_trigger_fns.sql
 -- Funções de gatilho não devem ser chamáveis pela API
 revoke execute on function public.tg_autorizacao_numero(), public.tg_lanc_mesma_empresa(), public.tg_updated_at() from authenticated, anon, public;
 
+-- >>> 20261006000004_fidc_prazo_cobrado.sql
 -- Prazo cobrado pelo fundo (base da "taxa do fundo"); prazo_medio continua sendo o prazo real
 alter table public.fidc_operacoes add column if not exists prazo_cobrado numeric(10,2);
 comment on column public.fidc_operacoes.prazo_medio is 'Prazo médio real dos títulos (dias), ponderado pelo valor';
 comment on column public.fidc_operacoes.prazo_cobrado is 'Prazo médio cobrado pelo fundo no borderô (dias); base da taxa do fundo. Nulo = igual ao prazo real';
 
+-- >>> 20261006000005_indices_mensais.sql
 -- Índices de referência por mês (CDI a.m. em %), usados na Análise FIDC
 create table if not exists public.indices_mensais (
   empresa_id uuid not null references public.empresas(id) on delete cascade,
@@ -602,6 +609,7 @@ create policy indices_mensais_del on public.indices_mensais for delete to authen
 revoke all on public.indices_mensais from anon;
 grant select, insert, update, delete on public.indices_mensais to authenticated;
 
+-- >>> 20261006000006_fidc_propostas.sql
 -- Propostas de borderô FIDC montadas na plataforma (títulos escolhidos + fundo), aprovadas pelo diretor.
 -- O borderô original do fundo (fidc_operacoes) entra depois apenas para comparação.
 
@@ -814,7 +822,7 @@ grant execute on function public.decidir_proposta_fidc(uuid, boolean, text) to a
 revoke all on public.fidc_fundos, public.fidc_propostas, public.fidc_proposta_itens from anon;
 grant select, insert, update, delete on public.fidc_fundos, public.fidc_propostas, public.fidc_proposta_itens to authenticated;
 
--- ===== 20261006000007_fidc_proposta_operacao.sql
+-- >>> 20261006000007_fidc_proposta_operacao.sql
 -- Proposta aprovada vira a operação oficial na base FIDC (fidc_operacoes/fidc_titulos), com borderô "P<nº>".
 -- operacao_id passa a apontar para essa operação; o borderô original do fundo fica só no comparativo.
 create or replace function public.decidir_proposta_fidc(p_id uuid, p_aprovar boolean, p_motivo text default null)
@@ -905,7 +913,7 @@ begin
 end $$;
 revoke execute on function public.tg_fidc_proposta_guarda() from authenticated, anon, public;
 
--- ===== 20261006000008_fidc_fundos_custos.sql
+-- >>> 20261006000008_fidc_fundos_custos.sql
 -- Custos de operação separados nas condições dos fundos (pedido do Renan em 06/10):
 -- tarifa_operacao = TED / tarifa fixa por borderô; tarifa_titulo = boleto / cobrança por título;
 -- custo_assinatura = assinatura eletrônica por borderô; custo_consulta = consulta Serasa por sacado novo no fundo.
@@ -922,7 +930,7 @@ comment on column public.fidc_fundos.custo_consulta is 'Consulta Serasa por saca
 update public.fidc_fundos set tarifa_operacao = 20, custo_assinatura = 70, tarifa_titulo = 4.50, custo_consulta = 0 where nome = 'FS';
 update public.fidc_fundos set tarifa_operacao = 15, tarifa_titulo = 2.50 where nome = 'Negocial';
 
--- ===== 20261006000009_v_lancamentos_nf.sql
+-- >>> 20261006000009_v_lancamentos_nf.sql
 -- v_lancamentos passa a expor NF-parcela (documento), emissão e a proposta FIDC do título
 create or replace view public.v_lancamentos with (security_invoker = on) as
  SELECT l.id, l.empresa_id, l.data, l.plano_id, l.descricao, l.opc1, l.opc2, l.opc3, l.opc4, l.favorecido_id, l.centro_custo_id,
@@ -945,7 +953,7 @@ create or replace view public.v_lancamentos with (security_invoker = on) as
      LEFT JOIN contas ct ON ct.id = l.conta_id
      LEFT JOIN grupos g ON g.id = ct.grupo_id;
 
--- ===== 20261006000010_fidc_metodo_desagio.sql
+-- >>> 20261006000010_fidc_metodo_desagio.sql
 -- Método de cálculo do deságio por fundo (conferido com o borderô FS 001226 de 06/10/2026):
 --   'fator'   = por dentro: v·k/(1+k), k = taxa × prazo cobrado / 30 (padrão; usado com a taxa média histórica)
 --   'simples' = juros simples sobre a face: v × taxa × prazo cobrado / 30 (é como a FS calcula)
@@ -955,7 +963,7 @@ alter table public.fidc_fundos add column if not exists metodo_desagio text not 
 comment on column public.fidc_fundos.metodo_desagio is 'fator = v·k/(1+k); simples = v × taxa × dias/30 sobre a face';
 update public.fidc_fundos set taxa_am = 2.46, dias_compensacao = 3, metodo_desagio = 'simples' where nome = 'FS';
 
--- ===== 20261006000011_duplicatas_endosso.sql
+-- >>> 20261006000011_duplicatas_endosso.sql
 -- Duplicatas para endosso (06/10): beneficiários do endosso, endereço de clientes e do emitente, registro das emitidas.
 
 -- Endereço e IE dos favorecidos (clientes = sacados das duplicatas; vem do XML da NF-e)
@@ -1035,7 +1043,7 @@ create policy dup_del on public.duplicatas for delete to authenticated using (pu
 revoke all on public.beneficiarios_endosso, public.duplicatas from anon;
 grant select, insert, update, delete on public.beneficiarios_endosso, public.duplicatas to authenticated;
 
--- ===== 20261006000012_endosso_fornecedor.sql
+-- >>> 20261006000012_endosso_fornecedor.sql
 -- Endosso para fornecedores (06/10): beneficiário pode ser fornecedor do cadastro de favorecidos;
 -- modalidade do endosso (translativo ou em garantia) e referência da garantia registradas na duplicata.
 alter table public.beneficiarios_endosso
@@ -1045,7 +1053,7 @@ alter table public.duplicatas
   add column if not exists modalidade text not null default 'translativo' check (modalidade in ('translativo', 'garantia')),
   add column if not exists referencia text;
 
--- ===== 20261006000013_cancelamento_endosso.sql
+-- >>> 20261006000013_cancelamento_endosso.sql
 -- Cancelamento de endosso (06/10): recusa do beneficiário ou desistência da IPLAMM.
 -- O registro fica no histórico com status 'cancelada', data e motivo; os títulos ficam livres para novo endosso.
 alter table public.duplicatas
@@ -1059,7 +1067,7 @@ do $$ begin
   end if;
 end $$;
 
--- ===== 20261007000014_beneficiarios_parametros.sql
+-- >>> 20261007000014_beneficiarios_parametros.sql
 -- Cadastro de beneficiários (favorecidos) por tipo, com parâmetros (07/10): base para conformidade,
 -- cadastro a partir de NF-e de entrada/saída e, adiante, cálculo de impostos.
 alter table public.favorecidos
@@ -1085,7 +1093,7 @@ alter table public.favorecidos
   add column if not exists updated_at timestamptz default now();
 create index if not exists favorecidos_doc on public.favorecidos(empresa_id, documento);
 
--- =====================================================================
+-- >>> 20261007000015_conciliacao_ofx.sql
 -- Conciliação bancária por extrato OFX (07/10)
 -- extrato_importacoes: cada arquivo importado (período e saldo informado pelo banco)
 -- extrato_itens: movimentos do extrato (valor com sinal: + crédito, − débito), sem duplicar pelo FITID
@@ -1163,7 +1171,7 @@ create policy conc_del on public.conciliacoes for delete to authenticated using 
 grant select, insert, update, delete on public.extrato_importacoes, public.extrato_itens to authenticated;
 grant select, insert, delete on public.conciliacoes to authenticated;
 
--- =====================================================================
+-- >>> 20261007000016_conciliacao_grupo.sql
 -- Conciliação N:N (07/10): vários movimentos do extrato ↔ vários lançamentos.
 -- Todos os movimentos e vínculos do conjunto levam o mesmo grupo_id; os vínculos apontam para o primeiro movimento.
 alter table public.extrato_itens add column if not exists grupo_id uuid;
@@ -1187,7 +1195,7 @@ begin
 end $$;
 revoke execute on function public.tg_conciliacao_removida() from public, anon, authenticated;
 
--- =====================================================================
+-- >>> 20261007000017_lancamento_conciliado_trava.sql
 -- Lançamento conciliado com o extrato (07/10): não pode ser excluído e só aceita mudança nas descrições
 -- (descrição e opcionais 1–4). Para alterar o resto, desfaça a conciliação antes.
 -- Exclusões em cascata (ex.: exclusão da empresa) passam (pg_trigger_depth > 1).
@@ -1210,7 +1218,7 @@ revoke execute on function public.tg_lanc_conciliado() from public, anon, authen
 create trigger lanc_conciliado_upd before update on public.lancamentos for each row execute function public.tg_lanc_conciliado();
 create trigger lanc_conciliado_del before delete on public.lancamentos for each row execute function public.tg_lanc_conciliado();
 
--- =====================================================================
+-- >>> 20261007000018_notas_fiscais.sql
 -- Notas fiscais (07/10): NF-e completas (cabeçalho, itens com impostos, parcelas) importadas dos XML,
 -- e o vínculo de cada parcela/nota com os lançamentos de recebimento que já existem.
 -- Nada aqui altera lançamentos: o vínculo fica em nfe_vinculos e só é gravado após aprovação.
@@ -1295,7 +1303,7 @@ create policy nfe_vinculos_del on public.nfe_vinculos for delete to authenticate
 grant select, insert, update, delete on public.nfe_notas to authenticated;
 grant select, insert, delete on public.nfe_itens, public.nfe_parcelas, public.nfe_vinculos to authenticated;
 
--- ===== 20261008000019_nfe_fidc_vinculos.sql =====
+-- >>> 20261008000019_nfe_fidc_vinculos.sql
 -- Borderôs × notas (08/10): liga cada título da base FIDC (fidc_titulos) à nota / parcela de onde ele veio.
 -- Só aditivo: nada em fidc_titulos, fidc_operacoes, lançamentos ou notas é alterado; o vínculo fica aqui e é gravado após aprovação.
 create table if not exists public.nfe_fidc_vinculos (
@@ -1317,7 +1325,7 @@ create policy nfe_fidc_vinculos_ins on public.nfe_fidc_vinculos for insert to au
 create policy nfe_fidc_vinculos_del on public.nfe_fidc_vinculos for delete to authenticated using (public.pode_editar(empresa_id));
 grant select, insert, delete on public.nfe_fidc_vinculos to authenticated;
 
--- ===== 20261008000020_propostas_da_base_fidc.sql =====
+-- >>> 20261008000020_propostas_da_base_fidc.sql
 -- Propostas de borderô a partir dos borderôs da base FIDC (08/10).
 -- Borderôs já realizados (até 31/08) entram como propostas Aprovadas, ligadas à operação original;
 -- os de setembro entram como Pendentes para o diretor aprovar. Só aditivo: lançamentos não são tocados aqui.
@@ -1434,7 +1442,7 @@ grant execute on function public.decidir_proposta_fidc(uuid, boolean, text) to a
 revoke execute on function public.nf_parcela(text) from anon, public;
 grant execute on function public.nf_parcela(text) to authenticated;
 
--- ===== 20261008000021_controle_orcamentario.sql =====
+-- >>> 20261008000021_controle_orcamentario.sql
 -- Controle orçamentário (08/10): realizado e comprometido por conta × centro de custo × mês,
 -- rateio do orçamento da conta entre centros de custo e justificativas dos desvios. Só aditivo.
 
@@ -1496,7 +1504,7 @@ create policy orc_just_upd on public.orcamento_justificativas for update to auth
 create policy orc_just_del on public.orcamento_justificativas for delete to authenticated using (public.pode_editar(empresa_id));
 grant select, insert, update, delete on public.orcamento_justificativas to authenticated;
 
--- ===== 20261008000022_titulos_das_notas.sql =====
+-- >>> 20261008000022_titulos_das_notas.sql
 -- Títulos a receber gerados a partir das notas (08/10) e aprovação dos borderôs de setembro.
 -- 1) nfe_vinculos aceita o tipo 'titulo': o lançamento é o próprio título a receber da parcela (nasce Em aberto e
 --    continua ligado à parcela quando é baixado — borderô, conciliação ou baixa manual).
@@ -1596,7 +1604,7 @@ end $$;
 revoke execute on function public.decidir_proposta_fidc(uuid, boolean, text) from anon, public;
 grant execute on function public.decidir_proposta_fidc(uuid, boolean, text) to authenticated;
 
--- ===== 20261008000023_aprovacao_interna.sql =====
+-- >>> 20261008000023_aprovacao_interna.sql
 -- Aprovação separada em função interna (sem checar quem aprova), usada pela decidir_proposta_fidc (diretor)
 -- e por aprovações registradas pelo administrador fora da tela (ex.: borderôs de setembro, autorizados pelo Renan em 08/10).
 create or replace function public._aprovar_proposta_fidc(p_id uuid, p_motivo text, p_aprovador uuid)
@@ -1698,7 +1706,7 @@ end $$;
 revoke execute on function public.decidir_proposta_fidc(uuid, boolean, text) from anon, public;
 grant execute on function public.decidir_proposta_fidc(uuid, boolean, text) to authenticated;
 
--- ===== 20261009000025_travas_contas.sql =====
+-- >>> 20261009000025_travas_contas.sql
 -- Trava de contas (09/10): depois que o banco bate com o extrato, o administrador trava a conta até uma data.
 -- Lançamentos pagos da conta com data até a trava não podem mudar data, valor, conta nem situação, nem ser excluídos
 -- ou incluídos; continuam livres classificação (mesma natureza), descrição, documento, centro de custo e favorecido.
@@ -1793,7 +1801,7 @@ create trigger trava_conciliacoes before insert or delete on public.conciliacoes
 drop trigger if exists trava_extrato_itens on public.extrato_itens;
 create trigger trava_extrato_itens before update or delete on public.extrato_itens for each row execute function public._trava_extrato();
 
--- ===== 20261009000026_creditos_adiantamentos.sql =====
+-- >>> 20261009000026_creditos_adiantamentos.sql
 -- Créditos e adiantamentos (09/10).
 -- creditos: valor que o cliente tem a abater (adiantamento recebido antes da nota, crédito por devolução, desconto,
 --           acordo) ou que a IPLAMM tem a abater com um fornecedor (adiantamento pago antes da nota de entrada).
@@ -1865,7 +1873,7 @@ create policy creditos_usos_del on public.creditos_usos for delete to authentica
 grant select, insert, update, delete on public.creditos to authenticated;
 grant select, insert, delete on public.creditos_usos to authenticated;
 
--- ===== 20261012000027_paraquedas.sql =====
+-- >>> 20261012000027_paraquedas.sql
 -- =====================================================================
 -- Paraquedas: pagamentos pedidos antes da nota fiscal (adiantamentos, compras do dia)
 --  - qualquer usuário da empresa (inclusive o novo papel "compras") lança o pedido
@@ -1996,7 +2004,55 @@ create policy paraquedas_upd on public.paraquedas for update to authenticated
   with check (public.pode_editar(empresa_id) or public.pode_aprovar_paraquedas(empresa_id)
          or (public.is_participante(empresa_id) and criado_por = (select auth.uid()) and status in ('aguardando', 'cancelado')));
 
--- 20261013000028_convites.sql
+-- >>> 20261013000028_conferencia_dia.sql
+-- =====================================================================
+-- Conferência do dia: o "visto" de quem conferiu cada conta em cada dia
+--  - um registro por conta e dia (dar visto de novo atualiza o registro)
+--  - situacao: 'ok' (conferido, tudo certo) ou 'ressalva' (conferido, com pendência explicada na observação)
+--  - saldo_informado: para conta sem extrato OFX (caixa, cartão, vale…), o saldo real conferido no dia
+-- Só lê/grava o visto: nenhum lançamento é alterado por esta tabela.
+-- =====================================================================
+create table if not exists public.conferencias_dia (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references public.empresas(id) on delete cascade,
+  conta_id uuid not null references public.contas(id) on delete cascade,
+  data date not null,
+  situacao text not null default 'ok' check (situacao in ('ok', 'ressalva')),
+  saldo_sistema numeric(16,2),
+  saldo_informado numeric(16,2),
+  observacao text,
+  conferido_por uuid default auth.uid(),
+  conferido_email text default (auth.jwt() ->> 'email'),
+  conferido_em timestamptz not null default now(),
+  unique (conta_id, data)
+);
+create index if not exists conferencias_dia_emp on public.conferencias_dia(empresa_id, data);
+
+-- quem gravou e quando é sempre o usuário logado (não dá para assinar em nome de outro)
+create or replace function public._conferencias_dia_autor() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  new.conferido_por := auth.uid();
+  new.conferido_email := auth.jwt() ->> 'email';
+  new.conferido_em := now();
+  return new;
+end $$;
+drop trigger if exists conferencias_dia_autor on public.conferencias_dia;
+create trigger conferencias_dia_autor before insert or update on public.conferencias_dia
+  for each row execute function public._conferencias_dia_autor();
+
+alter table public.conferencias_dia enable row level security;
+drop policy if exists conferencias_dia_sel on public.conferencias_dia;
+drop policy if exists conferencias_dia_ins on public.conferencias_dia;
+drop policy if exists conferencias_dia_upd on public.conferencias_dia;
+drop policy if exists conferencias_dia_del on public.conferencias_dia;
+create policy conferencias_dia_sel on public.conferencias_dia for select to authenticated using (public.is_membro(empresa_id));
+create policy conferencias_dia_ins on public.conferencias_dia for insert to authenticated with check (public.pode_editar(empresa_id));
+create policy conferencias_dia_upd on public.conferencias_dia for update to authenticated using (public.pode_editar(empresa_id)) with check (public.pode_editar(empresa_id));
+create policy conferencias_dia_del on public.conferencias_dia for delete to authenticated using (public.pode_editar(empresa_id));
+grant select, insert, update, delete on public.conferencias_dia to authenticated;
+
+-- >>> 20261013000028_convites.sql
 -- =====================================================================
 -- Convites: link de cadastro que já entra na empresa com o papel definido
 -- + bloqueio da criação de novas empresas (só libera quem tem acesso ao banco)
@@ -2128,7 +2184,7 @@ grant execute on function public.aceitar_convites() to authenticated;
 grant execute on function public.ver_convite(text) to anon, authenticated;
 grant execute on function public.pode_criar_empresa() to anon, authenticated;
 
--- 20261013000029_convite_encerra_pendente.sql
+-- >>> 20261013000029_convite_encerra_pendente.sql
 -- criar_convite: quando a pessoa já tem conta e entra direto na empresa,
 -- encerra qualquer convite pendente dela nesta empresa (senão o convite antigo
 -- poderia trocar o papel no primeiro login).
@@ -2153,53 +2209,9 @@ begin
     insert into convites(empresa_id, email, papel) values (p_empresa, v_email, p_papel) returning token into v_token;
   end if;
   return json_build_object('tipo', 'convite', 'token', v_token);
--- =====================================================================
--- Conferência do dia: o "visto" de quem conferiu cada conta em cada dia
---  - um registro por conta e dia (dar visto de novo atualiza o registro)
---  - situacao: 'ok' (conferido, tudo certo) ou 'ressalva' (conferido, com pendência explicada na observação)
---  - saldo_informado: para conta sem extrato OFX (caixa, cartão, vale…), o saldo real conferido no dia
--- Só lê/grava o visto: nenhum lançamento é alterado por esta tabela.
--- =====================================================================
-create table if not exists public.conferencias_dia (
-  id uuid primary key default gen_random_uuid(),
-  empresa_id uuid not null references public.empresas(id) on delete cascade,
-  conta_id uuid not null references public.contas(id) on delete cascade,
-  data date not null,
-  situacao text not null default 'ok' check (situacao in ('ok', 'ressalva')),
-  saldo_sistema numeric(16,2),
-  saldo_informado numeric(16,2),
-  observacao text,
-  conferido_por uuid default auth.uid(),
-  conferido_email text default (auth.jwt() ->> 'email'),
-  conferido_em timestamptz not null default now(),
-  unique (conta_id, data)
-);
-create index if not exists conferencias_dia_emp on public.conferencias_dia(empresa_id, data);
-
--- quem gravou e quando é sempre o usuário logado (não dá para assinar em nome de outro)
-create or replace function public._conferencias_dia_autor() returns trigger
-language plpgsql security definer set search_path = public as $$
-begin
-  new.conferido_por := auth.uid();
-  new.conferido_email := auth.jwt() ->> 'email';
-  new.conferido_em := now();
-  return new;
 end $$;
-drop trigger if exists conferencias_dia_autor on public.conferencias_dia;
-create trigger conferencias_dia_autor before insert or update on public.conferencias_dia
-  for each row execute function public._conferencias_dia_autor();
 
-alter table public.conferencias_dia enable row level security;
-drop policy if exists conferencias_dia_sel on public.conferencias_dia;
-drop policy if exists conferencias_dia_ins on public.conferencias_dia;
-drop policy if exists conferencias_dia_upd on public.conferencias_dia;
-drop policy if exists conferencias_dia_del on public.conferencias_dia;
-create policy conferencias_dia_sel on public.conferencias_dia for select to authenticated using (public.is_membro(empresa_id));
-create policy conferencias_dia_ins on public.conferencias_dia for insert to authenticated with check (public.pode_editar(empresa_id));
-create policy conferencias_dia_upd on public.conferencias_dia for update to authenticated using (public.pode_editar(empresa_id)) with check (public.pode_editar(empresa_id));
-create policy conferencias_dia_del on public.conferencias_dia for delete to authenticated using (public.pode_editar(empresa_id));
-grant select, insert, update, delete on public.conferencias_dia to authenticated;
-
+-- >>> 20261014000029_transferencia_unica.sql
 -- =====================================================================
 -- Transferência em um único lançamento
 --  - o lançamento de transferência passa a ter conta de ORIGEM (conta_id) e conta de DESTINO (conta_destino_id)
@@ -2388,6 +2400,7 @@ begin
   return new;
 end $$;
 
+-- >>> 20261014000030_fidc_transferencia_unica.sql
 -- =====================================================================
 -- Aprovação de borderô FIDC: o líquido passa a ser UMA transferência (conta do fundo → conta de crédito)
 -- em vez de dois lançamentos (3.02.01 no fundo + 3.01.01 na conta de crédito). Resto da função igual.
@@ -2473,6 +2486,7 @@ begin
   return 'Aprovada';
 end $$;
 
+-- >>> 20261014000031_transferencia_so_unica.sql
 -- =====================================================================
 -- Etapa 7: transferência nova só no formato único (origem → destino)
 --  - não aceita mais lançar transferência de entrada (3.01) nem transferência de saída sem conta de destino
@@ -2496,6 +2510,7 @@ end $$;
 drop trigger if exists transf_so_unica on public.lancamentos;
 create trigger transf_so_unica before insert on public.lancamentos for each row execute function public._transf_so_unica();
 
+-- >>> 20261014000032_paraquedas_autoriza_financeiro.sql
 -- =====================================================================
 -- Paraquedas: quem autoriza passa a ser o DIRETOR ou o FINANCEIRO (além do administrador)
 -- =====================================================================
@@ -2538,6 +2553,7 @@ begin
   return new;
 end $$;
 
+-- >>> 20261014000033_membros_areas.sql
 -- =====================================================================
 -- Acesso por área: Financeiro (fin), CPD (cpd) e Contabilidade (cont)
 --  - membros.areas = lista de áreas que o usuário enxerga no menu
@@ -2567,6 +2583,7 @@ language sql stable security definer set search_path = public, auth as $$
   order by m.created_at;
 $$;
 
+-- >>> 20261014000034_contabilidade_base.sql
 -- =====================================================================
 -- Contabilidade — etapa 1: plano de contas contábil, balancetes da contabilidade e saldo de abertura
 --  - só cria tabelas novas; não toca em lançamentos, contas bancárias, conciliações nem plano gerencial
@@ -2712,6 +2729,7 @@ end $$;
 revoke all on function public.importar_balancete_contabil(uuid, date, date, text, text, jsonb, jsonb, boolean) from public, anon;
 grant execute on function public.importar_balancete_contabil(uuid, date, date, text, text, jsonb, jsonb, boolean) to authenticated;
 
+-- >>> 20261014000035_contabilidade_motor.sql
 -- =====================================================================
 -- Contabilidade — etapas 2 e 3: de-para e motor de partidas dobradas (fatos financeiros)
 --  - rodar DEPOIS da 20261014000034_contabilidade_base.sql
@@ -2927,6 +2945,7 @@ $$;
 revoke all on function public.contab_balancete_gerencial(uuid, date, date) from public, anon;
 grant execute on function public.contab_balancete_gerencial(uuid, date, date) to authenticated;
 
+-- >>> 20261015000036_notificacoes_comprovante.sql
 -- =====================================================================
 -- Notificações (sino na plataforma + aviso no computador/celular) e comprovante de pagamento do paraquedas
 --  - só cria tabelas, funções e o espaço de arquivos; não altera lançamentos nem paraquedas existentes
@@ -3063,7 +3082,7 @@ end $$;
 drop trigger if exists paraquedas_notifica on public.paraquedas;
 create trigger paraquedas_notifica after insert or update on public.paraquedas for each row execute function public._paraquedas_notifica();
 
--- ===== 20261015000037_pagamento_antecipado_textos.sql =====
+-- >>> 20261015000037_pagamento_antecipado_textos.sql
 -- =====================================================================
 -- "Paraquedas" passa a se chamar "Pagamento Antecipado" (PA nº) nas mensagens do banco
 --  - só troca textos de avisos e de erros; regras, tabelas e dados continuam iguais
@@ -3137,7 +3156,7 @@ begin
   return new;
 end $$;
 
--- ===== 20261016000038_auditoria.sql =====
+-- >>> 20261016000038_auditoria.sql
 -- =====================================================================
 -- Auditoria: registra quem incluiu, alterou ou excluiu, quando, e os valores antes/depois
 --  - só cria tabela, função e gatilhos (AFTER); não altera nenhum dado existente
@@ -3218,7 +3237,7 @@ begin
   end loop;
 end $$;
 
--- ===== 20261016000039_caixa_compromissos.sql =====
+-- >>> 20261016000039_caixa_compromissos.sql
 -- =====================================================================
 -- Necessidade de caixa: compromissos programados (ex.: parcela mensal da Recuperação Judicial,
 -- quando definida pelo Administrador Judicial). Só cria a tabela; nada existente é alterado.
@@ -3253,7 +3272,7 @@ grant select, insert, update, delete on public.caixa_compromissos to authenticat
 drop trigger if exists zz_auditoria on public.caixa_compromissos;
 create trigger zz_auditoria after insert or update or delete on public.caixa_compromissos for each row execute function public._auditar();
 
--- ===== 20261016000040_compras.sql =====
+-- >>> 20261016000040_compras.sql
 -- =====================================================================
 -- Etapa 2 — Compras: requisição → aprovação → cotação → pedido (alçada) → previsão no contas a pagar
 -- → recebimento casado com a NF-e de entrada → parcelas da nota no contas a pagar.
@@ -3715,7 +3734,7 @@ begin
   end loop;
 end $$;
 
--- ===== 20261016000041_estoque_produto.sql =====
+-- >>> 20261016000041_estoque_produto.sql
 -- =====================================================================
 -- Etapa 3 — Estoque e produto. Decisão de 16/10/2026: o estoque oficial continua no Iniflex e a plataforma
 -- ESPELHA o saldo por importação periódica (posição numa data). A plataforma guarda o cadastro de produto
@@ -4027,7 +4046,7 @@ begin
   end loop;
 end $$;
 
--- ===== 20261016000042_comercial.sql =====
+-- >>> 20261016000042_comercial.sql
 -- =====================================================================
 -- Etapa 4a — Comercial: carteira de clientes, interações e agenda, funil até a proposta, propostas, metas
 -- e painel pelas NF-e de saída (o pedido de venda continua no Iniflex).
@@ -4364,7 +4383,7 @@ begin
   end loop;
 end $$;
 
--- ===== 20261016000043_portal_cliente.sql =====
+-- >>> 20261016000043_portal_cliente.sql
 -- =====================================================================
 -- Etapa 4b — Portal do Cliente (portal.html). Regras (como no ERP Consultoria, migrações 043–045):
 --  * o usuário do portal NUNCA entra em membros: identidade separada (portal_usuarios). Assim nenhuma política
@@ -4621,7 +4640,7 @@ begin
   end loop;
 end $$;
 
--- ===== 20261017000044_producao.sql =====
+-- >>> 20261017000044_producao.sql
 -- =====================================================================
 -- Etapa 5 — PCP e Produção (embalagens flexíveis: extrusão → impressão → corte/solda, rebobinamento, recuperação).
 -- Decisão de 17/10/2026: a plataforma faz tudo (OP, programação, apontamento, bobinas/etiquetas, rastreabilidade,
@@ -5022,7 +5041,7 @@ begin
   end loop;
 end $$;
 
--- ===== 20261018000045_logistica.sql =====
+-- >>> 20261018000045_logistica.sql
 -- =====================================================================
 -- Etapa 6 (parte) — Logística: frota, parâmetros, restrições de clientes, cargas e entregas.
 -- Decisão de 17/10/2026 (Renan, "pode seguir"): as cargas são montadas a partir das NF-e de saída já importadas
@@ -5223,7 +5242,129 @@ begin
   end loop;
 end $$;
 
--- ===== 20261021000047_credito_pago_maior.sql =====
+-- >>> 20261020000046_decisao_dia.sql
+-- Decisão do Dia — fase 2: registrar a decisão do dia (o que entra, o que sai, o que fica para depois),
+-- enviar para aprovação do diretor e comparar depois o decidido com o realizado.
+-- Rodar no SQL Editor do Supabase (projeto ceyzvhcpgokysgmpdalt). Pode rodar mais de uma vez.
+
+create table if not exists public.decisoes_dia (
+  id            uuid primary key default gen_random_uuid(),
+  empresa_id    uuid not null references public.empresas(id) on delete cascade,
+  numero        integer,
+  data          date not null,
+  status        text not null default 'Rascunho' check (status in ('Rascunho', 'Pendente', 'Aprovada', 'Rejeitada')),
+  contas        uuid[] not null default '{}',
+  minimo        numeric(14,2) not null default 0,
+  abertura      numeric(14,2) not null default 0,
+  entradas      numeric(14,2) not null default 0,
+  saidas        numeric(14,2) not null default 0,
+  saldo_fim     numeric(14,2) not null default 0,
+  itens         jsonb not null default '[]'::jsonb,   -- [{key, fonte, ref, lanc, conta, valor, desc, fav, prio, decisao: 'incluir'|'adiar', fixo}]
+  observacao    text,
+  motivo        text,                                  -- do diretor, ao aprovar/rejeitar
+  criado_por    uuid default auth.uid(),
+  criado_em     timestamptz not null default now(),
+  atualizado_em timestamptz not null default now(),
+  enviado_em    timestamptz,
+  decidido_por  uuid,
+  decidido_em   timestamptz
+);
+create index if not exists decisoes_dia_emp_data on public.decisoes_dia (empresa_id, data desc);
+
+-- número sequencial por empresa e data de atualização
+create or replace function public._decisao_dia_regras() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    select coalesce(max(numero), 0) + 1 into new.numero from decisoes_dia where empresa_id = new.empresa_id;
+    new.criado_por := coalesce(new.criado_por, auth.uid());
+    if new.status not in ('Rascunho', 'Pendente') then new.status := 'Rascunho'; end if;
+  else
+    -- aprovar/rejeitar só pela função decidir_decisao_dia
+    if new.status in ('Aprovada', 'Rejeitada') and new.status is distinct from old.status and current_setting('app.decidindo', true) is distinct from 'sim' then
+      raise exception 'Use Aprovar/Rejeitar (somente diretor)';
+    end if;
+    -- depois de aprovada, a decisão não muda (só o diretor reabre rejeitando)
+    if old.status = 'Aprovada' and current_setting('app.decidindo', true) is distinct from 'sim' then
+      raise exception 'Decisão nº % já aprovada: não pode ser alterada', old.numero;
+    end if;
+    new.numero := old.numero; new.empresa_id := old.empresa_id; new.criado_por := old.criado_por; new.criado_em := old.criado_em;
+  end if;
+  if new.status = 'Pendente' and (tg_op = 'INSERT' or old.status is distinct from 'Pendente') then new.enviado_em := now(); end if;
+  new.atualizado_em := now();
+  return new;
+end $$;
+revoke all on function public._decisao_dia_regras() from public, anon, authenticated;
+drop trigger if exists decisao_dia_regras on public.decisoes_dia;
+create trigger decisao_dia_regras before insert or update on public.decisoes_dia for each row execute function public._decisao_dia_regras();
+
+-- aprovar / rejeitar (diretor ou admin)
+create or replace function public.decidir_decisao_dia(p_id uuid, p_aprovar boolean, p_motivo text default null)
+returns text language plpgsql security definer set search_path = public as $$
+declare d decisoes_dia;
+begin
+  select * into d from decisoes_dia where id = p_id for update;
+  if not found then raise exception 'Decisão não encontrada'; end if;
+  if not exists (select 1 from membros where empresa_id = d.empresa_id and user_id = auth.uid() and papel::text in ('diretor', 'admin')) then
+    raise exception 'Somente o diretor pode aprovar ou rejeitar a decisão do dia';
+  end if;
+  if d.status <> 'Pendente' and not (d.status = 'Aprovada' and not p_aprovar) then
+    raise exception 'A decisão nº % não está pendente (status: %)', d.numero, d.status;
+  end if;
+  perform set_config('app.decidindo', 'sim', true);
+  update decisoes_dia set status = case when p_aprovar then 'Aprovada' else 'Rejeitada' end, motivo = p_motivo,
+         decidido_por = auth.uid(), decidido_em = now() where id = p_id;
+  return case when p_aprovar then 'Aprovada' else 'Rejeitada' end;
+end $$;
+revoke execute on function public.decidir_decisao_dia(uuid, boolean, text) from anon, public;
+grant execute on function public.decidir_decisao_dia(uuid, boolean, text) to authenticated;
+
+-- acesso: membros leem; quem edita (financeiro/admin) cria, atualiza e exclui rascunhos; o diretor decide pela função
+alter table public.decisoes_dia enable row level security;
+drop policy if exists decisoes_dia_sel on public.decisoes_dia;
+drop policy if exists decisoes_dia_ins on public.decisoes_dia;
+drop policy if exists decisoes_dia_upd on public.decisoes_dia;
+drop policy if exists decisoes_dia_del on public.decisoes_dia;
+create policy decisoes_dia_sel on public.decisoes_dia for select to authenticated using (public.is_membro(empresa_id));
+create policy decisoes_dia_ins on public.decisoes_dia for insert to authenticated with check (public.pode_editar(empresa_id));
+create policy decisoes_dia_upd on public.decisoes_dia for update to authenticated
+  using (public.pode_editar(empresa_id) and status in ('Rascunho', 'Pendente', 'Rejeitada'))
+  with check (public.pode_editar(empresa_id) and status in ('Rascunho', 'Pendente'));
+create policy decisoes_dia_del on public.decisoes_dia for delete to authenticated
+  using (public.pode_editar(empresa_id) and status in ('Rascunho', 'Rejeitada'));
+grant select, insert, update, delete on public.decisoes_dia to authenticated;
+
+-- notificações: enviada → diretor(es); aprovada/rejeitada → quem montou
+create or replace function public._decisao_dia_notifica() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare dirs uuid[]; resumo text; fmt text;
+begin
+  if to_regprocedure('public._notificar(uuid,uuid[],text,text,text,text,uuid)') is null then return null; end if;
+  fmt := 'R$ ' || translate(to_char(new.saldo_fim, 'FM999,999,999,990.00'), ',.', '.,');
+  resumo := 'Dia ' || to_char(new.data, 'DD/MM') || ' · saldo projetado ' || fmt;
+  if new.status = 'Pendente' and (tg_op = 'INSERT' or old.status is distinct from 'Pendente') then
+    select array_agg(user_id) into dirs from membros where empresa_id = new.empresa_id and papel::text = 'diretor';
+    perform _notificar(new.empresa_id, dirs, 'decisao_dia_nova', 'Decisão do dia nº ' || new.numero || ' aguardando aprovação', resumo, '#/decisao-dia?dia=' || new.data, new.id);
+  elsif tg_op = 'UPDATE' and new.status in ('Aprovada', 'Rejeitada') and old.status is distinct from new.status then
+    perform _notificar(new.empresa_id, array[new.criado_por], 'decisao_dia_' || lower(new.status),
+      'Decisão do dia nº ' || new.numero || case when new.status = 'Aprovada' then ' aprovada' else ' rejeitada' end,
+      resumo || coalesce(' · ' || new.motivo, ''), '#/decisao-dia?dia=' || new.data, new.id);
+  end if;
+  return null;
+end $$;
+revoke all on function public._decisao_dia_notifica() from public, anon, authenticated;
+drop trigger if exists decisao_dia_notifica on public.decisoes_dia;
+create trigger decisao_dia_notifica after insert or update on public.decisoes_dia for each row execute function public._decisao_dia_notifica();
+
+-- auditoria (se a função de auditoria existir)
+do $$ begin
+  if to_regprocedure('public._auditar()') is not null then
+    drop trigger if exists zz_auditoria on public.decisoes_dia;
+    create trigger zz_auditoria after insert or update or delete on public.decisoes_dia for each row execute function public._auditar();
+  end if;
+end $$;
+
+-- >>> 20261021000047_credito_pago_maior.sql
 -- Pagamento a maior ao fornecedor (21/10/2026).
 -- 1) creditos.tipo ganha 'pago_maior': quando o pagamento ligado à nota passa do valor dela, a diferença vira
 --    crédito com o fornecedor (ligado ao pagamento e à nota de origem) e abate as próximas notas.
@@ -5241,8 +5382,11 @@ alter table public.creditos_usos drop constraint if exists creditos_usos_destino
 alter table public.creditos_usos add constraint creditos_usos_destino_check check (nota_id is not null or lancamento_id is not null);
 create index if not exists creditos_usos_lanc on public.creditos_usos(lancamento_id) where lancamento_id is not null;
 
+-- conferência
+select conname, pg_get_constraintdef(oid) from pg_constraint
+ where conrelid in ('public.creditos'::regclass, 'public.creditos_usos'::regclass) and contype = 'c' order by 1;
 
--- ===== 20261021000048_admin_aprova_bordero.sql =====
+-- >>> 20261021000048_admin_aprova_bordero.sql
 -- O admin também aprova/rejeita propostas de borderô FIDC (pedido do Renan em 21/10/2026).
 -- Só muda a checagem de permissão de decidir_proposta_fidc (diretor OU admin); o resto da aprovação
 -- continua em _aprovar_proposta_fidc, sem alteração. Pode rodar mais de uma vez.
@@ -5265,8 +5409,10 @@ end $$;
 revoke execute on function public.decidir_proposta_fidc(uuid, boolean, text) from anon, public;
 grant execute on function public.decidir_proposta_fidc(uuid, boolean, text) to authenticated;
 
+-- conferência: deve mostrar "true"
+select position('admin' in pg_get_functiondef('public.decidir_proposta_fidc(uuid,boolean,text)'::regprocedure)) > 0 as admin_aprova;
 
--- ===== 20261021000049_operacoes_atomicas.sql =====
+-- >>> 20261021000049_operacoes_atomicas.sql
 -- Operações em um passo só + desfazer (21/10/2026).
 -- Motivo: correções feitas em vários passos (baixar o título, mover a conciliação, excluir o duplicado) ficavam pela
 -- metade quando um passo falhava ou era cancelado. Aqui:
@@ -5495,7 +5641,7 @@ grant execute on function public.desfazer_auditoria(bigint) to authenticated;
 -- conferência: deve listar as 4 funções
 select proname from pg_proc where proname in ('mesclar_lancamentos', 'baixar_parcial', 'desfazer_operacao', 'desfazer_auditoria') order by 1;
 
--- ===== 20261022000050_fidc_condicoes_sacado.sql =====
+-- >>> 20261022000050_fidc_condicoes_sacado.sql
 -- Condições do fundo por grupo de sacados (22/10/2026).
 -- Motivo: a FS cobra uma taxa para um grupo de sacados (CNPJ raiz informado) e outra para os demais, e nunca mistura
 -- os dois no mesmo borderô — por isso há dias com duas operações na FS. Cada fundo pode ter várias condições:
@@ -5554,7 +5700,7 @@ create trigger zz_auditoria after insert or update or delete on public.fidc_fund
 select (select count(*) from information_schema.tables where table_name = 'fidc_fundo_condicoes') tabela,
        (select count(*) from information_schema.columns where table_name = 'fidc_propostas' and column_name = 'condicao_id') coluna;
 
--- ===== 20261022000051_fidc_recesso_vencimento.sql =====
+-- >>> 20261022000051_fidc_recesso_vencimento.sql
 -- Recesso do fundo e vencimento ajustado na proposta de borderô (22/10/2026).
 -- 1) fidc_fundos.recessos: períodos sem expediente do fundo, [{"de":"2026-12-20","ate":"2027-01-07","cobra_ate":"2027-01-07"}].
 --    Quando a data cobrada (vencimento + compensação) cai dentro do período, o fundo cobra até "cobra_ate" (padrão: "ate").
@@ -5570,7 +5716,7 @@ alter table public.fidc_proposta_itens add column if not exists vencimento_origi
 select count(*) from information_schema.columns
  where (table_name = 'fidc_fundos' and column_name = 'recessos') or (table_name = 'fidc_proposta_itens' and column_name = 'vencimento_original');
 
--- ===== 20261027000052_rh_base.sql =====
+-- >>> 20261027000052_rh_base.sql
 -- =====================================================================
 -- RH / Trabalhista — etapa 1 (27/10/2026, Renan: "pode seguir sua sugestão"):
 --   colaboradores, histórico de salário, folha por competência (mensal e 13º) e os pagamentos da folha
@@ -5816,7 +5962,7 @@ grant execute on function public.rh_lancar_previsao(uuid), public.rh_encerrar_fo
 -- conferência: deve mostrar 6 tabelas
 select count(*) as tabelas_rh from information_schema.tables where table_schema = 'public' and table_name like 'rh\_%';
 
--- ===== 20261028000053_pa_pagamentos_anexos.sql =====
+-- >>> 20261028000053_pa_pagamentos_anexos.sql
 -- =====================================================================
 -- Pagamento Antecipado com vários pagamentos e vários anexos (28/10/2026, Renan: "pode seguir").
 -- Caso que motivou: PA nº 22 devia R$ 8.459,24 e foi pago R$ 6.987,62 — o complemento sai num segundo pagamento,
@@ -5967,7 +6113,7 @@ grant execute on function public.pa_registrar_pagamento(uuid, date, numeric, uui
 select (select count(*) from public.paraquedas_pagamentos) as pagamentos, (select count(*) from public.paraquedas_anexos) as anexos,
        (select count(*) from public.paraquedas where lancamento_id is not null) as pas_com_lancamento;
 
--- ===== 20261028000054_fretes_ciot.sql =====
+-- >>> 20261028000054_fretes_ciot.sql
 -- =====================================================================
 -- Logística › Fretes e CIOT — etapas 1 e 2 da conformidade ANTT (28/10/2026, Renan: "pode seguir").
 -- Base: Resolução ANTT 6.078/2026 (CIOT em toda operação; contratante de autônomo gera por IPEF; CIOT no MDF-e;
@@ -6154,7 +6300,7 @@ create trigger log_frete_trava_pagamento before insert or update of status on pu
 select (select count(*) from information_schema.tables where table_schema = 'public' and table_name in ('log_transportadores', 'log_piso_coef', 'log_fretes', 'log_frete_anexos')) as tabelas,
        (select count(*) from public.log_piso_coef) as coeficientes;
 
--- ===== 20261028000055_frete_dispensas.sql =====
+-- >>> 20261028000055_frete_dispensas.sql
 -- =====================================================================
 -- Fretes pagos sem ficha: dispensa com justificativa (28/10/2026, Renan: "pode seguir").
 -- Tira o lançamento dos alertas de "Conformidade do mês" sem apagar nada: fica registrado o motivo, quem e quando.
@@ -6184,7 +6330,7 @@ create trigger zz_auditoria after insert or update or delete on public.log_frete
 
 select count(*) as tabela_criada from information_schema.tables where table_schema = 'public' and table_name = 'log_frete_dispensas';
 
-
+-- >>> 20261028000056_seguranca_fase1.sql
 -- =====================================================================
 -- Segurança — fase 1 do diagnóstico de 28/10/2026 (Renan: "1 - Aprovado").
 -- 1) Backups saem do esquema público (que a API expõe) para o esquema "arquivo", sem acesso pela API. Nada é apagado.
@@ -6262,7 +6408,7 @@ select (select count(*) from pg_class c join pg_namespace n on n.oid = c.relname
        (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')) as funcoes_sem_login;
 
-
+-- >>> 20261028000057_mfa.sql
 -- =====================================================================
 -- Verificação em duas etapas (MFA, aplicativo autenticador) — fase 1 do diagnóstico (28/10/2026).
 -- empresas.mfa_obrigatorio: quando ligado (Empresa e usuários), administrador, financeiro e diretor só acessam os dados da
@@ -6316,6 +6462,7 @@ end $$;
 select count(*) as funcoes_com_mfa from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public' and p.prosrc ilike '%_mfa_ok(p_empresa)%';
 
+-- >>> 20261028000058_desempenho.sql
 -- =====================================================================
 -- Desempenho — fase 1 do diagnóstico de 28/10/2026.
 -- 1) Índice em toda chave estrangeira (FK) do esquema público que ainda não tem um índice começando pelas colunas

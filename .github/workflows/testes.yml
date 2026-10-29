@@ -1,0 +1,49 @@
+name: Testes
+# Em todo envio: sintaxe e imports de todos os módulos, testes das bibliotecas, regra dos manuais, setup.sql em dia
+# com as migrações, e todas as migrações aplicadas do zero num PostgreSQL 17 (com os testes de banco em tests/sql).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tests/verificar-sintaxe.mjs
+      - run: node --test "tests/*.test.js"
+  banco:
+    runs-on: ubuntu-latest
+    services:
+      pg:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: teste
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PGPASSWORD: teste
+      BANCO: postgresql://postgres:teste@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup.sql em dia com as migrações
+        run: |
+          scripts/gerar-setup.sh
+          git diff --exit-code supabase/setup.sql || { echo "::error::Rode scripts/gerar-setup.sh e envie o setup.sql"; exit 1; }
+      - name: Aplicar todas as migrações do zero
+        run: |
+          psql "$BANCO" -X -q -v ON_ERROR_STOP=1 -f scripts/backup/ambiente-supabase.sql
+          for f in supabase/migrations/*.sql; do
+            echo "::group::$f"; psql "$BANCO" -X -q -v ON_ERROR_STOP=1 -f "$f"; echo "::endgroup::"
+          done
+      - name: Testes de banco (tests/sql)
+        run: |
+          shopt -s nullglob
+          for f in tests/sql/*.sql; do echo "▶ $f"; psql "$BANCO" -X -q -v ON_ERROR_STOP=1 -f "$f"; done
