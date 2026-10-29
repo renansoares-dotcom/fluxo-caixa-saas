@@ -61,7 +61,7 @@ export async function render(root) {
         if (!(await fatoresVerificados()).length) { ev.target.checked = false; return toast('Ative primeiro a sua verificação em duas etapas (botão no menu), senão você perde o acesso.', true); } }
       await q(sb.from('empresas').update({ mfa_obrigatorio: liga }).eq('id', e.id).select('id'));
       state.empresa.mfa_obrigatorio = liga; toast(liga ? 'Verificação em duas etapas exigida para administrador, financeiro e diretor' : 'Exigência desligada');
-    } catch (err) { ev.target.checked = !liga; fail(/mfa_obrigatorio/.test(err.message || '') ? new Error('Rode antes o SQL 20261028000057_mfa.sql') : err); }
+    } catch (err) { ev.target.checked = !liga; fail(err); }
   };
   await membros(root);
   if (adm) await convites(root);
@@ -135,7 +135,7 @@ async function membros(root) {
         <td>${adm && r.user_id !== state.user.id ? '<button class="btn small danger rm">Remover</button>' : ''}</td></tr>`).join('')}</tbody></table>
       <p class="muted small" style="margin-top:8px">Áreas: o que a pessoa enxerga no menu (Financeiro inclui o Dashboard; Cadastros aparecem para todos).
       <strong>RH (salários)</strong> só vale para quem for marcado — o administrador sempre vê. O que ela pode <strong>alterar</strong> continua definido pelo papel — para um contador só consultar, use papel <em>leitura</em> + área Contabilidade.
-      ${adm && !comAreas ? '<br><strong class="warn">Para liberar a escolha de áreas, rode a migration 20261014000033_membros_areas.sql.</strong>' : ''}</p>`;
+      </p>`;
     el.onchange = async (ev) => {
       const tr = ev.target.closest('tr');
       if (ev.target.matches('.pap')) {

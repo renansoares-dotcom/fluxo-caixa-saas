@@ -1,7 +1,7 @@
 ---
 titulo: Conversas
 tela: Comunicação › Conversas
-versao: 2.1
+versao: 2.2
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -169,6 +169,8 @@ Regras do grupo:
 - Quando a outra pessoa está escrevendo, aparece **digitando…** no topo e na lista; num grupo, aparece o nome de quem está digitando.
 - Para esconder o seu: no menu **⋮** da lista, desmarque **Mostrar meu "visto por último"**. Como no WhatsApp, quem esconde também **não vê** o dos outros. O "digitando…" continua aparecendo.
 
+O online e o "digitando…" só chegam a quem pode recebê-los: o online, a quem é da empresa; o "digitando…", a quem participa da conversa.
+
 ## 11. Avisos no celular e no computador
 
 Os avisos usam a mesma liberação do sino de notificações. Clique no **sino** e em **Ativar avisos neste aparelho**. No iPhone, primeiro adicione a plataforma à Tela de Início.
@@ -216,3 +218,4 @@ Os avisos usam a mesma liberação do sino de notificações. Clique no **sino**
 | 1.0 | 29/10/2026 | Primeira versão: conversas individuais e em grupo, emojis, fotos e arquivos, entregue e lida, silenciar, fixar, arquivar, administração do grupo e avisos. |
 | 2.0 | 29/10/2026 | Etapa 2: responder, encaminhar, reações, editar e apagar, menções com @, mensagem de voz, busca nas mensagens, mensagem fixada, favoritas, dados da mensagem, mídia e documentos da conversa, exportar em PDF, online / visto por último / digitando, mini-chat e conversa do registro com cartões. |
 | 2.1 | 29/10/2026 | Microfone recusado: a plataforma explica o motivo e como liberar no computador, iPad/iPhone e Android. |
+| 2.2 | 29/10/2026 | O online e o "digitando…" passam por canais privados: só os recebe quem é da empresa ou da conversa. |

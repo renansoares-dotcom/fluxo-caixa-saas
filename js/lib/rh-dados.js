@@ -10,7 +10,7 @@ export const podeRH = () => state.papel === 'admin' || ((state.areas || []).incl
 
 const emp = () => state.empresa.id;
 export const semMigracao = (err) => /rh_|does not exist|schema cache/i.test(err?.message || '');
-export const avisoMigracao = '<div class="card"><div class="empty">Não foi possível carregar o RH. Se a migração <b>20261027000052_rh_base.sql</b> ainda não rodou, rode-a no SQL Editor do Supabase.</div></div>';
+export const avisoMigracao = '<div class="card"><div class="empty">Não foi possível carregar o RH. Recarregue a página; se continuar, avise o administrador da plataforma.</div></div>';
 
 export async function carregarBase() {
   const [P, colabs] = await Promise.all([

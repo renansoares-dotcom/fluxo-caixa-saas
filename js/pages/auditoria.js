@@ -140,7 +140,7 @@ export async function render(root) {
       pintar();
     } catch (e) {
       fail(e);
-      tbl.innerHTML = /auditoria/.test(e?.message || '') ? '<div class="empty">Rode a migração 20261016000038_auditoria.sql para ligar a auditoria.</div>' : '';
+      tbl.innerHTML = /auditoria/.test(e?.message || '') ? '<div class="empty">Não foi possível carregar a auditoria. Recarregue a página.</div>' : '';
     }
   };
   const visiveis = () => {

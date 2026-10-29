@@ -1,6 +1,6 @@
 // Créditos e adiantamentos: saldo por cliente/fornecedor, cadastro e onde cada crédito foi usado.
 import { sb, state, q, loadCadastros, podeEditar } from '../lib/data.js';
-import { $, esc, money, dateBR, fail, toast, exportXLSX } from '../lib/ui.js';
+import { erroTela, $, esc, money, dateBR, fail, toast, exportXLSX } from '../lib/ui.js';
 import { TIPOS, creditosComSaldo, novoCredito, devolverCredito } from '../lib/creditos.js';
 
 export const title = 'Créditos e adiantamentos';
@@ -27,7 +27,7 @@ export async function render(root) {
 
 async function carregar(root) {
   try { L = await creditosComSaldo({ natureza: ui.nat, todos: !ui.saldo }); }
-  catch (e) { $('#corpo', root).innerHTML = '<div class="card"><div class="empty">A estrutura de créditos ainda não foi instalada no banco. Rode o SQL <strong>20261009000026_creditos_adiantamentos.sql</strong> no SQL Editor do Supabase.</div></div>'; $('#kpis', root).innerHTML = ''; return; }
+  catch (e) { $('#corpo', root).innerHTML = erroTela('os créditos e adiantamentos'); $('#kpis', root).innerHTML = ''; return; }
   pintar(root);
 }
 

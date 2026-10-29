@@ -16,6 +16,7 @@ Em **Settings › Secrets and variables › Actions › New repository secret**:
 | Secret | O que colocar |
 |---|---|
 | `SUPABASE_DB_URL` | Supabase › **Connect** › **Session pooler** › URI, com a senha do banco no lugar de `[YOUR-PASSWORD]`. Use o *Session pooler* (o endereço direto não funciona no GitHub, que não tem IPv6). |
+| `SUPABASE_SERVICE_KEY` | Opcional, para copiar também os **arquivos** (comprovantes, anexos dos fretes, áudios e anexos do chat). Supabase › **Project Settings › API Keys** › chave `service_role` (ou uma *secret key*). Ela dá acesso total ao projeto: só cadastre aqui, nunca no código. |
 | `BACKUP_SENHA` | Uma senha longa (16 caracteres ou mais) só para os backups. **Guarde fora do GitHub** (gerenciador de senhas): sem ela o backup não abre. |
 
 Depois, em **Actions › Backup diário do banco › Run workflow**, rode uma vez para conferir.
@@ -33,7 +34,7 @@ Depois, em **Actions › Backup diário do banco › Run workflow**, rode uma ve
 4. Confira com `psql "$NOVO" -At -f scripts/backup/contagens.sql | diff - contagens.txt`.
 
 A verificação em duas etapas precisa ser ativada de novo por cada pessoa (os fatores não vão no backup).
-Os arquivos do Storage (anexos) não estão neste backup.
+Com o secret `SUPABASE_SERVICE_KEY`, a pasta `arquivos/` do backup traz os arquivos do Storage, separados por espaço (`chat/`, `paraquedas/`, `logistica/`…), e cada arquivo é conferido pelo tamanho registrado no banco. Para restaurar, envie-os ao Storage do projeto novo com os mesmos caminhos (Supabase › Storage, ou a CLI). Sem esse secret, os arquivos não entram no backup.
 
 ## Teste local
 

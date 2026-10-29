@@ -309,7 +309,7 @@ function pintar() {
   const prontos = cels.filter(x => x.st === 'ok' && !x.conferido);
   const pct = cels.length ? Math.round(conf / cels.length * 100) : 100;
   c.innerHTML = `
-    ${D.vistosOk ? '' : '<div class="card" style="border-color:var(--warn)"><strong>Falta instalar o visto no banco de dados.</strong> <span class="small">A conferência funciona, mas o botão “Dia conferido” só grava depois de rodar o SQL <code>20261013000028_conferencia_dia.sql</code>.</span></div>'}
+    ${D.vistosOk ? '' : '<div class="card" style="border-color:var(--warn)"><strong>Os vistos não carregaram.</strong> <span class="small">A conferência funciona, mas o botão “Dia conferido” fica desligado. Recarregue a página.</span></div>'}
     <div class="kpis">
       <div class="kpi"><div class="k-label">Conferência de ${esc(nomeMes(D.mes))}</div><div class="k-value ${pct === 100 ? 'pos' : ''}">${pct}%</div>
         <div class="k-sub">${conf} de ${cels.length} dias-conta conferidos</div><div class="cf-prog"><span style="width:${pct}%"></span></div></div>
@@ -511,7 +511,7 @@ function pintarDia() {
         <label class="grow">Observação${x.probs.length || x.al.length || x.naoConc.length ? ' (obrigatória: explique a ressalva)' : ''}<input id="cfobs" value="${esc(v?.observacao || '')}" placeholder="${x.probs.length || x.al.length ? 'ex.: duplicidade verificada, são dois pedidos' : 'opcional'}"></label>
         ${v ? '<button class="btn small ghost" id="cfdes">Desfazer visto</button>' : ''}
         <button class="btn primary" id="cfvis">${v ? 'Atualizar visto' : 'Dia conferido ✔'}</button></div>`
-        : !D.vistosOk ? '<span class="small muted">Rode o SQL da conferência para poder dar visto.</span>' : ''}
+        : !D.vistosOk ? '<span class="small muted">Vistos indisponíveis: recarregue a página.</span>' : ''}
     </div>
     <p class="small muted noprint" style="margin:6px 0 0">Atalhos: ← → dias · ↑ ↓ contas · Enter dá o visto e vai para o próximo dia pendente.</p>`;
   $$('[data-p]', M.el).forEach(b => b.onclick = () => { const [a, c] = b.dataset.p.split(',').map(Number); passo(a, c); });

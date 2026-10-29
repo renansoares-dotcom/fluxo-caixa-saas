@@ -53,7 +53,7 @@ export async function iniciarChat() {
   { const md = state.user?.user_metadata || {}; meuNome = (md.nome || md.full_name || (state.user?.email || '').split('@')[0] || '').trim();
     sb.from('membros').select('nome').eq('empresa_id', empresaId).eq('user_id', eu()).maybeSingle().then(({ data }) => { if (data?.nome?.trim()) meuNome = data.nome.trim(); }, () => {}); }
   marcarEntregue();
-  canal = sb.channel('chat-' + empresaId)
+  abrirCanal('chat-' + empresaId, {}, (c) => { let ch = c
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensagens', filter: `empresa_id=eq.${empresaId}` }, (p) => chegou(p.new))
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_mensagens', filter: `empresa_id=eq.${empresaId}` }, (p) => mudou(p.new))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_participantes', filter: `empresa_id=eq.${empresaId}` }, (p) => {
@@ -62,12 +62,12 @@ export async function iniciarChat() {
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_conversas', filter: `empresa_id=eq.${empresaId}` }, (p) => { emitir('conversa', p.new); agendarResumo(); });
   if (etapa2) {
-    canal.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_reacoes', filter: `empresa_id=eq.${empresaId}` }, (p) => emitir('reacao', p.new?.mensagem_id))
+    ch = ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_reacoes', filter: `empresa_id=eq.${empresaId}` }, (p) => emitir('reacao', p.new?.mensagem_id))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_reacoes', filter: `empresa_id=eq.${empresaId}` }, (p) => emitir('reacao', p.new?.mensagem_id))
       // exclusão não aceita filtro: chega só a chave (mensagem e pessoa), e a tela recarrega as reações se a mensagem estiver aberta
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_reacoes' }, (p) => emitir('reacao', p.old?.mensagem_id));
   }
-  canal.subscribe((st) => emitir('conexao', st));
+  return ch; }, (st) => emitir('conexao', st), (ch) => { canal = ch; });
   if (etapa2) iniciarPresenca();
   timer = setInterval(() => atualizarResumo(), 60000);       // reserva, se o tempo real cair
   timerFila = setInterval(processarFila, 15000);
@@ -103,17 +103,33 @@ export async function atualizarResumo(primeira = false) {
   return resumo;
 }
 
+// ---------- canais do tempo real ----------
+// Canais privados (SQL 064): o Realtime só deixa entrar quem é da empresa ou da conversa. Se o servidor recusar o
+// privado (SQL ainda não rodou), abre o canal comum e segue assim até a página recarregar.
+let privadoOk = true;
+function abrirCanal(topico, config, ligar, aoStatus, guardar) {
+  const abrir = (priv) => {
+    let entrou = false;
+    const ch = ligar(sb.channel(topico, { config: { ...config, private: priv } }));
+    guardar(ch);
+    ch.subscribe((st) => {
+      if (st === 'SUBSCRIBED') entrou = true;
+      if (priv && !entrou && st === 'CHANNEL_ERROR') { privadoOk = false; try { sb.removeChannel(ch); } catch {} abrir(false); return; }
+      aoStatus && aoStatus(st);
+    });
+  };
+  abrir(privadoOk);
+}
+
 // ---------- online, visto por último e "digitando…" ----------
 function iniciarPresenca() {
   sb.rpc('chat_visto', { p_mostrar: null }).then(({ data }) => {
     mostrarVisto = data !== false;
-    canalPres = sb.channel('chat-pres-' + empresaId, { config: { presence: { key: eu() } } })
-      .on('presence', { event: 'sync' }, () => {
+    abrirCanal('chat-pres-' + empresaId, { presence: { key: eu() } }, (c) => c.on('presence', { event: 'sync' }, () => {
         online.clear();
         for (const k of Object.keys(canalPres.presenceState())) if (k !== eu()) online.add(k);
         emitir('presenca', online);
-      })
-      .subscribe((st) => { if (st === 'SUBSCRIBED' && mostrarVisto) canalPres.track({ em: new Date().toISOString() }); });
+      }), (st) => { if (st === 'SUBSCRIBED' && mostrarVisto) canalPres.track({ em: new Date().toISOString() }); }, (ch) => { canalPres = ch; });
   }, () => {});
   timerVisto = setInterval(() => { if (!document.hidden) gravarVisto(); }, 120000);
 }
@@ -130,14 +146,13 @@ const canaisDig = new Map();
 const digitando = new Map();           // conversa → Map(user → {acao, ate})
 export function entrarDigitando(conversa) {
   if (!etapa2 || !conversa || canaisDig.has(conversa)) return;
-  const ch = sb.channel('chat-dig-' + conversa).on('broadcast', { event: 'dig' }, ({ payload }) => {
+  abrirCanal('chat-dig-' + conversa, {}, (c) => c.on('broadcast', { event: 'dig' }, ({ payload }) => {
     if (!payload || payload.u === eu()) return;
     const mp = digitando.get(conversa) || new Map(); digitando.set(conversa, mp);
     if (payload.acao === 'parou') mp.delete(payload.u); else mp.set(payload.u, { acao: payload.acao, ate: Date.now() + 6000 });
     emitir('digitando', conversa);
     setTimeout(() => emitir('digitando', conversa), 6100);
-  }).subscribe();
-  canaisDig.set(conversa, ch);
+  }), null, (ch) => canaisDig.set(conversa, ch));
 }
 export function sairDigitando(conversa) { const ch = canaisDig.get(conversa); if (ch) { try { sb.removeChannel(ch); } catch {} canaisDig.delete(conversa); } }
 export function quemDigita(conversa) {

@@ -46,7 +46,7 @@ export async function usarCredito(n, recPorParc, onDone) {
   const natureza = n.tipo === 'saida' ? 'cliente' : 'fornecedor';
   if (!n.favorecido_id) return toast('A nota não está ligada a um cadastro de cliente/fornecedor (Beneficiários).', true);
   let creds;
-  try { creds = await creditosComSaldo({ favorecidos: mesmoGrupo(n.favorecido_id), natureza }); } catch (e) { return fail(new Error('A estrutura de créditos ainda não foi instalada no banco (rodar o SQL de créditos e adiantamentos).')); }
+  try { creds = await creditosComSaldo({ favorecidos: mesmoGrupo(n.favorecido_id), natureza }); } catch (e) { return fail(e); }
   const parc = n.parcelas.map(p => ({ ...p, falta: +(+p.valor - (recPorParc.get(p.id) || 0)).toFixed(2) })).filter(p => p.falta > 0.005);
   if (!creds.length) return toast(`${natureza === 'cliente' ? 'O cliente' : 'O fornecedor'} não tem crédito com saldo. Cadastre em Movimento › Créditos e adiantamentos.`, true);
   if (!parc.length) return toast('Todas as parcelas já estão quitadas.', true);
@@ -123,19 +123,15 @@ export function novoCredito(preset = {}, onDone) {
       await q(sb.from('creditos').insert({ empresa_id: state.empresa.id, favorecido_id: f.id, natureza: $('#nat', m.el).value, tipo: $('#tp', m.el).value, data: $('#dt', m.el).value, valor: +valor.toFixed(2),
         descricao: $('#ds', m.el).value.trim() || null, lancamento_id: lancSel?.id || null, nota_id: preset.nota_id || null }));
       toast('Crédito cadastrado'); m.close(); onDone && onDone();
-    } catch (e) { fail(/relation|does not exist|schema cache/i.test(e.message || '') ? new Error('A estrutura de créditos ainda não foi instalada no banco (rodar o SQL de créditos e adiantamentos).') : e); }
+    } catch (e) { fail(e); }
   };
 }
 
-const SEM_ESTRUTURA = /creditos_usos_destino|lancamento_id|pago_maior|creditos_tipo_check|null value in column "nota_id"/i;
-const erroEstrutura = (e) => SEM_ESTRUTURA.test(e?.message || '') ? new Error('Falta rodar o SQL 20261021000047_credito_pago_maior.sql no Supabase (pagamento a maior e devolução de crédito).') : e;
 
 /** Pagamento a maior: a diferença entre o pago e a nota vira crédito com o fornecedor. */
 export async function registrarPagoMaior({ favorecido_id, valor, data, lancamento_id, nota, natureza = 'fornecedor' }) {
-  try {
-    return await q(sb.from('creditos').insert({ empresa_id: state.empresa.id, favorecido_id, natureza, tipo: 'pago_maior', data, valor: +(+valor).toFixed(2),
-      descricao: `Pagamento a maior${nota ? ` na NF ${nota.numero}` : ''}`, lancamento_id: lancamento_id || null, nota_id: nota?.id || null }).select().single());
-  } catch (e) { throw erroEstrutura(e); }
+  return q(sb.from('creditos').insert({ empresa_id: state.empresa.id, favorecido_id, natureza, tipo: 'pago_maior', data, valor: +(+valor).toFixed(2),
+    descricao: `Pagamento a maior${nota ? ` na NF ${nota.numero}` : ''}`, lancamento_id: lancamento_id || null, nota_id: nota?.id || null }).select().single());
 }
 
 /**
@@ -152,7 +148,7 @@ export async function devolverCredito(c, onDone) {
     const usados = new Set((await q(sb.from('creditos_usos').select('lancamento_id').eq('empresa_id', state.empresa.id).not('lancamento_id', 'is', null))).map(u => u.lancamento_id));
     livres = (await fetchAll(() => sb.from('lancamentos').select('id,data,valor,descricao,conta_id,plano_id,v:nfe_vinculos(id)').eq('empresa_id', state.empresa.id).in('favorecido_id', mesmoGrupo(c.favorecido_id)).eq('status', 'Pago').gte('data', c.data).order('data')))
       .filter(l => !usados.has(l.id) && !l.v?.length && cad.planoById[l.plano_id]?.natureza === natLanc && cad.planoById[l.plano_id]?.tipo !== 'T');
-  } catch (e) { return fail(erroEstrutura(e)); }
+  } catch (e) { return fail(e); }
   const planoPadrao = cad.contasPlano.find(p => p.codigo === (forn ? '1.02.09' : '2.04.04'));
   const planos = cad.contasPlano.filter(p => p.natureza === natLanc && p.tipo !== 'T' && p.ativo !== false);
   const m = modal({ title: `Devolver crédito em dinheiro — ${f?.nome || ''}`, wide: true, body: `
@@ -187,6 +183,6 @@ export async function devolverCredito(c, onDone) {
       try { await q(sb.from('creditos_usos').insert({ empresa_id: state.empresa.id, credito_id: c.id, nota_id: null, lancamento_id: lancId, data, valor: +valor.toFixed(2), observacao: 'Devolução em dinheiro' })); }
       catch (e) { if (!sel) await sb.from('lancamentos').delete().eq('id', lancId); throw e; }   // não deixa o lançamento novo solto
       toast(`Crédito baixado: ${money(valor)} devolvido${sel ? '' : ' (lançamento criado)'}`); m.close(); onDone && onDone();
-    } catch (e) { fail(erroEstrutura(e)); }
+    } catch (e) { fail(e); }
   };
 }

@@ -69,7 +69,7 @@ async function carregar(root) {
     await carregarItens(root);
   } catch (e) {
     fail(e);
-    tbl.innerHTML = /contab_/.test(e.message || '') ? '<div class="empty">A contabilidade ainda não foi ativada no banco.<br><span class="small">Rode a migration 20261014000034_contabilidade_base.sql.</span></div>' : '';
+    tbl.innerHTML = /contab_/.test(e.message || '') ? '<div class="empty">Não foi possível carregar a contabilidade. Recarregue a página.</div>' : '';
   }
 }
 

@@ -2,7 +2,7 @@
 // conformidade do mês (fretes pagos sem ficha, pelo caixa, a pessoa física) e relatório para imprimir.
 // Autônomo: pagamento só é liberado sem pendências (trava no banco). Transportadora: CIOT/MDF-e/piso viram aviso.
 import { sb, state, q, fetchAll, loadCadastros } from '../lib/data.js';
-import { $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, options, today } from '../lib/ui.js';
+import { erroTela, $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, options, today } from '../lib/ui.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 import { podeLogistica } from '../lib/logistica.js';
 import { inp, num } from '../lib/compras.js';
@@ -56,7 +56,7 @@ export async function render(root) {
     <div class="card toolbar"><div class="chips" id="lf-abas">${[['fretes', 'Fretes'], ['mdfe', 'MDF-e · 23/11'], ['transp', 'Transportadores'], ['conf', 'Conformidade do mês'], ['piso', 'Piso mínimo']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div id="lf-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#lf-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
-  try { await carregar(); } catch (err) { console.error(err); $('#lf-corpo', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Se a migração <b>20261028000054_fretes_ciot.sql</b> ainda não rodou, rode-a no SQL Editor do Supabase.</div></div>'; return; }
+  try { await carregar(); } catch (err) { console.error(err); $('#lf-corpo', root).innerHTML = erroTela('os fretes'); return; }
   const corpo = $('#lf-corpo', root);
   const ab = state.abrir?.tipo === 'frete' ? state.abrir : null;
   if (ab) { delete state.abrir; ui.aba = 'fretes'; $$('#lf-abas .chip', root).forEach(c => c.classList.toggle('on', c.dataset.a === 'fretes')); }
@@ -210,7 +210,7 @@ function ficha(f0, root, pre = {}) {
       try { await q(sb.from('log_frete_anexos').delete().eq('id', a.id)); await sb.storage.from('logistica').remove([a.path]); B.A = B.A.filter(x => x.id !== a.id); g('fr-anx').innerHTML = listaAnexos(anexosDe(f0), pode); atualizar(); } catch (err) { fail(err); } return; }
     if (b.id === 'fr-env') { const arqs = [...g('fr-arq').files]; if (!arqs.length) return toast('Escolha os arquivos', true);
       b.disabled = true; try { await enviar(arqs, f0.id, { frete_id: f0.id, tipo: g('fr-at').value }); await carregar(); g('fr-anx').innerHTML = listaAnexos(anexosDe(f0), pode); g('fr-arq').value = ''; atualizar(); toast('Anexado'); }
-      catch (err) { fail(/bucket|not found/i.test(err.message || '') ? new Error('Espaço de arquivos da logística não criado: rode a migração 054.') : err); } b.disabled = false; return; }
+      catch (err) { fail(err); } b.disabled = false; return; }
     if (b.id === 'fr-canc') { if (!await confirmDialog('Cancelar este frete? O lançamento programado em aberto, se houver, continua no fluxo — exclua lá se for o caso.')) return;
       try { await q(sb.from('log_fretes').update({ status: 'cancelado' }).eq('id', f0.id)); md.close(); render(root); } catch (err) { fail(err); } return; }
     if (b.id === 'fr-mdfe') { try { await salvar(); } catch (err) { return fail(err); } md.close(); await carregar(); return fichaMDFe(B.F.find(x => x.id === f0.id), root); }
@@ -317,7 +317,7 @@ function editarTransp(t, root, depois = null) {
       try { await q(sb.from('log_frete_anexos').delete().eq('id', a.id)); await sb.storage.from('logistica').remove([a.path]); B.A = B.A.filter(x => x.id !== a.id); g('ct-anx').innerHTML = listaAnexos(B.A.filter(x => x.transportador_id === t.id), pode); } catch (err) { fail(err); } return; }
     if (b.id === 'ct-env') { const arqs = [...g('ct-arq').files]; if (!arqs.length) return toast('Escolha os arquivos', true);
       b.disabled = true; try { await enviar(arqs, t.id, { transportador_id: t.id, tipo: g('ct-at2').value }); await carregar(); g('ct-anx').innerHTML = listaAnexos(B.A.filter(x => x.transportador_id === t.id), pode); g('ct-arq').value = ''; toast('Anexado'); }
-      catch (err) { fail(/bucket|not found/i.test(err.message || '') ? new Error('Espaço de arquivos da logística não criado: rode a migração 054.') : err); } b.disabled = false; }
+      catch (err) { fail(err); } b.disabled = false; }
   });
 }
 
@@ -661,7 +661,7 @@ async function padroesMDFe(root) {
 
 // painel "MDF-e · 23/11": o que falta para emitir as viagens com CIOT
 function prontidao(corpo, root) {
-  if (B.semMdfe) { corpo.innerHTML = '<div class="card"><div class="empty">Rode a migração <b>20261029000062_mdfe_preparo.sql</b> no SQL Editor do Supabase para ligar o preparo do MDF-e.</div></div>'; return; }
+  if (B.semMdfe) { corpo.innerHTML = erroTela('o preparo do MDF-e'); return; }
   const pode = podeLogistica(), hoje = today(), dias = MD.diasAte(MD.DATA_CIOT_MDFE, hoje);
   const lim = new Date(); lim.setDate(lim.getDate() - 45); const desde = lim.toISOString().slice(0, 10);
   const fs = B.F.filter(f => f.status !== 'cancelado' && f.data >= desde).sort((a, b) => b.data.localeCompare(a.data));

@@ -203,7 +203,7 @@ function detalheSemana(w) {
 }
 
 function compromissos(root) {
-  if (D.comp === null) return toast('Rode a migração 20261016000039_caixa_compromissos.sql para cadastrar compromissos', true);
+  if (D.comp === null) return toast('Não foi possível carregar os compromissos. Recarregue a página.', true);
   const ed = podeEditar();
   const m = modal({ title: 'Compromissos programados', wide: true, body: `
     <p class="small muted" style="margin-top:0">Valores que se repetem todo mês e ainda não estão lançados (ex.: parcela da Recuperação Judicial, quando definida). Entram na projeção no dia do mês informado, entre o início e o fim.</p>

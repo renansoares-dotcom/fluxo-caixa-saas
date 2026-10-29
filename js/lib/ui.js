@@ -38,6 +38,8 @@ export function toast(msg, err = false) {
   $('#toast-root').appendChild(el);
   setTimeout(() => el.remove(), err ? 6000 : 3000);
 }
+// tela que não carregou: mensagem para quem usa (o detalhe técnico vai para o console)
+export const erroTela = (oQue = 'esta tela') => `<div class="card"><div class="empty">Não foi possível carregar ${oQue}. Recarregue a página; se continuar, avise o administrador da plataforma.</div></div>`;
 export function fail(e) { console.error(e); toast(e?.message || String(e), true); }
 
 export function modal({ title, body, foot = '', wide = false, onMount, fixo = false }) {

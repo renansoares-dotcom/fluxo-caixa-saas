@@ -3,7 +3,7 @@
 // do dia) → pago (vira adiantamento ao fornecedor) → nota recebida (a nota abate o adiantamento).
 // "Terá nota fiscal = não" fica separado para o controle de pagamentos sem lastro fiscal.
 import { sb, state, q, fetchAll, loadCadastros, podeEditar } from '../lib/data.js';
-import { $, esc, money, dateBR, fail, toast, modal, options, parseNum, exportXLSX, today, logoPNG } from '../lib/ui.js';
+import { erroTela, $, esc, money, dateBR, fail, toast, modal, options, parseNum, exportXLSX, today, logoPNG } from '../lib/ui.js';
 import { dispararAvisos } from '../lib/notif.js';
 import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 import { conversaNoModal } from '../lib/mini-chat.js';
@@ -94,7 +94,7 @@ async function carregar(root) {
 
 function pintar(root) {
   if (SEM_TABELA) {
-    $('#pq-corpo', root).innerHTML = '<div class="card"><div class="empty">A estrutura de Pagamentos Antecipados ainda não foi instalada no banco. Rode o SQL <strong>20261012000027_paraquedas.sql</strong> no SQL Editor do Supabase.</div></div>';
+    $('#pq-corpo', root).innerHTML = erroTela('os Pagamentos Antecipados');
     $('#pq-abas', root).innerHTML = ''; $('#pq-kpis', root).innerHTML = ''; return;
   }
   const abas = compras() ? ABAS_COMPRAS : ABAS, b = ui.busca.trim().toLowerCase();
@@ -396,7 +396,7 @@ function anexarComprovante(p, root) {
       await q(sb.from('paraquedas').update({ comprovante_path: path, comprovante_nome: f.name.slice(0, 200), comprovante_em: new Date().toISOString(), comprovante_por: state.user?.email || null }).eq('id', p.id));
       if (antigo) await sb.storage.from('paraquedas').remove([antigo]);
       toast('Comprovante anexado'); m.close(); carregar(root); dispararAvisos();
-    } catch (e) { btn.disabled = false; btn.textContent = 'Anexar'; fail(/bucket|not found/i.test(e.message || '') ? new Error('O espaço de comprovantes ainda não foi criado: rode a migration 20261015000036.') : e); }
+    } catch (e) { btn.disabled = false; btn.textContent = 'Anexar'; fail(e); }
   };
 }
 async function verComprovante(p) {
@@ -520,7 +520,7 @@ function pagamentosEAnexos(p, root) {
       const fs = [...$('#nf-arq', m.el).files]; if (!fs.length) return toast('Escolha os arquivos', true);
       t.disabled = true; t.textContent = 'Enviando…';
       try { await enviarArquivos(p, fs, $('#nf-pg', m.el).value || null, $('#nf-tipo', m.el).value); toast(`${fs.length} arquivo(s) anexado(s)`); dispararAvisos(); reabrir(); }
-      catch (err) { t.disabled = false; t.textContent = 'Anexar'; fail(/bucket|not found/i.test(err.message || '') ? new Error('O espaço de comprovantes ainda não foi criado: rode a migration 20261015000036.') : err); }
+      catch (err) { t.disabled = false; t.textContent = 'Anexar'; fail(err); }
     }
   });
 }

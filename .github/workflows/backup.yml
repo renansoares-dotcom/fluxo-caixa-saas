@@ -3,6 +3,7 @@ name: Backup diário do banco
 # tabela o número de linhas. Só guarda a cópia se a restauração bater. A cópia é criptografada (AES-256) com a senha
 # do secret BACKUP_SENHA antes de sair da máquina e fica 30 dias em "Actions › Backup diário do banco".
 # Secrets necessários (Settings › Secrets and variables › Actions): SUPABASE_DB_URL e BACKUP_SENHA.
+# Com o secret SUPABASE_SERVICE_KEY, também copia e confere os arquivos do Storage (anexos, comprovantes, áudios).
 on:
   schedule:
     - cron: '15 6 * * *'
@@ -51,13 +52,21 @@ jobs:
             echo "Tentativa $t não conferiu; repetindo em 60 s"; sleep 60
           done
           exit 1
+      - name: Copiar os arquivos do Storage
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_URL: https://ceyzvhcpgokysgmpdalt.supabase.co
+        run: |
+          if [ -z "$SERVICE_KEY" ]; then echo "::warning::Sem o secret SUPABASE_SERVICE_KEY: os arquivos do Storage não entram neste backup"; exit 0; fi
+          scripts/backup/copiar-arquivos.sh saida
       - name: Criptografar
         env:
           SENHA: ${{ secrets.BACKUP_SENHA }}
         run: |
           D=$(TZ=America/Sao_Paulo date +%Y-%m-%d)
           echo "DATA=$D" >> "$GITHUB_ENV"
-          tar -C saida -cf backup.tar banco.dump usuarios.dump contagens.txt
+          tar -C saida -cf backup.tar banco.dump usuarios.dump contagens.txt $( [ -d saida/arquivos ] && echo arquivos )
           gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 \
               --output "backup-$D.tar.gpg" backup.tar <<< "$SENHA"
           rm -rf saida backup.tar

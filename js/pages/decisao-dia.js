@@ -301,7 +301,7 @@ async function gravar(root, R, status) {
 }
 
 function painelDecisao(R) {
-  if (D.decs === null) return `<div class="card" style="border-color:var(--warn)"><strong>Registrar decisão:</strong> <span class="small">falta criar a tabela no banco — rodar o SQL <code>20261020000046_decisao_dia.sql</code>.</span></div>`;
+  if (D.decs === null) return `<div class="card" style="border-color:var(--warn)"><strong>Registrar decisão:</strong> <span class="small">não foi possível carregar as decisões. Recarregue a página.</span></div>`;
   const dec = D.dec, ed = podeEditar(), dir = ['diretor', 'admin'].includes(state.papel);
   const st = dec?.status || 'Nova', bcls = { Aprovada: 'pago', Pendente: 'aberto', Rejeitada: 'vencido', Rascunho: '' }[st] || '';
   const podeMexer = ed && (!dec || ['Rascunho', 'Pendente', 'Rejeitada'].includes(dec.status));

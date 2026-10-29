@@ -69,7 +69,7 @@ async function carregar(root) {
     pintar(root);
   } catch (err) {
     fail(err);
-    tbl.innerHTML = /contab_/.test(err.message || '') ? '<div class="empty">Rode as migrations 20261014000034 e 20261014000035 da Contabilidade.</div>' : '';
+    tbl.innerHTML = /contab_/.test(err.message || '') ? '<div class="empty">Não foi possível carregar a contabilidade. Recarregue a página.</div>' : '';
   }
 }
 
