@@ -1,7 +1,7 @@
 // Logística › Cargas: entregas pendentes (NF-e de saída com frete por conta da empresa), montagem automática por peso,
 // volume, região e jornada, ajuste arrastando entre caminhões, romaneio, mapa e acompanhamento da entrega.
 import { sb, state, q } from '../lib/data.js';
-import { $, $$, esc, dateBR, today, fail, toast, modal, confirmDialog } from '../lib/ui.js';
+import { erroTela, $, $$, esc, dateBR, today, fail, toast, modal, confirmDialog } from '../lib/ui.js';
 import { badge } from '../lib/compras.js';
 import { carregarBase, municipios, paradas, ordenar, metricas, montarCargas, capacidade, veiculoPequeno, imprimirRomaneio, mapaSVG, podeLogistica,
   TIPOS_VEICULO, ST_CARGA, PROX_ST } from '../lib/logistica.js';
@@ -21,7 +21,7 @@ export async function render(root) {
   root.innerHTML = '<div class="loading">Carregando…</div>';
   try {
     [B, M] = await Promise.all([carregarBase(), municipios()]);
-  } catch (err) { fail(err); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Se a migração 045 ainda não rodou, rode-a antes.</div></div>'; return; }
+  } catch (err) { fail(err); root.innerHTML = erroTela(); return; }
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Cargas e entregas</h2><div class="muted small">Notas de saída com frete por conta da empresa (modFrete ${esc(B.P.mod_fretes.join(', '))}). Peso e volumes vêm da nota; volume em m³ estimado por tonelada quando não há medida.</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Dia das cargas<input type="date" id="lg-d" value="${ui.data}"></label>
       <label>Notas de<input type="date" id="lg-de" value="${ui.de}"></label><label>até<input type="date" id="lg-ate" value="${ui.ate}"></label>

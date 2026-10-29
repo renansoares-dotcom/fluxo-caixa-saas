@@ -1,8 +1,8 @@
 ---
 titulo: Terminal de produção
 tela: Produção › Terminal do setor
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -20,6 +20,8 @@ Cada operador entra com o **próprio usuário**, com o perfil **Produção**. Es
 O usuário do operador é ligado ao cadastro dele e aos setores dele em **Produção › Cadastros › Operadores**. Sem essa ligação, os apontamentos ficam sem operador.
 
 ## 3. A tela
+
+![Figura 1 — Terminal do setor de extrusão (dados fictícios)](img/terminal-producao-1.jpg)
 
 - No topo, escolha o **setor**. O terminal lembra o último setor usado.
 - Cada **máquina** do setor aparece num quadro com a situação: **livre**, **produzindo** (com a OP e o tempo) ou **parada** (com o motivo e o tempo).
@@ -76,3 +78,4 @@ O usuário do operador é ligado ao cadastro dele e aos setores dele em **Produ�
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: início, bobina com etiqueta, parada, retomada e encerramento do apontamento. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

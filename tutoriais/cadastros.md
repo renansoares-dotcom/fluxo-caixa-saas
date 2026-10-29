@@ -1,8 +1,8 @@
 ---
 titulo: Cadastros — plano de contas, contas, beneficiários e centros de custo
 tela: Cadastros › Plano de contas, Contas bancárias, Beneficiários e Centros de custo e grupos
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -18,6 +18,8 @@ Os cadastros são a base de toda a plataforma:
 Os cadastros aparecem para todos. O administrador e o financeiro incluem e alteram; os demais perfis consultam.
 
 ## 3. Plano de contas
+
+![Figura 1 — Plano de contas (dados fictícios)](img/cadastros-1.jpg)
 
 ### 3.1 Estrutura
 
@@ -42,6 +44,8 @@ Na **classificação** você define:
 Conta usada em lançamentos **não pode ser excluída**: inative-a.
 
 ## 4. Contas bancárias
+
+![Figura 2 — Contas bancárias (dados fictícios)](img/cadastros-2.jpg)
 
 Para cada conta, informe:
 
@@ -124,3 +128,4 @@ Inative o que não estiver mais em uso.
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: plano de contas, contas bancárias, beneficiários por aba (inclusive pelas NF-e e fundos FIDC) e centros de custo e grupos. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

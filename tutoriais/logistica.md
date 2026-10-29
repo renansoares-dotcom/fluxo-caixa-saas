@@ -1,8 +1,8 @@
 ---
 titulo: Logística — cargas, entregas e frota
 tela: Logística › Cargas e entregas e Frota e parâmetros
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -23,6 +23,8 @@ Os fretes contratados de terceiros (CIOT, MDF-e, piso) ficam em **Logística ›
 | Demais perfis com a área Logística | Consultam. |
 
 ## 3. Frota e parâmetros (comece por aqui)
+
+![Figura 1 — Frota e parâmetros (dados fictícios)](img/logistica-1.jpg)
 
 ### 3.1 Veículos
 
@@ -57,6 +59,8 @@ Clique em **Salvar parâmetros**.
 Clique em **Incluir cliente** e informe o CNPJ/CPF, se ele **só recebe veículo pequeno**, os dias e o horário de recebimento e uma observação.
 
 ## 4. Cargas e entregas
+
+![Figura 2 — Cargas e entregas (dados fictícios)](img/logistica-2.jpg)
 
 ### 4.1 Montar as cargas do dia
 
@@ -104,3 +108,4 @@ Para as notas que foram entregues **antes** de usar a plataforma, use **Baixa in
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: frota, parâmetros, clientes com restrição, montagem automática de cargas, romaneio, mapa, baixa das entregas e baixa inicial. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

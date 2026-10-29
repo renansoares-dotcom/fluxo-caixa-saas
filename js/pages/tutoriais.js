@@ -46,10 +46,10 @@ async function abrir(root, m) {
       <div class="muted small">${esc(dados.tela || m.area)} · versão ${esc(dados.versao || '1.0')} · atualizado em ${dataBR(dados.atualizado)}</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn ghost" href="#/tutoriais">← Todos os tutoriais</a>${m.rotas[0] ? `<a class="btn ghost" href="#/${m.rotas[0]}">Ir para a tela</a>` : ''}
         <a class="btn" href="${base}pdf/${m.id}.pdf?v=${V}" target="_blank" rel="noopener">Baixar PDF</a><button class="btn primary" id="tut-imp">Imprimir</button></div></div>
-    <div class="card manual-tela"><div class="manual-corpo">${mdParaHtml(corpo)}</div></div>`;
+    <div class="card manual-tela"><div class="manual-corpo">${mdParaHtml(corpo, { img: (c) => base + c + '?v=' + V })}</div></div>`;
   $('#tut-imp', root).onclick = async () => {
     const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
     const logo = await logoPNG().catch(() => null);
-    w.document.write(htmlManual(m, md, logo, { auto: true, barra: true })); w.document.close();
+    w.document.write(htmlManual(m, md, logo, { auto: true, barra: true, img: (c) => base + c + '?v=' + V })); w.document.close();
   };
 }

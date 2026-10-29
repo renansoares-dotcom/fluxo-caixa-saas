@@ -1,8 +1,8 @@
 ---
 titulo: Fluxo de caixa e necessidade de caixa
 tela: Financeiro › Fluxo de caixa mensal, Fluxo de caixa diário e Necessidade de caixa
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -17,6 +17,8 @@ Três telas mostram o dinheiro da empresa no tempo:
 Quem tem a área Financeiro consulta e exporta. Só o administrador e o financeiro cadastram **compromissos programados**.
 
 ## 3. Fluxo de caixa mensal e diário
+
+![Figura 1 — Fluxo de caixa mensal (dados fictícios)](img/fluxo-caixa-1.jpg)
 
 ### 3.1 Filtros
 
@@ -40,6 +42,8 @@ No mensal, as colunas são os meses, o **TOTAL** e a **Part.** (participação d
 **Exportar Excel** baixa a tabela como está na tela.
 
 ## 4. Necessidade de caixa
+
+![Figura 2 — Necessidade de caixa por semana (dados fictícios)](img/fluxo-caixa-2.jpg)
 
 ### 4.1 Como a projeção é feita
 
@@ -97,3 +101,4 @@ A plataforma sugere títulos a receber para antecipar. **Montar borderô com ess
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: fluxo mensal e diário, necessidade de caixa de 13 semanas, caixa mínimo, forecast, contas consideradas e compromissos programados. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

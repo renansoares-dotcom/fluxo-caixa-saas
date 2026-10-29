@@ -1,7 +1,7 @@
 // Produção › Planta da fábrica: acompanhamento ao vivo (isométrico no computador e na TV, planta baixa no celular)
 // e editor da planta (vista de cima, arrastar e soltar) para montar setores, máquinas, corredores, áreas, portões e setas.
 import { sb, state, q } from '../lib/data.js';
-import { $, $$, esc, dateBR, fail, toast, modal, confirmDialog } from '../lib/ui.js';
+import { erroTela, $, $$, esc, dateBR, fail, toast, modal, confirmDialog } from '../lib/ui.js';
 import { podePCP, limparCadProducao } from '../lib/producao.js';
 import { TIPOS_VISUAIS, TIPOS_AREA, COR, ROTULO_ST, pegada, uid, carregarPlanta, carregarSituacao, desenharIso, desenharBaixa, rascunho, textoMaquina, dur, COR_V, ROT_V, lugaresCaminhoes, textoVeiculo, capKg } from '../lib/planta.js';
 import { qtd } from '../lib/compras.js';
@@ -20,7 +20,7 @@ export async function render(root) {
   clearInterval(timer);
   root.innerHTML = '<div class="loading">Carregando…</div>';
   let C, planta;
-  try { ({ C, planta } = await carregarPlanta()); } catch (err) { fail(err); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Se a migração 044 ainda não rodou, rode-a antes.</div></div>'; return; }
+  try { ({ C, planta } = await carregarPlanta()); } catch (err) { fail(err); root.innerHTML = erroTela(); return; }
   _els = planta.elementos || [];
   if (ui.editando) return editor(root, C, planta);
   const temPlanta = (planta.elementos || []).length || C.maquinas.some(m => m.pos_x != null);

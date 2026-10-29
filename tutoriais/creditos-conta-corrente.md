@@ -1,8 +1,8 @@
 ---
 titulo: Créditos, adiantamentos e conta-corrente
 tela: Financeiro › Créditos e adiantamentos e Conta-corrente fornecedor / cliente
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -26,6 +26,8 @@ atualizado: 2026-10-28
 ## 3. Créditos e adiantamentos
 
 ### 3.1 A tela
+
+![Figura 1 — Créditos e adiantamentos (dados fictícios)](img/creditos-conta-corrente-1.jpg)
 
 Escolha **De** (clientes ou fornecedores) e use a busca. Os indicadores mostram o **saldo de créditos**, os **adiantamentos em aberto** e o que **já foi usado em notas**.
 
@@ -62,6 +64,8 @@ Informe o valor devolvido e ligue o lançamento que já existe ou lance agora (d
 Crédito que ainda não foi usado pode ser cancelado. Ele deixa de aparecer para uso nas notas.
 
 ## 4. Conta-corrente fornecedor / cliente
+
+![Figura 2 — Conta-corrente de um cliente (dados fictícios)](img/creditos-conta-corrente-2.jpg)
 
 ### 4.1 Abrir
 
@@ -107,3 +111,4 @@ Nada muda no caixa: a nota passa a constar como paga pelo adiantamento. Cada aba
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: créditos e adiantamentos, devolução, conta-corrente de fornecedor e cliente, adiantamentos × notas e relatório. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

@@ -1,8 +1,8 @@
 ---
 titulo: Autorização de pagamentos
 tela: Financeiro › Autorização de pagamentos
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -19,6 +19,8 @@ A lista mostra os títulos a pagar em aberto com a prioridade, o banco e o orça
 | Leitura | Consulta. |
 
 ## 3. Passo a passo
+
+![Figura 1 — Autorização de pagamentos (dados fictícios)](img/autorizacao-1.jpg)
 
 ### 3.1 Filtrar os títulos
 
@@ -78,3 +80,4 @@ Em **Autorizações emitidas**, o diretor ou o administrador clica em **Aprovar*
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: filtros, marcação, valor parcial, justificativa de orçamento, PDF para assinatura e aprovação. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

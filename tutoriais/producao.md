@@ -1,7 +1,7 @@
 ---
 titulo: Produção — PCP, ordens, programação e planta
 tela: Produção › Painel, Planta da fábrica, Ordens de produção, Programação, Cadastros e Importar do Iniflex
-versao: 1.1
+versao: 1.2
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -37,6 +37,8 @@ Prefira **desativar** a excluir o que já foi usado em OPs ou apontamentos.
 
 ## 4. Ordens de produção
 
+![Figura 1 — Ordens de produção em aberto (dados fictícios)](img/producao-1.jpg)
+
 ### 4.1 Criar uma OP
 
 1. Clique em **Nova OP**.
@@ -58,6 +60,8 @@ Os botões são **Concluir**, **Reabrir**, **Cancelar** e **Imprimir OP**, que g
 Os filtros da lista são **Em aberto**, **Atrasadas**, **Concluídas** e **Todas**. **Excel** baixa a lista.
 
 ## 5. Programação
+
+![Figura 2 — Programação da semana (dados fictícios)](img/producao-2.jpg)
 
 1. Escolha a **semana** e o **setor**.
 2. Em **A programar**, clique em **Programar** na etapa e informe a máquina, o início previsto, as horas previstas e a quantidade desta etapa.
@@ -120,3 +124,4 @@ Veja o manual **Conversas** para os detalhes.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: cadastros, OPs com necessidade de material e rastreabilidade, programação, painel com OEE, planta da fábrica e importação do Iniflex. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** da ordem de produção (Conversas, etapa 2). |
+| 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |

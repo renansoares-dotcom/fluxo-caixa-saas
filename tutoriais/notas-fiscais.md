@@ -1,8 +1,8 @@
 ---
 titulo: Notas fiscais e apuração de impostos
 tela: CPD › Notas Fiscais e Apuração de impostos
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -30,6 +30,8 @@ O administrador e o financeiro importam, ligam e desfazem. Quem tem a área CPD 
 Depois da importação, a plataforma oferece **conferir o cadastro** dos clientes e fornecedores dessas notas. Os cadastros novos e as diferenças aparecem para aprovação campo a campo; nada muda sem marcar. Use **Aprovar todas** ou **Só completar campos vazios**.
 
 ## 4. Consultar as notas
+
+![Figura 1 — Notas fiscais de saída do mês (dados fictícios)](img/notas-fiscais-1.jpg)
 
 Use os filtros: o período (**Filtrar por** emissão ou vencimento, **até**), o **tipo** (entrada ou saída), o **financeiro** e a busca. As opções do filtro de financeiro são:
 
@@ -101,3 +103,4 @@ Nas notas de fornecedores, o CFOP e o CST são os do emitente.
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: importação dos XML, conferência do cadastro, consulta, impostos por CFOP, recebimentos e pagamentos × notas, borderôs × notas e apuração (prévia). |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

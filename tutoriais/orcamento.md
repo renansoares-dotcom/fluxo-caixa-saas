@@ -1,8 +1,8 @@
 ---
 titulo: Orçamento — budget, forecast e controle orçamentário
 tela: Financeiro › Budget / Forecast, Orçado x Realizado e Controle orçamentário
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -48,6 +48,8 @@ No forecast, escolha para cada mês o que vale nas comparações:
 
 ## 4. Orçado x Realizado
 
+![Figura 1 — Orçado x Realizado (dados fictícios)](img/orcamento-1.jpg)
+
 1. Escolha com o que **comparar** (budget ou forecast), o **período** e a **visão**.
 2. A tabela mostra, por conta: o orçado, o realizado, a diferença em R$ e em %, e o **atingimento**. O quadro **Mês a mês** abre a comparação por mês.
 3. Os indicadores mostram as entradas, as saídas e o resultado realizados.
@@ -55,6 +57,8 @@ No forecast, escolha para cada mês o que vale nas comparações:
 O budget e o forecast são lançados por conta do plano, sem banco nem favorecido. Os filtros da tela afetam só o realizado.
 
 ## 5. Controle orçamentário
+
+![Figura 2 — Controle orçamentário (dados fictícios)](img/orcamento-2.jpg)
 
 ### 5.1 Os parâmetros
 
@@ -119,3 +123,4 @@ O rateio não muda o budget nem o forecast: só distribui o valor na visão por 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: budget, forecast e status do mês, orçado x realizado, controle orçamentário com semáforo, justificativas, rateio por centro de custo e relatório. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

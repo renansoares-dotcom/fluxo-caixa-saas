@@ -1,6 +1,7 @@
 // Markdown simples dos manuais (tutoriais/*.md) para HTML — sem bibliotecas, igual na tela e no PDF.
 // Suporta: cabeçalho de dados entre "---", # ## ###, parágrafos, listas (- e 1.), **negrito**, *itálico*, `código`,
-// tabelas com |, citações com > (viram quadros de destaque) e linha horizontal (---).
+// tabelas com |, citações com > (viram quadros de destaque), linha horizontal (---) e figura numa linha só:
+// ![Legenda](img/arquivo.png) — só imagens da pasta tutoriais/img (o endereço final vem de opcoes.img).
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /** separa o cabeçalho de dados (chave: valor) do texto */
@@ -19,7 +20,9 @@ const inline = (s) => esc(s)
   .replace(/\[([^\]]+)\]\((#\/[^)\s]+|https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
 
 /** converte o corpo do manual em HTML */
-export function mdParaHtml(md) {
+const FIG = /^!\[([^\]]*)\]\((img\/[a-z0-9][a-z0-9_-]*\.(?:png|jpg|webp))\)\s*$/;
+export function mdParaHtml(md, opcoes = {}) {
+  const urlImg = opcoes.img || ((c) => c);
   const L = String(md || '').replace(/\r\n?/g, '\n').split('\n');
   const out = [];
   let i = 0;
@@ -30,7 +33,8 @@ export function mdParaHtml(md) {
     let m;
     if ((m = /^(#{1,4})\s+(.*)$/.exec(l))) { const n = m[1].length; out.push(`<h${n}>${inline(m[2])}</h${n}>`); i++; continue; }
     if (/^---+\s*$/.test(l)) { out.push('<hr>'); i++; continue; }
-    if (/^\s*>/.test(l)) { const xs = bloco(/^\s*>/).map(x => x.replace(/^\s*>\s?/, '')); out.push(`<blockquote>${mdParaHtml(xs.join('\n'))}</blockquote>`); continue; }
+    if ((m = FIG.exec(l.trim()))) { out.push(`<figure class="manual-fig"><img src="${esc(urlImg(m[2]))}" alt="${esc(m[1])}"><figcaption>${inline(m[1])}</figcaption></figure>`); i++; continue; }
+    if (/^\s*>/.test(l)) { const xs = bloco(/^\s*>/).map(x => x.replace(/^\s*>\s?/, '')); out.push(`<blockquote>${mdParaHtml(xs.join('\n'), opcoes)}</blockquote>`); continue; }
     if (/^\s*\|/.test(l)) {
       const xs = bloco(/^\s*\|/).map(x => x.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim()));
       const sep = xs[1] && xs[1].every(c => /^:?-{2,}:?$/.test(c));
@@ -50,7 +54,7 @@ export function mdParaHtml(md) {
       out.push(`<${tag}${ord && ini > 1 ? ` start="${ini}"` : ''}>${itens.map(x => `<li>${x.map(inline).join('<br>')}</li>`).join('')}</${tag}>`);
       continue;
     }
-    const ps = bloco(/^(?!\s*$)(?!#{1,4}\s)(?!\s*>)(?!\s*\|)(?!\s*([-*]|\d+[.)])\s+)(?!---+\s*$).*/);
+    const ps = bloco(/^(?!\s*$)(?!!\[)(?!#{1,4}\s)(?!\s*>)(?!\s*\|)(?!\s*([-*]|\d+[.)])\s+)(?!---+\s*$).*/);
     out.push(`<p>${ps.map(inline).join(' ')}</p>`);
   }
   return out.join('\n');
@@ -67,4 +71,7 @@ export const CSS_MANUAL = `
   .manual-corpo blockquote p{margin:2px 0}
   .manual-corpo code{font-family:'Courier New',monospace;font-size:10px;background:#f0f0f0;padding:0 3px}
   .manual-corpo hr{border:0;border-top:.6px solid #111;margin:12px 0}
-  .manual-corpo td,.manual-corpo th{font-size:10px}`;
+  .manual-corpo td,.manual-corpo th{font-size:10px}
+  .manual-corpo .manual-fig{margin:10px 0 12px;page-break-inside:avoid;text-align:center}
+  .manual-corpo .manual-fig img{max-width:100%;max-height:118mm;border:.6px solid #999;border-radius:3px}
+  .manual-corpo .manual-fig figcaption{font-size:9.5px;color:#444;margin-top:3px;font-style:italic}`;

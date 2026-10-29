@@ -1,8 +1,8 @@
 ---
 titulo: Painéis — Minha Manhã, Decisão do Dia, Decision Center e dashboards
 tela: Painéis › Minha Manhã, Decisão do Dia, Decision Center, Dashboard Executivo e Dashboard
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -23,6 +23,8 @@ Os painéis fazem parte da área **Financeiro**. Na Decisão do Dia:
 
 ## 3. Minha Manhã
 
+![Figura 1 — Minha Manhã (dados fictícios)](img/paineis-1.jpg)
+
 A tela abre com:
 
 - **Situação do dia**: saldo, conferência, extratos e travas.
@@ -33,6 +35,8 @@ A tela abre com:
 Cada item leva à tela certa. **Atualizar** recarrega os dados.
 
 ## 4. Decisão do Dia
+
+![Figura 2 — Decisão do Dia (dados fictícios)](img/paineis-2.jpg)
 
 ### 4.1 Simular
 
@@ -63,6 +67,8 @@ A **Decisão sugerida** resume o que a plataforma propõe para o dia.
 
 ## 5. Decision Center
 
+![Figura 3 — Decision Center (dados fictícios)](img/paineis-3.jpg)
+
 As **Recomendações da semana** mostram, para cada uma, o motivo, o impacto estimado, a urgência, a **regra usada** e a ação, com o link para a tela certa. Exemplos:
 
 - cobrir a falta de caixa prevista;
@@ -81,6 +87,8 @@ Filtre por **urgência**. **Adiar 7 dias** esconde uma recomendação por uma se
 As recomendações seguem regras fixas e mostram a regra que usaram; não há inteligência artificial nelas.
 
 ## 6. Dashboard Executivo
+
+![Figura 4 — Dashboard Executivo (dados fictícios)](img/paineis-4.jpg)
 
 1. Escolha o **mês de referência**.
 2. Os indicadores podem ser clicados para ver a composição:
@@ -107,6 +115,8 @@ O painel usa só lançamentos com conta bancária, a mesma base dos saldos.
 
 ## 7. Dashboard
 
+![Figura 5 — Dashboard (dados fictícios)](img/paineis-5.jpg)
+
 O resumo do ano mostra:
 
 - o saldo em bancos disponível;
@@ -129,3 +139,4 @@ O resumo do ano mostra:
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: Minha Manhã, Decisão do Dia com registro e aprovação, Decision Center, Dashboard Executivo e Dashboard. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

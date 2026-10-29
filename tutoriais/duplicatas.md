@@ -1,8 +1,8 @@
 ---
 titulo: Duplicatas para endosso
 tela: Financeiro › Duplicatas para endosso
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -17,6 +17,8 @@ O PDF sai com **uma duplicata por página** (frente e endosso no verso), pronto 
 O administrador e o financeiro geram e cancelam endossos e cadastram beneficiários. Os demais perfis com a área Financeiro consultam.
 
 ## 3. Passo a passo
+
+![Figura 1 — Duplicatas para endosso (dados fictícios)](img/duplicatas-1.jpg)
 
 ### 3.1 Escolher os títulos
 
@@ -76,3 +78,4 @@ Clique em **Gerar PDF**. A plataforma registra o lote e baixa o arquivo para ass
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: escolha dos títulos, beneficiário, dados do endosso, PDF para assinatura digital, lotes emitidos, cancelamento e termo. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

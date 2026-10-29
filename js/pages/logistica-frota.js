@@ -1,6 +1,6 @@
 // Logística › Frota e parâmetros: caminhões (capacidade, baú, custo), parâmetros da montagem de cargas e clientes com restrição.
 import { sb, state, q } from '../lib/data.js';
-import { $, $$, esc, fail, toast, modal, confirmDialog } from '../lib/ui.js';
+import { erroTela, $, $$, esc, fail, toast, modal, confirmDialog } from '../lib/ui.js';
 import { carregarBase, podeLogistica, TIPOS_VEICULO, PARAM_PADRAO, municipios } from '../lib/logistica.js';
 import { qtd, inp, num } from '../lib/compras.js';
 
@@ -15,7 +15,7 @@ export async function render(root) {
     <div class="card toolbar"><div class="chips" id="lf-abas">${[['frota', 'Veículos'], ['param', 'Parâmetros'], ['cli', 'Clientes com restrição']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div id="lf-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#lf-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
-  let B; try { B = await carregarBase(); } catch (err) { fail(err); $('#lf-corpo', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Se a migração 045 ainda não rodou, rode-a antes.</div></div>'; return; }
+  let B; try { B = await carregarBase(); } catch (err) { fail(err); $('#lf-corpo', root).innerHTML = erroTela(); return; }
   const corpo = $('#lf-corpo', root);
   if (ui.aba === 'frota') return frota(corpo, B, root);
   if (ui.aba === 'param') return parametros(corpo, B, root);

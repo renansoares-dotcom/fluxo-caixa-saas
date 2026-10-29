@@ -1,8 +1,8 @@
 ---
 titulo: Portal do Cliente
 tela: Financeiro › Portal do Cliente
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -23,6 +23,8 @@ O vencimento **só muda** quando o Financeiro aprova o pedido nesta tela. O clie
 | Administrador, financeiro e diretor | Convidam clientes, bloqueiam e liberam acessos, cancelam convites. |
 
 ## 3. Passo a passo
+
+![Figura 1 — Portal do Cliente: pedidos de prorrogação e acessos (dados fictícios)](img/portal-cliente-1.jpg)
 
 ### 3.1 Convidar um cliente
 
@@ -71,3 +73,4 @@ Na aba **Acessos**:
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: convites, pedidos de prorrogação e acessos. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

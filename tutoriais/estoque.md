@@ -1,8 +1,8 @@
 ---
 titulo: Estoque e produtos
 tela: Compras › Posição de estoque, Produtos e De-para de fornecedores
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -59,6 +59,8 @@ Confirme com a contabilidade quais impostos marcar.
 
 ## 4. Produtos
 
+![Figura 1 — Cadastro de produtos (dados fictícios)](img/estoque-1.jpg)
+
 ### 4.1 Cadastrar
 
 1. Clique em **Novo produto**.
@@ -108,3 +110,4 @@ Clique no produto para ver:
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: espelho do Iniflex, curva ABC, ponto de pedido, requisição automática, parâmetros de custo, cadastro de produtos com estrutura e de-para de fornecedores. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

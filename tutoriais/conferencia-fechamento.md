@@ -1,8 +1,8 @@
 ---
 titulo: Conferência do dia e Fechamento do mês
 tela: Financeiro › Conferência do dia e Fechamento do mês
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -22,6 +22,8 @@ Nenhuma das duas altera lançamentos. As correções são feitas nas telas de se
 | Diretor e leitura | Consultam e imprimem. |
 
 ## 3. Conferência do dia
+
+![Figura 1 — Mapa da conferência do mês (dados fictícios)](img/conferencia-fechamento-1.jpg)
 
 ### 3.1 O mapa do mês
 
@@ -62,6 +64,8 @@ A aba **Saldos da conta** mostra uma linha por dia de uma conta: saldo inicial, 
 **Imprimir / PDF** gera a tela no padrão IPLAMM.
 
 ## 4. Fechamento do mês
+
+![Figura 2 — Checklist do fechamento do mês (dados fictícios)](img/conferencia-fechamento-2.jpg)
 
 ### 4.1 O checklist
 
@@ -112,3 +116,4 @@ Cada conta pode ser fechada numa data diferente.
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: mapa do mês, visto por dia e em lote, saldos da conta, checklist do fechamento, resumo para a direção e trava por conta. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

@@ -1,7 +1,7 @@
 ---
 titulo: FIDC — propostas de borderô e análise
 tela: Financeiro › Propostas de borderô e Análise FIDC
-versao: 1.1
+versao: 1.2
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -20,6 +20,8 @@ As duas telas cobrem a antecipação de recebíveis com os fundos (FIDC):
 | Leitura | Consulta. |
 
 ## 3. Propostas de borderô
+
+![Figura 1 — Títulos disponíveis para a proposta de borderô (dados fictícios)](img/fidc-1.jpg)
 
 ### 3.1 Escolher os títulos
 
@@ -119,3 +121,4 @@ Veja o manual **Conversas** para os detalhes.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: propostas de borderô (simulação, comparação entre fundos, verificações, aprovação, comparação com o borderô original e condições dos fundos) e análise FIDC. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** da proposta (Conversas, etapa 2). |
+| 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |

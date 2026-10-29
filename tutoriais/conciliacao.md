@@ -1,8 +1,8 @@
 ---
 titulo: Conciliação bancária
 tela: Financeiro › Conciliação bancária
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -34,6 +34,8 @@ Escolha a **conta** e o **mês** no topo. Depois:
 > **Atenção:** não importe o relatório do ERP numa conta que já tem o extrato OFX do banco no mesmo período. A plataforma avisa, porque o extrato ficaria duplicado.
 
 ## 4. Conciliar
+
+![Figura 1 — Conciliação bancária: extrato à esquerda, lançamentos sem extrato à direita (dados fictícios)](img/conciliacao-1.jpg)
 
 ### 4.1 Pelas sugestões
 
@@ -97,3 +99,4 @@ Use os filtros **Pendentes / Conciliados / Ignorados / Todos** na lista do extra
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: importação OFX, ERP e VExpenses, sugestões, conciliação um a um e em grupo, ignorar, criar lançamento e desfazer. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

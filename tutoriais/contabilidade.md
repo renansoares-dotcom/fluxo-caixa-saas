@@ -1,8 +1,8 @@
 ---
 titulo: Contabilidade — DRE, balancete, balanço e DFC
 tela: Contabilidade › DRE gerencial, Balancete, Balanço Patrimonial, DRE Contábil, DFC e De-para contábil
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -21,6 +21,8 @@ A área **Contabilidade** junta os demonstrativos:
 O administrador e o financeiro importam balancetes, geram os lançamentos contábeis e gravam o de-para. Quem tem a área Contabilidade consulta e exporta.
 
 ## 3. DRE gerencial
+
+![Figura 1 — DRE gerencial (dados fictícios)](img/contabilidade-1.jpg)
 
 1. Use os filtros de sempre (visão, grupo, conta, centro de custo, favorecido e disponibilidade) e escolha a **exibição**: **Mensal** ou **Acumulado no ano**.
 2. Os indicadores mostram a **receita bruta**, o **EBITDA gerencial** e o **resultado gerencial**. O gráfico compara a receita com o resultado.
@@ -90,3 +92,4 @@ Use o filtro **Sem conta contábil** para ver o que falta.
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: DRE gerencial, balancete importado e da plataforma, balanço, DRE contábil, DFC e de-para contábil. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

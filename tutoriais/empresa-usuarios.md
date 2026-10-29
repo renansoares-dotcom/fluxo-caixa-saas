@@ -1,8 +1,8 @@
 ---
 titulo: Empresa, usuários e auditoria
 tela: Cadastros › Empresa e usuários e Auditoria
-versao: 1.1
-atualizado: 2026-10-28
+versao: 1.2
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -17,6 +17,8 @@ atualizado: 2026-10-28
 | Administrador e diretor | Veem a Auditoria e podem desfazer alterações. |
 
 ## 3. Dados da empresa
+
+![Figura 1 — Dados da empresa e usuários (dados fictícios)](img/empresa-usuarios-1.jpg)
 
 Preencha:
 
@@ -101,6 +103,8 @@ A **importação da base completa** (migração da planilha) só funciona em emp
 
 ## 7. Auditoria
 
+![Figura 2 — Auditoria (dados fictícios)](img/empresa-usuarios-2.jpg)
+
 1. Filtre por período (**De / Até**), **onde** (tela ou tabela), **ação** (inclusão, alteração ou exclusão) e **usuário**, ou use a busca.
 2. Clique numa linha para ver o **antes → depois** de cada campo.
 3. **Desfazer** volta a alteração. Quando ela faz parte de uma operação (por exemplo, uma importação), desfazer volta a operação inteira.
@@ -131,3 +135,4 @@ Dentro do lançamento, o botão **Histórico** mostra a auditoria só daquele la
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: dados da empresa, convites, papéis, áreas, importação por planilha e auditoria. |
 | 1.1 | 28/10/2026 | Verificação em duas etapas: ativar a sua e exigir para administrador, financeiro e diretor. |
+| 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |

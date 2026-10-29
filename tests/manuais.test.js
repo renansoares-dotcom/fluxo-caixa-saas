@@ -34,3 +34,10 @@ test('toda tela do menu tem manual', () => {
   const sem = [...new Set(rotas)].filter(r => !cobertas.has(r));
   assert.deepEqual(sem, [], `telas do menu sem manual: ${sem.join(', ')}`);
 });
+
+test('as figuras dos manuais existem na pasta tutoriais/img', () => {
+  for (const m of MANUAIS) {
+    const refs = [...ler(`tutoriais/${m.id}.md`).matchAll(/^!\[[^\]]*\]\((img\/[^)]+)\)\s*$/gm)].map(x => x[1]);
+    for (const r of refs) assert.ok(existsSync(new URL(`tutoriais/${r}`, raiz)), `${m.id}: falta tutoriais/${r}`);
+  }
+});

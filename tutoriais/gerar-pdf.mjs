@@ -21,7 +21,9 @@ const b = await chromium.launch();
 const p = await b.newPage();
 for (const m of lista) {
   const md = readFileSync(join(DIR, `${m.id}.md`), 'utf8');
-  await p.setContent(htmlManual(m, md, logo), { waitUntil: 'load' });
+  // figuras: viram data: URI (a página do PDF não tem endereço para buscar arquivos)
+  const img = (c) => 'data:image/' + (c.endsWith('.jpg') ? 'jpeg' : c.split('.').pop()) + ';base64,' + readFileSync(join(DIR, c)).toString('base64');
+  await p.setContent(htmlManual(m, md, logo, { img }), { waitUntil: 'load' });
   const pdf = await p.pdf({ preferCSSPageSize: true, printBackground: true });
   writeFileSync(join(DIR, 'pdf', `${m.id}.pdf`), pdf);
   console.log(`tutoriais/pdf/${m.id}.pdf`, Math.round(pdf.length / 1024) + ' KB');

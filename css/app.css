@@ -730,6 +730,9 @@ select.sb-nativo{position:absolute!important;opacity:0!important;width:1px!impor
 .manual-tela .manual-corpo blockquote{margin:10px 0;padding:8px 12px;border-left:3px solid var(--primary);background:var(--surface-2);border-radius:0 8px 8px 0}
 .manual-tela .manual-corpo blockquote p{margin:2px 0}
 .manual-tela .manual-corpo table{width:100%;min-width:0;table-layout:auto;border-collapse:collapse;margin:6px 0 10px}
+.manual-tela .manual-corpo .manual-fig{margin:14px 0 16px;text-align:center}
+.manual-tela .manual-corpo .manual-fig img{max-width:100%;border:1px solid var(--border);border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.manual-tela .manual-corpo .manual-fig figcaption{font-size:12.5px;color:var(--muted);margin-top:6px}
 .manual-tela .manual-corpo th,.manual-tela .manual-corpo td{white-space:normal;padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
 .manual-tela .manual-corpo code{font-size:12.5px;background:var(--surface-2);padding:1px 4px;border-radius:4px}
 @media print{.tut-ajuda{display:none!important}}

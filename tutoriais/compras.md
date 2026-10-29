@@ -1,7 +1,7 @@
 ---
 titulo: Compras — requisições, pedidos e recebimentos
 tela: Compras › Painel, Requisições e cotações, Pedidos de compra e Recebimentos
-versao: 1.1
+versao: 1.2
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -26,6 +26,8 @@ O pedido aprovado já vira **previsão no contas a pagar**. No recebimento, a pr
 A **alçada** é o valor até o qual o próprio Compras aprova o pedido. O padrão é R$ 5.000,00. Acima disso, a aprovação é da direção. A alçada é definida em **Painel de Compras › Parâmetros**.
 
 ## 3. Painel de Compras
+
+![Figura 1 — Painel de Compras (dados fictícios)](img/compras-1.jpg)
 
 O painel mostra, em indicadores que podem ser clicados para ver a lista:
 
@@ -68,6 +70,8 @@ A requisição mostra o **mapa comparativo de cotações**: o menor preço de ca
 Também dá para criar um pedido avulso, sem requisição, em **Pedidos de compra › Novo pedido**.
 
 ### 4.5 Completar e aprovar o pedido
+
+![Figura 2 — Pedidos de compra (dados fictícios)](img/compras-2.jpg)
 
 1. Em **Pedidos de compra**, abra o pedido e clique em **Editar**.
 2. Confira o fornecedor, a entrega prevista, as **parcelas (dias após a entrega)**, o frete, o desconto e os itens. Preencha a **classificação (plano de contas)**, obrigatória para aprovar, o centro de custo e o **nº do pedido no Iniflex**.
@@ -130,3 +134,4 @@ Veja o manual **Conversas** para os detalhes.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: painel, requisição, cotação e mapa comparativo, pedido com alçada e impressão, recebimento conferido com a nota. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do pedido de compra (Conversas, etapa 2). |
+| 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |

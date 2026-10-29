@@ -1,8 +1,8 @@
 ---
 titulo: Comercial — painel, carteira, funil e metas
 tela: Comercial › Painel comercial, Carteira e agenda, Funil e propostas, Representantes e metas
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -22,6 +22,8 @@ O módulo **Comercial** é o CRM de vendas da IPLAMM. Ele vai **até a proposta*
 
 ## 3. Painel comercial
 
+![Figura 1 — Painel comercial (dados fictícios)](img/comercial-1.jpg)
+
 Escolha o **mês**. O painel mostra:
 
 - **Faturado** e **meta**, com o gráfico dos 12 meses;
@@ -32,6 +34,8 @@ Escolha o **mês**. O painel mostra:
 - a **Nota comercial**.
 
 ## 4. Carteira e agenda
+
+![Figura 2 — Carteira de clientes (dados fictícios)](img/comercial-2.jpg)
 
 ### 4.1 A situação de cada cliente
 
@@ -62,6 +66,8 @@ Clique no cliente para ver:
 A aba **Agenda de contatos** lista os próximos contatos. Clique em **Feito** quando o contato acontecer.
 
 ## 5. Funil e propostas
+
+![Figura 3 — Funil de oportunidades (dados fictícios)](img/comercial-3.jpg)
 
 ### 5.1 Oportunidade
 
@@ -115,3 +121,4 @@ Se a meta da empresa ficar em branco, o painel usa a soma das metas dos represen
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: painel, carteira com situação dos clientes, contatos e agenda, funil, propostas com calculadora e PDF, representantes e metas. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |

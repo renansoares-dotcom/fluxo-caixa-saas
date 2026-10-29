@@ -1,7 +1,7 @@
 ---
 titulo: Lançamentos e contas a pagar / receber
 tela: Financeiro › Lançamentos e Contas a pagar / receber
-versao: 1.1
+versao: 1.2
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -28,6 +28,8 @@ atualizado: 2026-10-29
 O botão **Histórico** dentro do lançamento, que mostra quem alterou o quê, aparece para o administrador e o diretor.
 
 ## 3. Lançamentos
+
+![Figura 1 — Lançamentos do mês com os totais (dados fictícios)](img/lancamentos-1.jpg)
 
 ### 3.1 Filtros e totais
 
@@ -65,6 +67,8 @@ Para mudar vários de uma vez, marque as caixas na lista e use **Marcar como pag
 - **Exportar Excel**: baixa os lançamentos filtrados, com todas as colunas.
 
 ## 4. Contas a pagar / receber
+
+![Figura 2 — Contas a pagar / receber (dados fictícios)](img/lancamentos-2.jpg)
 
 ### 4.1 As abas
 
@@ -125,3 +129,4 @@ Veja o manual **Conversas** para os detalhes.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: lançamentos, transferência única, juros e multa, importações (NFs, XML e ERP) e contas a pagar / receber com baixa em lote e borderô. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do lançamento (Conversas, etapa 2). |
+| 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |

@@ -38,3 +38,8 @@ node tutoriais/gerar-pdf.mjs rh compras   # só esses
 ```
 
 O script precisa do Playwright com Chromium. Se o Playwright não estiver instalado no projeto, informe o caminho dele: `PLAYWRIGHT=/caminho/playwright/index.mjs`.
+
+## Figuras
+
+As imagens das telas ficam em `tutoriais/img/` e entram no texto numa linha só: `![Legenda](img/arquivo.jpg)`.
+São tiradas sempre com **dados fictícios** (veja `scripts/prints/README.md`), nunca da empresa real.

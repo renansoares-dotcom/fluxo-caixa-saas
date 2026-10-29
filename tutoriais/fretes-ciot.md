@@ -1,7 +1,7 @@
 ---
 titulo: Fretes e CIOT
 tela: Logística › Fretes e CIOT
-versao: 1.3
+versao: 1.4
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -26,6 +26,8 @@ O registro de cada frete é a **ficha do frete**. A tela também guarda o cadast
 | Demais perfis com a área Logística | Consultam tudo, sem editar. |
 
 ## 3. As abas
+
+![Figura 1 — Fretes do mês com a situação de cada um (dados fictícios)](img/fretes-ciot-1.jpg)
 
 - **Fretes**: os fretes do mês, com os indicadores (fretes no mês, com autônomo, autônomo com pendência, abaixo do piso).
 - **MDF-e · 23/11**: o painel de prontidão para a regra do CIOT no MDF-e. Mostra quantos dias faltam, as viagens com MDF-e da IPLAMM, quantas estão prontas para emitir e quantas estão sem CIOT. Também mostra o que a empresa ainda precisa configurar.
@@ -90,6 +92,8 @@ Quando a ANTT reajustar a tabela, abra a aba **Piso mínimo** e clique em **Incl
 Inclua sempre uma linha nova com a nova vigência, sem apagar a antiga: os fretes antigos continuam calculados pela tabela da época.
 
 ### 4.6 Preparar o MDF-e da viagem
+
+![Figura 2 — Painel MDF-e · 23/11 (dados fictícios)](img/fretes-ciot-2.jpg)
 
 O MDF-e (manifesto da carga) é emitido por quem faz o transporte:
 
@@ -171,3 +175,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do frete (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Preparo do MDF-e com CIOT (NT 2026.001): campo **Quem emite o MDF-e**, janela **Dados do MDF-e** com busca das NF-e, painel **MDF-e · 23/11**, padrões do MDF-e e resumo para impressão. |
 | 1.3 | 29/10/2026 | Conferência do pedido de CIOT à IPEF na janela do MDF-e e botão **XML (teste)** com o XML do MDF-e no leiaute 3.00, conferido contra os esquemas oficiais. |
+| 1.4 | 29/10/2026 | Imagens das telas, com dados fictícios. |

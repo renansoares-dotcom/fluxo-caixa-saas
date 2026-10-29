@@ -1,7 +1,7 @@
 ---
 titulo: Conversas
 tela: Comunicação › Conversas
-versao: 2.2
+versao: 2.3
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -26,6 +26,8 @@ O assunto fica registrado junto com o trabalho, e não espalhado em grupos de ce
 > **Privacidade:** só quem participa da conversa lê as mensagens. O **administrador da empresa não lê** as conversas dos outros. A regra vale no banco de dados, não só na tela.
 
 ## 3. A tela
+
+![Figura 1 — Conversa individual aberta, com a lista à esquerda (dados fictícios)](img/conversas-1.jpg)
 
 - **No menu:** em **Comunicação › Conversas**.
 - **No topo de qualquer tela:** o ícone de balão, com o número de conversas com mensagens não lidas. O número também aparece no título da aba do navegador.
@@ -219,3 +221,4 @@ Os avisos usam a mesma liberação do sino de notificações. Clique no **sino**
 | 2.0 | 29/10/2026 | Etapa 2: responder, encaminhar, reações, editar e apagar, menções com @, mensagem de voz, busca nas mensagens, mensagem fixada, favoritas, dados da mensagem, mídia e documentos da conversa, exportar em PDF, online / visto por último / digitando, mini-chat e conversa do registro com cartões. |
 | 2.1 | 29/10/2026 | Microfone recusado: a plataforma explica o motivo e como liberar no computador, iPad/iPhone e Android. |
 | 2.2 | 29/10/2026 | O online e o "digitando…" passam por canais privados: só os recebe quem é da empresa ou da conversa. |
+| 2.3 | 29/10/2026 | Imagens das telas, com dados fictícios. |

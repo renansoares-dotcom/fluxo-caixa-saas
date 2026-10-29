@@ -1,7 +1,7 @@
 ---
 titulo: Pagamentos Antecipados
 tela: Financeiro › Pagamentos Antecipados
-versao: 1.1
+versao: 1.2
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -27,6 +27,8 @@ Cada pedido recebe um número: **PA nº**.
 | Financeiro e administrador | Programam no fluxo, registram pagamentos e comprovantes, ligam a nota, concluem e cancelam. |
 
 ## 3. A tela
+
+![Figura 1 — Pagamentos Antecipados aguardando aprovação (dados fictícios)](img/pagamentos-antecipados-1.jpg)
 
 No topo ficam os botões **+ Novo pagamento antecipado**, **Relatório (PDF)** e **Exportar Excel**, e o campo **Buscar** (fornecedor, CNPJ, descrição ou nº).
 
@@ -155,3 +157,4 @@ Veja o manual **Conversas** para os detalhes.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: pedido, aprovação, programação, vários pagamentos e comprovantes, ligar a nota e relatório no padrão IPLAMM. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do pagamento antecipado (Conversas, etapa 2). |
+| 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |

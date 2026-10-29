@@ -1,8 +1,8 @@
 ---
 titulo: RH — colaboradores, folha do mês e 13º
 tela: RH / Trabalhista › Colaboradores, Folha do mês e 13º salário
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -21,6 +21,8 @@ Salário é informação **sigilosa**. As telas de RH só abrem para o **adminis
 Sem essa marcação, a pessoa não vê o menu de RH, mesmo tendo acesso às outras áreas. Quem tem a área RH com perfil de leitura consulta, mas não altera.
 
 ## 3. Colaboradores
+
+![Figura 1 — Colaboradores (dados fictícios)](img/rh-1.jpg)
 
 ### 3.1 Importar a relação de funcionários
 
@@ -68,6 +70,8 @@ Os filtros ficam no topo da lista: busca, **Ativos / Desligados / Todos**, setor
 > **Cuidado:** o relatório com salário é **confidencial**. Imprima só quando necessário e não deixe cópias soltas.
 
 ## 4. Folha do mês
+
+![Figura 2 — Folha do mês (previsão de caixa) (dados fictícios)](img/rh-2.jpg)
 
 ### 4.1 Montar a folha da competência
 
@@ -161,3 +165,4 @@ Pessoa sem data de admissão entra com 12 avos. Preencha a admissão de quem ent
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: cadastro e importação, setor por cargo, relatório, folha do mês com previsão no fluxo, parâmetros e 13º salário. |
+| 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
