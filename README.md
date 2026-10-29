@@ -70,7 +70,12 @@ js/lib/               cliente/estado, UI, formulário de lançamento, CRUD gené
 js/pages/             uma tela por arquivo
 supabase/migrations/  schema, RLS e funções (RPC)
 supabase/setup.sql    as migrations concatenadas, para colar no SQL Editor
+tutoriais/            manuais de uso (texto .md e PDF) — Ajuda › Tutoriais na plataforma
 ```
+
+## Manuais de uso (regra)
+
+Todo ajuste numa funcionalidade termina com o manual dela atualizado em `tutoriais/` (texto, versão, histórico de alterações e PDF), no mesmo commit. Veja `tutoriais/README.md`.
 
 ## Regras de negócio herdadas da planilha
 

@@ -4,6 +4,7 @@ import { SUPABASE_URL } from './config.js';
 import { iniciarNotificacoes, pararNotificacoes } from './lib/notif.js';
 import { iniciarBusca } from './lib/busca.js';
 import { iniciarSelectBusca } from './lib/select-busca.js';
+import { manualDaRota } from './lib/tutoriais.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -58,6 +59,7 @@ const routes = {
   'contab/dfc': () => import(`./pages/contab-dfc.js?v=${V}`),
   'conferencia': () => import(`./pages/conferencia.js?v=${V}`),
   'fechamento': () => import(`./pages/fechamento.js?v=${V}`),
+  'tutoriais': () => import(`./pages/tutoriais.js?v=${V}`),
   'orcamento': () => import(`./pages/orcamento.js?v=${V}`),
   'orcado-realizado': () => import(`./pages/orcado-realizado.js?v=${V}`),
   'controle-orcamento': () => import(`./pages/controle-orcamento.js?v=${V}`),
@@ -257,9 +259,9 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil compras: Pagamentos Antecipados e o módulo Compras
 // perfil vendas (representante): só a área Comercial
 // perfil producao (operador no terminal do setor)
-const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens'].includes(r);
-const rotaDeVendas = (r) => r === 'comercial' || ['comercial/carteira', 'comercial/funil'].includes(r);
-const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos'].includes(r) || r.startsWith('compras/');
+const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens', 'tutoriais'].includes(r);
+const rotaDeVendas = (r) => r === 'comercial' || ['comercial/carteira', 'comercial/funil', 'tutoriais'].includes(r);
+const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos', 'tutoriais'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;
@@ -282,6 +284,8 @@ async function render() {
     const mod = await loader();
     if (seq !== renderSeq) return;
     $('#page-title').textContent = mod.title;
+    // botão "?": manual de uso desta tela (Ajuda › Tutoriais)
+    { const man = manualDaRota(route), b = $('#ajuda-btn'); if (b) { b.hidden = !man || (man.rh && !temRH()); if (man) b.href = `#/tutoriais?m=${man.id}`; } }
     // trilha: Área › Seção (de onde a página fica no menu)
     { const a = $(`#nav a[data-route="${route}"]`); const area = a?.closest('.nav-area'); const sec = a?.closest('details')?.querySelector('summary')?.textContent;
       const tit = area?.querySelector('.nav-area-tit')?.textContent; const tr = $('#page-trilha');

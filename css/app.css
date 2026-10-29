@@ -710,3 +710,27 @@ select.sb-nativo{position:absolute!important;opacity:0!important;width:1px!impor
 .sb-lista .sb-g{color:var(--muted)}
 .sb-lista .sb-nada{color:var(--muted);cursor:default}
 @media print{.sb-lista{display:none}}
+/* Ajuda › Tutoriais (28/10/2026) */
+.nav-area[data-area="ajuda"]{--area:var(--muted)}
+.tut-ajuda{font-weight:700;font-size:15px;width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--border);text-decoration:none}
+.tut-area{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.tut-lista{margin-top:12px}
+.tut-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.tut-card{display:flex;flex-direction:column;gap:6px;margin:0}
+.tut-card .tut-tit{font-weight:700;font-size:15px;text-decoration:none;color:var(--text)}
+.tut-card p{margin:0}
+.tut-acoes{display:flex;gap:8px;margin-top:auto;padding-top:6px}
+.manual-tela{max-width:900px}
+.manual-tela .manual-corpo{font-size:14px;line-height:1.6}
+.manual-tela .manual-corpo h2{font-size:17px;margin:22px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.manual-tela .manual-corpo h2:first-child{margin-top:0}
+.manual-tela .manual-corpo h3{font-size:15px;margin:16px 0 4px}
+.manual-tela .manual-corpo ul,.manual-tela .manual-corpo ol{padding-left:24px}
+.manual-tela .manual-corpo li{margin:3px 0}
+.manual-tela .manual-corpo blockquote{margin:10px 0;padding:8px 12px;border-left:3px solid var(--primary);background:var(--surface-2);border-radius:0 8px 8px 0}
+.manual-tela .manual-corpo blockquote p{margin:2px 0}
+.manual-tela .manual-corpo table{width:100%;min-width:0;table-layout:auto;border-collapse:collapse;margin:6px 0 10px}
+.manual-tela .manual-corpo th,.manual-tela .manual-corpo td{white-space:normal;padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.manual-tela .manual-corpo code{font-size:12.5px;background:var(--surface-2);padding:1px 4px;border-radius:4px}
+@media print{.tut-ajuda{display:none!important}}
+.tut-ajuda[hidden]{display:none}
