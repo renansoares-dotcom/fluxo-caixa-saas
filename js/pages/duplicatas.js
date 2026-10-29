@@ -4,6 +4,7 @@
 import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.js';
 import { $, esc, money, money0, dateBR, fail, toast, modal, formData, logoPNG } from '../lib/ui.js';
 import { valorExtenso, dataExtenso } from '../lib/extenso.js';
+import { padronizarPDF, PRETO } from '../lib/relatorio.js';
 
 export const title = 'Duplicatas para endosso';
 
@@ -302,12 +303,12 @@ function endossos(root) {
 // Termo de cancelamento de endosso / devolução das duplicatas, para o beneficiário assinar
 async function termoCancelamento(ds, b0) {
   if (!ds.length) return;
-  const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const { jsPDF } = window.jspdf; const doc = padronizarPDF(new jsPDF({ unit: 'mm', format: 'a4' }));
   const e = state.empresa; const bd = dadosBenef(b0) || {}; const bs = ds[0].dados?.beneficiario || {};
   const B = { nome: bd.razao_social || bs.nome || b0?.nome || '', cnpj: fmtDoc(bd.cnpj || bs.cnpj || ''), end: bd.logradouro || bs.endereco || '', cid: [bd.municipio, bd.uf].filter(Boolean).join('/') || bs.cidade || '' };
   const E = { nome: e.razao_social || e.nome, cnpj: fmtDoc(e.cnpj), end: e.logradouro || '', cid: [e.municipio, e.uf].filter(Boolean).join('/') };
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 18, CW = W - 2 * M;
-  const azul = [43, 85, 152], marinho = [42, 31, 111], cinza = [102, 112, 133];
+  const azul = PRETO, marinho = PRETO, cinza = [68, 68, 68];
   const garantia = ds[0].modalidade === 'garantia';
   const total = ds.reduce((s, d) => s + +d.valor, 0);
   const idDoc = `TC-${(ds[0].lote || '').replace(/\D+/g, '').slice(0, 12) || hojeISO().replace(/-/g, '')}`;
@@ -316,7 +317,7 @@ async function termoCancelamento(ds, b0) {
   if (logo) doc.addImage(logo.data, 'PNG', M, 12, 11 * logo.ratio, 11);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...cinza);
   doc.text(pdfTxt(E.nome), W - M, 14.5, { align: 'right' }); doc.text(`CNPJ ${E.cnpj}`, W - M, 18.5, { align: 'right' }); doc.text(pdfTxt(E.cid), W - M, 22.5, { align: 'right' });
-  doc.setDrawColor(...marinho); doc.setLineWidth(0.6); doc.line(M, 27, W - M, 27);
+  doc.setDrawColor(0); doc.setLineWidth(0.4); doc.line(M, 27, W - M, 27);
   doc.setTextColor(...marinho); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
   doc.text('TERMO DE CANCELAMENTO DE ENDOSSO', W / 2, 38, { align: 'center' });
   doc.setFontSize(10.5); doc.setFont('helvetica', 'normal'); doc.text('e devolução de duplicatas mercantis', W / 2, 44, { align: 'center' });
@@ -324,7 +325,7 @@ async function termoCancelamento(ds, b0) {
   // partes
   let y = 56;
   const parte = (x, rot, P) => {
-    doc.setFillColor(240, 243, 248); doc.setDrawColor(226, 231, 239); doc.setLineWidth(0.2); doc.roundedRect(x, y, CW / 2 - 3, 31, 2, 2, 'FD');
+    doc.setFillColor(246, 246, 246); doc.setDrawColor(0); doc.setLineWidth(0.2); doc.roundedRect(x, y, CW / 2 - 3, 31, 2, 2, 'FD');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...azul); doc.text(rot, x + 4, y + 5.5);
     doc.setFontSize(9.5); doc.setTextColor(20); doc.text(doc.splitTextToSize(pdfTxt(P.nome), CW / 2 - 11).slice(0, 2), x + 4, y + 11);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60);
@@ -348,7 +349,7 @@ async function termoCancelamento(ds, b0) {
     body: ds.map(d => [d.numero, pdfTxt(d.dados?.sacado?.nome || ''), d.dados?.sacado?.cnpj || '', dateBR(d.vencimento), money(d.valor)]),
     foot: [[{ content: `${ds.length} duplicata(s)`, colSpan: 3 }, 'Total', money(total)]],
     styles: { fontSize: 8.5, cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 }, textColor: 30, lineColor: [226, 231, 239], lineWidth: { bottom: 0.2 } },
-    headStyles: { fillColor: azul, textColor: 255, fontStyle: 'bold' }, footStyles: { fillColor: [232, 238, 248], textColor: 20, fontStyle: 'bold' },
+    headStyles: { fillColor: azul, textColor: 255, fontStyle: 'bold' }, footStyles: { fillColor: [242, 242, 242], textColor: 20, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [250, 251, 253] },
     columnStyles: { 0: { cellWidth: 24 }, 2: { cellWidth: 36 }, 3: { cellWidth: 24, halign: 'center' }, 4: { cellWidth: 28, halign: 'right' } },
     didParseCell: (h) => { if ((h.section === 'head' || h.section === 'foot') && h.column.index === 4) h.cell.styles.halign = 'right'; if (h.section === 'head' && h.column.index === 3) h.cell.styles.halign = 'center'; } });
@@ -365,7 +366,7 @@ async function termoCancelamento(ds, b0) {
   };
   ass(M, B, 'ENDOSSATÁRIO'); ass(W - M - 78, E, 'ENDOSSANTE');
   // rodapé
-  doc.setDrawColor(226, 231, 239); doc.setLineWidth(0.2); doc.line(M, H - 16, W - M, H - 16);
+  doc.setDrawColor(0); doc.setLineWidth(0.2); doc.line(M, H - 16, W - M, H - 16);
   doc.setFontSize(7); doc.setTextColor(...cinza);
   doc.text('Documento para assinatura digital com certificado ICP-Brasil (MP 2.200-2/2001).', M, H - 11.5);
   doc.text(`${idDoc} · página 1 de ${doc.getNumberOfPages()}`, W - M, H - 11.5, { align: 'right' });

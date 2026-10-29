@@ -1,5 +1,6 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formData, parseNum, exportXLSX, chart, CORES, COR, MESES, MESES_CURTO, loading, logoPNG } from '../lib/ui.js';
+import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 
 export const title = 'Análise FIDC';
 const f = { mes: 0, fundo: '' };
@@ -468,26 +469,19 @@ function fichaSacado(nome) {
 const pdfTxt = (t) => String(t ?? '').replace(/✓/g, 'OK').replace(/↳\s*/g, '   ').replace(/[−–]/g, '-').replace(/Δ/g, 'Dif.').replace(/×/g, 'x').replace(/[⚠ℹ]\s*/g, '').replace(/\u00a0/g, ' ');
 async function gerarPDF(root) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const doc = padronizarPDF(new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }));
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-  const azul = [43, 85, 152], marinho = [42, 31, 111];
-  const logo = await logoPNG();
+  const azul = PRETO, marinho = PRETO;
+  const logo = await logoPNG().catch(() => null);
   const periodo = pdfTxt($('#exec-tit', root).textContent.replace('Resumo executivo — ', ''));
-  const cabecalho = () => {
-    if (logo) doc.addImage(logo.data, 'PNG', 14, 8, 13 * logo.ratio, 13);
-    doc.setTextColor(...marinho); doc.setFontSize(15); doc.setFont(undefined, 'bold');
-    doc.text('Análise de operações FIDC', W - 14, 14, { align: 'right' });
-    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
-    doc.text(`${state.empresa.nome} · ${periodo} · emitido em ${dateBR(hojeISO())}`, W - 14, 19.5, { align: 'right' });
-    doc.setDrawColor(...marinho); doc.setLineWidth(.6); doc.line(14, 24, W - 14, 24); doc.setTextColor(20);
-  };
+  const cabecalho = () => pdfCabecalho(doc, 'Análise de operações FIDC', logo, { M: 14, sub: periodo });
   const tabela = (sel, titulo, opts = {}) => {
     const t = $(sel + ' table', root); if (!t) return;
     let y = (doc.lastAutoTable?.finalY ?? 24) + 9;
     if (y > H - 40) { doc.addPage(); cabecalho(); y = 33; }
     doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.setTextColor(...marinho); doc.text(pdfTxt(titulo), 14, y); doc.setTextColor(20); doc.setFont(undefined, 'normal');
     doc.autoTable({ html: t, startY: y + 2, theme: 'grid', styles: { fontSize: 7.5, cellPadding: 1.4, lineColor: [226, 231, 239] }, headStyles: { fillColor: azul, textColor: 255 },
-      didParseCell: (d) => { d.cell.text = d.cell.text.map(pdfTxt); if (d.section === 'body' && d.row.raw?.classList?.contains('row-total')) { d.cell.styles.fontStyle = 'bold'; d.cell.styles.fillColor = [232, 238, 248]; } if (d.section === 'body' && d.column.index > 0) d.cell.styles.halign = 'right'; },
+      didParseCell: (d) => { d.cell.text = d.cell.text.map(pdfTxt); if (d.section === 'body' && d.row.raw?.classList?.contains('row-total')) { d.cell.styles.fontStyle = 'bold'; d.cell.styles.fillColor = [242, 242, 242]; } if (d.section === 'body' && d.column.index > 0) d.cell.styles.halign = 'right'; },
       margin: { left: 14, right: 14, top: 30 }, didDrawPage: () => {}, ...opts });
   };
   cabecalho();
@@ -522,7 +516,7 @@ async function gerarPDF(root) {
   const sac = $('#sac table', root);
   if (sac) { const clone = sac.cloneNode(true); [...clone.tBodies[0].rows].slice(10).forEach(r => { if (!r.classList.contains('row-total')) r.remove(); }); const tmp = document.createElement('div'); tmp.id = 'tmp-sac'; tmp.style.display = 'none'; tmp.appendChild(clone); root.appendChild(tmp); tabela('#tmp-sac', `Concentração por sacado — top 10 · ${$('#hhi', root).textContent.trim()}`); tmp.remove(); }
   tabela('#conc', 'Conciliação borderôs × fluxo de caixa');
-  const n = doc.getNumberOfPages();
+  pdfRodapes(doc, 'Fonte: borderôs dos fundos e lançamentos do fluxo de caixa', { M: 14 });
   for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(130); doc.text(`Página ${i} de ${n}`, W - 14, H - 7, { align: 'right' }); doc.text('Fonte: borderôs dos fundos e lançamentos do fluxo de caixa', 14, H - 7); }
   doc.save(`analise_fidc_${periodo.replace(/[^\wÀ-ú]+/g, '_')}.pdf`);
 }

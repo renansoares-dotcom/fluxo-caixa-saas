@@ -3,6 +3,7 @@
 // e justificativa dos desvios com relatório em PDF. Nada aqui altera lançamentos nem o budget/forecast.
 import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.js';
 import { $, esc, money, money0, pct, dateBR, fail, toast, modal, exportXLSX, loading, chart, COR, MESES, MESES_CURTO, moneyTick, logoPNG, parseNum } from '../lib/ui.js';
+import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 
 export const title = 'Controle orçamentário';
 
@@ -362,16 +363,12 @@ function editarRateio(pidIni, root) {
 async function pdfDesvios() {
   try {
     const { jsPDF } = window.jspdf; const c = state.cad;
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const doc = padronizarPDF(new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }));
     const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-    const azul = [43, 85, 152], marinho = [42, 31, 111];
+    const azul = PRETO, marinho = PRETO;
     const mesNome = MESES[ui.ref - 1][0] + MESES[ui.ref - 1].slice(1).toLowerCase();
-    const logo = await logoPNG(); if (logo) doc.addImage(logo.data, 'PNG', 14, 8, 12 * logo.ratio, 12);
-    doc.setTextColor(...marinho); doc.setFontSize(14); doc.setFont(undefined, 'bold');
-    doc.text(`Controle orçamentário — ${mesNome}/${D.ano}`, W - 14, 13, { align: 'right' });
-    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
-    doc.text(`${state.empresa.nome} · comparado com o ${ui.comp} · tolerância ${ui.tolPct}% ou ${money0(ui.tolVal)} · emitido em ${dateBR(new Date().toISOString())}`, W - 14, 18.5, { align: 'right' });
-    doc.setDrawColor(...marinho); doc.setLineWidth(.6); doc.line(14, 23, W - 14, 23); doc.setTextColor(20);
+    const logo = await logoPNG().catch(() => null);
+    pdfCabecalho(doc, `Controle orçamentário - ${mesNome}/${D.ano}`, logo, { M: 14, sub: `comparado com o ${ui.comp} · tolerância ${ui.tolPct}% ou ${money0(ui.tolVal)}` });
     const todas = linhasConta(); const T = (tp) => totais(todas.filter(l => l.s.p.tipo === tp));
     const S = T('S'), E = T('E');
     doc.autoTable({ startY: 27, theme: 'grid', head: [['', `Orçado ${MESES_CURTO[ui.ref - 1]}`, `Realizado ${MESES_CURTO[ui.ref - 1]}`, 'Orçado acum.', 'Realizado acum.', 'Desvio acum.', 'Orçado ano', 'Em aberto', 'Projeção ano', 'Proj. − orçado']], headStyles: { fillColor: azul },
@@ -387,7 +384,7 @@ async function pdfDesvios() {
       styles: { fontSize: 7.5, cellPadding: 1.3 }, columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 20 }, 2: { halign: 'right', cellWidth: 20 }, 3: { halign: 'right', cellWidth: 22 }, 4: { halign: 'right', cellWidth: 15 }, 5: { halign: 'right', cellWidth: 24 } },
       didParseCell: (d) => { if (d.section === 'body' && d.column.index === 6 && d.cell.raw === 'PENDENTE') { d.cell.styles.textColor = [200, 40, 40]; d.cell.styles.fontStyle = 'bold'; } },
       margin: { left: 14, right: 14 } });
-    const n = doc.getNumberOfPages(); for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(130); doc.text(`Página ${i} de ${n}`, W - 14, H - 7, { align: 'right' }); }
+    pdfRodapes(doc, 'Fonte: orçamento e lançamentos realizados do fluxo de caixa', { M: 14 });
     doc.save(`controle_orcamentario_${D.ano}_${String(ui.ref).padStart(2, '0')}.pdf`);
   } catch (e) { fail(e); }
 }

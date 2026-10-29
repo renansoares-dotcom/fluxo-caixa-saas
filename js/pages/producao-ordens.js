@@ -5,6 +5,7 @@ import { $, $$, esc, money, dateBR, today, fail, toast, modal, confirmDialog, ex
 import { cadProducao, ST_OP, ST_ET, podePCP, podeApontar, necessidadeMaterial, imprimirEtiquetas, horas } from '../lib/producao.js';
 import { carregarProdutos, datalistProdutos, acharProduto } from '../lib/produtos.js';
 import { badge, qtd, num } from '../lib/compras.js';
+import { abrirRelatorio } from '../lib/relatorio.js';
 
 export const title = 'Ordens de produção';
 const ui = { filtro: 'abertas', busca: '' };
@@ -172,16 +173,18 @@ async function abrir(o, root) {
   });
 }
 
-function imprimirOP(o, et, nec) {
+async function imprimirOP(o, et, nec) {
   const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up', true);
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>OP ${o.numero}</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:24px}h1{font-size:18px;margin:0}
-    table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #999;padding:5px 7px;text-align:left}.g{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-top:10px}</style></head><body>
-    <h1>ORDEM DE PRODUÇÃO Nº ${o.numero}${o.numero_iniflex ? ` — Iniflex ${esc(o.numero_iniflex)}` : ''}</h1><div>${esc(state.empresa.nome || '')}</div>
-    <div class="g"><div><b>Produto:</b> ${esc(o.codigo_produto || '')} ${esc(o.descricao || '')}</div><div><b>Quantidade:</b> ${qtd(o.quantidade)} ${esc(o.unidade)}</div>
-      <div><b>Cliente:</b> ${esc(o.cliente || '')}</div><div><b>Pedido:</b> ${esc(o.pedido_iniflex || '')}</div><div><b>Entrega:</b> ${dateBR(o.entrega)}</div><div><b>Prioridade:</b> ${o.prioridade}</div></div>
-    <table><thead><tr><th>#</th><th>Setor</th><th>Máquina</th><th>Início</th><th>Fim</th><th>Bom (kg)</th><th>Refugo (kg)</th><th>Operador</th></tr></thead><tbody>
+  await abrirRelatorio({ janela: w, nome: `Ordem de produção OP ${o.numero}`, titulo: `Ordem de produção nº ${o.numero}`,
+    subtitulo: o.numero_iniflex ? `Iniflex ${esc(o.numero_iniflex)}` : '',
+    extraCss: 'table.prc td{height:22px;border-bottom:.4px solid #888} table.prc td+td{border-left:.25px solid #bbb}',
+    corpo: `<h2>1. Produto e pedido</h2>
+    <table class="info"><tr><td>Produto</td><td>${esc(o.codigo_produto || '')} ${esc(o.descricao || '')}</td></tr><tr><td>Quantidade</td><td>${qtd(o.quantidade)} ${esc(o.unidade)}</td></tr>
+      <tr><td>Cliente</td><td>${esc(o.cliente || '')}</td></tr><tr><td>Pedido</td><td>${esc(o.pedido_iniflex || '')}</td></tr><tr><td>Entrega</td><td>${dateBR(o.entrega)}</td></tr><tr><td>Prioridade</td><td>${o.prioridade}</td></tr></table>
+    <h2>2. Etapas (preencher na produção)</h2>
+    <table class="prc"><thead><tr><th>#</th><th>Setor</th><th>Máquina</th><th>Início</th><th>Fim</th><th>Bom (kg)</th><th>Refugo (kg)</th><th>Operador</th></tr></thead><tbody>
     ${et.map(x => `<tr><td>${x.seq}</td><td>${esc(C.setorById[x.setor_id]?.nome || '')}</td><td>${esc(C.maqById[x.maquina_id]?.codigo || '')}</td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}</tbody></table>
-    ${nec.linhas?.length ? `<table><thead><tr><th>Material</th><th>Necessário</th><th>Lote</th><th>Consumido</th></tr></thead><tbody>${nec.linhas.map(l => `<tr><td>${esc(l.produto.codigo || '')} — ${esc(l.produto.descricao || '')}</td><td>${qtd(Math.round(l.necessario * 100) / 100)} ${esc(l.produto.unidade || '')}</td><td></td><td></td></tr>`).join('')}</tbody></table>` : ''}
-    ${o.observacao ? `<p><b>Observação:</b> ${esc(o.observacao)}</p>` : ''}<script>window.onload=()=>window.print()</script></body></html>`);
-  w.document.close();
+    ${nec.linhas?.length ? `<h2>3. Materiais</h2><table class="prc"><thead><tr><th>Material</th><th>Necessário</th><th>Lote</th><th>Consumido</th></tr></thead><tbody>${nec.linhas.map(l => `<tr><td>${esc(l.produto.codigo || '')} — ${esc(l.produto.descricao || '')}</td><td>${qtd(Math.round(l.necessario * 100) / 100)} ${esc(l.produto.unidade || '')}</td><td></td><td></td></tr>`).join('')}</tbody></table>` : ''}
+    ${o.observacao ? `<p><b>Observação:</b> ${esc(o.observacao)}</p>` : ''}`,
+    rodape: `Ordem de produção emitida pela plataforma · ${esc(state.empresa.nome || '')}` });
 }

@@ -1,5 +1,6 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, $$, esc, money, cls, dateBR, today, options, fail, toast, parseNum, loading, logoPNG, modal, MESES_CURTO } from '../lib/ui.js';
+import { padronizarPDF, pdfCabecalho, pdfTitulo, pdfRodapes } from '../lib/relatorio.js';
 
 export const title = 'Autorização de pagamentos';
 const f = { de: '', ate: '', conta: '', grupo: '', cc: '', favorecido: '', situacao: '', prioridade: '' };
@@ -198,32 +199,32 @@ async function gerar(root) {
 
 export async function pdf(aut, rows) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const doc = padronizarPDF(new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }));
   const W = doc.internal.pageSize.getWidth();
-  const logo = await logoPNG();
-  if (logo) doc.addImage(logo.data, 'PNG', W - 14 - 14 * logo.ratio, 7, 14 * logo.ratio, 14);
-  doc.setFontSize(14); doc.setFont(undefined, 'bold');
-  doc.text(`AUTORIZAÇÃO DE PAGAMENTOS — ${state.empresa.nome}`, 14, 15);
-  doc.setFontSize(10); doc.setFont(undefined, 'normal');
-  doc.text(`Nº ${aut.numero}   |   Emissão: ${dateBR(aut.emissao)}   |   Elaborado por: ${aut.elaborado_por || '-'}`, 14, 22);
+  const logo = await logoPNG().catch(() => null);
+  pdfCabecalho(doc, `Autorização de pagamentos nº ${aut.numero}`, logo, { M: 14, sub: `emissão ${dateBR(aut.emissao)}` });
+  let yT = pdfTitulo(doc, `Autorização de pagamentos nº ${aut.numero}`, 27);
+  doc.setFontSize(9.5); doc.setFont(undefined, 'normal');
+  doc.text(`Emissão: ${dateBR(aut.emissao)}   |   Elaborado por: ${aut.elaborado_por || '-'}`, W / 2, yT, { align: 'center' });
   const aprov = rows.filter(r => r.autoriza);
-  doc.text(`Total em aberto listado: R$ ${money(aut.total_listado)}   |   Saldo em bancos: R$ ${money(aut.saldo_bancos)}   |   TOTAL AUTORIZADO: R$ ${money(aut.total_autorizado)}   |   Saldo após pagamentos: R$ ${money((+aut.saldo_bancos || 0) - aut.total_autorizado)}`, 14, 28);
+  doc.text(`Total em aberto listado: R$ ${money(aut.total_listado)}   |   Saldo em bancos: R$ ${money(aut.saldo_bancos)}   |   TOTAL AUTORIZADO: R$ ${money(aut.total_autorizado)}   |   Saldo após pagamentos: R$ ${money((+aut.saldo_bancos || 0) - aut.total_autorizado)}`, W / 2, yT + 5, { align: 'center' });
   doc.autoTable({
-    startY: 33, styles: { fontSize: 7.5, cellPadding: 1.5 }, headStyles: { fillColor: [43, 85, 152] },
+    startY: yT + 9, styles: { fontSize: 7.5, cellPadding: 1.5 },
     head: [['Nº', 'Vencimento', 'Favorecido', 'Descrição', 'Plano de contas', 'Banco', 'Prioridade', 'Valor', 'Autoriza', 'Valor autorizado', 'Observação']],
     body: rows.map((r, i) => [i + 1, dateBR(r.vencimento), r.favorecido || '', r.descricao || '', r.plano || '', r.conta || '', r.prioridade || '',
       money(r.valor), r.autoriza ? 'SIM' : 'NÃO', r.autoriza ? money(r.valor_autorizado) : '', r.observacao || '']),
     columnStyles: { 7: { halign: 'right' }, 9: { halign: 'right' }, 8: { halign: 'center' } },
     didParseCell: (d) => { if (d.section === 'body' && rows[d.row.index]?.autoriza) d.cell.styles.fontStyle = 'bold'; },
     foot: [['', '', '', '', '', '', 'TOTAL', money(rows.reduce((s, r) => s + +r.valor, 0)), `${aprov.length} itens`, money(aut.total_autorizado), '']],
-    footStyles: { fillColor: [240, 243, 248], textColor: 20, fontStyle: 'bold' },
+    footStyles: { fillColor: [242, 242, 242], textColor: 20, fontStyle: 'bold' },
   });
   let y = doc.lastAutoTable.finalY + 22;
   if (y > doc.internal.pageSize.getHeight() - 20) { doc.addPage(); y = 40; }
   doc.line(30, y, 120, y); doc.line(W - 120, y, W - 30, y);
   doc.setFontSize(9);
   doc.text(`Elaborado por: ${aut.elaborado_por || ''}`, 30, y + 5);
-  doc.text('Diretor — autorizo os pagamentos marcados como SIM', W - 120, y + 5);
+  doc.text('Diretor - autorizo os pagamentos marcados como SIM', W - 120, y + 5);
+  pdfRodapes(doc, `Autorização de pagamentos nº ${aut.numero} · ${state.empresa.nome || ''}`, { M: 14 });
   doc.save(`autorizacao_${aut.numero}_${aut.emissao}.pdf`);
 }
 

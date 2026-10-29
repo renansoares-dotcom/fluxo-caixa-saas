@@ -5,6 +5,7 @@ import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
 import { notasSemTitulo, gerarContasReceber } from '../lib/nfe-receb.js';
 import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formData, parseNum, exportXLSX, loading, MESES_CURTO, logoPNG } from '../lib/ui.js';
 import { condicaoDe, condicaoDoFundo, prazos, desagioTitulo } from '../lib/fidc-condicoes.js';
+import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 
 export const title = 'Propostas de borderô';
 
@@ -625,17 +626,12 @@ function blocoCondicoes(c, root) {
 // ======================================================================
 async function pdfProposta(p, fu, itens) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const doc = padronizarPDF(new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }));
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-  const azul = [43, 85, 152], marinho = [42, 31, 111];
+  const azul = PRETO, marinho = PRETO;
   const t = (s) => String(s ?? '').replace(/[✓]/g, 'OK').replace(/[⚠ℹ]\s*/g, '').replace(/[−–]/g, '-').replace(/×/g, 'x');
-  const logo = await logoPNG();
-  if (logo) doc.addImage(logo.data, 'PNG', 14, 8, 12 * logo.ratio, 12);
-  doc.setTextColor(...marinho); doc.setFontSize(14); doc.setFont(undefined, 'bold');
-  doc.text(`Proposta de borderô nº ${p.numero} — ${fu.nome}`, W - 14, 13, { align: 'right' });
-  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
-  doc.text(`${state.empresa.nome} · operação em ${dateBR(p.data_operacao)} · status: ${p.status}`, W - 14, 18.5, { align: 'right' });
-  doc.setDrawColor(...marinho); doc.setLineWidth(.6); doc.line(14, 23, W - 14, 23); doc.setTextColor(20);
+  const logo = await logoPNG().catch(() => null);
+  pdfCabecalho(doc, `Proposta de borderô nº ${p.numero} - ${t(fu.nome)}`, logo, { M: 14, sub: `operação em ${dateBR(p.data_operacao)} · status: ${p.status}` });
   const kv = [['Valor de face', money(p.valor_face)], ['Títulos', String(p.qtd_titulos)], ['Deságio estimado', money(p.desagio)], ['Tarifas, IOF e ad valorem', money(+p.tarifas + +p.iof + +p.ad_valorem)],
     ...(p.analise?.custos ? [['   TED / tarifa do borderô', money(p.analise.custos.ted)], ['   Assinatura eletrônica', money(p.analise.custos.assinatura)], [`   Boletos (${p.qtd_titulos} títulos)`, money(p.analise.custos.boletos)], [`   Consulta Serasa (${p.analise.custos.novos} sacado(s) novo(s))`, money(p.analise.custos.consultas)]].filter(r => r[1] !== money(0)) : []),
     ['Custo total estimado', money(p.custo_total)], ['Recompras a descontar', money(p.recompras)], ['Líquido estimado', money(p.liquido)], ['Taxa a.m.', pct(p.taxa_am / 100, 2)],
@@ -654,11 +650,11 @@ async function pdfProposta(p, fu, itens) {
   if (p.observacao) { doc.setFontSize(8.5); doc.text(doc.splitTextToSize('Observação: ' + t(p.observacao), W - 28), 14, y); y += 8; }
   doc.autoTable({ startY: y, theme: 'grid', head: [['Vencimento', 'Prazo', 'Sacado', 'NF / parcela', 'Valor', 'Custo est.']], headStyles: { fillColor: azul },
     body: itens.map(i => [dateBR(i.vencimento), i.prazo ?? '', t(i.sacado || ''), i.documento || '', money(i.valor), money(i.custo_estimado)]),
-    foot: [['', '', 'TOTAL', '', money(p.valor_face), money(itens.reduce((s, i) => s + +(i.custo_estimado || 0), 0))]], footStyles: { fillColor: [232, 238, 248], textColor: 20, fontStyle: 'bold' },
+    foot: [['', '', 'TOTAL', '', money(p.valor_face), money(itens.reduce((s, i) => s + +(i.custo_estimado || 0), 0))]], footStyles: { fillColor: [242, 242, 242], textColor: 20, fontStyle: 'bold' },
     styles: { fontSize: 7.5, cellPadding: 1.3 }, columnStyles: { 1: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }, margin: { left: 14, right: 14 } });
   y = doc.lastAutoTable.finalY + 24; if (y > H - 25) { doc.addPage(); y = 40; }
   doc.setDrawColor(120); doc.setLineWidth(.3); doc.line(20, y, 90, y); doc.line(W - 90, y, W - 20, y); doc.setFontSize(8.5);
-  doc.text('Elaborado por (financeiro)', 20, y + 5); doc.text('Diretor — aprovo a operação', W - 90, y + 5);
-  const n = doc.getNumberOfPages(); for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(130); doc.text(`Página ${i} de ${n}`, W - 14, H - 7, { align: 'right' }); }
+  doc.text('Elaborado por (financeiro)', 20, y + 5); doc.text('Diretor - aprovo a operação', W - 90, y + 5);
+  pdfRodapes(doc, 'Fonte: proposta de borderô e títulos selecionados na plataforma', { M: 14 });
   doc.save(`proposta_fidc_${p.numero}_${fu.nome}.pdf`);
 }

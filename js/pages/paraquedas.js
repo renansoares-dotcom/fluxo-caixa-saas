@@ -5,6 +5,7 @@
 import { sb, state, q, fetchAll, loadCadastros, podeEditar } from '../lib/data.js';
 import { $, esc, money, dateBR, fail, toast, modal, options, parseNum, exportXLSX, today, logoPNG } from '../lib/ui.js';
 import { dispararAvisos } from '../lib/notif.js';
+import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 
 export const title = 'Pagamentos Antecipados';
 const ST = { aguardando: 'Aguardando aprovação', aprovado: 'Aprovado', rejeitado: 'Rejeitado', cancelado: 'Cancelado', pago: 'Pago — aguardando nota', nota_recebida: 'Nota recebida' };
@@ -552,17 +553,13 @@ async function relatorioPDF() {
   if (!window.jspdf) return toast('Biblioteca de PDF ainda carregando, tente de novo em instantes', true);
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   if (!doc.autoTable) return toast('Biblioteca de tabelas do PDF ainda carregando', true);
+  padronizarPDF(doc);
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 10;
-  const azul = [43, 85, 152], marinho = [42, 31, 111];
-  const logo = await logoPNG();
+  const azul = PRETO, marinho = PRETO;
+  const logo = await logoPNG().catch(() => null);
   const titulo = `Pagamentos Antecipados - ${VIS.aba}`;
-  const cabecalho = () => {
-    if (logo) doc.addImage(logo.data, 'PNG', M, 7, 11 * logo.ratio, 11);
-    doc.setTextColor(...marinho); doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(pdfTxt(titulo), W - M, 12, { align: 'right' });
-    doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
-    doc.text(pdfTxt(`${state.empresa.nome} - pagamentos pedidos antes da nota fiscal - emitido em ${new Date().toLocaleString('pt-BR')}${ui.busca.trim() ? ` - busca: "${ui.busca.trim()}"` : ''}`), W - M, 17, { align: 'right' });
-    doc.setDrawColor(...marinho); doc.setLineWidth(.5); doc.line(M, 20, W - M, 20); doc.setTextColor(20);
-  };
+  const cabecalho = () => pdfCabecalho(doc, pdfTxt(titulo), logo, { M, sub: pdfTxt(`pagamentos pedidos antes da nota fiscal${ui.busca.trim() ? ` - busca: "${ui.busca.trim()}"` : ''}`) });
+
   cabecalho();
   // resumo
   const tot = R.reduce((s, p) => s + +p.valor, 0), urg = R.filter(p => p.prioridade === 'urgente'), semNf = R.filter(p => !p.tera_nota);
@@ -589,7 +586,7 @@ async function relatorioPDF() {
     head: [['Nº', 'Pagar em', 'Quem recebe', 'Pix / dados bancários', 'Descrição', 'Nota fiscal', 'Situação', 'Valor']],
     body, foot: [['', '', `${R.length} PA`, '', '', '', 'Total', money(tot)]],
     styles: { fontSize: 7.4, cellPadding: 1.3, lineColor: [226, 231, 239], valign: 'top' }, headStyles: { fillColor: azul, textColor: 255 },
-    footStyles: { fillColor: [232, 238, 248], textColor: 20, fontStyle: 'bold' }, showFoot: 'lastPage',
+    footStyles: { fillColor: [242, 242, 242], textColor: 20, fontStyle: 'bold' }, showFoot: 'lastPage',
     columnStyles: { 0: { cellWidth: 18 }, 1: { cellWidth: 18 }, 2: { cellWidth: 52 }, 3: { cellWidth: 46 }, 4: { cellWidth: 'auto' }, 5: { cellWidth: 24 }, 6: { cellWidth: 34 }, 7: { cellWidth: 24, halign: 'right' } },
     didParseCell: (d) => { if (d.section === 'body' && d.column.index === 0 && /URGENTE/.test(d.cell.raw)) d.cell.styles.textColor = [192, 53, 43]; if (d.column.index === 7) d.cell.styles.halign = 'right'; },
     didDrawPage: (d) => { if (d.pageNumber > 1) cabecalho(); } });
@@ -602,7 +599,6 @@ async function relatorioPDF() {
     doc.setDrawColor(120); doc.setLineWidth(.2); doc.line(x, y, x + larg, y);
     doc.setFontSize(8); doc.setTextColor(90); doc.text(pdfTxt(t), x + larg / 2, y + 4, { align: 'center' });
   });
-  const n = doc.getNumberOfPages();
-  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(130); doc.text(`Página ${i} de ${n}`, W - M, H - 5, { align: 'right' }); doc.text('Fonte: Pagamentos Antecipados (fluxo-caixa-saas)', M, H - 5); }
+  pdfRodapes(doc, 'Fonte: Pagamentos Antecipados (plataforma de fluxo de caixa)', { M });
   doc.save(`pagamentos_antecipados_${VIS.aba.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_')}_${today()}.pdf`);
 }

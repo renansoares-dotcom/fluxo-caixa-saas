@@ -5,6 +5,7 @@ import { $, $$, esc, money, money0, dateBR, today, fail, toast, modal, confirmDi
 import { baseComercial, ETAPAS, ABERTAS, podeEditarCom, interno, addDias } from '../lib/comercial.js';
 import { MATERIAIS, pesoTeorico, carregarProdutos, datalistProdutos, acharProduto } from '../lib/produtos.js';
 import { qtd, inp, unit, num } from '../lib/compras.js';
+import { abrirRelatorio } from '../lib/relatorio.js';
 
 export const title = 'Funil e propostas';
 const ui = { vend: '', mostrar: 'abertas' };
@@ -204,24 +205,22 @@ function calculadora(tr, depois) {
   $('#ca-ok', m.el).onclick = () => { if (!preco) return toast('Complete o cálculo', true); $('.pi-p', tr).value = inp(Math.round(preco * 100) / 100); tr.nextElementSibling.querySelector('.pi-custo').value = Math.round(custo * 10000) / 10000; m.close(); depois(); };
 }
 
-function pdf(o, p, its) {
+async function pdf(o, p, its) {
   const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para gerar o PDF', true);
   const cli = o.favorecido_id ? B.clientes.find(c => c.id === o.favorecido_id) : null;
   const espec = (i) => [i.material, i.largura_mm && `${qtd(i.largura_mm)} mm`, i.espessura_um && `${qtd(i.espessura_um)} µm`, i.comprimento_m && `${qtd(i.comprimento_m)} m`, i.cores_impressao ? `${i.cores_impressao} cor(es)` : null, i.especificacao].filter(Boolean).join(' · ');
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Proposta comercial nº ${p.numero}</title><style>
-    body{font-family:Arial,sans-serif;font-size:12px;margin:30px;color:#111} h1{font-size:18px;margin:0} .cab{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #2a1f6f;padding-bottom:8px}
-    table{width:100%;border-collapse:collapse;margin-top:14px} th,td{border:1px solid #999;padding:6px 7px;text-align:left;vertical-align:top} th.n,td.n{text-align:right}
-    .g{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-top:12px} .m{color:#555;font-size:11px} .ass{margin-top:60px;width:260px;border-top:1px solid #111;text-align:center;padding-top:4px}</style></head><body>
-    <div class="cab"><div><h1>PROPOSTA COMERCIAL Nº ${p.numero}</h1><div>${esc(state.empresa.nome || '')}</div></div><div>Data: ${dateBR(p.data)}<br>Validade: ${dateBR(p.validade) || '—'}</div></div>
-    <div class="g"><div><b>Cliente:</b> ${esc(cli?.nome || o.prospect || '')}</div><div><b>CNPJ/CPF:</b> ${esc(cli?.documento || '')}</div>
-      <div><b>A/C:</b> ${esc(o.contato || '')}</div><div><b>Referência:</b> ${esc(o.titulo)}</div></div>
+  await abrirRelatorio({ janela: w, nome: `Proposta comercial nº ${p.numero}`, titulo: `Proposta comercial nº ${p.numero}`,
+    subtitulo: `Data ${dateBR(p.data)} · validade ${dateBR(p.validade) || '—'}`,
+    corpo: `<h2>1. Cliente</h2>
+    <table class="info"><tr><td>Cliente</td><td>${esc(cli?.nome || o.prospect || '')}</td></tr><tr><td>CNPJ/CPF</td><td>${esc(cli?.documento || '')}</td></tr>
+      <tr><td>A/C</td><td>${esc(o.contato || '')}</td></tr><tr><td>Referência</td><td>${esc(o.titulo)}</td></tr></table>
+    <h2>2. Produtos</h2>
     <table><thead><tr><th>#</th><th>Produto / especificação</th><th class="n">Quantidade</th><th>Unid.</th><th class="n">Preço unitário</th><th class="n">Total</th></tr></thead><tbody>
-    ${its.map((i, k) => `<tr><td>${k + 1}</td><td><b>${esc(i.descricao)}</b><div class="m">${esc(espec(i))}</div></td><td class="n">${qtd(i.quantidade)}</td><td>${i.unidade === 'MIL' ? 'milheiro' : esc(i.unidade)}</td><td class="n">${unit(i.preco)}</td><td class="n">${money(i.quantidade * i.preco)}</td></tr>`).join('')}
-    <tr><td colspan="5"><b>Total</b></td><td class="n"><b>${money(p.total)}</b></td></tr></tbody></table>
-    <div class="g"><div><b>Condição de pagamento:</b> ${esc(p.condicao_pagamento || '')}</div><div><b>Prazo de entrega:</b> ${esc(p.prazo_entrega || '')}</div><div><b>Frete:</b> ${esc(p.frete || '')}</div></div>
+    ${its.map((i, k) => `<tr><td>${k + 1}</td><td><b>${esc(i.descricao)}</b><div class="m">${esc(espec(i))}</div></td><td class="n">${qtd(i.quantidade)}</td><td>${i.unidade === 'MIL' ? 'milheiro' : esc(i.unidade)}</td><td class="n">${unit(i.preco)}</td><td class="n">${money(i.quantidade * i.preco)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="5">Total</td><td class="n">${money(p.total)}</td></tr></tfoot></table>
+    <h2>3. Condições</h2>
+    <table class="info"><tr><td>Condição de pagamento</td><td>${esc(p.condicao_pagamento || '')}</td></tr><tr><td>Prazo de entrega</td><td>${esc(p.prazo_entrega || '')}</td></tr><tr><td>Frete</td><td>${esc(p.frete || '')}</td></tr></table>
     ${p.observacao ? `<p><b>Observação:</b> ${esc(p.observacao)}</p>` : ''}
-    <p class="m" style="margin-top:14px">Preços válidos até a data de validade desta proposta.</p>
-    <div class="ass">${esc(state.empresa.nome || '')}</div>
-    <script>window.onload=()=>window.print()</script></body></html>`);
-  w.document.close();
+    <div class="ass"><div>${esc(state.empresa.nome || '')}</div></div>`,
+    rodape: 'Preços válidos até a data de validade desta proposta.' });
 }

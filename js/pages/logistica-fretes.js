@@ -2,7 +2,8 @@
 // conformidade do mês (fretes pagos sem ficha, pelo caixa, a pessoa física) e relatório para imprimir.
 // Autônomo: pagamento só é liberado sem pendências (trava no banco). Transportadora: CIOT/MDF-e/piso viram aviso.
 import { sb, state, q, fetchAll, loadCadastros } from '../lib/data.js';
-import { $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, options, today, logoPNG } from '../lib/ui.js';
+import { $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, options, today } from '../lib/ui.js';
+import { abrirRelatorio } from '../lib/relatorio.js';
 import { podeLogistica } from '../lib/logistica.js';
 import { inp, num } from '../lib/compras.js';
 import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, coefDe, pendencias, pendenciasTransp, tipoPeloDoc, lerVeiculos, veiculosTxt } from '../lib/fretes.js';
@@ -375,32 +376,21 @@ async function conformidade(corpo, root) {
 
 async function relatorio(F, semFicha, caixa, pf, dispensados = []) {
   const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
-  const logo = await logoPNG().catch(() => null);
   const [a, m] = ui.mes.split('-'); const mesTxt = `${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][+m - 1]}/${a}`;
   const linhas = F.map(f => { const t = B.tById[f.transportador_id], p = pendDe(f), l = B.L.get(f.lancamento_id);
     return `<tr><td>${f.numero}</td><td>${dateBR(f.data)}</td><td>${esc(t?.nome || '')}<br><span class="m">${TIPO_CURTO[t?.tipo] || ''}</span></td><td>${esc(f.destino || '')}${f.km ? `<br><span class="m">${(+f.km).toLocaleString('pt-BR')} km · ${f.eixos || '?'} eixos</span>` : ''}</td>
       <td class="n">${money(f.valor)}</td><td class="n">${f.piso != null ? money(f.piso) : '–'}</td><td>${esc(f.ciot || '–')}</td><td>${f.mdfe_chave ? 'sim' : 'não'}</td><td>${l ? (l.status === 'Pago' ? 'pago ' : 'prog. ') + dateBR(l.data) : '–'}</td><td>${p.length ? esc(p.join(', ')) : 'conforme'}</td></tr>`; }).join('');
   const sf = semFicha.map(l => `<tr><td>${dateBR(l.data)}</td><td>${esc(state.cad.favById[l.favorecido_id]?.nome || l.descricao || '')}</td><td>${esc(state.cad.contaById[l.conta_id]?.nome || '')}</td><td class="n">${money(l.valor)}</td><td>${[caixa(l) ? 'pago pelo caixa' : '', pf(l) ? 'pessoa física?' : ''].filter(Boolean).join(' · ')}</td></tr>`).join('');
   const tot = (xs, f = (x) => +x.valor || 0) => money(xs.reduce((s, x) => s + f(x), 0));
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Conformidade de fretes — ${mesTxt}</title><style>
-    @page{size:A4 landscape;margin:12mm} body{font-family:'Times New Roman',Times,serif;font-size:10.5px;color:#111;margin:0}
-    .cab{display:flex;align-items:center;gap:14px;border-bottom:1px solid #111;padding-bottom:6px} .cab img{height:34px} .cab .t{font-weight:bold;font-size:11px} .cab .d{margin-left:auto;text-align:right;font-size:10px}
-    h1{text-align:center;font-size:16px;margin:14px 0 2px} .sub{text-align:center;margin-bottom:10px} h2{font-size:12px;margin:14px 0 4px}
-    table{width:100%;border-collapse:collapse} th{font-size:9.5px;text-align:left;border-top:1px solid #000;border-bottom:.6px solid #000;padding:3px 4px} td{padding:3px 4px;border-bottom:.25px solid #bbb;vertical-align:top} td.n,th.n{text-align:right;white-space:nowrap}
-    tr{page-break-inside:avoid} thead{display:table-header-group} .m{color:#555;font-size:9.5px} .rod{margin-top:12px;font-size:9px;color:#444;border-top:.6px solid #111;padding-top:4px}
-    @media screen{body{margin:20px auto;max-width:1100px}} @media print{.bar{display:none}}</style></head><body>
-    <div class="bar"><button onclick="print()">Imprimir / salvar PDF</button></div>
-    <div class="cab">${logo ? `<img src="${logo.data}">` : ''}<div class="t">IPLAMM – INDÚSTRIA DE PLÁSTICOS LTDA.</div><div class="d">Conformidade ANTT nos fretes<br>emitido em ${new Date().toLocaleString('pt-BR')}</div></div>
-    <h1>RELATÓRIO DE CONFORMIDADE DE FRETES</h1><div class="sub">Competência ${mesTxt} · CIOT, MDF-e, piso mínimo, vale-pedágio e pagamento</div>
-    <h2>1. Fretes com ficha (${F.length} · ${tot(F)})</h2>
+  await abrirRelatorio({ janela: w, nome: 'Conformidade ANTT nos fretes', titulo: 'Relatório de conformidade de fretes', paisagem: true,
+    subtitulo: `Competência ${mesTxt} · CIOT, MDF-e, piso mínimo, vale-pedágio e pagamento`,
+    corpo: `<h2>1. Fretes com ficha (${F.length} · ${tot(F)})</h2>
     <table><thead><tr><th>Nº</th><th>Data</th><th>Transportador</th><th>Destino</th><th class="n">Valor</th><th class="n">Piso</th><th>CIOT</th><th>MDF-e</th><th>Pagamento</th><th>Situação</th></tr></thead><tbody>${linhas || '<tr><td colspan="10">Nenhum frete com ficha no mês.</td></tr>'}</tbody></table>
     <h2>2. Fretes pagos sem ficha (${semFicha.length} · ${tot(semFicha)})</h2>
     <table><thead><tr><th>Data</th><th>Favorecido / descrição</th><th>Conta</th><th class="n">Valor</th><th>Alerta</th></tr></thead><tbody>${sf || '<tr><td colspan="5">Nenhum.</td></tr>'}</tbody></table>
     <h2>3. Dispensados com justificativa (${dispensados.length} · ${tot(dispensados)})</h2>
-    <table><thead><tr><th>Data</th><th>Favorecido / descrição</th><th class="n">Valor</th><th>Motivo</th><th>Justificativa</th><th>Por</th></tr></thead><tbody>${dispensados.map(l => `<tr><td>${dateBR(l.data)}</td><td>${esc(state.cad.favById[l.favorecido_id]?.nome || l.descricao || '')}</td><td class="n">${money(l.valor)}</td><td>${MOTIVOS[l.d.motivo]}</td><td>${esc(l.d.justificativa)}</td><td>${esc((l.d.criado_email || '').split('@')[0])} ${dateBR(l.d.criado_em)}</td></tr>`).join('') || '<tr><td colspan="6">Nenhum.</td></tr>'}</tbody></table>
-    <div class="rod">Base: Resolução ANTT nº 6.078/2026, MP nº 1.343/2026 e NT MDF-e 2026.001. Frete com autônomo deve ter CIOT gerado pela IPLAMM via IPEF, MDF-e com o CIOT, valor ≥ piso mínimo e pagamento pela IPEF na conta indicada pelo autônomo.</div>
-    <script>window.onload=()=>setTimeout(()=>print(),300)</script></body></html>`);
-  w.document.close();
+    <table><thead><tr><th>Data</th><th>Favorecido / descrição</th><th class="n">Valor</th><th>Motivo</th><th>Justificativa</th><th>Por</th></tr></thead><tbody>${dispensados.map(l => `<tr><td>${dateBR(l.data)}</td><td>${esc(state.cad.favById[l.favorecido_id]?.nome || l.descricao || '')}</td><td class="n">${money(l.valor)}</td><td>${MOTIVOS[l.d.motivo]}</td><td>${esc(l.d.justificativa)}</td><td>${esc((l.d.criado_email || '').split('@')[0])} ${dateBR(l.d.criado_em)}</td></tr>`).join('') || '<tr><td colspan="6">Nenhum.</td></tr>'}</tbody></table>`,
+    rodape: 'Base: Resolução ANTT nº 6.078/2026, MP nº 1.343/2026 e NT MDF-e 2026.001. Frete com autônomo deve ter CIOT gerado pela IPLAMM via IPEF, MDF-e com o CIOT, valor ≥ piso mínimo e pagamento pela IPEF na conta indicada pelo autônomo.' });
 }
 
 // ---------------------------------------------------------------- Piso mínimo

@@ -9,6 +9,7 @@ import { sb, state, q, fetchAll, loadCadastros, podeEditar } from '../lib/data.j
 import { $, esc, money, dateBR, fail, toast, modal, exportXLSX, today, logoPNG } from '../lib/ui.js';
 import { creditosComSaldo, mesmoGrupo, desfazerUso } from '../lib/creditos.js';
 import { semPagamento } from '../lib/nfe-pag.js';
+import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 
 export const title = 'Conta-corrente de fornecedor / cliente';
 const LS = 'contaForn.fav';
@@ -309,17 +310,12 @@ async function gerarPDF() {
   if (!window.jspdf) return toast('Biblioteca de PDF ainda carregando, tente de novo em instantes', true);
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   if (!doc.autoTable) return toast('Biblioteca de tabelas do PDF ainda carregando', true);
+  padronizarPDF(doc);
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 12;
-  const azul = [43, 85, 152], marinho = [42, 31, 111], cli = CLI(), f = D.fav, T = D.tot;
-  const logo = await logoPNG();
+  const azul = PRETO, marinho = PRETO, cli = CLI(), f = D.fav, T = D.tot;
+  const logo = await logoPNG().catch(() => null);
   const titulo = `Conta-corrente de ${cli ? 'cliente' : 'fornecedor'}`;
-  const cabecalho = () => {
-    if (logo) doc.addImage(logo.data, 'PNG', M, 8, 12 * logo.ratio, 12);
-    doc.setTextColor(...marinho); doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(titulo, W - M, 13, { align: 'right' });
-    doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
-    doc.text(pdfTxt(`${state.empresa.nome} · período ${dateBR(ui.de)} a ${dateBR(ui.ate)} · emitido em ${dateBR(today())}`), W - M, 18, { align: 'right' });
-    doc.setDrawColor(...marinho); doc.setLineWidth(.5); doc.line(M, 22, W - M, 22); doc.setTextColor(20);
-  };
+  const cabecalho = () => pdfCabecalho(doc, titulo, logo, { M, sub: pdfTxt(`período ${dateBR(ui.de)} a ${dateBR(ui.ate)}`) });
   const secao = (t) => { let y = (doc.lastAutoTable?.finalY ?? 40) + 8; if (y > H - 30) { doc.addPage(); cabecalho(); y = 30; } doc.setFontSize(10.5); doc.setFont(undefined, 'bold'); doc.setTextColor(...marinho); doc.text(pdfTxt(t), M, y); doc.setTextColor(20); doc.setFont(undefined, 'normal'); return y + 2; };
   const grade = { theme: 'grid', styles: { fontSize: 7.4, cellPadding: 1.2, lineColor: [226, 231, 239] }, headStyles: { fillColor: azul, textColor: 255 }, margin: { left: M, right: M, top: 28 }, didDrawPage: (d) => { if (d.pageNumber > 1) cabecalho(); } };
   cabecalho();
@@ -338,7 +334,7 @@ async function gerarPDF() {
   let y = secao('Extrato do período');
   doc.autoTable({ ...grade, startY: y, head: [cab], body: ext.map(r => [dateBR(r.data), pdfTxt(r.hist), r.a ? money(r.a) : '', r.b ? money(r.b) : '', money(r.saldo)]),
     foot: [['', 'Movimento do período / saldo final', money(ext.reduce((s, r) => s + (r.a || 0), 0)), money(ext.reduce((s, r) => s + (r.b || 0), 0)), money(T.final)]],
-    footStyles: { fillColor: [232, 238, 248], textColor: 20, fontStyle: 'bold' }, columnStyles: { 0: { cellWidth: 18 }, 2: { halign: 'right', cellWidth: 26 }, 3: { halign: 'right', cellWidth: 26 }, 4: { halign: 'right', cellWidth: 28 } },
+    footStyles: { fillColor: [242, 242, 242], textColor: 20, fontStyle: 'bold' }, columnStyles: { 0: { cellWidth: 18 }, 2: { halign: 'right', cellWidth: 26 }, 3: { halign: 'right', cellWidth: 26 }, 4: { halign: 'right', cellWidth: 28 } },
     didParseCell: (d) => { if (d.section === 'body' && d.row.index === 0) d.cell.styles.fontStyle = 'bold'; if (d.section === 'foot' && d.column.index > 1) d.cell.styles.halign = 'right'; } });
   // notas
   const N = notasPeriodo();
@@ -350,7 +346,7 @@ async function gerarPDF() {
     const tot = (fn) => money(N.reduce((s, n) => s + fn(n), 0));
     const foot = cli ? ['Total', '', '', tot(n => +n.v_nf), tot(n => n.pagoDireto + n.abatido + n.antecipado), tot(n => n.devolvida ? 0 : n.falta)]
       : ['Total', '', '', kgFmt(N.filter(n => !n.devolvida).reduce((s, n) => s + (n.kg || 0), 0)), '', tot(n => +n.v_nf), tot(n => n.pagoDireto + n.abatido), tot(n => n.devolvida ? 0 : n.falta)];
-    doc.autoTable({ ...grade, startY: y, head: [head], body, foot: [foot], footStyles: { fillColor: [232, 238, 248], textColor: 20, fontStyle: 'bold' },
+    doc.autoTable({ ...grade, startY: y, head: [head], body, foot: [foot], footStyles: { fillColor: [242, 242, 242], textColor: 20, fontStyle: 'bold' },
       didParseCell: (d) => { if (d.column.index >= (cli ? 3 : 3)) d.cell.styles.halign = 'right'; } });
   }
   // produtos (fornecedor)
@@ -362,12 +358,7 @@ async function gerarPDF() {
       didParseCell: (d) => { if ([2, 4, 5, 6].includes(d.column.index)) d.cell.styles.halign = 'right'; } });
   }
   // rodapé
-  const n = doc.getNumberOfPages();
-  for (let i = 1; i <= n; i++) {
-    doc.setPage(i); doc.setFontSize(7); doc.setTextColor(130);
-    doc.text(`Página ${i} de ${n}`, W - M, H - 6, { align: 'right' });
-    doc.text(pdfTxt(cli ? 'Fonte: notas fiscais de venda (XML), recebimentos lançados, borderôs FIDC e créditos registrados na plataforma.' : 'Fonte: notas fiscais de entrada (XML), pagamentos lançados e adiantamentos registrados na plataforma.'), M, H - 6);
-  }
+  pdfRodapes(doc, pdfTxt(cli ? 'Fonte: notas fiscais de venda (XML), recebimentos lançados, borderôs FIDC e créditos registrados na plataforma.' : 'Fonte: notas fiscais de entrada (XML), pagamentos lançados e adiantamentos registrados na plataforma.'), { M });
   doc.save(`conta_corrente_${normN(f?.nome).replace(/ /g, '_').slice(0, 40)}_${ui.de}_${ui.ate}.pdf`);
 }
 

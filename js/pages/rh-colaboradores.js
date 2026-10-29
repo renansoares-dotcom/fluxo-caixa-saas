@@ -1,10 +1,11 @@
 // RH › Colaboradores: cadastro (cargo, setor, vínculo, admissão, salário), importação da relação em planilha e setor por cargo.
 // Salário é sigiloso: a tela e o banco só abrem para administrador ou quem tem a área RH (SQL 052).
 import { sb, state, q } from '../lib/data.js';
-import { $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, exportXLSX, logoPNG } from '../lib/ui.js';
+import { $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, exportXLSX } from '../lib/ui.js';
 import { VINCULOS, SITUACOES, setorDoCargo, chaveNome } from '../lib/rh.js';
 import { temRH, podeRH, carregarBase, avisoMigracao, kpi } from '../lib/rh-dados.js';
 import { inp, num } from '../lib/compras.js';
+import { abrirRelatorio } from '../lib/relatorio.js';
 
 export const title = 'RH — colaboradores';
 const ui = { busca: '', sit: 'ativos', setor: '', vinc: '' };
@@ -214,7 +215,6 @@ function opcoesRelatorio(xs) {
 
 async function imprimirRelatorio(xs, filtros) {
   const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
-  const logo = await logoPNG().catch(() => null);
   const cpfM = (c) => c && c.length === 11 ? `***.${c.slice(3, 6)}.${c.slice(6, 9)}-**` : '';
   const chave = (c) => REL.grupo === 'vinculo' ? (VINCULOS[c.vinculo] || c.vinculo) : REL.grupo ? (limpa(c[REL.grupo]) || `(sem ${REL.grupo})`) : '';
   const grupos = {};
@@ -231,25 +231,11 @@ async function imprimirRelatorio(xs, filtros) {
     return `${REL.grupo ? `<tr class="gr"><td colspan="${cols.length}">${esc(g)} <span>— ${l.length} pessoa(s)</span></td></tr>` : ''}
       ${l.map(c => { k++; return `<tr>${cols.map(([t, f, cl], i) => `<td class="${cl || ''}">${i === 0 ? k : f(c)}</td>`).join('')}</tr>`; }).join('')}
       ${REL.grupo && REL.salario ? `<tr class="st"><td colspan="${cols.length - 1 - (REL.assinatura ? 1 : 0)}">Subtotal ${esc(g)}</td><td class="n">${money(soma(l))}</td>${REL.assinatura ? '<td></td>' : ''}</tr>` : ''}`; }).join('');
-  const agora = new Date();
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Colaboradores — ${esc(state.empresa.nome || '')}</title><style>
-    @page{size:A4 ${cols.length > 8 ? 'landscape' : 'portrait'};margin:12mm}
-    body{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#111;margin:0}
-    .cab{display:flex;align-items:center;gap:14px;border-bottom:2px solid #111;padding-bottom:8px} .cab img{height:38px} .cab h1{font-size:16px;margin:0} .cab .d{margin-left:auto;text-align:right;font-size:10px;color:#444}
-    .res{display:flex;gap:18px;margin:8px 0 6px;font-size:11px} .res b{font-size:12px}
-    table{width:100%;border-collapse:collapse} th{background:#eee;text-align:left;font-size:10px;padding:4px 5px;border-bottom:1px solid #999} thead{display:table-header-group}
-    td{padding:3px 5px;border-bottom:1px solid #ddd;vertical-align:top} td.n,th.n{text-align:right;white-space:nowrap} td.ass{width:150px} tr{page-break-inside:avoid}
-    tr.gr td{background:#f4f4f4;font-weight:bold;font-size:11px;border-bottom:1px solid #999;padding-top:7px} tr.gr span{font-weight:normal;color:#555}
-    tr.st td{font-weight:bold;border-bottom:1px solid #999} tr.tot td{font-weight:bold;font-size:11.5px;border-top:2px solid #111;border-bottom:0}
-    .rod{margin-top:10px;font-size:9px;color:#555;border-top:1px solid #ccc;padding-top:4px}
-    @media screen{body{margin:20px auto;max-width:1000px}.bar{margin-bottom:12px}} @media print{.bar{display:none}}</style></head><body>
-    <div class="bar"><button onclick="print()">Imprimir / salvar PDF</button></div>
-    <div class="cab">${logo ? `<img src="${logo.data}">` : ''}<div><h1>Relação de colaboradores</h1><div>${esc(state.empresa.nome || '')}</div></div>
-      <div class="d">Emitido em ${agora.toLocaleDateString('pt-BR')} ${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}<br>${esc(state.user?.email || '')}</div></div>
-    <div class="res"><div>Pessoas: <b>${xs.length}</b></div>${REL.salario ? `<div>Salário base total: <b>${money(soma(xs))}</b></div><div>Média: <b>${money(soma(xs) / xs.length)}</b></div>` : ''}<div>Filtros: ${esc(filtros)}</div></div>
+  await abrirRelatorio({ janela: w, nome: 'Relação de colaboradores', titulo: 'Relação de colaboradores', paisagem: cols.length > 8,
+    subtitulo: `${esc(state.empresa.nome || '')}${state.user?.email ? ` · emitido por ${esc(state.user.email)}` : ''}`,
+    extraCss: '.res{display:flex;gap:18px;justify-content:center;margin:4px 0 8px;font-size:11px} .res b{font-size:12px} td.ass{width:150px} tr.gr span{font-weight:normal;color:#555}',
+    corpo: `<div class="res"><div>Pessoas: <b>${xs.length}</b></div>${REL.salario ? `<div>Salário base total: <b>${money(soma(xs))}</b></div><div>Média: <b>${money(soma(xs) / xs.length)}</b></div>` : ''}<div>Filtros: ${esc(filtros)}</div></div>
     <table><thead><tr>${cols.map(([t, , cl]) => `<th class="${cl || ''}">${t}</th>`).join('')}</tr></thead><tbody>${corpo}
-      ${REL.salario ? `<tr class="tot"><td colspan="${cols.length - 1 - (REL.assinatura ? 1 : 0)}">Total geral — ${xs.length} pessoa(s)</td><td class="n">${money(soma(xs))}</td>${REL.assinatura ? '<td></td>' : ''}</tr>` : ''}</tbody></table>
-    <div class="rod">Documento confidencial — uso restrito ao RH e à direção. ${REL.salario ? 'Contém salários.' : ''}</div>
-    <script>window.onload=()=>setTimeout(()=>print(),300)</script></body></html>`);
-  w.document.close();
+      ${REL.salario ? `<tr class="tot"><td colspan="${cols.length - 1 - (REL.assinatura ? 1 : 0)}">Total geral — ${xs.length} pessoa(s)</td><td class="n">${money(soma(xs))}</td>${REL.assinatura ? '<td></td>' : ''}</tr>` : ''}</tbody></table>`,
+    rodape: `Documento confidencial — uso restrito ao RH e à direção. ${REL.salario ? 'Contém salários.' : ''} Base: cadastro de colaboradores da plataforma.` });
 }

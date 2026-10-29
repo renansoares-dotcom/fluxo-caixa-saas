@@ -2,6 +2,7 @@
 // Distâncias estimadas entre os centros dos municípios (linha reta × fator rodoviário); dentro da mesma cidade, a ordem segue o CEP.
 import { sb, state, q } from './data.js';
 import { esc, dateBR } from './ui.js';
+import { abrirRelatorio } from './relatorio.js';
 
 export const TIPOS_VEICULO = { carreta: 'Carreta', truck: 'Truck', toco: 'Toco', tres_quartos: '3/4', vuc: 'VUC', utilitario: 'Utilitário', outro: 'Outro' };
 export const ST_CARGA = { planejada: ['Planejada', 'negoc'], carregando: ['Carregando', 'aberto'], pronta: ['Pronta para sair', 'pago'], em_rota: ['Em rota', 'aberto'], concluida: ['Concluída', 'pago'], cancelada: ['Cancelada', 'vencido'] };
@@ -104,23 +105,22 @@ export function montarCargas(stops, veiculos, P, origem) {
 }
 
 // ---------------------------------------------------------------- impressão do romaneio
-export function imprimirRomaneio(carga, veiculo, stops, m) {
+export async function imprimirRomaneio(carga, veiculo, stops, m) {
   const w = window.open('', '_blank'); if (!w) return alert('Libere as janelas pop-up para imprimir o romaneio');
   const kg = (v) => Math.round(+v || 0).toLocaleString('pt-BR');
   const linhas = (lista, carreg) => lista.map((s, i) => `<tr><td class="c">${carreg ? lista.length - i : i + 1}</td><td><b>${esc(s.nome || '')}</b><br><span class="p">${esc([s.logradouro, s.nro].filter(Boolean).join(', '))}${s.bairro ? ' · ' + esc(s.bairro) : ''}</span></td>
     <td>${esc(s.xmun || '')}/${esc(s.uf || '')}</td><td>${s.notas.map(n => n.numero).join(', ')}</td><td class="n">${kg(s.vol)}</td><td class="n">${kg(s.kg)}</td>${carreg ? '' : '<td class="ass"></td>'}</tr>`).join('');
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Romaneio — carga ${carga.numero || ''}</title><style>
-    body{font-family:Arial,sans-serif;font-size:12px;margin:14mm} h1{font-size:18px;margin:0} h2{font-size:14px;margin:16px 0 6px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #999;padding:4px 6px;vertical-align:top}
-    th{background:#eee;text-align:left} .n{text-align:right} .c{text-align:center;width:28px} .p{color:#555;font-size:11px} .ass{width:150px} .cab{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
-    .cab div{border:1px solid #ccc;padding:5px} .cab b{display:block;font-size:13px} @media print{h2{page-break-after:avoid}}</style></head><body>
-    <h1>${esc(state.empresa.nome || '')} — Romaneio de carga ${carga.numero ? 'nº ' + carga.numero : '(sugestão)'}</h1>
-    <div class="cab"><div>Data<b>${dateBR(carga.data)}</b></div><div>Veículo<b>${esc(veiculo?.codigo || '')} ${esc(veiculo?.placa || '')}</b></div><div>Motorista<b>${esc(carga.motorista || veiculo?.motorista || '')}</b></div>
-    <div>Peso / entregas<b>${kg(m.kg)} kg · ${stops.length}</b></div><div>Volume estimado<b>${m.m3.toFixed(1).replace('.', ',')} m³</b></div><div>Trajeto previsto<b>${kg(m.km)} km · ${m.horas.toFixed(1).replace('.', ',')} h</b></div>
-    <div>Saída<b>&nbsp;</b></div><div>Volta / km final<b>&nbsp;</b></div></div>
-    <h2>Ordem de carregamento (a última entrega entra primeiro)</h2><table><thead><tr><th>#</th><th>Cliente</th><th>Cidade</th><th>Notas</th><th class="n">Vol.</th><th class="n">kg</th></tr></thead><tbody>${linhas(stops.slice().reverse(), true)}</tbody></table>
-    <h2>Ordem de entrega</h2><table><thead><tr><th>#</th><th>Cliente / endereço</th><th>Cidade</th><th>Notas</th><th class="n">Vol.</th><th class="n">kg</th><th>Recebido por / assinatura</th></tr></thead><tbody>${linhas(stops, false)}</tbody></table>
-    <script>window.onload=()=>window.print()</script></body></html>`);
-  w.document.close();
+  await abrirRelatorio({ janela: w, nome: `Romaneio — carga ${carga.numero || '(sugestão)'}`, titulo: `Romaneio de carga ${carga.numero ? 'nº ' + carga.numero : '(sugestão)'}`,
+    subtitulo: `${dateBR(carga.data)} · ${esc(veiculo?.codigo || '')} ${esc(veiculo?.placa || '')}`,
+    extraCss: '.c{text-align:center;width:28px} .p{color:#555;font-size:9.5px} td.ass{width:150px;border-left:.25px solid #bbb} @media print{h2{page-break-after:avoid}}',
+    corpo: `<h2>1. Dados da carga</h2>
+    <table class="info"><tr><td>Data</td><td>${dateBR(carga.data)}</td><td><b>Veículo</b></td><td>${esc(veiculo?.codigo || '')} ${esc(veiculo?.placa || '')}</td></tr>
+      <tr><td>Motorista</td><td>${esc(carga.motorista || veiculo?.motorista || '')}</td><td><b>Peso / entregas</b></td><td>${kg(m.kg)} kg · ${stops.length}</td></tr>
+      <tr><td>Volume estimado</td><td>${m.m3.toFixed(1).replace('.', ',')} m³</td><td><b>Trajeto previsto</b></td><td>${kg(m.km)} km · ${m.horas.toFixed(1).replace('.', ',')} h</td></tr>
+      <tr><td>Saída</td><td>&nbsp;</td><td><b>Volta / km final</b></td><td>&nbsp;</td></tr></table>
+    <h2>2. Ordem de carregamento (a última entrega entra primeiro)</h2><table><thead><tr><th class="c">#</th><th>Cliente</th><th>Cidade</th><th>Notas</th><th class="n">Vol.</th><th class="n">kg</th></tr></thead><tbody>${linhas(stops.slice().reverse(), true)}</tbody></table>
+    <h2>3. Ordem de entrega</h2><table><thead><tr><th class="c">#</th><th>Cliente / endereço</th><th>Cidade</th><th>Notas</th><th class="n">Vol.</th><th class="n">kg</th><th>Recebido por / assinatura</th></tr></thead><tbody>${linhas(stops, false)}</tbody></table>`,
+    rodape: `Romaneio emitido pela plataforma · ${esc(state.empresa.nome || '')}` });
 }
 
 // ---------------------------------------------------------------- mapa simples (sem mapa de fundo): pontos pelas coordenadas e o trajeto

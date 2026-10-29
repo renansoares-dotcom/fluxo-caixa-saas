@@ -3,6 +3,7 @@ import { sb, state, q, fetchAll } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, today, fail, toast, modal, confirmDialog, exportXLSX } from '../lib/ui.js';
 import { cadCompras, ST_PED, badge, ABERTOS, qtd, inp, unit, num, diasTxt, lerDias, podeAprovar } from '../lib/compras.js';
 import { carregarProdutos, datalistProdutos, ligarItensProduto, produtoDoItem } from '../lib/produtos.js';
+import { abrirRelatorio } from '../lib/relatorio.js';
 
 export const title = 'Pedidos de compra';
 const ui = { filtro: 'andamento', busca: '' };
@@ -173,22 +174,20 @@ async function abrir(p, root) {
   }
 }
 
-function imprimir(p) {
+async function imprimir(p) {
   const f = C.forById[p.favorecido_id], w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Pedido de compra PC ${p.numero}</title><style>
-    body{font-family:Arial,sans-serif;font-size:12px;margin:28px;color:#111} h1{font-size:18px;margin:0} table{width:100%;border-collapse:collapse;margin-top:14px}
-    th,td{border:1px solid #999;padding:5px 7px;text-align:left} td.n,th.n{text-align:right} .cab{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px}
-    .g{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-top:12px} .ass{margin-top:60px;display:flex;gap:60px} .ass div{border-top:1px solid #111;padding-top:4px;width:240px;text-align:center}</style></head><body>
-    <div class="cab"><div><h1>PEDIDO DE COMPRA Nº ${p.numero}</h1><div>${esc(state.empresa.nome || '')}</div></div><div>Data: ${dateBR(p.data_pedido)}${p.pedido_iniflex ? `<br>Iniflex: ${esc(p.pedido_iniflex)}` : ''}</div></div>
-    <div class="g"><div><b>Fornecedor:</b> ${esc(f?.nome || '')}</div><div><b>CNPJ/CPF:</b> ${esc(f?.documento || '')}</div>
-      <div><b>Entrega prevista:</b> ${dateBR(p.entrega_prevista) || 'a combinar'}</div><div><b>Pagamento:</b> ${esc(p.condicao_pagamento || '')} ${diasTxt(p.parcelas_dias)}</div></div>
+  await abrirRelatorio({ janela: w, nome: `Pedido de compra PC ${p.numero}`, titulo: `Pedido de compra nº ${p.numero}`,
+    subtitulo: `Data do pedido ${dateBR(p.data_pedido)}${p.pedido_iniflex ? ` · Iniflex ${esc(p.pedido_iniflex)}` : ''}`,
+    corpo: `<h2>1. Fornecedor e condições</h2>
+    <table class="info"><tr><td>Fornecedor</td><td>${esc(f?.nome || '')}</td></tr><tr><td>CNPJ/CPF</td><td>${esc(f?.documento || '')}</td></tr>
+      <tr><td>Entrega prevista</td><td>${dateBR(p.entrega_prevista) || 'a combinar'}</td></tr><tr><td>Pagamento</td><td>${esc(p.condicao_pagamento || '')} ${diasTxt(p.parcelas_dias)}</td></tr></table>
+    <h2>2. Itens</h2>
     <table><thead><tr><th>#</th><th>Descrição</th><th>Unid.</th><th class="n">Quant.</th><th class="n">Unitário</th><th class="n">Total</th></tr></thead><tbody>
     ${p.itens.map((i, k) => `<tr><td>${k + 1}</td><td>${esc(i.descricao)}${i.ncm ? ` (NCM ${esc(i.ncm)})` : ''}</td><td>${esc(i.unidade)}</td><td class="n">${qtd(i.quantidade)}</td><td class="n">${unit(i.valor_unitario)}</td><td class="n">${money(i.quantidade * i.valor_unitario)}</td></tr>`).join('')}
-    ${+p.frete ? `<tr><td colspan="5">Frete</td><td class="n">${money(p.frete)}</td></tr>` : ''}${+p.desconto ? `<tr><td colspan="5">Desconto</td><td class="n">−${money(p.desconto)}</td></tr>` : ''}
-    <tr><td colspan="5"><b>Total</b></td><td class="n"><b>${money(p.total)}</b></td></tr></tbody></table>
+    ${+p.frete ? `<tr><td colspan="5">Frete</td><td class="n">${money(p.frete)}</td></tr>` : ''}${+p.desconto ? `<tr><td colspan="5">Desconto</td><td class="n">−${money(p.desconto)}</td></tr>` : ''}</tbody>
+    <tfoot><tr><td colspan="5">Total</td><td class="n">${money(p.total)}</td></tr></tfoot></table>
     ${p.observacao ? `<p><b>Observação:</b> ${esc(p.observacao)}</p>` : ''}
     <p style="margin-top:14px">Informar o número deste pedido na nota fiscal.</p>
-    <div class="ass"><div>Comprador</div><div>Aprovação</div></div>
-    <script>window.onload=()=>window.print()</script></body></html>`);
-  w.document.close();
+    <div class="ass"><div>Comprador</div><div>Aprovação</div></div>`,
+    rodape: `Pedido de compra emitido pela plataforma · ${esc(state.empresa.nome || '')}` });
 }
