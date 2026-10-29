@@ -4,6 +4,7 @@ import { $, $$, esc, money, dateBR, today, fail, toast, modal, confirmDialog, ex
 import { cadCompras, ST_PED, badge, ABERTOS, qtd, inp, unit, num, diasTxt, lerDias, podeAprovar } from '../lib/compras.js';
 import { carregarProdutos, datalistProdutos, ligarItensProduto, produtoDoItem } from '../lib/produtos.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
+import { conversaNoModal } from '../lib/mini-chat.js';
 
 export const title = 'Pedidos de compra';
 const ui = { filtro: 'andamento', busca: '' };
@@ -151,6 +152,7 @@ async function abrir(p, root) {
       ${lancs.map(l => `<tr><td>${dateBR(l.data)}</td><td>${l.tipo === 'previsao' ? 'Previsão do pedido' : 'Parcela da nota'}</td><td class="wrap">${esc(l.descricao || '')}</td><td class="num">${money(l.valor)}</td><td>${l.status}</td></tr>`).join('')}</tbody></table></div>`
       : (ABERTOS.includes(p.status) && state.papel !== 'compras' && C.parametros?.previsao_automatica !== false ? '<p class="small muted">Sem previsão no contas a pagar.</p>' : '')}`,
     foot: '<div id="pc-acoes" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%"></div>' });
+  conversaNoModal(m, 'compras_pedido', p.id);
   const ac = $('#pc-acoes', m.el);
   const btn = (t, cls, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = t; b.onclick = fn; ac.appendChild(b); };
   const mudar = async (dados, msg) => { try { await q(sb.from('compras_pedidos').update(dados).eq('id', p.id)); toast(msg); m.close(); await carregar(root); abrir(P.find(x => x.id === p.id), root); } catch (err) { fail(err); } };

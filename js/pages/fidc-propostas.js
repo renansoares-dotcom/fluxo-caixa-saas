@@ -6,6 +6,7 @@ import { notasSemTitulo, gerarContasReceber } from '../lib/nfe-receb.js';
 import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formData, parseNum, exportXLSX, loading, MESES_CURTO, logoPNG } from '../lib/ui.js';
 import { condicaoDe, condicaoDoFundo, prazos, desagioTitulo } from '../lib/fidc-condicoes.js';
 import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
+import { conversaNoModal } from '../lib/mini-chat.js';
 
 export const title = 'Propostas de borderô';
 
@@ -436,6 +437,7 @@ async function detalhe(p, root) {
         ${itens.map(i => `<tr><td>${dateBR(i.vencimento)}</td><td class="num">${i.prazo ?? ''}</td><td class="wrap">${esc(i.sacado || '')}</td><td>${esc(i.documento || '')}</td><td class="num">${money(i.valor)}</td><td class="num">${money(i.custo_estimado)}</td>${p.comparativo ? `<td>${esc(i.situacao_bordero || '')}</td>` : ''}</tr>`).join('')}</tbody></table></div>`}`,
     foot: `<button class="btn" id="pdfp" style="margin-right:auto">PDF para aprovação</button>${base ? '<button class="btn" id="expi">Exportar Excel</button>' : ''}${p.status === 'Aprovada' && ed && !base ? '<button class="btn" id="cmpb">Comparar com borderô original</button>' : ''}${ed && ['Pendente', 'Aprovada'].includes(p.status) ? '<button class="btn" id="dupl">Duplicatas para endosso</button>' : ''}${acoes.join('')}<button class="btn" data-close>Fechar</button>`,
   });
+  conversaNoModal(m, 'fidc_proposta', p.id);
   const act = async (fn, msg) => { try { await fn(); toast(msg); m.close(); await carregar(); desenhar(root); } catch (e) { fail(e); } };
   $('#pdfp', m.el).onclick = () => pdfProposta(p, fu, itens);
   $('#expi', m.el) && ($('#expi', m.el).onclick = () => exportXLSX($('#titp', m.el), `bordero_${fu.nome}_${p.comparativo?.bordero || p.numero}`));

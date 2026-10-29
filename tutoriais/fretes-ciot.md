@@ -1,8 +1,8 @@
 ---
 titulo: Fretes e CIOT
 tela: Logística › Fretes e CIOT
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -115,8 +115,18 @@ Inclua sempre uma linha nova com a nova vigência, sem apagar a antiga: os frete
 
 **Cancelei um frete e o lançamento continua no fluxo.** O cancelamento não apaga o lançamento programado. Exclua o lançamento em Lançamentos, se for o caso.
 
-## 7. Histórico de alterações
+## 7. Conversa sobre o registro
+
+No topo da janela do frete ficam dois botões das **Conversas**:
+
+- **💬 Conversa** abre o bate-papo da equipe sobre este registro. Cada registro tem uma conversa só, e só entra quem consegue ver o registro.
+- **↗ Enviar no chat** manda o registro como cartão numa conversa. Quem recebe clica no cartão e abre o registro.
+
+Veja o manual **Conversas** para os detalhes.
+
+## 8. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: transportadores, ficha do frete, piso mínimo, pagamento com trava para autônomo, conformidade do mês com dispensa justificada e relatório. |
+| 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do frete (Conversas, etapa 2). |

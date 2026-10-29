@@ -1,8 +1,8 @@
 ---
 titulo: FIDC — propostas de borderô e análise
 tela: Financeiro › Propostas de borderô e Análise FIDC
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -104,8 +104,18 @@ Em **Condições por grupo de sacados**, cadastre as taxas diferentes por grupo 
 
 **A taxa simulada não bate com o borderô do fundo.** Confira as condições do fundo (taxa, dias de compensação e tarifas) na aba Condições dos fundos e compare usando **Comparar com borderô original**.
 
-## 7. Histórico de alterações
+## 7. Conversa sobre o registro
+
+No topo da janela da proposta ficam dois botões das **Conversas**:
+
+- **💬 Conversa** abre o bate-papo da equipe sobre este registro. Cada registro tem uma conversa só, e só entra quem consegue ver o registro.
+- **↗ Enviar no chat** manda o registro como cartão numa conversa. Quem recebe clica no cartão e abre o registro.
+
+Veja o manual **Conversas** para os detalhes.
+
+## 8. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: propostas de borderô (simulação, comparação entre fundos, verificações, aprovação, comparação com o borderô original e condições dos fundos) e análise FIDC. |
+| 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** da proposta (Conversas, etapa 2). |

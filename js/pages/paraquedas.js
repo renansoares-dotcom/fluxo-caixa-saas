@@ -6,6 +6,7 @@ import { sb, state, q, fetchAll, loadCadastros, podeEditar } from '../lib/data.j
 import { $, esc, money, dateBR, fail, toast, modal, options, parseNum, exportXLSX, today, logoPNG } from '../lib/ui.js';
 import { dispararAvisos } from '../lib/notif.js';
 import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
+import { conversaNoModal } from '../lib/mini-chat.js';
 
 export const title = 'Pagamentos Antecipados';
 const ST = { aguardando: 'Aguardando aprovação', aprovado: 'Aprovado', rejeitado: 'Rejeitado', cancelado: 'Cancelado', pago: 'Pago — aguardando nota', nota_recebida: 'Nota recebida' };
@@ -213,6 +214,7 @@ function editar(p, root, soVer = false, pre = null) {
     </div>` : ''}
     ${p?.aprovado_em ? `<p class="small muted">${p.status === 'rejeitado' ? 'Rejeitado' : 'Aprovado'} em ${dateBR(p.aprovado_em)}.</p>` : ''}`,
     foot: soVer ? '<button class="btn" data-close>Fechar</button>' : `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">${novo ? 'Enviar para aprovação' : p.status === 'rejeitado' ? 'Reenviar para aprovação' : 'Salvar'}</button>` });
+  if (!novo) conversaNoModal(m, 'paraquedas', p.id);
   if (soVer) return;
   // escolher um fornecedor do cadastro preenche CNPJ
   $('#rs', m.el).onchange = () => { const f = favs.find(x => x.nome === $('#rs', m.el).value.trim()); if (f && f.documento && !dig($('#doc', m.el).value)) $('#doc', m.el).value = fmtDoc(f.documento); };

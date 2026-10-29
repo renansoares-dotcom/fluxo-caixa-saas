@@ -1,8 +1,8 @@
 ---
 titulo: Compras — requisições, pedidos e recebimentos
 tela: Compras › Painel, Requisições e cotações, Pedidos de compra e Recebimentos
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -115,8 +115,18 @@ Os recebimentos ficam em **Últimos recebimentos**, com as divergências encontr
 
 **Errei o fornecedor de um pedido aprovado.** Use **Voltar para rascunho**, corrija e aprove de novo. Se já houver recebimento, cancele e faça outro pedido.
 
-## 7. Histórico de alterações
+## 7. Conversa sobre o registro
+
+No topo da janela do pedido de compra ficam dois botões das **Conversas**:
+
+- **💬 Conversa** abre o bate-papo da equipe sobre este registro. Cada registro tem uma conversa só, e só entra quem consegue ver o registro.
+- **↗ Enviar no chat** manda o registro como cartão numa conversa. Quem recebe clica no cartão e abre o registro.
+
+Veja o manual **Conversas** para os detalhes.
+
+## 8. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: painel, requisição, cotação e mapa comparativo, pedido com alçada e impressão, recebimento conferido com a nota. |
+| 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do pedido de compra (Conversas, etapa 2). |

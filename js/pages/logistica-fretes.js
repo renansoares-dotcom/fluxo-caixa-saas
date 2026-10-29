@@ -6,6 +6,7 @@ import { $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, options, 
 import { abrirRelatorio } from '../lib/relatorio.js';
 import { podeLogistica } from '../lib/logistica.js';
 import { inp, num } from '../lib/compras.js';
+import { conversaNoModal } from '../lib/mini-chat.js';
 import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, coefDe, pendencias, pendenciasTransp, tipoPeloDoc, lerVeiculos, veiculosTxt } from '../lib/fretes.js';
 
 export const title = 'Logística — fretes e CIOT';
@@ -53,7 +54,10 @@ export async function render(root) {
   $('#lf-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
   try { await carregar(); } catch (err) { console.error(err); $('#lf-corpo', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Se a migração <b>20261028000054_fretes_ciot.sql</b> ainda não rodou, rode-a no SQL Editor do Supabase.</div></div>'; return; }
   const corpo = $('#lf-corpo', root);
+  const ab = state.abrir?.tipo === 'frete' ? state.abrir : null;
+  if (ab) { delete state.abrir; ui.aba = 'fretes'; $$('#lf-abas .chip', root).forEach(c => c.classList.toggle('on', c.dataset.a === 'fretes')); }
   try {
+    if (ab) { fretes(corpo, root); const fr = B.F.find(x => x.id === ab.id) || await q(sb.from('log_fretes').select('*').eq('id', ab.id).maybeSingle()).catch(() => null); if (fr) ficha(fr, root); return; }
     if (ui.aba === 'transp') return transportadores(corpo, root);
     if (ui.aba === 'conf') return await conformidade(corpo, root);
     if (ui.aba === 'piso') return piso(corpo, root);
@@ -152,6 +156,7 @@ function ficha(f0, root, pre = {}) {
     foot: pode ? `${f0 && f0.status !== 'cancelado' && !(l?.status === 'Pago') ? '<button class="btn danger" id="fr-canc" style="margin-right:auto">Cancelar frete</button>' : ''}
       ${f0 && !f0.lancamento_id && f0.status !== 'cancelado' ? '<button class="btn" id="fr-prog">Programar pagamento</button><button class="btn" id="fr-lig">Ligar a lançamento</button>' : ''}
       <button class="btn" data-close>Fechar</button><button class="btn primary" id="fr-ok">Salvar</button>` : '<button class="btn" data-close>Fechar</button>' });
+  if (f0?.id) conversaNoModal(md, 'log_frete', f0.id);
   const g = (id) => $('#' + id, md.el);
   const ler = () => { const [tb, tc] = (g('fr-tc').value || 'A|geral').split('|'); const n = (id) => { const s = g(id).value.trim(); return s ? num(s) : null; };
     return { transportador_id: g('fr-t').value || null, data: g('fr-d').value, carga_id: g('fr-k').value || null, notas: g('fr-n').value.trim() || null, origem: g('fr-o').value.trim() || null,

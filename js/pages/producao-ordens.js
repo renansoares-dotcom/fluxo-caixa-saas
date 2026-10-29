@@ -6,6 +6,7 @@ import { cadProducao, ST_OP, ST_ET, podePCP, podeApontar, necessidadeMaterial, i
 import { carregarProdutos, datalistProdutos, acharProduto } from '../lib/produtos.js';
 import { badge, qtd, num } from '../lib/compras.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
+import { conversaNoModal } from '../lib/mini-chat.js';
 
 export const title = 'Ordens de produção';
 const ui = { filtro: 'abertas', busca: '' };
@@ -143,6 +144,7 @@ async function abrir(o, root) {
       <div class="grid-form" style="margin-top:6px"><label class="span2">Material<input id="oc-p" list="oc-dl">${datalistProdutos('oc-dl', PRODS.filter(p => p.tipo !== 'produto_acabado'))}</label>
         <label>Quantidade<input id="oc-q"></label><label>Lote / NF<input id="oc-l"></label><div style="align-self:end"><button class="btn small" id="oc-ok">+ Consumo</button></div></div>` : ''}`,
     foot: '<div id="op-ac" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%"></div>' });
+  conversaNoModal(m, 'prod_ordem', o.id);
   const ac = $('#op-ac', m.el), btn = (t, cls, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = t; b.onclick = fn; ac.appendChild(b); };
   const reabrir = async () => { m.close(); await carregar(root); abrir(OPS.find(x => x.id === o.id), root); };
   const mudar = async (dados, msg) => { try { await q(sb.from('prod_ordens').update(dados).eq('id', o.id)); toast(msg); reabrir(); } catch (err) { fail(err); } };

@@ -1,6 +1,7 @@
 // Formulário de lançamento (novo / editar / duplicar) reutilizado em várias telas
 import { sb, state, q, podeEditar, loadCadastros } from './data.js';
 import { modal, options, esc, $, toast, fail, parseNum, today, money } from './ui.js';
+import { conversaNoModal } from './mini-chat.js';
 
 // transferência é um lançamento só (origem → destino) no plano de saída 3.02; os planos de entrada de transferência
 // (3.01) só aparecem quando o lançamento já é um deles (transferências antigas, em duas pontas)
@@ -78,6 +79,7 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
     `${editando ? '<button class="btn danger" id="lf-del" style="margin-right:auto">Excluir</button>' + hist + '<button class="btn" id="lf-dup">Duplicar</button>' : ''}
      <button class="btn" data-close>Cancelar</button><button class="btn primary" id="lf-save">Salvar</button>`;
   const m = modal({ title: editando ? 'Editar lançamento' : 'Novo lançamento', body: (editando && l.fidc_proposta_id ? '<p class="small muted" style="margin-top:0">Título vinculado a uma proposta de borderô FIDC.</p>' : '') + body, foot });
+  if (editando) conversaNoModal(m, 'lancamento', l.id);
   const form = $('#lanc-form', m.el);
   // transferência: "De" (conta) → "Para" (destino)
   const modoTransf = () => {

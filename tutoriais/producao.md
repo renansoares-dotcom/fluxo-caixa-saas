@@ -1,8 +1,8 @@
 ---
 titulo: Produção — PCP, ordens, programação e planta
 tela: Produção › Painel, Planta da fábrica, Ordens de produção, Programação, Cadastros e Importar do Iniflex
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -105,8 +105,18 @@ Tirar uma máquina da planta não a apaga do cadastro.
 
 **A máquina aparece sem OEE.** Falta a capacidade (kg/h) no cadastro da máquina.
 
-## 10. Histórico de alterações
+## 10. Conversa sobre o registro
+
+No topo da janela da ordem de produção ficam dois botões das **Conversas**:
+
+- **💬 Conversa** abre o bate-papo da equipe sobre este registro. Cada registro tem uma conversa só, e só entra quem consegue ver o registro.
+- **↗ Enviar no chat** manda o registro como cartão numa conversa. Quem recebe clica no cartão e abre o registro.
+
+Veja o manual **Conversas** para os detalhes.
+
+## 11. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: cadastros, OPs com necessidade de material e rastreabilidade, programação, painel com OEE, planta da fábrica e importação do Iniflex. |
+| 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** da ordem de produção (Conversas, etapa 2). |

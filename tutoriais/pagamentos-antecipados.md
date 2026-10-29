@@ -1,8 +1,8 @@
 ---
 titulo: Pagamentos Antecipados
 tela: Financeiro › Pagamentos Antecipados
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -140,8 +140,18 @@ Clique em **Cancelar** e escreva o motivo. Se houver lançamento em aberto no fl
 
 **Paguei a menos.** Registre o complemento (item 4.5). Se o valor registrado estiver errado, use **Corrigir valor** (item 4.6).
 
-## 7. Histórico de alterações
+## 7. Conversa sobre o registro
+
+No topo da janela do pagamento antecipado ficam dois botões das **Conversas**:
+
+- **💬 Conversa** abre o bate-papo da equipe sobre este registro. Cada registro tem uma conversa só, e só entra quem consegue ver o registro.
+- **↗ Enviar no chat** manda o registro como cartão numa conversa. Quem recebe clica no cartão e abre o registro.
+
+Veja o manual **Conversas** para os detalhes.
+
+## 8. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: pedido, aprovação, programação, vários pagamentos e comprovantes, ligar a nota e relatório no padrão IPLAMM. |
+| 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do pagamento antecipado (Conversas, etapa 2). |

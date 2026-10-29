@@ -1,8 +1,8 @@
 ---
 titulo: Lançamentos e contas a pagar / receber
 tela: Financeiro › Lançamentos e Contas a pagar / receber
-versao: 1.0
-atualizado: 2026-10-28
+versao: 1.1
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -110,8 +110,18 @@ Só entram títulos de receita (1.01) em aberto que não estejam em outra propos
 
 **Importei o relatório do ERP duas vezes.** O que já existe (mesmo dia, valor e conta) é pulado. Mesmo assim, confira a revisão antes de gravar.
 
-## 7. Histórico de alterações
+## 7. Conversa sobre o registro
+
+No topo da janela do lançamento ficam dois botões das **Conversas**:
+
+- **💬 Conversa** abre o bate-papo da equipe sobre este registro. Cada registro tem uma conversa só, e só entra quem consegue ver o registro.
+- **↗ Enviar no chat** manda o registro como cartão numa conversa. Quem recebe clica no cartão e abre o registro.
+
+Veja o manual **Conversas** para os detalhes.
+
+## 8. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: lançamentos, transferência única, juros e multa, importações (NFs, XML e ERP) e contas a pagar / receber com baixa em lote e borderô. |
+| 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do lançamento (Conversas, etapa 2). |

@@ -7,6 +7,8 @@ import { iniciarSelectBusca } from './lib/select-busca.js';
 import { manualDaRota } from './lib/tutoriais.js';
 import { verificarAoEntrar, gerenciar as gerenciarMFA } from './lib/mfa.js';
 import { iniciarChat, pararChat, setAberta as chatFechado } from './lib/chat.js';
+import { alternarMini, fecharMini } from './lib/mini-chat.js';
+import { abrirLancamento } from './lib/lanc-form.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -163,9 +165,11 @@ function trocarSenha(recuperacao = false) {
 }
 $('#trocar-senha').onclick = () => trocarSenha(false);
 
-const logout = async () => { pararNotificacoes(); pararChat(); await sb.auth.signOut(); location.hash = ''; };
+const logout = async () => { pararNotificacoes(); fecharMini(); pararChat(); await sb.auth.signOut(); location.hash = ''; };
 $('#logout').onclick = logout; $('#logout-2').onclick = logout;
 $('#mfa-btn') && ($('#mfa-btn').onclick = () => gerenciarMFA());
+// balão do topo: no computador abre o mini-chat por cima da tela; no celular vai para a tela Conversas
+$('#chat-btn') && ($('#chat-btn').onclick = (e) => { if (matchMedia('(max-width: 900px)').matches || location.hash.startsWith('#/conversas')) return; e.preventDefault(); alternarMini(); });
 
 // ---------- Empresas ----------
 async function escolherEmpresa() {
@@ -199,7 +203,7 @@ $('#empresa-form').onsubmit = async (e) => {
     entrarEmpresa(emp, 'admin');
   } catch (err) { fail(err); }
 };
-$('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'); pararChat(); state.empresa = null; state.cad = null; escolherEmpresa(); };
+$('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'); fecharMini(); pararChat(); state.empresa = null; state.cad = null; escolherEmpresa(); };
 
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
 function aplicarAreas() {
@@ -274,6 +278,10 @@ async function render() {
   lerCores();
   chatFechado(null);            // a tela Conversas diz qual conversa está aberta
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
+  // link direto para um registro (cartão das Conversas): #/<tela>?abrir=<id> abre o registro na tela
+  { const ab = new URLSearchParams(location.hash.split('?')[1] || '').get('abrir');
+    const TIPO = { 'compras/pedidos': 'pedido', 'producao/ordens': 'op', 'fidc-propostas': 'proposta', 'paraquedas': 'pa', 'logistica/fretes': 'frete', 'lancamentos': 'lancamento' };
+    if (ab && TIPO[route]) { state.abrir = { tipo: TIPO[route], id: ab }; history.replaceState(null, '', '#/' + route); } }
   if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
   if (state.papel === 'vendas' && !rotaDeVendas(route)) { location.hash = '#/comercial'; return; }
   if (state.papel === 'producao' && !rotaDeProducao(route)) { location.hash = '#/producao/terminal'; return; }
@@ -302,7 +310,15 @@ async function render() {
     if (seq !== renderSeq) return;
     page.innerHTML = '';
     await mod.render(page);
+    if (state.abrir?.tipo === 'lancamento') { const id = state.abrir.id; delete state.abrir; abrirLancamentoPorId(id); }
   } catch (e) { fail(e); page.innerHTML = `<div class="card empty">Não foi possível carregar esta tela.<br><span class="small">${esc(e.message || e)}</span></div>`; }
+}
+async function abrirLancamentoPorId(id) {
+  try {
+    const l = await q(sb.from('lancamentos').select('*').eq('id', id).maybeSingle());
+    if (!l) return toast('Lançamento não encontrado (pode ter sido excluído)', true);
+    abrirLancamento(l, () => render());
+  } catch (e) { fail(e); }
 }
 window.addEventListener('hashchange', render);
 export const rerender = render;
