@@ -1,7 +1,7 @@
 ---
 titulo: Fretes e CIOT
 tela: Logística › Fretes e CIOT
-versao: 1.2
+versao: 1.3
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -115,6 +115,10 @@ Para deixar o MDF-e da IPLAMM pronto:
 
 **Resumo para impressão**: gera uma folha com todos os dados no formato do MDF-e. Use enquanto a emissão pela plataforma não estiver ligada: emita no sistema emissor atual a partir dela.
 
+**Pedido do CIOT**: quando a IPLAMM contrata um autônomo, a lista do topo também mostra o que falta para pedir o CIOT à IPEF: RNTRC, motorista com CPF, origem e destino com código IBGE, peso, natureza da carga, km, valor acima do piso e de quem é a conta indicada. Quando a IPEF for ligada à plataforma, o pedido sai daqui.
+
+**XML (teste)**: baixa o XML do MDF-e no leiaute oficial 3.00, em homologação (série 999) e sem assinatura. Serve para conferir os dados com o emissor que for contratado; não vale como documento. O endereço do emitente vem da NF-e própria mais recente.
+
 **Padrões do MDF-e**: seguradora, apólice, IPEF, produto, carregamento e responsável pelo CIOT se repetem em quase toda viagem. Grave uma vez em **Salvar como padrão** (na janela do MDF-e) ou em **Padrões do MDF-e** (no painel). Os próximos fretes já vêm preenchidos, e dá para mudar em cada frete.
 
 ## 5. Regras e travas
@@ -166,3 +170,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.0 | 28/10/2026 | Primeira versão do manual: transportadores, ficha do frete, piso mínimo, pagamento com trava para autônomo, conformidade do mês com dispensa justificada e relatório. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do frete (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Preparo do MDF-e com CIOT (NT 2026.001): campo **Quem emite o MDF-e**, janela **Dados do MDF-e** com busca das NF-e, painel **MDF-e · 23/11**, padrões do MDF-e e resumo para impressão. |
+| 1.3 | 29/10/2026 | Conferência do pedido de CIOT à IPEF na janela do MDF-e e botão **XML (teste)** com o XML do MDF-e no leiaute 3.00, conferido contra os esquemas oficiais. |

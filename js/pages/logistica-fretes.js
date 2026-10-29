@@ -8,6 +8,8 @@ import { podeLogistica } from '../lib/logistica.js';
 import { inp, num } from '../lib/compras.js';
 import { conversaNoModal } from '../lib/mini-chat.js';
 import * as MD from '../lib/mdfe.js';
+import { gerarXMLMDFe } from '../lib/mdfe-xml.js';
+import { pedidoCIOT, faltasCIOT, empresaGeraCIOT } from '../lib/ipef.js';
 import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, coefDe, pendencias, pendenciasTransp, tipoPeloDoc, lerVeiculos, veiculosTxt } from '../lib/fretes.js';
 
 export const title = 'Logística — fretes e CIOT';
@@ -472,7 +474,7 @@ async function fichaMDFe(f, root) {
   const vt = (t?.veiculos || []).find(v => v.placa === m.veiculo.placa);
   if (vt) for (const k of ['renavam', 'tara', 'cap_kg', 'uf', 'tp_rod', 'tp_car']) if (m.veiculo[k] == null || m.veiculo[k] === '') m.veiculo[k] = vt[k] ?? m.veiculo[k];
   const md = modal({ title: `MDF-e do frete nº ${f.numero}`, wide: true, body: '<div id="mf-corpo"></div>',
-    foot: `<button class="btn" id="mf-res" style="margin-right:auto">Resumo para impressão</button>${pode ? '<button class="btn" id="mf-pad" title="Seguradora, IPEF, produto, carregamento e responsável pelo CIOT passam a vir preenchidos nos próximos fretes">Salvar como padrão</button>' : ''}
+    foot: `<button class="btn" id="mf-res">Resumo para impressão</button><button class="btn" id="mf-xml" style="margin-right:auto" title="XML do MDF-e no leiaute 3.00, em homologação e sem assinatura: serve para conferir com o emissor que for contratado">XML (teste)</button>${pode ? '<button class="btn" id="mf-pad" title="Seguradora, IPEF, produto, carregamento e responsável pelo CIOT passam a vir preenchidos nos próximos fretes">Salvar como padrão</button>' : ''}
       <button class="btn" data-close>Fechar</button>${pode ? '<button class="btn primary" id="mf-ok">Salvar</button>' : ''}` });
   const corpo = $('#mf-corpo', md.el);
   const campo = (rot, k, { tipo = 'text', ph = '', cls = '', lista = '' } = {}) => `<label class="${cls}">${rot}<input data-k="${k}" type="${tipo}" value="${esc(getP(m, k) ?? '')}" placeholder="${esc(ph)}" ${lista ? `list="${lista}"` : ''} ${dis}></label>`;
@@ -483,7 +485,9 @@ async function fichaMDFe(f, root) {
     const dias = MD.diasAte(MD.DATA_CIOT_MDFE, today());
     $('#mf-check', md.el).innerHTML = `${gr.length ? `<div class="neg"><b>Falta para emitir (${gr.length}):</b> ${esc(gr.map(x => x.txt).join('; '))}.</div>` : '<div class="pos"><b>Pronto para emitir o MDF-e.</b></div>'}
       ${av.length ? `<div class="warn">Recomendado: ${esc(av.map(x => x.txt).join('; '))}.</div>` : ''}
-      ${MD.ciotObrigatorio(fx, t) ? `<div class="small muted">CIOT obrigatório neste MDF-e (veículo de terceiro)${dias > 0 ? ` · a Sefaz passa a recusar sem CIOT em ${dias} dia(s), em 23/11/2026` : ' · a Sefaz já recusa sem CIOT (rejeição 684)'}.</div>` : ''}`;
+      ${MD.ciotObrigatorio(fx, t) ? `<div class="small muted">CIOT obrigatório neste MDF-e (veículo de terceiro)${dias > 0 ? ` · a Sefaz passa a recusar sem CIOT em ${dias} dia(s), em 23/11/2026` : ' · a Sefaz já recusa sem CIOT (rejeição 684)'}.</div>` : ''}
+      ${empresaGeraCIOT(f, t) && !MD.ciotValido(ciot) ? (() => { const fc = faltasCIOT(pedidoCIOT(fx, t, state.empresa, { padrao: B.P }));
+        return fc.length ? `<div class="small warn">Para pedir o CIOT à IPEF falta: ${esc(fc.map(x => x.txt).join('; '))}.</div>` : '<div class="small pos">Dados completos para pedir o CIOT à IPEF.</div>'; })() : ''}`;
   };
   const pintar = () => {
     const aut = ehAutonomo(t);
@@ -605,6 +609,20 @@ async function fichaMDFe(f, root) {
     } catch (err) { fail(err); }
   });
   $('#mf-res', md.el).onclick = () => resumoMDFe({ ...f, ciot, mdfe: montarSalvar() }, t);
+  $('#mf-xml', md.el).onclick = async (ev) => {
+    ev.target.disabled = true;
+    try {
+      const [e] = await q(sb.rpc('log_mdfe_emitente', { p_empresa: state.empresa.id }));
+      if (!e) throw new Error('Importe ao menos uma NF-e própria (com XML): o endereço do emitente vem dela.');
+      const emp = { ...state.empresa, cnpj: state.empresa.cnpj || e.cnpj, ie: state.empresa.ie || e.ie, razao_social: state.empresa.razao_social || e.xnome };
+      const ender = { xLgr: e.xlgr, nro: e.nro, xCpl: e.xcpl, xBairro: e.xbairro, cMun: e.cmun, xMun: e.xmun, CEP: e.cep, UF: e.uf, fone: e.fone };
+      const { xml, chave } = gerarXMLMDFe({ ...f, ciot, mdfe: montarSalvar() }, t, emp, ender, { tpAmb: 2, serie: 999, nMDF: f.numero, padrao: B.P });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
+      a.download = `MDFe-teste-frete-${f.numero}.xml`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast(`XML de teste gerado (homologação, série 999, sem assinatura) · chave ${chave.slice(0, 6)}…`);
+    } catch (err) { fail(err); }
+    ev.target.disabled = false;
+  };
 }
 
 function resumoMDFe(f, t) {

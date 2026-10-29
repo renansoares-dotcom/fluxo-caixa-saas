@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: xmllint (esquemas do MDF-e)
+        run: sudo apt-get install -y -qq libxml2-utils >/dev/null
       - run: node tests/verificar-sintaxe.mjs
       - run: node --test "tests/*.test.js"
   banco:
