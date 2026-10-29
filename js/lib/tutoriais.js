@@ -2,6 +2,8 @@
 // manual dela atualizado (texto em tutoriais/<id>.md, histórico de alterações e PDF em tutoriais/pdf/<id>.pdf).
 // `rotas` liga o botão "?" do topo de cada tela ao manual dela. A ordem aqui é a ordem da tela Tutoriais (a do menu).
 export const MANUAIS = [
+  { id: 'conversas', titulo: 'Conversas', area: 'Comunicação', rotas: ['conversas'],
+    resumo: 'Chat da equipe: conversas individuais e em grupo, fotos e arquivos, lida, silenciar e avisos no celular.' },
   { id: 'paineis', titulo: 'Painéis — Minha Manhã, Decisão do Dia, Decision Center e dashboards', area: 'Painéis', rotas: ['hoje', 'decisao-dia', 'decisoes', 'executivo', 'dashboard'],
     resumo: 'O que precisa de atenção hoje, a decisão de pagamentos do dia com aprovação, recomendações da semana e a visão da direção.' },
   { id: 'lancamentos', titulo: 'Lançamentos e contas a pagar / receber', area: 'Financeiro', rotas: ['lancamentos', 'abertos'],

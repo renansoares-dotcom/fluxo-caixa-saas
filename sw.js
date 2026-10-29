@@ -5,10 +5,19 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { titulo: e.data && e.data.text() }; }
-  e.waitUntil(self.registration.showNotification(d.titulo || 'IPLAMM · Fluxo de Caixa', {
-    body: d.corpo || '', tag: d.tag, icon: 'assets/icon-192.png', badge: 'assets/icon-192.png',
-    data: { link: d.link || '' }, requireInteraction: /URGENTE/.test(d.titulo || ''),
-  }));
+  e.waitUntil((async () => {
+    // mensagem de Conversas com a plataforma aberta e na frente: o próprio app já tocou o som — não duplica o aviso
+    if (String(d.tag || '').startsWith('chat-')) {
+      const abas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      if (abas.some(c => c.visibilityState === 'visible' && c.focused)) return;
+    }
+    // mensagens da mesma conversa substituem o aviso anterior (como no WhatsApp)
+    const tag = String(d.tag || '').startsWith('chat-') && d.link ? 'chat-' + d.link : d.tag;
+    return self.registration.showNotification(d.titulo || 'IPLAMM · Fluxo de Caixa', {
+      body: d.corpo || '', tag, renotify: !!tag && tag.startsWith('chat-'), icon: 'assets/icon-192.png', badge: 'assets/icon-192.png',
+      data: { link: d.link || '' }, requireInteraction: /URGENTE/.test(d.titulo || ''),
+    });
+  })());
 });
 
 self.addEventListener('notificationclick', (e) => {

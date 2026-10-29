@@ -189,7 +189,7 @@ begin
   select v_id, m.user_id, p_empresa from membros m where m.empresa_id = p_empresa and m.user_id = any(coalesce(p_users, '{}')) and m.user_id <> eu
   on conflict do nothing;
   perform public._chat_sistema(v_id, public._chat_nome(eu, p_empresa) || ' criou o grupo "' || left(trim(p_nome), 80) || '"');
-  update chat_conversas c set ultima_msg_em = now(), ultima_msg_texto = 'Grupo criado', ultima_msg_autor = eu where c.id = v_id;
+  update chat_conversas c set ultima_msg_em = now(), ultima_msg_texto = 'Grupo criado' where c.id = v_id;
   return v_id;
 end $$;
 

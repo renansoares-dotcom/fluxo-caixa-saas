@@ -37,7 +37,7 @@ export function pararNotificacoes() { if (timer) clearInterval(timer); timer = n
 async function buscar(primeira = false) {
   if (!state.empresa || !state.user) return;
   try {
-    lista = await q(sb.from('notificacoes').select('id, tipo, titulo, corpo, link, lida_em, criado_em').eq('empresa_id', state.empresa.id).order('criado_em', { ascending: false }).limit(40));
+    lista = await q(sb.from('notificacoes').select('id, tipo, titulo, corpo, link, lida_em, criado_em').eq('empresa_id', state.empresa.id).neq('tipo', 'chat').order('criado_em', { ascending: false }).limit(40));
   } catch { return; }   // tabela ainda não criada: o sino fica quieto
   const novas = lista.filter(n => !n.lida_em).length;
   const n = $('#notif-n'); if (n) { n.hidden = !novas; n.textContent = novas > 9 ? '9+' : novas; }

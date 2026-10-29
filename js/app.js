@@ -6,6 +6,7 @@ import { iniciarBusca } from './lib/busca.js';
 import { iniciarSelectBusca } from './lib/select-busca.js';
 import { manualDaRota } from './lib/tutoriais.js';
 import { verificarAoEntrar, gerenciar as gerenciarMFA } from './lib/mfa.js';
+import { iniciarChat, pararChat, setAberta as chatFechado } from './lib/chat.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -61,6 +62,7 @@ const routes = {
   'conferencia': () => import(`./pages/conferencia.js?v=${V}`),
   'fechamento': () => import(`./pages/fechamento.js?v=${V}`),
   'tutoriais': () => import(`./pages/tutoriais.js?v=${V}`),
+  'conversas': () => import(`./pages/conversas.js?v=${V}`),
   'orcamento': () => import(`./pages/orcamento.js?v=${V}`),
   'orcado-realizado': () => import(`./pages/orcado-realizado.js?v=${V}`),
   'controle-orcamento': () => import(`./pages/controle-orcamento.js?v=${V}`),
@@ -161,7 +163,7 @@ function trocarSenha(recuperacao = false) {
 }
 $('#trocar-senha').onclick = () => trocarSenha(false);
 
-const logout = async () => { pararNotificacoes(); await sb.auth.signOut(); location.hash = ''; };
+const logout = async () => { pararNotificacoes(); pararChat(); await sb.auth.signOut(); location.hash = ''; };
 $('#logout').onclick = logout; $('#logout-2').onclick = logout;
 $('#mfa-btn') && ($('#mfa-btn').onclick = () => gerenciarMFA());
 
@@ -197,7 +199,7 @@ $('#empresa-form').onsubmit = async (e) => {
     entrarEmpresa(emp, 'admin');
   } catch (err) { fail(err); }
 };
-$('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'); state.empresa = null; state.cad = null; escolherEmpresa(); };
+$('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'); pararChat(); state.empresa = null; state.cad = null; escolherEmpresa(); };
 
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
 function aplicarAreas() {
@@ -209,7 +211,7 @@ function aplicarAreas() {
 }
 // primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
 function primeiraRota() {
-  const a = $$('#nav a[data-route]').find(x => !x.hidden && !x.closest('.nav-area')?.hidden);
+  const a = $$('#nav a[data-route]').find(x => !x.hidden && !x.closest('.nav-area')?.hidden && x.dataset.route !== 'conversas');
   return a?.dataset.route || 'cadastros/plano';
 }
 const areaDaRota = (route) => ['dashboard', 'hoje', 'decisao-dia', 'decisoes', 'executivo'].includes(route) ? 'fin' : $(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
@@ -220,6 +222,7 @@ async function entrarEmpresa(emp, papel, areas) {
   state.areas = Array.isArray(areas) && areas.length ? areas : null;
   aplicarAreas();
   iniciarNotificacoes();
+  iniciarChat();
   iniciarBusca();
   iniciarSelectBusca();
   try { localStorage.setItem('fc-empresa', emp.id); } catch {}
@@ -261,14 +264,15 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil compras: Pagamentos Antecipados e o módulo Compras
 // perfil vendas (representante): só a área Comercial
 // perfil producao (operador no terminal do setor)
-const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens', 'tutoriais'].includes(r);
-const rotaDeVendas = (r) => r === 'comercial' || ['comercial/carteira', 'comercial/funil', 'tutoriais'].includes(r);
-const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos', 'tutoriais'].includes(r) || r.startsWith('compras/');
+const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens', 'tutoriais', 'conversas'].includes(r);
+const rotaDeVendas = (r) => r === 'comercial' || ['comercial/carteira', 'comercial/funil', 'tutoriais', 'conversas'].includes(r);
+const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos', 'tutoriais', 'conversas'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;
   if (!state.cad) { try { await loadCadastros(); } catch (e) { fail(e); return; } }
   lerCores();
+  chatFechado(null);            // a tela Conversas diz qual conversa está aberta
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
   if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
   if (state.papel === 'vendas' && !rotaDeVendas(route)) { location.hash = '#/comercial'; return; }
@@ -290,7 +294,7 @@ async function render() {
     { const man = manualDaRota(route), b = $('#ajuda-btn'); if (b) { b.hidden = !man || (man.rh && !temRH()); if (man) b.href = `#/tutoriais?m=${man.id}`; } }
     // trilha: Área › Seção (de onde a página fica no menu)
     { const a = $(`#nav a[data-route="${route}"]`); const area = a?.closest('.nav-area'); const sec = a?.closest('details')?.querySelector('summary')?.textContent;
-      const tit = area?.querySelector('.nav-area-tit')?.textContent; const tr = $('#page-trilha');
+      const tit = area?.querySelector('.nav-area-tit')?.firstChild?.textContent?.trim(); const tr = $('#page-trilha');
       tr.textContent = [tit, sec].filter(Boolean).join(' › '); tr.dataset.area = area?.dataset.area || ''; }
     document.title = `${mod.title} · ${state.empresa.nome}`;
     // os cadastros podem ter sido descartados no meio do caminho (sessão renovada, troca de empresa): recarrega antes de desenhar
