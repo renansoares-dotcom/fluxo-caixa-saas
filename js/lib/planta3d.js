@@ -4,7 +4,7 @@
 import { esc } from './ui.js';
 import { TIPOS_VISUAIS, COR, COR_V, pegada, lugaresCaminhoes, geoCaminhao, textoVeiculo, textoMaquina, geometriaSeta, textoSeta } from './planta.js';
 
-const URL_THREE = 'https://cdn.jsdelivr.net/npm/three@0.169.0/+esm';
+const URL_THREE = new URL('../../vendor/three-0.169.0.module.min.js', import.meta.url).href;
 let T = null;
 export async function carregarThree() {
   if (T) return T;

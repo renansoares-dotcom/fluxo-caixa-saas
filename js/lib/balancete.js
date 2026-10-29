@@ -1,9 +1,9 @@
+import { carregarPdfjs } from './pdfjs.js';
 // Leitura do balancete de verificação em PDF enviado pela contabilidade (layout GESTCONT/"BALANCETE").
 // Funciona com o PDF assinado digitalmente: a camada de texto acrescentada pela assinatura
 // (fonte maior, cinza) é ignorada e as colunas são identificadas pela posição na página.
 // Nada aqui grava no banco: devolve as contas lidas e o resultado das conferências.
 
-const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 const RX_NUM = /^(\d{1,3}(?:\.\d{3})*,\d{2})([DC]?)$/;
 const RX_CLASS = /^\d+(?:\.\d+)*$/;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -127,17 +127,7 @@ export function conferir(contas, resumo = {}) {
   return { ok: !erros.length, erros, contas: contas.length, analiticas: contas.filter(c => c.tipo === 'A').length };
 }
 
-let pdfjsP = null;
-export function carregarPdfjs() {
-  if (!pdfjsP) pdfjsP = new Promise((res, rej) => {
-    if (window.pdfjsLib) return res(window.pdfjsLib);
-    const s = document.createElement('script'); s.src = PDFJS + 'pdf.min.js';
-    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; res(window.pdfjsLib); };
-    s.onerror = () => { pdfjsP = null; rej(new Error('Não foi possível carregar o leitor de PDF')); };
-    document.head.appendChild(s);
-  });
-  return pdfjsP;
-}
+export { carregarPdfjs };
 
 export async function lerBalanceteArquivo(file) {
   const pdfjs = await carregarPdfjs();

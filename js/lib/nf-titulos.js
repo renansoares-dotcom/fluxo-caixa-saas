@@ -136,7 +136,7 @@ export function lancarNFs(onDone = () => {}) {
 // ======================================================================
 // Importação dos XML das NF-e (duplicatas → títulos em aberto)
 // ======================================================================
-const JSZIP = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+const JSZIP = new URL('../../vendor/jszip-3.10.1.min.js', import.meta.url).href;
 let jszipP = null;
 const carregarJSZip = () => globalThis.JSZip ? Promise.resolve(globalThis.JSZip) : (jszipP ??= new Promise((ok, erro) => {
   const sc = document.createElement('script'); sc.src = JSZIP;

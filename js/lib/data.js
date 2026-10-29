@@ -1,5 +1,5 @@
 // Cliente Supabase, estado global, cache de cadastros e montagem dos relatórios
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
+import { createClient } from '../../vendor/supabase-2.117.2.esm.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js';
 import { options, esc, $, MESES } from './ui.js';
 

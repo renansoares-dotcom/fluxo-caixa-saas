@@ -7,15 +7,7 @@
 // Só os gastos e estornos viram linhas de extrato; cargas e devoluções ficam no resumo (saldo nos cartões).
 // Formato de saída igual ao lerOFX/lerRelatorioERP.
 
-const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
-const WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
-let _pdfjs = null;
-async function carregarPdfjs() {
-  if (_pdfjs) return _pdfjs;
-  const m = await import(PDFJS);
-  m.GlobalWorkerOptions.workerSrc = WORKER;
-  return (_pdfjs = m);
-}
+import { carregarPdfjs } from './pdfjs.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();

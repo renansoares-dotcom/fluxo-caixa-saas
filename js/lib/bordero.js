@@ -1,8 +1,8 @@
+import { carregarPdfjs } from './pdfjs.js';
 // Leitura dos borderôs enviados pelos fundos (.htm da Contato/Vector, .pdf da FS/Negocial).
 // Porta das regras de Sistema/FIDC/parse_all.py. Usado só para comparar a proposta
 // aprovada na plataforma com o borderô que o fundo efetivamente operou.
 
-const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 
 const num = (s) => (s ? parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0 : 0);
 const iso = (s) => (s ? s.split('/').reverse().join('-') : null);
@@ -56,18 +56,6 @@ export async function textoPdfDoc(doc) {
   return out.join('\n');
 }
 
-let pdfjsP = null;
-function carregarPdfjs() {
-  if (globalThis.pdfjsLib) return Promise.resolve(globalThis.pdfjsLib);
-  pdfjsP ??= new Promise((ok, erro) => {
-    const s = document.createElement('script');
-    s.src = PDFJS + 'pdf.min.js';
-    s.onload = () => { globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; ok(globalThis.pdfjsLib); };
-    s.onerror = () => { pdfjsP = null; erro(new Error('não foi possível carregar o leitor de PDF')); };
-    document.head.appendChild(s);
-  });
-  return pdfjsP;
-}
 
 // ---------------------------------------------------------------- parser
 const dias = (a, b) => Math.round((Date.parse(iso(b)) - Date.parse(iso(a))) / 864e5);

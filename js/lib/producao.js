@@ -49,7 +49,7 @@ export async function necessidadeMaterial(op) {
 let qrLib = null;
 async function qr() {
   if (qrLib) return qrLib;
-  await new Promise((ok, err) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'; s.onload = ok; s.onerror = err; document.head.appendChild(s); });
+  await new Promise((ok, err) => { const s = document.createElement('script'); s.src = new URL('../../vendor/qrcode-generator-1.4.4.js', import.meta.url).href; s.onload = ok; s.onerror = err; document.head.appendChild(s); });
   qrLib = window.qrcode; return qrLib;
 }
 export async function imprimirEtiquetas(bobinas, op, maqNome = (id) => '') {

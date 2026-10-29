@@ -1,6 +1,6 @@
 // Portal do Cliente: acesso por convite, separado dos usuários internos. Tudo vem de funções do banco que devolvem
 // só o que o cliente pode ver (títulos, notas e XML, compras, pedidos de prorrogação).
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
+import { createClient } from '../vendor/supabase-2.117.2.esm.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { $, $$, esc, money, dateBR, today, toast, fail, modal } from './lib/ui.js';
 
