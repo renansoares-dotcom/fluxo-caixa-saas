@@ -7,6 +7,7 @@ import { abrirRelatorio } from '../lib/relatorio.js';
 import { podeLogistica } from '../lib/logistica.js';
 import { inp, num } from '../lib/compras.js';
 import { conversaNoModal } from '../lib/mini-chat.js';
+import * as MD from '../lib/mdfe.js';
 import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, coefDe, pendencias, pendenciasTransp, tipoPeloDoc, lerVeiculos, veiculosTxt } from '../lib/fretes.js';
 
 export const title = 'Logística — fretes e CIOT';
@@ -29,10 +30,13 @@ async function carregar() {
     q(sb.from('log_piso_coef').select('*').eq('empresa_id', e).order('tabela').order('tipo_carga').order('eixos').order('vigencia', { ascending: false })),
     q(sb.from('log_cargas').select('id,numero,data,status,veiculo_id').eq('empresa_id', e).gte('data', desde.toISOString().slice(0, 10)).order('data', { ascending: false }).limit(300)).catch(() => []),
   ]);
+  // padrões do MDF-e (SQL 062); sem a migração, a parte do MDF-e fica escondida
+  let P = {}, semMdfe = false, parId = null;
+  try { const r = await q(sb.from('log_parametros').select('id, mdfe_padrao').eq('empresa_id', e)); P = r[0]?.mdfe_padrao || {}; parId = r[0]?.id || null; } catch { semMdfe = true; }
   const ids = F.map(f => f.lancamento_id).filter(Boolean);
   const L = new Map();
   for (let i = 0; i < ids.length; i += 150) for (const l of await q(sb.from('lancamentos').select('id,status,data,valor,conta_id').in('id', ids.slice(i, i + 150)))) L.set(l.id, l);
-  B = { T, F, A, C, K, L, tById: Object.fromEntries(T.map(t => [t.id, t])), plano: state.cad.contasPlano.find(p => p.codigo === PLANO_FRETE) };
+  B = { T, F, A, C, K, L, P, semMdfe, parId, tById: Object.fromEntries(T.map(t => [t.id, t])), plano: state.cad.contasPlano.find(p => p.codigo === PLANO_FRETE) };
   return B;
 }
 const anexosDe = (f) => B.A.filter(a => (f.id && a.frete_id === f.id) || (a.transportador_id && a.transportador_id === f.transportador_id && a.tipo === 'contrato'));
@@ -49,7 +53,7 @@ function situacao(f) {
 export async function render(root) {
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Fretes e CIOT</h2><div class="muted small">Conformidade ANTT dos fretes contratados: CIOT, MDF-e, piso mínimo, vale-pedágio e pagamento ao autônomo pela IPEF.</div></div>
       <a class="btn ghost" href="#/logistica">Cargas e entregas</a></div>
-    <div class="card toolbar"><div class="chips" id="lf-abas">${[['fretes', 'Fretes'], ['transp', 'Transportadores'], ['conf', 'Conformidade do mês'], ['piso', 'Piso mínimo']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
+    <div class="card toolbar"><div class="chips" id="lf-abas">${[['fretes', 'Fretes'], ['mdfe', 'MDF-e · 23/11'], ['transp', 'Transportadores'], ['conf', 'Conformidade do mês'], ['piso', 'Piso mínimo']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div id="lf-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#lf-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
   try { await carregar(); } catch (err) { console.error(err); $('#lf-corpo', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Se a migração <b>20261028000054_fretes_ciot.sql</b> ainda não rodou, rode-a no SQL Editor do Supabase.</div></div>'; return; }
@@ -61,6 +65,7 @@ export async function render(root) {
     if (ui.aba === 'transp') return transportadores(corpo, root);
     if (ui.aba === 'conf') return await conformidade(corpo, root);
     if (ui.aba === 'piso') return piso(corpo, root);
+    if (ui.aba === 'mdfe') return prontidao(corpo, root);
     return fretes(corpo, root);
   } catch (err) { fail(err); }
 }
@@ -146,6 +151,8 @@ function ficha(f0, root, pre = {}) {
       <label>Comprovante do vale-pedágio<input id="fr-pc" value="${esc(f.pedagio_comprovante || '')}" ${dis}></label>
       <label class="chk"><input type="checkbox" id="fr-pn" ${f.pedagio_nao_ha ? 'checked' : ''} ${dis}> Rota sem pedágio</label>
       <label class="span2">Observação<input id="fr-obs" value="${esc(f.observacao || '')}" ${dis}></label>
+      ${B.semMdfe ? '' : `<label>Quem emite o MDF-e<select id="fr-em" ${dis} data-nobusca><option value="">—</option><option value="iplamm" ${f.mdfe_emissor === 'iplamm' ? 'selected' : ''}>IPLAMM (carga própria)</option><option value="transportadora" ${f.mdfe_emissor === 'transportadora' ? 'selected' : ''}>Transportadora (com CT-e)</option></select></label>
+      <div class="small" id="fr-mdfe-st" style="align-self:end"></div>`}
     </div>
     <div id="fr-pend" style="margin-top:10px"></div>
     <h3 style="margin:14px 0 6px">Pagamento</h3>
@@ -163,7 +170,7 @@ function ficha(f0, root, pre = {}) {
       destino: g('fr-de').value.trim() || null, km: n('fr-km'), eixos: +g('fr-e').value || null, tabela: tb, tipo_carga: tc, lotacao: g('fr-lot').checked, retorno_vazio: g('fr-rv').checked,
       km_retorno: n('fr-kr'), valor: n('fr-v'), placa: g('fr-pl').value.trim().toUpperCase() || null, motorista: g('fr-mo').value.trim() || null, ciot: soDig(g('fr-ci').value) || g('fr-ci').value.trim() || null,
       ciot_por: g('fr-cp').value || null, mdfe_chave: soDig(g('fr-mdf').value) || null, cte_chave: soDig(g('fr-cte').value) || null, pedagio_valor: n('fr-pv'), pedagio_comprovante: g('fr-pc').value.trim() || null,
-      pedagio_nao_ha: g('fr-pn').checked, observacao: g('fr-obs').value.trim() || null }; };
+      pedagio_nao_ha: g('fr-pn').checked, observacao: g('fr-obs').value.trim() || null, ...(g('fr-em') ? { mdfe_emissor: g('fr-em').value || null } : {}) }; };
   const atualizar = () => {
     const x = { ...f, ...ler() }; x.piso = calcPiso(x, B.C);
     const t = B.tById[x.transportador_id], c = coefDe(B.C, x, x.data);
@@ -176,6 +183,12 @@ function ficha(f0, root, pre = {}) {
     g('fr-pend').innerHTML = !t ? '' : p.length ? `<div class="${ehAutonomo(t) ? 'neg' : 'warn'} small"><b>${ehAutonomo(t) ? 'Pagamento travado (autônomo)' : 'Avisos'}:</b> falta ${esc(p.join(', '))}.</div>` : '<div class="pos small"><b>Conforme.</b></div>';
     if (ehAutonomo(t) && !g('fr-cp').value) g('fr-cp').value = 'iplamm';
     if (t && !ehAutonomo(t) && !g('fr-cp').value) g('fr-cp').value = 'transportadora';
+    if (g('fr-em')) {
+      if (t && !g('fr-em').value) g('fr-em').value = ehAutonomo(t) ? 'iplamm' : 'transportadora';
+      const fx = { ...x, mdfe_emissor: g('fr-em').value || null, mdfe: f.mdfe || {} }, fs = MD.faltasMDFe(fx, t, B.P), gr = MD.graves(fs);
+      g('fr-mdfe-st').innerHTML = !fx.mdfe_emissor ? '' : fx.mdfe_emissor === 'transportadora' ? '<span class="muted">A transportadora emite o MDF-e: informe o CT-e e o CIOT dela.</span>'
+        : `${gr.length ? `<span class="neg">MDF-e: falta ${gr.length} item(ns)</span>` : '<span class="pos">MDF-e: dados completos ✓</span>'} ${f0 ? '<button type="button" class="btn small" id="fr-mdfe">Dados do MDF-e</button>' : '<span class="muted">(salve a ficha para preencher)</span>'}`;
+    }
     return x;
   };
   md.el.addEventListener('input', atualizar); md.el.addEventListener('change', atualizar); atualizar();
@@ -200,6 +213,7 @@ function ficha(f0, root, pre = {}) {
       catch (err) { fail(/bucket|not found/i.test(err.message || '') ? new Error('Espaço de arquivos da logística não criado: rode a migração 054.') : err); } b.disabled = false; return; }
     if (b.id === 'fr-canc') { if (!await confirmDialog('Cancelar este frete? O lançamento programado em aberto, se houver, continua no fluxo — exclua lá se for o caso.')) return;
       try { await q(sb.from('log_fretes').update({ status: 'cancelado' }).eq('id', f0.id)); md.close(); render(root); } catch (err) { fail(err); } return; }
+    if (b.id === 'fr-mdfe') { try { await salvar(); } catch (err) { return fail(err); } md.close(); await carregar(); return fichaMDFe(B.F.find(x => x.id === f0.id), root); }
     if (b.id === 'fr-prog') { try { await salvar(); } catch (err) { return fail(err); } md.close(); await carregar(); return programar(B.F.find(x => x.id === f0.id), root); }
     if (b.id === 'fr-lig') { try { await salvar(); } catch (err) { return fail(err); } md.close(); await carregar(); return ligar(B.F.find(x => x.id === f0.id), root); }
   });
@@ -288,7 +302,7 @@ function editarTransp(t, root, depois = null) {
     if (!g('ct-n').value.trim()) return toast('Informe o nome', true);
     if (doc && ![11, 14].includes(doc.length)) return toast('CPF com 11 ou CNPJ com 14 dígitos', true);
     const row = { nome: g('ct-n').value.trim().toUpperCase(), documento: doc || null, tipo: g('ct-t').value, favorecido_id: g('ct-f').value || null, rntrc: g('ct-r').value.trim() || null, rntrc_validade: g('ct-rv').value || null,
-      veiculos: lerVeiculos(g('ct-vs').value), conta_banco: g('ct-b').value.trim() || null, conta_agencia: g('ct-ag').value.trim() || null, conta_numero: g('ct-c').value.trim() || null, conta_pix: g('ct-px').value.trim() || null,
+      veiculos: lerVeiculos(g('ct-vs').value).map(v => ({ ...((t?.veiculos || []).find(o => o.placa === v.placa) || {}), ...Object.fromEntries(Object.entries(v).filter(([, x]) => x != null)) })), conta_banco: g('ct-b').value.trim() || null, conta_agencia: g('ct-ag').value.trim() || null, conta_numero: g('ct-c').value.trim() || null, conta_pix: g('ct-px').value.trim() || null,
       conta_titular: g('ct-ti').value.trim() || null, conta_vinculo: g('ct-vi').value || null, ipef: g('ct-ip').value.trim() || null, contrato_validade: g('ct-cv').value || null, observacao: g('ct-o').value.trim() || null, ativo: g('ct-at').checked };
     ev.target.disabled = true;
     try {
@@ -422,4 +436,259 @@ function piso(corpo, root) {
   };
   $('#pc-novo', corpo) && ($('#pc-novo', corpo).onclick = () => editar(null));
   if (pode) $$('tr[data-id]', corpo).forEach(tr => tr.onclick = () => editar(B.C.find(c => c.id === tr.dataset.id)));
+}
+
+// ---------------------------------------------------------------- MDF-e (passo 3: dados prontos para emitir — SQL 062)
+// NT MDF-e 2026.001: a partir de 23/11/2026 a Sefaz recusa (684) o MDF-e da IPLAMM (carga própria) com veículo de terceiro sem CIOT.
+let MUNS = null;
+async function municipiosNF() {
+  if (MUNS) return MUNS;
+  const k = 'mdfe-mun-' + state.empresa.id;
+  try { const c = JSON.parse(localStorage.getItem(k) || 'null'); if (c && Date.now() - c.em < 7 * 864e5 && c.l?.length) return (MUNS = c.l); } catch {}
+  MUNS = await q(sb.rpc('log_mdfe_municipios', { p_empresa: state.empresa.id })).catch(() => []);
+  try { localStorage.setItem(k, JSON.stringify({ em: Date.now(), l: MUNS })); } catch {}
+  return MUNS;
+}
+const munTxt = (m) => (m?.cmun ? `${m.xmun || ''}/${m.uf || ''} · ${m.cmun}` : '');
+function lerMun(txt) {
+  const s = String(txt || '').trim(); if (!s) return null;
+  const cod = s.match(/\b(\d{7})\b/)?.[1];
+  const achado = (MUNS || []).find(m => m.cmun === cod) || (MUNS || []).find(m => norm(`${m.xmun}/${m.uf}`) === norm(s.split('·')[0].trim()) || norm(m.xmun) === norm(s));
+  if (achado) return { cmun: achado.cmun, xmun: achado.xmun, uf: achado.uf };
+  return cod ? { cmun: cod, xmun: s.replace(/·?\s*\d{7}/, '').split('/')[0].trim(), uf: (s.match(/\/([A-Z]{2})/) || [])[1] || '' } : { cmun: '', xmun: s, uf: '' };
+}
+const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
+function setP(o, p, v) { const ks = p.split('.'); let a = o; ks.slice(0, -1).forEach((k, i) => { if (a[k] == null) a[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; a = a[k]; }); a[ks[ks.length - 1]] = v; }
+const selOpts = (obj, val, vazioTxt = '—') => `<option value="">${vazioTxt}</option>` + Object.entries(obj).map(([k, v]) => `<option value="${k}" ${String(val ?? '') === k ? 'selected' : ''}>${k} · ${esc(v)}</option>`).join('');
+const ufOpts = (val) => '<option value="">—</option>' + MD.UFS.map(u => `<option ${val === u ? 'selected' : ''}>${u}</option>`).join('');
+
+async function fichaMDFe(f, root) {
+  const t = B.tById[f.transportador_id], pode = podeLogistica(), dis = pode ? '' : 'disabled';
+  await municipiosNF();
+  const m = MD.dadosMDFe(f, B.P);
+  let ciot = f.ciot || '';
+  if (!m.ciot_resp && f.ciot_por === 'iplamm') m.ciot_resp = soDig(state.empresa.cnpj);
+  // veículo: completa com o que já foi informado para esta placa no transportador
+  const vt = (t?.veiculos || []).find(v => v.placa === m.veiculo.placa);
+  if (vt) for (const k of ['renavam', 'tara', 'cap_kg', 'uf', 'tp_rod', 'tp_car']) if (m.veiculo[k] == null || m.veiculo[k] === '') m.veiculo[k] = vt[k] ?? m.veiculo[k];
+  const md = modal({ title: `MDF-e do frete nº ${f.numero}`, wide: true, body: '<div id="mf-corpo"></div>',
+    foot: `<button class="btn" id="mf-res" style="margin-right:auto">Resumo para impressão</button>${pode ? '<button class="btn" id="mf-pad" title="Seguradora, IPEF, produto, carregamento e responsável pelo CIOT passam a vir preenchidos nos próximos fretes">Salvar como padrão</button>' : ''}
+      <button class="btn" data-close>Fechar</button>${pode ? '<button class="btn primary" id="mf-ok">Salvar</button>' : ''}` });
+  const corpo = $('#mf-corpo', md.el);
+  const campo = (rot, k, { tipo = 'text', ph = '', cls = '', lista = '' } = {}) => `<label class="${cls}">${rot}<input data-k="${k}" type="${tipo}" value="${esc(getP(m, k) ?? '')}" placeholder="${esc(ph)}" ${lista ? `list="${lista}"` : ''} ${dis}></label>`;
+  const sel = (rot, k, opcoes, cls = '') => `<label class="${cls}">${rot}<select data-k="${k}" ${dis} data-nobusca>${opcoes}</select></label>`;
+  const munCampo = (rot, k) => `<label class="grow">${rot}<input data-mun="${k}" value="${esc(munTxt(getP(m, k)))}" list="mf-muns" placeholder="cidade/UF ou código IBGE" ${dis}></label>`;
+  const conferir = () => {
+    const fx = { ...f, ciot, mdfe: m }, fs = MD.faltasMDFe(fx, t, {}), gr = MD.graves(fs), av = fs.filter(x => !x.grave);
+    const dias = MD.diasAte(MD.DATA_CIOT_MDFE, today());
+    $('#mf-check', md.el).innerHTML = `${gr.length ? `<div class="neg"><b>Falta para emitir (${gr.length}):</b> ${esc(gr.map(x => x.txt).join('; '))}.</div>` : '<div class="pos"><b>Pronto para emitir o MDF-e.</b></div>'}
+      ${av.length ? `<div class="warn">Recomendado: ${esc(av.map(x => x.txt).join('; '))}.</div>` : ''}
+      ${MD.ciotObrigatorio(fx, t) ? `<div class="small muted">CIOT obrigatório neste MDF-e (veículo de terceiro)${dias > 0 ? ` · a Sefaz passa a recusar sem CIOT em ${dias} dia(s), em 23/11/2026` : ' · a Sefaz já recusa sem CIOT (rejeição 684)'}.</div>` : ''}`;
+  };
+  const pintar = () => {
+    const aut = ehAutonomo(t);
+    corpo.innerHTML = `<datalist id="mf-muns">${(MUNS || []).map(x => `<option value="${esc(munTxt(x))}">`).join('')}</datalist>
+    <div id="mf-check" class="small card" style="padding:10px;margin-bottom:10px"></div>
+    <h3 style="margin:0 0 6px">1. Viagem</h3>
+    <div class="grid2">${sel('UF de início *', 'uf_ini', ufOpts(m.uf_ini))}${sel('UF de fim *', 'uf_fim', ufOpts(m.uf_fim))}
+      <label class="grow">UFs do percurso (entre o início e o fim)<input data-perc value="${esc((m.percurso || []).join(', '))}" placeholder="ex.: AL, SE (só se passar por outro estado)" ${dis}></label>
+      ${m.carregamento.map((c, i) => `${munCampo(`Município de carregamento ${m.carregamento.length > 1 ? i + 1 : ''} *`, `carregamento.${i}`)}`).join('') || munCampo('Município de carregamento *', 'carregamento.0')}
+    </div>
+    <h3 style="margin:14px 0 6px">2. NF-e e descarregamento</h3>
+    <div class="small" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">${pode ? `<button type="button" class="btn small" id="mf-nfe">Buscar NF-e ${f.carga_id ? 'da carga e ' : ''}dos números da ficha</button>` : ''}
+      <span class="muted">NF-e da ficha: ${esc(f.notas || '—')}. As chaves, o destino, o peso e o valor vêm do XML das notas importadas.</span></div>
+    ${m.descarga.map((x, i) => `<div class="card" style="padding:8px 10px;margin-bottom:6px"><div class="grid2" style="align-items:end">${munCampo(`Descarga ${i + 1} — município *`, `descarga.${i}`)}
+        ${pode ? `<button type="button" class="btn ghost small" data-rm-desc="${i}">Tirar município</button>` : ''}</div>
+      <div class="small" style="margin-top:4px">${(x.chaves || []).map((c, j) => `<div style="display:flex;gap:6px;align-items:center"><code class="${MD.chaveValida(c) ? '' : 'neg'}">${esc(c)}</code><span class="muted">NF ${esc(String(+c.slice(25, 34) || ''))}</span>${pode ? `<button type="button" class="btn ghost small" data-rm-ch="${i}.${j}" title="Tirar">✕</button>` : ''}</div>`).join('') || '<span class="muted">Nenhuma NF-e neste município.</span>'}
+        ${pode ? `<div style="display:flex;gap:6px;margin-top:4px"><input data-nova-ch="${i}" placeholder="colar chave de 44 dígitos" style="flex:1"><button type="button" class="btn small" data-add-ch="${i}">Incluir</button></div>` : ''}</div></div>`).join('') || '<p class="small muted">Nenhuma NF-e ainda. Use "Buscar NF-e" ou inclua um município.</p>'}
+    ${pode ? '<button type="button" class="btn ghost small" id="mf-add-desc">+ Município de descarga</button>' : ''}
+    <h3 style="margin:14px 0 6px">3. Veículo</h3>
+    <div class="grid2">${campo('Placa do cavalo/veículo *', 'veiculo.placa', { ph: 'ABC1D23' })}${campo('RENAVAM', 'veiculo.renavam')}${campo('Tara (kg) *', 'veiculo.tara', { tipo: 'number' })}${campo('Capacidade (kg)', 'veiculo.cap_kg', { tipo: 'number' })}
+      ${sel('UF do veículo *', 'veiculo.uf', ufOpts(m.veiculo.uf))}${sel('Tipo de rodado *', 'veiculo.tp_rod', selOpts(MD.TP_ROD, m.veiculo.tp_rod))}${sel('Carroceria *', 'veiculo.tp_car', selOpts(MD.TP_CAR, m.veiculo.tp_car))}</div>
+    ${m.reboques.map((x, i) => `<div class="grid2" style="margin-top:6px;align-items:end"><b class="span2 small">Reboque ${i + 1}</b>${campo('Placa *', `reboques.${i}.placa`)}${campo('RENAVAM', `reboques.${i}.renavam`)}${campo('Tara (kg) *', `reboques.${i}.tara`, { tipo: 'number' })}${campo('Capacidade (kg)', `reboques.${i}.cap_kg`, { tipo: 'number' })}
+      ${sel('UF *', `reboques.${i}.uf`, ufOpts(x.uf))}${sel('Carroceria', `reboques.${i}.tp_car`, selOpts(MD.TP_CAR, x.tp_car))}${pode ? `<button type="button" class="btn ghost small" data-rm-reb="${i}">Tirar reboque</button>` : ''}</div>`).join('')}
+    ${pode && m.reboques.length < 3 ? '<button type="button" class="btn ghost small" id="mf-add-reb" style="margin-top:6px">+ Reboque (carreta)</button>' : ''}
+    <h3 style="margin:14px 0 6px">4. Dono do veículo e motorista</h3>
+    <div class="grid2"><div class="small">${t ? `<b>${esc(t.nome)}</b> · ${TIPO_CURTO[t.tipo]}<br>${esc(fmtDoc(t.documento)) || '<span class="neg">sem CPF/CNPJ</span>'} · RNTRC ${esc(t.rntrc || '') || '<span class="neg">sem RNTRC</span>'}<br><span class="muted">Corrija em Transportadores.</span>` : '<span class="neg">Escolha o transportador na ficha.</span>'}</div>
+      ${sel('Tipo do proprietário *', 'prop.tp_prop', selOpts(MD.TP_PROP, m.prop.tp_prop))}${campo('Motorista *', 'condutor.nome')}${campo('CPF do motorista *', 'condutor.cpf')}</div>
+    <h3 style="margin:14px 0 6px">5. Carga</h3>
+    <div class="grid2">${campo('Peso bruto (kg) *', 'peso_kg', { tipo: 'number' })}${campo('Valor total da carga (R$) *', 'valor_carga', { tipo: 'number' })}
+      ${sel('Tipo de carga *', 'prod.tp_carga', selOpts(MD.TP_CARGA, m.prod.tp_carga))}${campo('Produto predominante *', 'prod.nome', { ph: 'ex.: Embalagens plásticas', cls: 'grow' })}${campo('NCM', 'prod.ncm', { ph: '8 dígitos' })}</div>
+    <h3 style="margin:14px 0 6px">6. CIOT</h3>
+    <div class="grid2"><label>Nº do CIOT ${MD.ciotObrigatorio({ ...f, mdfe: m }, t) ? '*' : ''}<input id="mf-ciot" value="${esc(ciot)}" placeholder="12 dígitos, gerado pela IPEF" ${dis}></label>${campo('CPF/CNPJ de quem gerou o CIOT *', 'ciot_resp', { ph: 'IPLAMM (contratante) ou a transportadora' })}</div>
+    ${aut ? `<h3 style="margin:14px 0 6px">7. Pagamento do frete ao autônomo</h3>
+    <div class="grid2">${sel('Forma *', 'pag.forma', '<option value="ipef" ' + (m.pag.forma === 'ipef' ? 'selected' : '') + '>Pela IPEF (cartão/conta de pagamento)</option><option value="pix" ' + (m.pag.forma === 'pix' ? 'selected' : '') + '>Pix do autônomo</option><option value="banco" ' + (m.pag.forma === 'banco' ? 'selected' : '') + '>Conta bancária do autônomo</option>')}
+      ${m.pag.forma === 'ipef' ? campo('CNPJ da IPEF *', 'pag.cnpj_ipef') : m.pag.forma === 'pix' ? campo('Chave Pix *', 'pag.pix') : campo('Banco (código) *', 'pag.banco') + campo('Agência *', 'pag.agencia')}
+      ${sel('Pagamento *', 'pag.ind_pag', `<option value="0" ${m.pag.ind_pag !== '1' ? 'selected' : ''}>À vista</option><option value="1" ${m.pag.ind_pag === '1' ? 'selected' : ''}>A prazo</option>`)}
+      <div class="small muted" style="align-self:end">Valor do contrato: <b>${money(f.valor)}</b> (da ficha)</div></div>
+    ${m.pag.ind_pag === '1' ? `<div class="small" style="margin-top:6px"><b>Parcelas</b>${(m.pag.prazos || []).map((p, i) => `<div class="grid2" style="align-items:end">${campo(`Vencimento ${i + 1}`, `pag.prazos.${i}.venc`, { tipo: 'date' })}${campo('Valor (R$)', `pag.prazos.${i}.valor`, { tipo: 'number' })}</div>`).join('')}${pode ? '<button type="button" class="btn ghost small" id="mf-add-prazo">+ Parcela</button>' : ''}</div>` : ''}
+    <div class="small" style="margin-top:6px"><b>Componentes do valor</b> <span class="muted">(se não informar, vai o valor total como "outros")</span>${(m.pag.comp || []).map((c, i) => `<div class="grid2" style="align-items:end">${sel(`Componente ${i + 1}`, `pag.comp.${i}.tp`, selOpts(MD.TP_COMP, c.tp))}${campo('Valor (R$)', `pag.comp.${i}.valor`, { tipo: 'number' })}</div>`).join('')}${pode ? '<button type="button" class="btn ghost small" id="mf-add-comp">+ Componente</button>' : ''}</div>` : ''}
+    <h3 style="margin:14px 0 6px">${aut ? 8 : 7}. Seguro da carga</h3>
+    <div class="grid2">${sel('Responsável pelo seguro', 'seguro.resp', selOpts(MD.RESP_SEG, m.seguro.resp))}${campo('Seguradora', 'seguro.nome', { cls: 'grow' })}${campo('CNPJ da seguradora', 'seguro.cnpj')}${campo('Nº da apólice', 'seguro.apolice')}
+      <label class="grow">Averbações (separe por vírgula)<input data-aver value="${esc((m.seguro.averbacoes || []).join(', '))}" ${dis}></label></div>
+    ${!f.pedagio_nao_ha && +f.pedagio_valor > 0 ? `<h3 style="margin:14px 0 6px">Vale-pedágio (${money(f.pedagio_valor)})</h3><div class="grid2">${campo('CNPJ do fornecedor do vale-pedágio *', 'pedagio.cnpj_forn')}${campo('CNPJ de quem pagou (se não for a IPLAMM)', 'pedagio.cnpj_pagador')}
+      <div class="small muted" style="align-self:end">Nº do comprovante: ${esc(f.pedagio_comprovante || '—')} (da ficha)</div></div>` : ''}
+    <label style="margin-top:10px">Informações complementares (vão no MDF-e)<input data-k="info" value="${esc(m.info || '')}" maxlength="5000" ${dis}></label>`;
+    conferir();
+  };
+  pintar();
+  corpo.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el.dataset.k) setP(m, el.dataset.k, el.type === 'number' ? (el.value === '' ? null : +el.value) : el.value);
+    if (el.dataset.perc != null) m.percurso = el.value.toUpperCase().split(/[\s,;]+/).filter(Boolean);
+    if (el.dataset.aver != null) m.seguro.averbacoes = el.value.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+    if (el.id === 'mf-ciot') ciot = soDig(el.value);
+    conferir();
+  });
+  corpo.addEventListener('change', (e) => {
+    const el = e.target;
+    if (el.dataset.mun) { const v = lerMun(el.value); const [lista, i] = el.dataset.mun.split('.'); m[lista][+i] = { ...(m[lista][+i] || {}), ...(v || { cmun: '', xmun: '', uf: '' }) }; el.value = munTxt(m[lista][+i]) || el.value; conferir(); }
+    if (['pag.forma', 'pag.ind_pag'].includes(el.dataset.k)) pintar();
+  });
+  corpo.addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'mf-add-desc') { m.descarga.push({ cmun: '', xmun: '', uf: '', chaves: [] }); return pintar(); }
+    if (b.dataset.rmDesc != null) { m.descarga.splice(+b.dataset.rmDesc, 1); return pintar(); }
+    if (b.dataset.rmCh) { const [i, j] = b.dataset.rmCh.split('.').map(Number); m.descarga[i].chaves.splice(j, 1); return pintar(); }
+    if (b.dataset.addCh != null) { const i = +b.dataset.addCh, inp = corpo.querySelector(`[data-nova-ch="${i}"]`), c = soDig(inp.value);
+      if (!MD.chaveValida(c)) return toast('Chave inválida: confira os 44 dígitos', true);
+      if (MD.chavesDe(m).includes(c)) return toast('Esta NF-e já está no manifesto', true);
+      (m.descarga[i].chaves ||= []).push(c); return pintar(); }
+    if (b.id === 'mf-add-reb') { m.reboques.push({ placa: '', tara: null, cap_kg: null, uf: m.veiculo.uf || '', tp_car: m.veiculo.tp_car || '' }); return pintar(); }
+    if (b.dataset.rmReb != null) { m.reboques.splice(+b.dataset.rmReb, 1); return pintar(); }
+    if (b.id === 'mf-add-prazo') { (m.pag.prazos ||= []).push({ venc: '', valor: null }); return pintar(); }
+    if (b.id === 'mf-add-comp') { (m.pag.comp ||= []).push({ tp: '01', valor: null }); return pintar(); }
+    if (b.id === 'mf-nfe') {
+      const nums = [...new Set(String(f.notas || '').split(/[^\d]+/).map(Number).filter(n => n > 0))];
+      if (!nums.length && !f.carga_id) return toast('Informe os números das NF-e na ficha do frete (ou ligue a carga da logística)', true);
+      b.disabled = true;
+      try {
+        const ns = await q(sb.rpc('log_mdfe_notas', { p_empresa: state.empresa.id, p_numeros: nums, p_carga: f.carga_id || null }));
+        if (!ns.length) { toast('Nenhuma NF-e de saída encontrada com esses números. Importe os XML em CPD › Notas fiscais.', true); b.disabled = false; return; }
+        const r = MD.descargaDasNotas(ns), faltam = nums.filter(n => !ns.some(x => x.numero === n));
+        m.descarga = r.descarga; if (r.peso_kg) m.peso_kg = r.peso_kg; if (r.valor_carga) m.valor_carga = r.valor_carga;
+        if (r.carregamento && !m.carregamento.some(c => c.cmun)) m.carregamento = r.carregamento;
+        if (!m.uf_ini) m.uf_ini = r.carregamento?.[0]?.uf || m.uf_ini;
+        const ufs = [...new Set(r.descarga.map(x => x.uf).filter(Boolean))]; if (ufs.length === 1) m.uf_fim = ufs[0];
+        if (r.produto && !m.prod.nome) m.prod = { ...m.prod, nome: r.produto.nome, ncm: r.produto.ncm };
+        pintar(); toast(`${ns.length} NF-e trazida(s)${faltam.length ? ` · não encontradas: ${faltam.join(', ')}` : ''}`);
+      } catch (err) { fail(err); b.disabled = false; }
+    }
+  });
+  const montarSalvar = () => {
+    const limpo = JSON.parse(JSON.stringify(m));
+    limpo.veiculo.placa = MD.limparPlaca(limpo.veiculo.placa); limpo.reboques.forEach(x => { x.placa = MD.limparPlaca(x.placa); });
+    limpo.situacao = MD.prontoMDFe({ ...f, ciot, mdfe: limpo }, t, {}) ? 'pronto' : 'rascunho';
+    return limpo;
+  };
+  $('#mf-ok', md.el) && ($('#mf-ok', md.el).onclick = async (ev) => {
+    const mdfe = montarSalvar(); ev.target.disabled = true;
+    try {
+      await q(sb.from('log_fretes').update({ mdfe, ciot: ciot || null, placa: mdfe.veiculo.placa || f.placa || null, motorista: mdfe.condutor.nome || f.motorista || null }).eq('id', f.id));
+      // guarda os dados do veículo no cadastro do transportador (próximo frete com a mesma placa já vem preenchido)
+      if (t && mdfe.veiculo.placa) {
+        const vs = [...(t.veiculos || [])], novos = [mdfe.veiculo, ...mdfe.reboques].filter(v => v.placa);
+        for (const v of novos) { const i = vs.findIndex(o => o.placa === v.placa), d = { placa: v.placa, renavam: v.renavam || null, tara: v.tara || null, cap_kg: v.cap_kg || null, uf: v.uf || null, tp_rod: v.tp_rod || null, tp_car: v.tp_car || null };
+          if (i >= 0) vs[i] = { ...vs[i], ...Object.fromEntries(Object.entries(d).filter(([, x]) => x != null)) }; else vs.push({ ...d, eixos: null, tipo: null }); }
+        await q(sb.from('log_transportadores').update({ veiculos: vs }).eq('id', t.id)).catch(() => {});
+      }
+      md.close(); toast(mdfe.situacao === 'pronto' ? 'MDF-e pronto para emitir' : 'Dados do MDF-e salvos (ainda falta informação)'); render(root);
+    } catch (err) { fail(err); ev.target.disabled = false; }
+  });
+  $('#mf-pad', md.el) && ($('#mf-pad', md.el).onclick = async () => {
+    const pad = { ...B.P, seguro: m.seguro, prod: m.prod, carregamento: m.carregamento.filter(c => c.cmun), ciot_resp: m.ciot_resp,
+      pag: { forma: m.pag.forma, cnpj_ipef: m.pag.cnpj_ipef || null, ind_pag: m.pag.ind_pag }, pedagio: { cnpj_forn: m.pedagio.cnpj_forn || null } };
+    try {
+      if (B.parId) await q(sb.from('log_parametros').update({ mdfe_padrao: pad }).eq('id', B.parId));
+      else { const [r] = await q(sb.from('log_parametros').insert({ empresa_id: state.empresa.id, mdfe_padrao: pad }).select('id')); B.parId = r.id; }
+      B.P = pad; toast('Padrões do MDF-e salvos: os próximos fretes já vêm com seguro, IPEF, produto e carregamento');
+    } catch (err) { fail(err); }
+  });
+  $('#mf-res', md.el).onclick = () => resumoMDFe({ ...f, ciot, mdfe: montarSalvar() }, t);
+}
+
+function resumoMDFe(f, t) {
+  const emp = state.empresa, x = MD.montarMDFe(f, t, emp, {}), d = MD.dadosMDFe(f, {}), fs = MD.faltasMDFe(f, t, {}), gr = MD.graves(fs);
+  const lin = (r, v) => `<tr><th style="width:34%;text-align:left">${esc(r)}</th><td>${v}</td></tr>`;
+  const rodo = x.infModal.rodo, vt = rodo.veicTracao;
+  const corpo = `${gr.length ? `<p><b>Atenção — falta para emitir:</b> ${esc(gr.map(z => z.txt).join('; '))}.</p>` : '<p><b>Dados completos para emitir o MDF-e.</b></p>'}
+    <h3>1. Identificação</h3><table>${lin('Emitente', `${esc(x.emit.xNome)} · CNPJ ${esc(fmtDoc(x.emit.CNPJ))}`)}${lin('Tipo de emitente', f.mdfe_emissor === 'iplamm' ? '2 — transportador de carga própria' : 'transportadora')}
+      ${lin('UF de início → fim', `${esc(x.ide.UFIni)} → ${esc(x.ide.UFFim)}${x.ide.infPercurso.length ? ` · percurso: ${esc(x.ide.infPercurso.map(p => p.UFPer).join(', '))}` : ''}`)}
+      ${lin('Carregamento', esc(x.ide.infMunCarrega.map(c => `${c.xMunCarrega} (${c.cMunCarrega})`).join('; ')))}</table>
+    <h3>2. Documentos (NF-e) por município de descarga</h3><table>${x.infDoc.infMunDescarga.map(m => lin(`${m.xMunDescarga} (${m.cMunDescarga})`, m.infNFe.map(n => `<code>${esc(n.chNFe)}</code>`).join('<br>'))).join('') || lin('—', 'sem NF-e')}</table>
+    <h3>3. Totais e carga</h3><table>${lin('Quantidade de NF-e', x.tot.qNFe)}${lin('Valor total da carga', money(x.tot.vCarga))}${lin('Peso bruto (kg)', (x.tot.qCarga || 0).toLocaleString('pt-BR'))}
+      ${lin('Produto predominante', `${esc(MD.TP_CARGA[x.prodPred.tpCarga] || '')} · ${esc(x.prodPred.xProd || '')}${x.prodPred.NCM ? ` · NCM ${esc(x.prodPred.NCM)}` : ''}`)}</table>
+    <h3>4. Rodoviário — ANTT</h3><table>${lin('CIOT', rodo.infANTT.infCIOT.map(c => `${esc(c.CIOT)} · responsável ${esc(fmtDoc(c.CPF || c.CNPJ))}`).join('<br>') || '<b>não informado</b>')}
+      ${lin('Contratante', esc(rodo.infANTT.infContratante.map(c => `${c.xNome} · ${fmtDoc(c.CNPJ)}`).join('; ')))}
+      ${rodo.infANTT.infPag.map(p => lin('Pagamento do frete', `${esc(p.xNome)} · ${esc(fmtDoc(p.CPF || p.CNPJ))}<br>Valor do contrato ${money(p.vContrato)} · ${p.indPag ? 'a prazo' : 'à vista'} · ${p.infBanc.CNPJIPEF ? 'IPEF CNPJ ' + esc(fmtDoc(p.infBanc.CNPJIPEF)) : p.infBanc.PIX ? 'Pix ' + esc(p.infBanc.PIX) : 'Banco ' + esc(p.infBanc.codBanco || '') + ' ag. ' + esc(p.infBanc.codAgencia || '')}
+        <br>Componentes: ${esc(p.Comp.map(c => `${c.xComp} ${money(c.vComp)}`).join('; '))}${p.infPrazo ? '<br>Parcelas: ' + esc(p.infPrazo.map(z => `${z.nParcela} ${dateBR(z.dVenc)} ${money(z.vParcela)}`).join('; ')) : ''}`)).join('')}
+      ${rodo.infANTT.valePed ? lin('Vale-pedágio', esc(rodo.infANTT.valePed.disp.map(v => `fornecedor ${fmtDoc(v.CNPJForn)} · comprovante ${v.nCompra} · ${money(v.vValePed)}`).join('; '))) : ''}</table>
+    <h3>5. Veículo e motorista</h3><table>${lin('Veículo de tração', `${esc(vt.placa)} · RENAVAM ${esc(vt.RENAVAM || '—')} · tara ${vt.tara} kg${vt.capKG ? ` · cap. ${vt.capKG} kg` : ''} · ${esc(MD.TP_ROD[vt.tpRod] || '')} · ${esc(MD.TP_CAR[vt.tpCar] || '')} · ${esc(vt.UF)}`)}
+      ${vt.prop ? lin('Proprietário', `${esc(vt.prop.xNome)} · ${esc(fmtDoc(vt.prop.CPF || vt.prop.CNPJ))} · RNTRC ${esc(vt.prop.RNTRC)} · ${esc(MD.TP_PROP[vt.prop.tpProp] || '')}`) : ''}
+      ${rodo.veicReboque.map((r, i) => lin(`Reboque ${i + 1}`, `${esc(r.placa)} · tara ${r.tara} kg · cap. ${r.capKG} kg · ${esc(MD.TP_CAR[r.tpCar] || '')} · ${esc(r.UF)}`)).join('')}
+      ${lin('Motorista', esc(vt.condutor.map(c => `${c.xNome} · CPF ${fmtDoc(c.CPF)}`).join('; ')))}</table>
+    ${x.seg.length ? `<h3>6. Seguro</h3><table>${x.seg.map(s => lin('Seguro da carga', `${esc(MD.RESP_SEG[s.infResp.respSeg] || '')} · ${esc(s.infSeg.xSeg)} · CNPJ ${esc(fmtDoc(s.infSeg.CNPJ))} · apólice ${esc(s.nApol)}${s.nAver.length ? ' · averbação ' + esc(s.nAver.join(', ')) : ''}`)).join('')}</table>` : ''}
+    ${d.info ? `<h3>Informações complementares</h3><p>${esc(d.info)}</p>` : ''}`;
+  abrirRelatorio({ nome: `MDF-e do frete nº ${f.numero}`, titulo: `Dados do MDF-e — frete nº ${f.numero}`, subtitulo: `${t?.nome || ''} · ${dateBR(f.data)} · valor do frete ${money(f.valor)}`, corpo,
+    rodape: 'Fonte: Logística › Fretes e CIOT (plataforma). Leiaute MDF-e 3.00 e NT 2026.001 (CIOT).' });
+}
+
+async function padroesMDFe(root) {
+  const p = B.P || {}, s = p.seguro || {}, pr = p.prod || {}, pg = p.pag || {};
+  await municipiosNF();
+  const md = modal({ title: 'Padrões do MDF-e', wide: true, body: `<p class="small muted" style="margin-top:0">O que se repete em todo MDF-e da IPLAMM. Vem preenchido em cada frete (dá para mudar no frete).</p>
+    <datalist id="pd-muns">${(MUNS || []).map(x => `<option value="${esc(munTxt(x))}">`).join('')}</datalist>
+    <div class="grid2"><label class="grow">Município de carregamento<input id="pd-car" list="pd-muns" value="${esc(munTxt((p.carregamento || [])[0]))}"></label>
+      <label>CPF/CNPJ de quem gera o CIOT<input id="pd-cr" value="${esc(p.ciot_resp || soDig(state.empresa.cnpj))}"></label>
+      <label>Tipo de carga<select id="pd-tc" data-nobusca>${selOpts(MD.TP_CARGA, pr.tp_carga || '05')}</select></label><label class="grow">Produto predominante<input id="pd-pn" value="${esc(pr.nome || '')}" placeholder="ex.: Embalagens plásticas"></label><label>NCM<input id="pd-ncm" value="${esc(pr.ncm || '')}"></label>
+      <label>Forma de pagar o autônomo<select id="pd-fp" data-nobusca><option value="ipef" ${pg.forma !== 'pix' && pg.forma !== 'banco' ? 'selected' : ''}>Pela IPEF</option><option value="pix" ${pg.forma === 'pix' ? 'selected' : ''}>Pix do autônomo</option><option value="banco" ${pg.forma === 'banco' ? 'selected' : ''}>Conta do autônomo</option></select></label>
+      <label>CNPJ da IPEF contratada<input id="pd-ipef" value="${esc(pg.cnpj_ipef || '')}"></label>
+      <label>Responsável pelo seguro<select id="pd-sr" data-nobusca>${selOpts(MD.RESP_SEG, s.resp || '1')}</select></label><label class="grow">Seguradora<input id="pd-sn" value="${esc(s.nome || '')}"></label><label>CNPJ da seguradora<input id="pd-sc" value="${esc(s.cnpj || '')}"></label><label>Nº da apólice<input id="pd-sa" value="${esc(s.apolice || '')}"></label>
+      <label>CNPJ do fornecedor do vale-pedágio<input id="pd-vp" value="${esc(p.pedagio?.cnpj_forn || '')}"></label></div>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pd-ok">Salvar</button>' });
+  const g = (id) => $('#' + id, md.el).value.trim();
+  $('#pd-ok', md.el).onclick = async () => {
+    const car = lerMun(g('pd-car'));
+    const pad = { ...p, carregamento: car?.cmun ? [car] : [], ciot_resp: soDig(g('pd-cr')), prod: { tp_carga: g('pd-tc') || '05', nome: g('pd-pn'), ncm: soDig(g('pd-ncm')) },
+      pag: { ...pg, forma: g('pd-fp'), cnpj_ipef: soDig(g('pd-ipef')) || null }, seguro: { ...s, resp: g('pd-sr') || '1', nome: g('pd-sn'), cnpj: soDig(g('pd-sc')), apolice: g('pd-sa') }, pedagio: { cnpj_forn: soDig(g('pd-vp')) || null } };
+    try {
+      if (B.parId) await q(sb.from('log_parametros').update({ mdfe_padrao: pad }).eq('id', B.parId));
+      else { const [r] = await q(sb.from('log_parametros').insert({ empresa_id: state.empresa.id, mdfe_padrao: pad }).select('id')); B.parId = r.id; }
+      B.P = pad; md.close(); toast('Padrões do MDF-e salvos'); render(root);
+    } catch (err) { fail(err); }
+  };
+}
+
+// painel "MDF-e · 23/11": o que falta para emitir as viagens com CIOT
+function prontidao(corpo, root) {
+  if (B.semMdfe) { corpo.innerHTML = '<div class="card"><div class="empty">Rode a migração <b>20261029000062_mdfe_preparo.sql</b> no SQL Editor do Supabase para ligar o preparo do MDF-e.</div></div>'; return; }
+  const pode = podeLogistica(), hoje = today(), dias = MD.diasAte(MD.DATA_CIOT_MDFE, hoje);
+  const lim = new Date(); lim.setDate(lim.getDate() - 45); const desde = lim.toISOString().slice(0, 10);
+  const fs = B.F.filter(f => f.status !== 'cancelado' && f.data >= desde).sort((a, b) => b.data.localeCompare(a.data));
+  const info = fs.map(f => { const t = B.tById[f.transportador_id], fa = MD.faltasMDFe(f, t, B.P), gr = MD.graves(fa); return { f, t, gr, ciotFalta: MD.ciotObrigatorio(f, t) && !MD.ciotValido(f.ciot) }; });
+  const ipl = info.filter(x => x.f.mdfe_emissor === 'iplamm'), prontos = ipl.filter(x => !x.gr.length), semCiot = ipl.filter(x => x.ciotFalta), semEm = info.filter(x => !x.f.mdfe_emissor);
+  const P = B.P || {}, conf = [
+    ['IPEF contratada (CNPJ nos padrões)', !!MD.docValido(P.pag?.cnpj_ipef)], ['Seguro da carga nos padrões', !!(P.seguro?.nome && P.seguro?.apolice)],
+    ['Produto predominante nos padrões', !!P.prod?.nome], ['Município de carregamento nos padrões', !!(P.carregamento || []).some(c => c.cmun)],
+    ['Transportadores autônomos com CPF/CNPJ e RNTRC', B.T.filter(t => t.ativo && ehAutonomo(t)).every(t => MD.docValido(t.documento) && MD.rntrcValido(t.rntrc))]];
+  const kpi = (r, v, s = '', c = '') => `<div class="kpi"><div class="k-label">${r}</div><div class="k-value ${c}">${v}</div>${s ? `<div class="k-sub">${s}</div>` : ''}</div>`;
+  corpo.innerHTML = `<div class="kpis">${kpi('CIOT no MDF-e', dias > 0 ? `${dias} dias` : 'em vigor', dias > 0 ? 'até 23/11/2026 (rejeição 684)' : 'MDF-e sem CIOT é recusado', dias <= 15 ? 'neg' : '')}
+      ${kpi('Viagens com MDF-e da IPLAMM', ipl.length, 'últimos 45 dias e futuras')}${kpi('Prontas para emitir', prontos.length, ipl.length ? `${Math.round(prontos.length / ipl.length * 100)}%` : '', prontos.length === ipl.length && ipl.length ? 'pos' : '')}
+      ${kpi('Sem CIOT', semCiot.length, semCiot.length ? 'seriam recusadas após 23/11' : 'nenhuma', semCiot.length ? 'neg' : '')}</div>
+    <div class="grid2" style="margin-top:12px;align-items:start">
+      <div class="card"><div class="card-head"><h3 style="margin:0">Preparação da empresa</h3>${pode ? '<button class="btn small" id="pr-pad">Padrões do MDF-e</button>' : ''}</div>
+        ${conf.map(([t, ok]) => `<div class="small" style="padding:4px 0">${ok ? '<span class="pos">✓</span>' : '<span class="neg">✗</span>'} ${esc(t)}</div>`).join('')}
+        <p class="small muted" style="margin-bottom:0">A IPEF gera o CIOT e paga o autônomo (Res. ANTT 6.078/2026). Sem IPEF contratada, o MDF-e com autônomo é recusado a partir de 23/11.</p></div>
+      <div class="card"><h3 style="margin:0 0 6px">Como usar</h3><ol class="small" style="margin:0;padding-left:18px;line-height:1.6">
+        <li>Na ficha do frete, escolha <b>Quem emite o MDF-e</b>.</li><li>Clique em <b>Dados do MDF-e</b> e use <b>Buscar NF-e</b>: chaves, destino, peso e valor vêm das notas.</li>
+        <li>Complete veículo, motorista e CIOT. A lista em vermelho mostra o que falta.</li><li>Use o <b>Resumo para impressão</b> para emitir no Iniflex enquanto a emissão pela plataforma não estiver ligada.</li></ol></div></div>
+    ${semEm.length ? `<div class="card warn small" style="margin-top:12px">${semEm.length} frete(s) sem "Quem emite o MDF-e" definido.</div>` : ''}
+    <div class="card flush" style="margin-top:12px"><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Transportador</th><th>Emite o MDF-e</th><th>CIOT</th><th>Situação do MDF-e</th></tr></thead><tbody>
+    ${info.map(({ f, t, gr, ciotFalta }) => `<tr class="clickable" data-id="${f.id}"><td><b>${f.numero}</b></td><td>${dateBR(f.data)}</td><td>${esc(t?.nome || '—')}<div class="small muted">${TIPO_CURTO[t?.tipo] || ''}</div></td>
+      <td class="small">${f.mdfe_emissor === 'iplamm' ? 'IPLAMM' : f.mdfe_emissor === 'transportadora' ? 'Transportadora' : '<span class="warn">definir</span>'}</td>
+      <td class="small">${MD.ciotValido(f.ciot) ? esc(f.ciot) : ciotFalta ? '<span class="neg">falta</span>' : '<span class="muted">—</span>'}</td>
+      <td class="small">${f.mdfe_chave ? '<span class="badge pago">Emitido</span>' : f.mdfe_emissor !== 'iplamm' ? '<span class="muted">—</span>' : gr.length ? `<span class="badge vencido">Falta ${gr.length}</span><div class="muted">${esc(gr.slice(0, 3).map(x => x.txt).join('; '))}${gr.length > 3 ? '…' : ''}</div>` : '<span class="badge pago">Pronto para emitir</span>'}</td></tr>`).join('')
+      || '<tr><td colspan="6" class="empty">Nenhum frete nos últimos 45 dias. Cadastre em Fretes › Novo frete.</td></tr>'}</tbody></table></div></div>`;
+  $('#pr-pad', corpo) && ($('#pr-pad', corpo).onclick = () => padroesMDFe(root));
+  $$('tr[data-id]', corpo).forEach(tr => tr.onclick = () => { const f = B.F.find(x => x.id === tr.dataset.id); f.mdfe_emissor === 'iplamm' ? fichaMDFe(f, root) : ficha(f, root); });
 }

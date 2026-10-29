@@ -1,7 +1,7 @@
 ---
 titulo: Fretes e CIOT
 tela: Logística › Fretes e CIOT
-versao: 1.1
+versao: 1.2
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -28,6 +28,7 @@ O registro de cada frete é a **ficha do frete**. A tela também guarda o cadast
 ## 3. As abas
 
 - **Fretes**: os fretes do mês, com os indicadores (fretes no mês, com autônomo, autônomo com pendência, abaixo do piso).
+- **MDF-e · 23/11**: o painel de prontidão para a regra do CIOT no MDF-e. Mostra quantos dias faltam, as viagens com MDF-e da IPLAMM, quantas estão prontas para emitir e quantas estão sem CIOT. Também mostra o que a empresa ainda precisa configurar.
 - **Transportadores**: o cadastro de autônomos, transportadoras e cooperativas.
 - **Conformidade do mês**: o resumo do mês, os fretes pagos sem ficha e o relatório para imprimir.
 - **Piso mínimo**: os coeficientes da tabela da ANTT usados no cálculo.
@@ -88,6 +89,34 @@ Quando a ANTT reajustar a tabela, abra a aba **Piso mínimo** e clique em **Incl
 
 Inclua sempre uma linha nova com a nova vigência, sem apagar a antiga: os fretes antigos continuam calculados pela tabela da época.
 
+### 4.6 Preparar o MDF-e da viagem
+
+O MDF-e (manifesto da carga) é emitido por quem faz o transporte:
+
+- **Transportadora com CT-e**: ela emite o MDF-e e gera o CIOT. Na ficha do frete, escolha **Quem emite o MDF-e = Transportadora** e anote a chave do MDF-e quando ela mandar.
+- **IPLAMM (carga própria)**: a IPLAMM emite o MDF-e. Se o veículo for de terceiro (autônomo ou transportadora contratada sem CT-e), o **CIOT é obrigatório no MDF-e**. A partir de **23/11/2026** a SEFAZ recusa o MDF-e sem CIOT (rejeição 684).
+
+Para deixar o MDF-e da IPLAMM pronto:
+
+1. Na ficha do frete, escolha **Quem emite o MDF-e = IPLAMM**, informe os números das NF-e e clique em **Salvar**.
+2. Clique em **Dados do MDF-e**. A janela tem uma lista no topo: em vermelho, o que falta para emitir; em amarelo, o que é recomendado.
+3. Clique em **Buscar NF-e**. A plataforma lê o XML das notas importadas e preenche:
+   - as chaves de acesso;
+   - os municípios de descarga;
+   - o peso bruto e o valor da carga;
+   - o produto predominante e o município de carregamento.
+   Para incluir uma nota que não foi importada, cole a chave de 44 dígitos no município de descarga.
+4. Confira o **veículo**: placa, tara, UF, tipo de rodado e carroceria. Inclua as carretas em **+ Reboque**. Os dados ficam guardados no transportador e voltam no próximo frete com a mesma placa.
+5. Informe o **motorista** e o **CPF dele**.
+6. Informe o **CIOT** (12 dígitos, gerado pela IPEF) e o CPF/CNPJ de quem gerou. Quando a IPLAMM gera, vem o CNPJ da IPLAMM.
+7. Para autônomo, informe o **pagamento do frete**: pela IPEF (CNPJ da IPEF), por Pix ou por conta bancária do autônomo; à vista ou a prazo, com as parcelas.
+8. Informe o **seguro da carga** e, se houver pedágio, o CNPJ do fornecedor do vale-pedágio.
+9. Clique em **Salvar**. Com tudo completo, o frete aparece como **Pronto para emitir** no painel MDF-e · 23/11.
+
+**Resumo para impressão**: gera uma folha com todos os dados no formato do MDF-e. Use enquanto a emissão pela plataforma não estiver ligada: emita no sistema emissor atual a partir dela.
+
+**Padrões do MDF-e**: seguradora, apólice, IPEF, produto, carregamento e responsável pelo CIOT se repetem em quase toda viagem. Grave uma vez em **Salvar como padrão** (na janela do MDF-e) ou em **Padrões do MDF-e** (no painel). Os próximos fretes já vêm preenchidos, e dá para mudar em cada frete.
+
 ## 5. Regras e travas
 
 - **Piso mínimo** = km × CCD + CC. Com retorno vazio obrigatório, soma 0,92 × CCD × km de retorno. Vale só para **carga lotação**; o pedágio é pago à parte, pelo vale-pedágio.
@@ -101,6 +130,8 @@ Inclua sempre uma linha nova com a nova vigência, sem apagar a antiga: os frete
   - valor igual ou maior que o piso.
 - **Transportadora**: as mesmas faltas aparecem como **aviso**, sem travar o pagamento. O CIOT e o MDF-e são gerados por ela; peça os números e anexe.
 - A chave do MDF-e tem **44 dígitos**.
+- **CIOT no MDF-e**: obrigatório quando a IPLAMM emite o MDF-e com veículo de terceiro. O CIOT tem 12 dígitos e o RNTRC tem 8.
+- As chaves de NF-e são conferidas pelo dígito verificador. Uma chave não entra duas vezes no mesmo manifesto.
 - Frete já pago não pode ser cancelado pela ficha.
 
 ## 6. Perguntas frequentes e erros comuns
@@ -114,6 +145,10 @@ Inclua sempre uma linha nova com a nova vigência, sem apagar a antiga: os frete
 **Lancei uma despesa que não é frete no plano de fretes.** Dispense com o motivo "Não é frete rodoviário" e peça ao financeiro para reclassificar o lançamento.
 
 **Cancelei um frete e o lançamento continua no fluxo.** O cancelamento não apaga o lançamento programado. Exclua o lançamento em Lançamentos, se for o caso.
+
+**O Buscar NF-e diz que não encontrou as notas.** As notas precisam estar importadas (com XML) em CPD › Notas fiscais. Confira os números na ficha do frete, ou cole a chave de 44 dígitos no município de descarga.
+
+**O painel diz que falta a IPEF contratada.** Depois de contratar a IPEF, grave o CNPJ dela em **Padrões do MDF-e**.
 
 ## 7. Conversa sobre o registro
 
@@ -130,3 +165,4 @@ Veja o manual **Conversas** para os detalhes.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: transportadores, ficha do frete, piso mínimo, pagamento com trava para autônomo, conformidade do mês com dispensa justificada e relatório. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do frete (Conversas, etapa 2). |
+| 1.2 | 29/10/2026 | Preparo do MDF-e com CIOT (NT 2026.001): campo **Quem emite o MDF-e**, janela **Dados do MDF-e** com busca das NF-e, painel **MDF-e · 23/11**, padrões do MDF-e e resumo para impressão. |
