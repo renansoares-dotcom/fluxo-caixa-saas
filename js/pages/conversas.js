@@ -825,7 +825,7 @@ function inserirMencao(tx, u, n) {
 async function gravar() {
   if (ui.gravador) return;
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast('Libere o microfone no navegador para gravar áudio', true); }
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { return ajudaMicrofone(e); }
   const tipo = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'].find(t => MediaRecorder.isTypeSupported?.(t)) || '';
   const rec = new MediaRecorder(stream, tipo ? { mimeType: tipo } : undefined), partes = [];
   const g = ui.gravador = { rec, stream, inicio: Date.now(), cancelado: false, conversa: ui.id, resp: ui.resp };
@@ -852,6 +852,46 @@ async function gravar() {
   g.timer = setInterval(() => { const t = document.getElementById('gr-t'); if (t) t.textContent = durTxt((Date.now() - g.inicio) / 1000); if (Date.now() - g.inicio > 15 * 60e3) rec.stop(); else chat.avisarDigitando(g.conversa, 'gravando'); }, 1000);
   $('#gr-x', f).onclick = () => { g.cancelado = true; rec.stop(); };
   $('#gr-ok', f).onclick = () => rec.stop();
+}
+// o navegador recusou o microfone: explica o motivo e como liberar, conforme o aparelho
+async function ajudaMicrofone(e) {
+  const nome = e?.name || '', ua = navigator.userAgent;
+  const ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), android = /Android/.test(ua);
+  const app = /Claude\//.test(ua), emb = window.top !== window;
+  let estado = ''; try { estado = (await navigator.permissions.query({ name: 'microphone' })).state; } catch {}
+  let motivo, passos;
+  if (nome === 'NotFoundError' || nome === 'OverconstrainedError') {
+    motivo = 'Nenhum microfone foi encontrado neste aparelho.';
+    passos = ['Ligue um fone com microfone ou um microfone USB e tente de novo.', 'No computador, confira em Configurações › Som › Entrada se há um microfone ativo.'];
+  } else if (nome === 'NotReadableError' || nome === 'AbortError') {
+    motivo = 'O microfone está sendo usado por outro programa (Teams, Meet, WhatsApp…) ou foi bloqueado pelo sistema.';
+    passos = ['Feche a chamada ou o programa que está usando o microfone e tente de novo.', 'No Windows: Configurações › Privacidade e segurança › Microfone › deixe ligado "Permitir que aplicativos da área de trabalho acessem o microfone".'];
+  } else if (/system/i.test(e?.message || '')) {
+    motivo = 'O sistema do aparelho está bloqueando o microfone para o navegador.';
+    passos = ['No Windows: Configurações › Privacidade e segurança › Microfone › ligue "Acesso ao microfone" e "Permitir que aplicativos da área de trabalho acessem o microfone".',
+      'No Mac: Ajustes do Sistema › Privacidade e Segurança › Microfone › ligue o navegador.', 'Feche e abra o navegador de novo e tente outra vez.'];
+  } else if (app || emb) {
+    motivo = 'A plataforma está aberta dentro de outro aplicativo, que não deixa usar o microfone.';
+    passos = ['Abra a plataforma direto no navegador (Chrome, Edge ou Safari) e grave por lá.'];
+  } else if (ios) {
+    motivo = estado === 'denied' ? 'O microfone está bloqueado para este site no iPad/iPhone.' : 'O iPad/iPhone não liberou o microfone.';
+    passos = ['No Safari: toque em "aA" na barra de endereço › Configurações do Site › Microfone › Permitir (ou Perguntar).',
+      'Ou em Ajustes do aparelho › Apps › Safari › Microfone › Perguntar ou Permitir.',
+      'Se a plataforma estiver instalada na Tela de Início: Ajustes › Privacidade e Segurança › Microfone, e confira o Safari.',
+      'Depois recarregue a página e toque no microfone de novo.'];
+  } else if (android) {
+    motivo = estado === 'denied' ? 'O microfone está bloqueado para este site.' : 'O navegador não liberou o microfone.';
+    passos = ['No Chrome: toque no ícone à esquerda do endereço › Permissões › Microfone › Permitir.',
+      'Se continuar bloqueado: Configurações do Android › Apps › Chrome › Permissões › Microfone › Permitir.', 'Depois recarregue a página.'];
+  } else {
+    motivo = estado === 'denied' ? 'O microfone está BLOQUEADO para este site no navegador. Por isso ele não pergunta mais.' : 'O navegador não liberou o microfone.';
+    passos = ['Clique no ícone à esquerda do endereço do site (cadeado ou ajustes), em cima da tela.',
+      'Em Microfone, escolha Permitir.', 'Recarregue a página (F5) e clique no microfone de novo.',
+      'Se ainda não funcionar, no Windows: Configurações › Privacidade e segurança › Microfone › ligue o acesso para o navegador.'];
+  }
+  modal({ title: 'Microfone não liberado', body: `<p style="margin-top:0"><strong>${esc(motivo)}</strong></p><ol class="ch-ajuda-mic">${passos.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+    <p class="small muted">Detalhe técnico: ${esc(nome || 'erro')}${e?.message ? ' (' + esc(e.message) + ')' : ''}${estado ? ` · permissão: ${esc(estado)}` : ''}</p>`,
+    foot: '<button class="btn primary" data-close>Entendi</button>' });
 }
 function pararGravacao(cancelar) { const g = ui?.gravador; if (!g) return; g.cancelado = !!cancelar; try { g.rec.stop(); } catch {} }
 function pintarComposerNormal() { const f = $('#ch-composer', ui.root); if (!f) return; if (f.dataset.gravando) { delete f.dataset.gravando; f.innerHTML = ''; } pintarComposer(); ajustarBotao(); }

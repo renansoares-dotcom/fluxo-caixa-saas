@@ -924,3 +924,4 @@ select.sb-nativo{position:absolute!important;opacity:0!important;width:1px!impor
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cm-menc{color:#53bdeb}}
 .chat-reg-acoes{display:inline-flex;gap:6px;margin-left:auto;margin-right:6px;flex-wrap:wrap}
 @media (max-width:600px){.chat-reg-acoes .btn{padding:4px 8px}}
+.ch-ajuda-mic{padding-left:20px;line-height:1.6}
