@@ -20,6 +20,10 @@ export async function render(root) {
             .map(([k, t, sp]) => `<label class="${sp ? 'span2' : ''}">${t}<input name="${k}" value="${esc(e[k] || '')}" ${adm ? '' : 'disabled'}></label>`).join('')}
         </form>
         ${adm ? '<div style="margin-top:12px"><button class="btn primary" id="esave">Salvar</button></div>' : ''}
+        ${adm ? `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px"><strong>Segurança</strong>
+          <label class="chk" style="margin-top:6px"><input type="checkbox" id="mfa-obr" ${e.mfa_obrigatorio ? 'checked' : ''}> Exigir verificação em duas etapas (aplicativo autenticador) para administrador, financeiro e diretor</label>
+          <p class="small muted" style="margin:4px 0 0">Com a opção ligada, esses perfis só acessam os dados depois de digitar o código do aplicativo, e a regra vale no banco de dados, não só na tela.
+          Quem ainda não ativou é obrigado a ativar no próximo acesso. Ative a sua antes, no botão <b>Verificação em duas etapas</b> do menu.</p></div>` : ''}
       </div>
       <div class="card"><h2>Usuários</h2><div id="mem" class="table-wrap"></div>
         ${adm ? `<form id="mf" class="toolbar" style="margin-top:12px">
@@ -49,6 +53,15 @@ export async function render(root) {
       const row = await q(sb.from('empresas').update({ nome: d.nome, cnpj: d.cnpj, ano_inicio: +d.ano_inicio, elaborado_por: d.elaborado_por, ...Object.fromEntries(['razao_social', 'ie', 'cep', 'logradouro', 'municipio', 'uf', 'responsavel_nome', 'responsavel_cpf', 'avalista_nome', 'avalista_cpf'].map(k => [k, (d[k] || '').trim() || null])) }).eq('id', e.id).select().single());
       Object.assign(state.empresa, row); document.querySelector('#empresa-switch').textContent = row.nome + ' ▾'; toast('Dados salvos');
     } catch (err) { fail(err); }
+  };
+  if (adm) $('#mfa-obr', root).onchange = async (ev) => {
+    const liga = ev.target.checked;
+    try {
+      if (liga) { const { fatoresVerificados } = await import('../lib/mfa.js');
+        if (!(await fatoresVerificados()).length) { ev.target.checked = false; return toast('Ative primeiro a sua verificação em duas etapas (botão no menu), senão você perde o acesso.', true); } }
+      await q(sb.from('empresas').update({ mfa_obrigatorio: liga }).eq('id', e.id).select('id'));
+      state.empresa.mfa_obrigatorio = liga; toast(liga ? 'Verificação em duas etapas exigida para administrador, financeiro e diretor' : 'Exigência desligada');
+    } catch (err) { ev.target.checked = !liga; fail(/mfa_obrigatorio/.test(err.message || '') ? new Error('Rode antes o SQL 20261028000057_mfa.sql') : err); }
   };
   await membros(root);
   if (adm) await convites(root);

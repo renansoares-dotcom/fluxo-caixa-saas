@@ -5,6 +5,7 @@ import { iniciarNotificacoes, pararNotificacoes } from './lib/notif.js';
 import { iniciarBusca } from './lib/busca.js';
 import { iniciarSelectBusca } from './lib/select-busca.js';
 import { manualDaRota } from './lib/tutoriais.js';
+import { verificarAoEntrar, gerenciar as gerenciarMFA } from './lib/mfa.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -162,6 +163,7 @@ $('#trocar-senha').onclick = () => trocarSenha(false);
 
 const logout = async () => { pararNotificacoes(); await sb.auth.signOut(); location.hash = ''; };
 $('#logout').onclick = logout; $('#logout-2').onclick = logout;
+$('#mfa-btn') && ($('#mfa-btn').onclick = () => gerenciarMFA());
 
 // ---------- Empresas ----------
 async function escolherEmpresa() {
@@ -318,6 +320,8 @@ sb.auth.onAuthStateChange((ev, session) => {
   setTimeout(boot, 0);
 });
 async function boot() {
+  // verificação em duas etapas: código do autenticador (se a conta tem) e ativação obrigatória (se a empresa exige para o perfil)
+  try { if (!await verificarAoEntrar(logout)) return; } catch (e) { console.warn('MFA', e); }
   // convites pendentes para o e-mail da pessoa: entra na empresa com o papel definido pelo administrador
   try {
     const n = await q(sb.rpc('aceitar_convites'));

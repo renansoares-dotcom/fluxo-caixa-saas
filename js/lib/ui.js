@@ -40,15 +40,16 @@ export function toast(msg, err = false) {
 }
 export function fail(e) { console.error(e); toast(e?.message || String(e), true); }
 
-export function modal({ title, body, foot = '', wide = false, onMount }) {
+export function modal({ title, body, foot = '', wide = false, onMount, fixo = false }) {
   const back = h(`<div class="modal-back"><div class="modal" style="${wide ? 'max-width:1100px' : ''}">
-    <div class="modal-head"><h2 style="margin:0">${esc(title)}</h2><button class="btn ghost icon" data-close>✕</button></div>
+    <div class="modal-head"><h2 style="margin:0">${esc(title)}</h2>${fixo ? '' : '<button class="btn ghost icon" data-close>✕</button>'}</div>
     <div class="modal-body"></div><div class="modal-foot"></div></div></div>`);
   const b = $('.modal-body', back); typeof body === 'string' ? b.innerHTML = body : b.appendChild(body);
   const f = $('.modal-foot', back); typeof foot === 'string' ? f.innerHTML = foot : f.appendChild(foot);
   if (!foot) f.remove();
   const close = () => back.remove();
-  back.addEventListener('click', e => { if (e.target === back || e.target.closest('[data-close]')) close(); });
+  // fixo: só fecha pelo próprio código (telas obrigatórias, como a verificação em duas etapas)
+  if (!fixo) back.addEventListener('click', e => { if (e.target === back || e.target.closest('[data-close]')) close(); });
   $('#modal-root').appendChild(back);
   onMount && onMount(back, close);
   return { el: back, close };

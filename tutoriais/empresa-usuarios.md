@@ -1,7 +1,7 @@
 ---
 titulo: Empresa, usuários e auditoria
 tela: Cadastros › Empresa e usuários e Auditoria
-versao: 1.0
+versao: 1.1
 atualizado: 2026-10-28
 ---
 ## 1. Para que serve
@@ -62,7 +62,29 @@ As **áreas** definem o que a pessoa enxerga no menu: Financeiro (inclui os pain
 - **RH (salários)** só vale para quem for marcado; o administrador sempre vê.
 - Deixe ao menos uma área marcada. A mudança vale no próximo acesso da pessoa.
 
-## 5. Importar lançamentos por planilha
+## 5. Verificação em duas etapas
+
+A verificação em duas etapas protege a conta mesmo que a senha vaze: ao entrar, além da senha, a plataforma pede um **código de 6 dígitos** do aplicativo autenticador do celular (Google Authenticator, Microsoft Authenticator ou Authy).
+
+### 5.1 Ativar a sua
+
+1. No menu, clique em **Verificação em duas etapas**.
+2. Instale o aplicativo autenticador no celular, escolha **adicionar conta** e leia o QR Code. Sem câmera, digite a chave que aparece ao lado do QR Code.
+3. Digite o código que aparecer no aplicativo e clique em **Ativar**.
+
+Nos próximos acessos, depois da senha, a plataforma pede o código. Trocou de celular? Desative e ative de novo no aparelho novo.
+
+### 5.2 Exigir para a empresa (administrador)
+
+Em **Dados da empresa › Segurança**, marque **Exigir verificação em duas etapas para administrador, financeiro e diretor**:
+
+- esses perfis só acessam os dados depois de digitar o código. A regra vale no **banco de dados**, não só na tela;
+- quem ainda não ativou é obrigado a ativar no próximo acesso;
+- os perfis compras, vendas, produção e leitura não são afetados.
+
+> **Atenção:** ative a sua antes de ligar a exigência. A plataforma não deixa ligar sem isso, para você não perder o acesso.
+
+## 6. Importar lançamentos por planilha
 
 1. Clique em **Baixar modelo** para ter o layout.
 2. Preencha as colunas (cabeçalho na 1ª linha):
@@ -77,7 +99,7 @@ As **áreas** definem o que a pessoa enxerga no menu: Financeiro (inclui os pain
 
 A **importação da base completa** (migração da planilha) só funciona em empresa sem lançamentos.
 
-## 6. Auditoria
+## 7. Auditoria
 
 1. Filtre por período (**De / Até**), **onde** (tela ou tabela), **ação** (inclusão, alteração ou exclusão) e **usuário**, ou use a busca.
 2. Clique numa linha para ver o **antes → depois** de cada campo.
@@ -86,22 +108,26 @@ A **importação da base completa** (migração da planilha) só funciona em emp
 
 Dentro do lançamento, o botão **Histórico** mostra a auditoria só daquele lançamento.
 
-## 7. Regras e travas
+## 8. Regras e travas
 
 - Novos usuários entram **por convite**, direto na empresa e com o papel definido.
 - Só o administrador gerencia usuários.
+- Com a exigência ligada, administrador, financeiro e diretor só acessam os dados com o código do autenticador.
 - A auditoria grava tudo a partir da sua ativação; o banco também restringe a leitura ao administrador e ao diretor.
 
-## 8. Perguntas frequentes e erros comuns
+## 9. Perguntas frequentes e erros comuns
 
 **A pessoa não recebeu o convite.** A plataforma não envia e-mail. Copie o link e mande você mesmo.
 
 **A pessoa não vê uma área no menu.** Marque a área no usuário dela. Vale no próximo acesso.
 
+**Perdi o celular com o autenticador.** Peça ao administrador do Supabase para remover o fator da sua conta (Authentication › Users) e ative de novo.
+
 **Alguém alterou um lançamento por engano.** Abra a Auditoria, encontre a alteração e use **Desfazer**, ou peça ao administrador ou ao diretor.
 
-## 9. Histórico de alterações
+## 10. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: dados da empresa, convites, papéis, áreas, importação por planilha e auditoria. |
+| 1.1 | 28/10/2026 | Verificação em duas etapas: ativar a sua e exigir para administrador, financeiro e diretor. |
