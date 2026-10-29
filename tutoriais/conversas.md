@@ -1,7 +1,7 @@
 ---
 titulo: Conversas
 tela: Comunicação › Conversas
-versao: 2.0
+versao: 2.1
 atualizado: 2026-10-29
 ---
 ## 1. Para que serve
@@ -195,6 +195,12 @@ Os avisos usam a mesma liberação do sino de notificações. Clique no **sino**
 
 **"Só os administradores podem enviar mensagens neste grupo".** O grupo é de avisos. Fale com um administrador do grupo.
 
+**Toco no microfone e não pede permissão.** O navegador já está com o microfone bloqueado para o site e não pergunta de novo. A plataforma abre uma janela dizendo o motivo e o passo a passo:
+- **Computador (Chrome ou Edge):** clique no ícone à esquerda do endereço do site › Microfone › Permitir, e recarregue com F5. Se continuar, no Windows vá em Configurações › Privacidade e segurança › Microfone e libere o acesso para o navegador.
+- **iPad ou iPhone (Safari):** toque em "aA" na barra de endereço › Configurações do Site › Microfone › Permitir. Ou Ajustes › Apps › Safari › Microfone.
+- **Android (Chrome):** toque no ícone à esquerda do endereço › Permissões › Microfone › Permitir.
+- Dentro de outro aplicativo (por exemplo, o navegador embutido do Claude), o microfone não funciona: abra a plataforma direto no navegador.
+
 **O microfone não aparece.** O navegador não grava áudio (alguns navegadores antigos) ou a conversa é só de leitura. No iPhone, use o Safari atualizado.
 
 **"Você não tem acesso a este registro".** O registro é de uma área que o seu perfil não vê. Peça a quem mandou para escrever o que precisa na conversa.
@@ -209,3 +215,4 @@ Os avisos usam a mesma liberação do sino de notificações. Clique no **sino**
 |---|---|---|
 | 1.0 | 29/10/2026 | Primeira versão: conversas individuais e em grupo, emojis, fotos e arquivos, entregue e lida, silenciar, fixar, arquivar, administração do grupo e avisos. |
 | 2.0 | 29/10/2026 | Etapa 2: responder, encaminhar, reações, editar e apagar, menções com @, mensagem de voz, busca nas mensagens, mensagem fixada, favoritas, dados da mensagem, mídia e documentos da conversa, exportar em PDF, online / visto por último / digitando, mini-chat e conversa do registro com cartões. |
+| 2.1 | 29/10/2026 | Microfone recusado: a plataforma explica o motivo e como liberar no computador, iPad/iPhone e Android. |
