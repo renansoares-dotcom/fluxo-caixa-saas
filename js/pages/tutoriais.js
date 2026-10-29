@@ -25,11 +25,17 @@ export async function render(root) {
     <div class="tut-lista" id="tut-lista"><div class="loading">Carregando…</div></div>`;
   const lista = visiveis();
   const dados = await Promise.all(lista.map(x => texto(x.id).then(t => lerManual(t).dados).catch(() => ({}))));
-  $('#tut-lista', root).innerHTML = `<div class="tut-grade">${lista.map((x, i) => { const d = dados[i]; return `
-      <div class="card tut-card"><span class="tut-area">${esc(x.area)}</span><a class="tut-tit" href="#/tutoriais?m=${x.id}">${esc(x.titulo)}</a><p class="small muted">${esc(x.resumo)}</p>
+  const card = (x, d) => `<div class="card tut-card" data-txt="${esc((x.titulo + ' ' + x.resumo + ' ' + x.area).toLowerCase())}"><a class="tut-tit" href="#/tutoriais?m=${x.id}">${esc(x.titulo)}</a><p class="small muted">${esc(x.resumo)}</p>
         <div class="small muted">versão ${esc(d.versao || '1.0')} · atualizado em ${dataBR(d.atualizado) || '–'}</div>
-        <div class="tut-acoes"><a class="btn small primary" href="#/tutoriais?m=${x.id}">Abrir</a><a class="btn small" href="${base}pdf/${x.id}.pdf?v=${V}" target="_blank" rel="noopener">PDF</a></div></div>`; }).join('')}</div>`
-    || '<div class="card"><div class="empty">Nenhum manual disponível.</div></div>';
+        <div class="tut-acoes"><a class="btn small primary" href="#/tutoriais?m=${x.id}">Abrir</a><a class="btn small" href="${base}pdf/${x.id}.pdf?v=${V}" target="_blank" rel="noopener">PDF</a></div></div>`;
+  const areas = [...new Set(lista.map(x => x.area))];
+  $('#tut-lista', root).innerHTML = lista.length ? `<div class="toolbar card"><input id="tut-busca" placeholder="Procurar um assunto (ex.: borderô, conciliação, folha)" style="min-width:320px"><span class="muted small">${lista.length} manuais</span></div>
+    ${areas.map(a => `<section class="tut-sec"><h3 class="tut-sec-tit">${esc(a)}</h3><div class="tut-grade">${lista.map((x, i) => [x, dados[i]]).filter(([x]) => x.area === a).map(([x, d]) => card(x, d)).join('')}</div></section>`).join('')}`
+    : '<div class="card"><div class="empty">Nenhum manual disponível.</div></div>';
+  const bz = $('#tut-busca', root);
+  if (bz) bz.oninput = () => { const t = bz.value.trim().toLowerCase();
+    root.querySelectorAll('.tut-card').forEach(c => { c.hidden = !!t && !c.dataset.txt.includes(t); });
+    root.querySelectorAll('.tut-sec').forEach(sc => { sc.hidden = ![...sc.querySelectorAll('.tut-card')].some(c => !c.hidden); }); };
 }
 
 async function abrir(root, m) {

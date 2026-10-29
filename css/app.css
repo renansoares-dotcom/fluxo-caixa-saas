@@ -734,3 +734,5 @@ select.sb-nativo{position:absolute!important;opacity:0!important;width:1px!impor
 .manual-tela .manual-corpo code{font-size:12.5px;background:var(--surface-2);padding:1px 4px;border-radius:4px}
 @media print{.tut-ajuda{display:none!important}}
 .tut-ajuda[hidden]{display:none}
+.tut-sec{margin-top:16px} .tut-sec-tit{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.tut-card[hidden],.tut-sec[hidden]{display:none}

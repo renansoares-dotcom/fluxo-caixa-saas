@@ -39,7 +39,7 @@ export function mdParaHtml(md) {
       continue;
     }
     if (/^\s*([-*]|\d+[.)])\s+/.test(l)) {
-      const ord = /^\s*\d+[.)]\s+/.test(l);
+      const ord = /^\s*\d+[.)]\s+/.test(l), ini = ord ? parseInt(l.trim(), 10) : 1;
       const itens = [];
       while (i < L.length && (/^\s*([-*]|\d+[.)])\s+/.test(L[i]) || (/^\s{2,}\S/.test(L[i]) && itens.length))) {
         if (/^\s*([-*]|\d+[.)])\s+/.test(L[i]) && !/^\s{2,}/.test(L[i])) itens.push([L[i].replace(/^\s*([-*]|\d+[.)])\s+/, '')]);
@@ -47,7 +47,7 @@ export function mdParaHtml(md) {
         i++;
       }
       const tag = ord ? 'ol' : 'ul';
-      out.push(`<${tag}>${itens.map(x => `<li>${x.map(inline).join('<br>')}</li>`).join('')}</${tag}>`);
+      out.push(`<${tag}${ord && ini > 1 ? ` start="${ini}"` : ''}>${itens.map(x => `<li>${x.map(inline).join('<br>')}</li>`).join('')}</${tag}>`);
       continue;
     }
     const ps = bloco(/^(?!\s*$)(?!#{1,4}\s)(?!\s*>)(?!\s*\|)(?!\s*([-*]|\d+[.)])\s+)(?!---+\s*$).*/);
