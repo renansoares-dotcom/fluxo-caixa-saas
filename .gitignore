@@ -3,6 +3,8 @@ dados/
 supabase/seed/
 *.json
 !package.json
+# dados públicos (IBGE) usados pela Logística — não são dados da empresa
+!data/municipios.json
 *.xlsx
 *.xlsm
 *.csv
