@@ -36,7 +36,7 @@ export function cssCracha(cor = '#2b5598') {
   return `.crc{width:85.6mm;height:54mm;box-sizing:border-box;position:relative;overflow:hidden;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;border:.2mm solid #bbb;border-radius:3mm}
   .crc .faixa{position:absolute;left:0;right:0;top:0;height:11mm;background:var(--crc,${cor});display:flex;align-items:center;gap:2mm;padding:0 3mm}
   .crc .faixa .lg{height:7.5mm;max-width:30mm;background:#fff;border-radius:1.2mm;padding:.6mm 1.2mm;box-sizing:border-box;display:flex;align-items:center}
-  .crc .faixa .lg img{max-height:6.3mm;max-width:27mm}
+  .crc .faixa .lg img{height:6.3mm;width:auto;max-width:27mm;object-fit:contain;display:block}
   .crc .faixa .nm{color:#fff;font-weight:700;font-size:3.1mm;letter-spacing:.2mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .crc .ft{position:absolute;left:3mm;top:13.5mm;width:22mm;height:29.3mm;border-radius:1.5mm;background:#e9edf3 center/cover no-repeat;border:.3mm solid var(--crc,${cor})}
   .crc .ft.sem{display:flex;align-items:center;justify-content:center;color:#889;font-size:2.4mm;text-align:center}

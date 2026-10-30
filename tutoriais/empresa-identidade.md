@@ -1,7 +1,7 @@
 ---
 titulo: Empresa — identidade visual e crachás
 tela: Cadastros › Empresa: identidade e crachás
-versao: 1.0
+versao: 1.1
 atualizado: 2026-10-30
 ---
 ## 1. Para que serve
@@ -104,3 +104,4 @@ Todos os crachás emitidos, com via, validade, situação e baixa. Use **Devolvi
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 30/10/2026 | Primeira versão: identidade visual (logos, cores, unidades) aplicada na plataforma e nos relatórios; crachás com foto, QR Code de verificação, 2ª via, terceiros e visitantes, impressão em A4. |
+| 1.1 | 30/10/2026 | Correção: logo em SVG não aparecia na faixa do crachá (prévia e impressão). |
