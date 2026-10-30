@@ -41,6 +41,7 @@ const routes = {
   'logistica/frota': () => import(`./pages/logistica-frota.js?v=${V}`),
   'logistica/fretes': () => import(`./pages/logistica-fretes.js?v=${V}`),
   'logistica/gestao-frota': () => import(`./pages/frota.js?v=${V}`),
+  'logistica/indicadores': () => import(`./pages/logistica-indicadores.js?v=${V}`),
   'rh/colaboradores': () => import(`./pages/rh-colaboradores.js?v=${V}`),
   'rh/folha': () => import(`./pages/rh-folha.js?v=${V}`),
   'rh/decimo': () => import(`./pages/rh-decimo.js?v=${V}`),

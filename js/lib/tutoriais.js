@@ -42,6 +42,8 @@ export const MANUAIS = [
     resumo: 'Montagem automática de cargas, romaneio, mapa, baixa das entregas, frota e parâmetros.' },
   { id: 'frota', titulo: 'Gestão da frota e motoristas', area: 'Logística', rotas: ['logistica/gestao-frota'],
     resumo: 'Documentos, preventivas, manutenção, abastecimento com km/l, multas, motoristas (CNH e toxicológico) e custo por km.' },
+  { id: 'logistica-indicadores', titulo: 'Indicadores de logística', area: 'Logística', rotas: ['logistica/indicadores'],
+    resumo: 'Entregas no prazo, ocupação, custo logístico sobre as notas, custo por kg e frota, com metas e tendência de 6 meses.' },
   { id: 'fretes-ciot', titulo: 'Fretes e CIOT', area: 'Logística', rotas: ['logistica/fretes'],
     resumo: 'Ficha do frete, transportadores, piso mínimo da ANTT, CIOT e MDF-e, conformidade do mês.' },
   { id: 'rh', titulo: 'RH — colaboradores, folha do mês e 13º', area: 'RH / Trabalhista', rotas: ['rh/colaboradores', 'rh/folha', 'rh/decimo'], rh: true,

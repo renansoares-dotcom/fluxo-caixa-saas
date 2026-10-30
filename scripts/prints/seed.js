@@ -235,3 +235,23 @@ DB.frota_multas = [
   { id: id('fu'), empresa_id: E, veiculo_id: V1.id, motorista_id: M1.id, auto_numero: 'S123456789', orgao: 'PRF', data_infracao: '2026-10-12', local: 'BR-232 km 120', infracao: 'Velocidade superior à máxima em até 20%', codigo: '7455-0', pontos: 4, valor: 130.16, vencimento: '2026-11-25', prazo_indicacao: '2026-11-04', situacao: 'a_indicar' },
   { id: id('fu'), empresa_id: E, veiculo_id: V3.id, motorista_id: M2.id, auto_numero: 'E987654321', orgao: 'DETRAN-PE', data_infracao: '2026-09-02', infracao: 'Estacionar em local proibido', codigo: '5550-1', pontos: 3, valor: 195.23, vencimento: '2026-10-20', situacao: 'paga', desconto_folha: true },
 ];
+// indicadores de logística (SQL 071): cargas e entregas de maio a outubro
+DB.log_parametros = [{ id: id('lp'), empresa_id: E, dias_atraso: 3, metas: { prazo_pct: 95, ocupacao_pct: 80, custo_pct: 5, devol_pct: 1 } }];
+DB.log_carga_notas = DB.log_carga_notas || [];
+{ const CLI = ['SUPERMERCADOS BOA COMPRA LTDA', 'DISTRIBUIDORA NORDESTE LTDA', 'ATACADO SERTÃO LTDA', 'FARMÁCIAS SAÚDE MAIS S.A.'];
+  let num = 1, nn = 5000;
+  ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'].forEach((m, mi) => {
+    for (let c = 0; c < 9; c++) {
+      const v = DB.log_veiculos[c % 3], data = `${m}-${String(2 + c * 3).padStart(2, '0')}`;
+      const occ = 0.66 + mi * 0.025 + (c % 3) * 0.03, peso = Math.round(+v.carga_kg * occ);
+      const cg = { id: id('cg'), empresa_id: E, numero: num++, data, veiculo_id: v.id, motorista: 'PAULO SANTOS', status: 'concluida', peso_kg: peso, volume_m3: +(peso / 380).toFixed(1), km_previsto: 300 + c * 20, km_real: 310 + c * 22, frete_previsto: 1500 };
+      DB.log_cargas.push(cg);
+      for (let k = 0; k < 4; k++) {
+        const em = dia(data, -1 - (k % 2)), atraso = (c + k + mi) % (9 - mi) === 0 ? 3 : 0, entregue = dia(data, k % 2 + atraso);
+        const nota = { id: id('nf'), empresa_id: E, chave: String(26e42 + nn), numero: nn++, emissao: em, tipo: 'saida', emissao_propria: true, dest_nome: CLI[(c + k) % 4], v_nf: 18000 + ((c * 7 + k * 13) % 9) * 2500, situacao: 'autorizada' };
+        DB.nfe_notas.push(nota);
+        const sit = (c * 4 + k + mi) % 47 === 0 ? 'devolvida' : 'entregue';
+        DB.log_carga_notas.push({ id: id('cn'), empresa_id: E, carga_id: cg.id, nota_id: nota.id, seq: k, peso_kg: peso / 4, situacao: sit, entregue_em: sit === 'entregue' ? entregue + 'T15:00:00Z' : null });
+      }
+    }
+  }); }
