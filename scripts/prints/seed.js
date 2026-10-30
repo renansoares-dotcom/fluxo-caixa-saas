@@ -190,7 +190,8 @@ const CT = (numero, tipo, objeto, fav, valor, per, inicio, fim, extra = {}) => (
 DB.contratos = [
   CT(1, 'locacao_imovel', 'Locação do galpão de expedição', 'IMÓVEIS CENTRO', 18500, 'mensal', '2024-12-01', '2026-11-30', { aviso_previo_dias: 30, data_base: '2026-12-01', indice: 'IGP-M' }),
   CT(2, 'servico', 'Licença e suporte do sistema de gestão', 'SISTEMAS NUVEM', 3200, 'mensal', '2025-11-05', '2027-11-04', { data_base: '2026-11-05', plano_id: P('2.03.02').id }),
-  CT(3, 'locacao_veiculo_motorista', 'Locação de caminhão baú com motorista para rotas do interior', 'TRANSPORTES RÁPIDO', 14800, 'mensal', '2026-03-01', '2027-02-28', { data_base: '2027-03-01', plano_id: P('2.06.01').id }),
+  CT(3, 'locacao_veiculo_motorista', 'Locação de caminhão baú com motorista para rotas do interior', 'TRANSPORTES RÁPIDO', 14800, 'mensal', '2026-03-01', '2027-02-28', { data_base: '2027-03-01', plano_id: P('2.06.01').id,
+    modelo: 'locacao_veiculo_motorista', dados: { veiculo: { marca_modelo: 'VW Delivery 11.180', placa: 'ABC1D23', ano: '2022', cor: 'branca', renavam: '01234567890' }, rota: 'Caruaru, Agreste e Sertão de Pernambuco', combustivel: 'da CONTRATADA', foro: 'Caruaru/PE' } }),
   CT(4, 'transporte_tac', 'Transporte de cargas por autônomo — rota Caruaru/Recife', 'JOSÉ CARLOS', 0, 'sem_valor', '2026-06-01', null, { natureza: 'sem_valor', indice: 'nenhum', aviso_previo_dias: 15 }),
   CT(5, 'fornecimento', 'Fornecimento de energia no mercado livre', 'ENERGIA REGIONAL', 46000, 'mensal', '2025-01-01', '2029-12-31', { renovacao_automatica: true, data_base: '2027-01-01', plano_id: P('2.01.03').id, aviso_previo_dias: 180 }),
 ];

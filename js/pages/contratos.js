@@ -1,8 +1,9 @@
 // Contratos (SQL 068) — só administradores. Cadastro, PDF assinado (gov.br) e aditivos, alertas de vencimento,
 // aviso prévio e reajuste, parcelas no fluxo de caixa e reajuste proposto → aprovado.
 import { sb, state, q, isAdmin, loadCadastros } from '../lib/data.js';
-import { $, $$, esc, toast, fail, modal, confirmDialog, today, dateBR, money, options, erroTela } from '../lib/ui.js';
+import { $, $$, esc, toast, fail, modal, confirmDialog, today, dateBR, money, options, erroTela, logoPNG } from '../lib/ui.js';
 import * as K from '../lib/contratos.js';
+import * as M from '../lib/contratos-modelos.js';
 
 export const title = 'Contratos';
 const BUCKET = 'contratos';
@@ -17,7 +18,7 @@ async function carregar() {
     q(sb.from('contratos').select('*').eq('empresa_id', e).order('numero', { ascending: false })),
     q(sb.from('contrato_arquivos').select('*').eq('empresa_id', e).order('enviado_em', { ascending: false })),
     q(sb.from('contrato_reajustes').select('*').eq('empresa_id', e).order('data_base', { ascending: false })),
-    seguro(q(sb.from('log_transportadores').select('id,nome,documento,favorecido_id').eq('empresa_id', e).order('nome'))),
+    seguro(q(sb.from('log_transportadores').select('id,nome,documento,favorecido_id,rntrc,veiculos').eq('empresa_id', e).order('nome'))),
     seguro(q(sb.from('rh_colaboradores').select('id,nome,cpf,situacao').eq('empresa_id', e).order('nome'))),
     q(sb.from('lancamentos').select('id,contrato_id,data,valor,status').eq('empresa_id', e).not('contrato_id', 'is', null)),
   ]);
@@ -155,6 +156,7 @@ function extras(c, el, md, root) {
   box.innerHTML = `
     ${al.length ? `<div class="card" style="margin-top:12px;background:var(--bg-soft,#f6f7fb)">${al.map(a => `<div class="small ${a.nivel === 'neg' ? 'neg' : a.nivel === 'warn' ? 'warn' : 'muted'}">• ${esc(a.txt)}</div>`).join('')}
       ${al.some(a => a.k === 'renovar') ? `<button class="btn small" id="k-renovar" style="margin-top:6px">Renovar até ${dateBR(K.proximaVigencia(c))}</button>` : ''}</div>` : ''}
+    <div id="k-min"></div>
     <h3 style="margin:16px 0 6px">Documentos</h3>
     <div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Arquivo</th><th>Assinatura</th><th>Enviado</th><th></th></tr></thead><tbody>
       ${arqs.map(a => `<tr><td>${esc(K.ARQ[a.tipo] || a.tipo)}</td><td>${esc(a.nome)}${a.descricao ? `<div class="small muted">${esc(a.descricao)}</div>` : ''}</td>
@@ -178,6 +180,7 @@ function extras(c, el, md, root) {
         <td>${r.status === 'proposto' ? `<button class="btn small primary" data-apr="${r.id}">Aprovar</button> <button class="btn small" data-rec="${r.id}">Recusar</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhum reajuste.</td></tr>'}</tbody></table></div>
     ${c.indice !== 'nenhum' && c.data_base && !reas.some(r => r.data_base === c.data_base) ? `<button class="btn" id="k-calc" style="margin-top:8px">Calcular reajuste de ${dateBR(c.data_base)}</button>` : ''}` : ''}`;
 
+  minuta(c, $('#k-min', box), md, root);
   $$('[data-abrir]', box).forEach(b => b.onclick = async () => {
     const a = arqs.find(x => x.id === b.dataset.abrir);
     try { const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(a.path, 300); if (error) throw error; window.open(data.signedUrl, '_blank', 'noopener'); } catch (err) { fail(err); }
@@ -254,5 +257,65 @@ function encerrar(c, md0, root) {
       if ($('#e-del', md.el)?.checked) { const ids = futuras.filter(p => p.data > d).map(p => p.id); if (ids.length) await q(sb.from('lancamentos').delete().in('id', ids)); }
       md.close(); md0.close(); toast('Contrato encerrado'); await carregar(); lista($('#ct-corpo', root), root);
     } catch (err) { fail(err); ev.target.disabled = false; }
+  };
+}
+
+// ---------------------------------------------------------------- minuta (modelos — SQL 069)
+function parteDe(c) {
+  if (c.parte_tipo === 'favorecido' && c.favorecido_id) {
+    const f = state.cad.favById[c.favorecido_id] || {};
+    const end = [[f.logradouro, f.numero].filter(Boolean).join(', '), f.complemento, f.bairro, f.municipio && f.uf ? `${f.municipio}/${f.uf}` : f.municipio, f.cep && `CEP ${f.cep}`].filter(Boolean).join(', ');
+    return { nome: c.parte_nome, doc: c.parte_documento || f.documento, endereco: f.logradouro ? end : '' };
+  }
+  return { nome: c.parte_nome, doc: c.parte_documento, endereco: '' };
+}
+function preencherDados(c, modelo) {
+  const d = structuredClone(c.dados || {});
+  const t = c.parte_tipo === 'transportador' ? D.T.find(x => x.id === c.transportador_id) : null;
+  if (t) { d.rntrc ||= t.rntrc || ''; const ve = (t.veiculos || [])[0]; if (ve && !d.veiculo?.placa) d.veiculo = { ...(d.veiculo || {}), placa: ve.placa }; }
+  if (modelo === 'vistoria') d.vistoria = { momento: 'Entrega', data: M.dataBR(D.hoje), ...(d.vistoria || {}) };
+  return d;
+}
+function minuta(c, box, md, root) {
+  const modelo = c.modelo || M.MODELO_PADRAO(c.tipo);
+  const d = preencherDados(c, modelo), m = M.MODELOS[modelo];
+  const campo = (k) => {
+    const def = M.CAMPOS[k]; if (!def) return '';
+    if (def.bool) return `<label style="grid-column:1/-1;flex-direction:row;gap:8px;align-items:center"><input type="checkbox" data-k="${k}" ${d[k] ? 'checked' : ''} style="width:auto"> ${def.t}</label>`;
+    if (def.sub) return `<fieldset style="grid-column:1/-1;border:1px solid var(--line,#ddd);border-radius:8px;padding:8px 10px;margin:0"><legend class="small">${def.t}</legend><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+      ${def.sub.map(([sk, st]) => `<label>${st}<input data-k="${k}.${sk}" value="${esc(d[k]?.[sk] ?? '')}"></label>`).join('')}</div></fieldset>`;
+    return `<label style="${k === 'escopo' || k === 'rota' || k === 'uso' ? 'grid-column:1/-1' : ''}">${def.t}<input data-k="${k}" value="${esc(d[k] ?? '')}" ${def.num ? 'type="number" min="1"' : ''} placeholder="${esc(def.ph || '')}"></label>`;
+  };
+  box.innerHTML = `<h3 style="margin:16px 0 6px">Minuta para assinatura</h3>
+    <div class="grid2"><label>Modelo<select id="m-mod">${Object.entries(M.MODELOS).map(([k, x]) => `<option value="${k}" ${k === modelo ? 'selected' : ''}>${esc(x.titulo)}${x.termo ? ' (termo)' : ''}</option>`).join('')}</select></label>
+      <div class="small muted" style="align-self:end">Preenchido com os dados da empresa, da outra parte e deste contrato. Minuta-base: revise com o jurídico antes do primeiro uso.</div>
+      ${m.campos.map(campo).join('')}</div>
+    <div id="m-falta" class="small warn" style="margin-top:6px"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn" id="m-salvar">Salvar campos</button><button class="btn primary" id="m-gerar">Gerar minuta (PDF)</button></div>`;
+  const ler = () => {
+    const nd = structuredClone(d);
+    $$('[data-k]', box).forEach(i => { const [k, sk] = i.dataset.k.split('.'); const val = i.type === 'checkbox' ? i.checked : i.value.trim();
+      if (sk) { nd[k] = { ...(nd[k] || {}), [sk]: val }; } else nd[k] = i.type === 'number' ? (+val || null) : val; });
+    return nd;
+  };
+  const ctx = (dados, logo = null) => M.contexto({ empresa: state.empresa, ident: state.identidade || {}, contrato: { ...c, dados }, parte: parteDe(c), logo });
+  const mostrarFaltas = () => { const f = M.faltas($('#m-mod', box).value, ctx(ler())); $('#m-falta', box).textContent = f.length ? `Vai sair com espaço em branco para: ${f.join(', ')}.` : ''; };
+  mostrarFaltas(); box.oninput = mostrarFaltas;
+  $('#m-mod', box).onchange = async (e) => { try { await q(sb.from('contratos').update({ modelo: e.target.value, dados: ler() }).eq('id', c.id)); c.modelo = e.target.value; c.dados = ler(); minuta(c, box, md, root); } catch (err) { fail(err); } };
+  $('#m-salvar', box).onclick = async () => { try { const nd = ler(); await q(sb.from('contratos').update({ modelo: $('#m-mod', box).value, dados: nd }).eq('id', c.id)); c.dados = nd; toast('Campos salvos'); } catch (err) { fail(err); } };
+  $('#m-gerar', box).onclick = async (ev) => {
+    ev.target.disabled = true;
+    try {
+      const nd = ler(), mod = $('#m-mod', box).value;
+      await q(sb.from('contratos').update({ modelo: mod, dados: nd }).eq('id', c.id)); c.dados = nd; c.modelo = mod;
+      const logo = (await logoPNG(160).catch(() => null))?.data || null;   // logo da identidade da empresa (ou o padrão da plataforma)
+      const html = M.documento(mod, ctx(nd, logo), { data: D.hoje });
+      document.getElementById('ct-print')?.remove();
+      const fr = document.createElement('iframe'); fr.id = 'ct-print'; fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+      document.body.appendChild(fr);
+      fr.contentDocument.open(); fr.contentDocument.write(html); fr.contentDocument.close();
+      await new Promise(r => setTimeout(r, 500));
+      fr.contentWindow.focus(); fr.contentWindow.print();
+    } catch (err) { fail(err); } finally { ev.target.disabled = false; }
   };
 }

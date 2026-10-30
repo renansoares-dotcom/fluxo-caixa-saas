@@ -1,7 +1,7 @@
 ---
 titulo: Contratos
 tela: Cadastros › Contratos
-versao: 1.0
+versao: 1.1
 atualizado: 2026-10-30
 ---
 ## 1. Para que serve
@@ -49,7 +49,34 @@ Os mesmos alertas aparecem no **Decision Center** para os administradores.
 6. Em **Fluxo de caixa**, escolha a **conta do plano** (obrigatória para gerar parcelas), o centro de custo e a conta bancária.
 7. Clique em **Salvar**. O contrato recebe um número sequencial e a ficha abre com as partes de documentos, parcelas e reajuste.
 
-## 5. Contrato assinado (gov.br) e documentos
+## 5. Minuta para assinatura (modelos)
+
+![Figura 3 — Minuta para assinatura com os campos do modelo (dados fictícios)](img/contratos-3.jpg)
+
+1. Na ficha do contrato, em **Minuta para assinatura**, escolha o **modelo**. A plataforma sugere o modelo pelo tipo do contrato:
+
+| Modelo | Uso |
+|---|---|
+| Locação de veículo | Veículo de terceiro sem motorista. |
+| Locação de veículo com motorista | Veículo com motorista da contratada (jornada e encargos por conta dela). |
+| Prestação de serviços | Serviços em geral; também serve de base para fornecimento e locação de imóvel. |
+| Transporte com autônomo (TAC) | Lei 11.442/2007: RNTRC, CIOT, pagamento pela IPEF, piso mínimo da ANTT e vale-pedágio. |
+| Agregado (TAC-agregado) | Veículo à disposição com exclusividade e remuneração certa; plotagem e retirada. |
+| Acordo de confidencialidade | Troca de informações sigilosas, com prazo de sigilo. |
+| Termo de responsabilidade pelo uso de veículo | Motorista colaborador: CNH, multas e desconto de danos (art. 462, § 1º, da CLT). |
+| Termo de autorização de uso de imagem | Foto do crachá e dos sistemas internos (LGPD). |
+| Termo de vistoria de veículo | Lista de conferência na entrega e na devolução. |
+
+2. Preencha os **campos do modelo** (veículo, RNTRC, rota, foro, testemunhas etc.). O RNTRC e a placa vêm do cadastro do transportador, quando houver.
+3. A linha em amarelo mostra o que vai sair **em branco** (ex.: endereço da outra parte, representante legal da empresa). Complete os cadastros ou preencha à mão depois.
+4. Clique em **Gerar minuta (PDF)**. A plataforma monta o documento no padrão do papel timbrado (logo, razão social, CNPJ e endereço da empresa), com a qualificação das partes, as cláusulas, o valor por extenso, o reajuste, o foro e os campos de assinatura.
+5. Na janela de impressão, escolha **Salvar como PDF**.
+
+Os dados da empresa vêm de **Empresa e Usuários** (CNPJ, endereço e representante legal) e de **Cadastros › Empresa: identidade e crachás** (razão social dos documentos, logo e unidades). Os da outra parte vêm do cadastro do beneficiário (nome, CPF/CNPJ e endereço).
+
+> Os modelos são **minutas-base**. Peça ao jurídico para revisar cada modelo antes do primeiro uso e ajuste as cláusulas ao caso concreto.
+
+## 6. Contrato assinado (gov.br) e documentos
 
 1. Gere ou receba a minuta em PDF.
 2. Assine em **assinador.iti.br** com a conta gov.br (nível prata ou ouro) e envie o mesmo arquivo para a outra parte assinar.
@@ -57,14 +84,14 @@ Os mesmos alertas aparecem no **Decision Center** para os administradores.
 4. A plataforma confere se o PDF tem **assinatura digital**. Se não tiver, ela pergunta antes de anexar como assinado.
 5. Anexe também **aditivos**, **termos de vistoria** e outros documentos. Arquivos até 15 MB (PDF, PNG ou JPG). Só administradores abrem os arquivos.
 
-## 6. Parcelas no fluxo de caixa
+## 7. Parcelas no fluxo de caixa
 
 1. Na ficha, em **Parcelas no fluxo**, escolha **Gerar até** (padrão: 12 meses) e clique em **Gerar parcelas que faltam**.
 2. As parcelas entram como lançamentos **Em aberto**, com a descrição "Contrato nº …" e o documento "CT nº". Elas aparecem no fluxo, nos lançamentos e na autorização de pagamentos.
 3. Pode clicar de novo quando quiser: só as parcelas que faltam são criadas, nunca em dobro.
 4. Dia de vencimento 29, 30 ou 31 cai no último dia dos meses mais curtos.
 
-## 7. Reajuste: proposta e aprovação
+## 8. Reajuste: proposta e aprovação
 
 1. Quando a data-base chegar perto, abra a ficha e clique em **Calcular reajuste**.
 2. A plataforma busca o índice acumulado em 12 meses no **Banco Central** (IPCA, IGP-M ou INPC), até o último mês já publicado. Se a busca falhar, informe o percentual e a fonte.
@@ -74,12 +101,12 @@ Os mesmos alertas aparecem no **Decision Center** para os administradores.
    - **recusado**: o valor continua o mesmo.
 5. Nos dois casos, a próxima data-base passa para um ano depois.
 
-## 8. Renovar, encerrar ou rescindir
+## 9. Renovar, encerrar ou rescindir
 
 - **Renovação automática**: quando o prazo termina, a ficha mostra **Renovar até …** (mesmo prazo do período anterior).
 - **Encerrar / rescindir**: informe a situação, a data e o motivo. A plataforma oferece excluir as parcelas em aberto depois dessa data.
 
-## 9. Dúvidas frequentes
+## 10. Dúvidas frequentes
 
 **O botão Gerar parcelas está desligado.** O contrato precisa estar vigente, ter valor e ter a conta do plano escolhida. Salve a ficha depois de preencher.
 
@@ -87,10 +114,13 @@ Os mesmos alertas aparecem no **Decision Center** para os administradores.
 
 **Assinei no gov.br e a plataforma diz que não tem assinatura digital.** Confira se anexou o arquivo baixado do assinador (o nome costuma terminar em "_assinado.pdf"), e não a minuta original.
 
-**Os modelos de contrato prontos.** Vêm na segunda parte desta etapa: minutas de locação de veículo, prestação de serviços, transporte com autônomo e agregado, vistoria, responsabilidade do motorista, uso de imagem e confidencialidade, preenchidas com os cadastros.
+**A janela de impressão não abriu.** O navegador pode ter bloqueado. Clique de novo em **Gerar minuta (PDF)**; se continuar, libere janelas para o site.
 
-## 10. Histórico de alterações
+**A minuta saiu com espaços em branco.** São os dados que faltam nos cadastros (a linha em amarelo avisa antes). Complete o cadastro e gere de novo, ou preencha à mão antes de assinar.
+
+## 11. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 30/10/2026 | Primeira versão: cadastro de contratos, PDF assinado com conferência de assinatura digital, alertas de vencimento, aviso prévio e reajuste, parcelas no fluxo e reajuste proposto e aprovado. |
+| 1.1 | 30/10/2026 | Modelos de contrato: minuta preenchida com os cadastros (9 modelos), no padrão do papel timbrado, para salvar em PDF e assinar no gov.br. |

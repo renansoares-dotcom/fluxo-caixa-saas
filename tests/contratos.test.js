@@ -47,3 +47,32 @@ test('assinatura digital no PDF', () => {
   assert.equal(K.temAssinaturaDigital(sem), false);
   assert.equal(K.temAssinaturaDigital(com), true);
 });
+
+// ---- modelos (SQL 069)
+import * as M from '../js/lib/contratos-modelos.js';
+const empresa = { razao_social: 'EMPRESA EXEMPLO LTDA', cnpj: '11222333000181', logradouro: 'Rua A, 1', municipio: 'Caruaru', uf: 'PE', responsavel_nome: 'FULANA', responsavel_cpf: '52998224725' };
+const ctr = { numero: 7, natureza: 'pagar', objeto: 'Serviço', valor: 1250.5, periodicidade: 'mensal', dia_vencimento: 10, inicio: '2026-11-01', fim: '2027-10-31', aviso_previo_dias: 30, indice: 'IPCA', data_base: '2027-11-01', dados: {} };
+test('valor por extenso', () => {
+  assert.equal(M.extenso(1250.5), 'mil duzentos e cinquenta reais e cinquenta centavos');
+  assert.equal(M.extenso(18500), 'dezoito mil e quinhentos reais');
+  assert.equal(M.extenso(1000000), 'um milhão de reais');
+  assert.equal(M.extenso(101), 'cento e um reais');
+  assert.equal(M.extenso(0.01), 'um centavo');
+});
+test('todos os modelos geram o documento', () => {
+  for (const id of Object.keys(M.MODELOS)) {
+    const x = M.contexto({ empresa, contrato: ctr, parte: { nome: 'PARTE EXEMPLO', doc: '52998224725', endereco: 'Rua B, 2' } });
+    const h = M.documento(id, x, { data: '2026-10-30' });
+    assert.match(h, /EMPRESA EXEMPLO LTDA/); assert.match(h, /PARTE EXEMPLO/); assert.match(h, /30 de outubro de 2026/);
+  }
+});
+test('transporte com autônomo cita CIOT, IPEF, piso e vale-pedágio; faltas apontadas', () => {
+  const x = M.contexto({ empresa, contrato: { ...ctr, natureza: 'sem_valor' }, parte: { nome: 'JOSÉ', doc: '52998224725' } });
+  const h = M.documento('transporte_tac', x);
+  for (const t of ['CIOT', 'IPEF', 'piso mínimo', 'Vale-Pedágio', '11.442/2007']) assert.ok(h.includes(t), t);
+  assert.deepEqual(M.faltas('transporte_tac', x), ['endereço da outra parte (cadastro do beneficiário)', 'placa do veículo', 'RNTRC']);
+  const s = M.documento('servico', M.contexto({ empresa, contrato: ctr, parte: { nome: 'P', doc: '11222333000181' } }));
+  assert.match(s, /R\$\s1\.250,50 \(mil duzentos e cinquenta reais e cinquenta centavos\) por mês/);
+  assert.ok(s.includes('variação acumulada do IPCA'));
+  assert.equal(M.MODELO_PADRAO('agregado'), 'agregado'); assert.equal(M.MODELO_PADRAO('locacao_imovel'), 'servico');
+});
