@@ -28,12 +28,13 @@ export function lerNFeCompleta(xml) {
   }
   const ide = un(inf, 'ide'), emit = un(inf, 'emit'), dest = un(inf, 'dest'), tot = un(inf, 'ICMSTot'), ibst = un(inf, 'IBSCBSTot'), prot = un(doc, 'infProt');
   const dets = [...inf.getElementsByTagName('det')];
-  const itens = dets.map((d) => {
+  // nItem é atributo do <det>; alguns emissores gravam como elemento filho, e na falta vale a ordem do item
+  const itens = dets.map((d, i) => {
     const p = un(d, 'prod'), imp = un(d, 'imposto');
     const icms = filho(un(imp, 'ICMS')), ipi = un(imp, 'IPI'), pis = filho(un(imp, 'PIS')), cof = filho(un(imp, 'COFINS')), ibs = un(imp, 'IBSCBS');
     const ipiT = un(ipi, 'IPITrib') || un(ipi, 'IPINT');
     return {
-      n_item: +d.getAttribute('nItem') || null, cprod: tx(p, 'cProd'), xprod: tx(p, 'xProd'), ncm: tx(p, 'NCM'), cest: tx(p, 'CEST'), cfop: tx(p, 'CFOP'), ucom: tx(p, 'uCom'),
+      n_item: +d.getAttribute('nItem') || +tx(d, 'nItem') || i + 1, cprod: tx(p, 'cProd'), xprod: tx(p, 'xProd'), ncm: tx(p, 'NCM'), cest: tx(p, 'CEST'), cfop: tx(p, 'CFOP'), ucom: tx(p, 'uCom'),
       qcom: nn(tx(p, 'qCom')), vuncom: nn(tx(p, 'vUnCom')), vprod: n2(tx(p, 'vProd')), vdesc: n2(tx(p, 'vDesc')), vfrete: n2(tx(p, 'vFrete')), voutro: n2(tx(p, 'vOutro')),
       orig: tx(icms, 'orig'), cst_icms: tx(icms, 'CST') || tx(icms, 'CSOSN'), v_bc_icms: n2(tx(icms, 'vBC')), p_icms: nn(tx(icms, 'pICMS')), v_icms: n2(tx(icms, 'vICMS')),
       v_bc_st: n2(tx(icms, 'vBCST')), v_st: n2(tx(icms, 'vICMSST')),

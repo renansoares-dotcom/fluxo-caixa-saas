@@ -1,8 +1,8 @@
 ---
 titulo: Notas fiscais e apuração de impostos
 tela: CPD › Notas Fiscais e Apuração de impostos
-versao: 1.1
-atualizado: 2026-10-29
+versao: 1.2
+atualizado: 2026-10-30
 ---
 ## 1. Para que serve
 
@@ -104,3 +104,4 @@ Nas notas de fornecedores, o CFOP e o CST são os do emitente.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: importação dos XML, conferência do cadastro, consulta, impostos por CFOP, recebimentos e pagamentos × notas, borderôs × notas e apuração (prévia). |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 30/10/2026 | Importação aceita XML com o número do item gravado fora do padrão (como o de alguns emissores); antes a nota entrava sem os itens. |
