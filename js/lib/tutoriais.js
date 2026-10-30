@@ -52,6 +52,8 @@ export const MANUAIS = [
     resumo: 'Plano de contas com DRE e prioridade, contas bancárias, beneficiários por aba e centros de custo.' },
   { id: 'empresa-identidade', titulo: 'Empresa — identidade visual e crachás', area: 'Cadastros', rotas: ['cadastros/empresa'],
     resumo: 'Logos, cores e dados da empresa nos relatórios e na plataforma; crachás com foto e QR Code, impressos em A4.' },
+  { id: 'contratos', titulo: 'Contratos', area: 'Cadastros', rotas: ['contratos'],
+    resumo: 'Contratos com vigência, aviso prévio e reajuste; PDF assinado no gov.br; parcelas no fluxo de caixa. Só administradores.' },
   { id: 'empresa-usuarios', titulo: 'Empresa, usuários e auditoria', area: 'Cadastros', rotas: ['config', 'auditoria'],
     resumo: 'Dados da empresa, convites, papéis e áreas, importação por planilha e auditoria com desfazer.' },
 ];

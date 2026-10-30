@@ -77,6 +77,7 @@ const routes = {
   'cadastros/favorecidos': () => import(`./pages/cad-favorecidos.js?v=${V}`),
   'cadastros/centros': () => import(`./pages/cad-centros.js?v=${V}`),
   'cadastros/empresa': () => import(`./pages/cad-empresa.js?v=${V}`),
+  'contratos': () => import(`./pages/contratos.js?v=${V}`),
   'config': () => import(`./pages/config.js?v=${V}`),
   'auditoria': () => import(`./pages/auditoria.js?v=${V}`),
 };
@@ -243,6 +244,7 @@ async function entrarEmpresa(emp, papel, areas) {
   document.body.classList.toggle('so-vendas', papel === 'vendas');
   document.body.classList.toggle('so-producao', papel === 'producao');
   $$('#nav .nav-audit').forEach(el => el.hidden = !['admin', 'diretor'].includes(papel));
+  $$('#nav .nav-admin').forEach(el => el.hidden = papel !== 'admin');
   if (papel === 'compras') { if (!rotaDeCompras(location.hash.replace(/^#\//, ''))) location.hash = '#/compras'; else render(); return; }
   if (papel === 'vendas') { if (!rotaDeVendas(location.hash.replace(/^#\//, ''))) location.hash = '#/comercial'; else render(); return; }
   if (papel === 'producao') { if (!rotaDeProducao(location.hash.replace(/^#\//, ''))) location.hash = '#/producao/terminal'; else render(); return; }

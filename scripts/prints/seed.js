@@ -183,3 +183,19 @@ DB.empresa_identidade = [{ empresa_id: E, nome_exibicao: 'PLÁSTICOS EXEMPLO', r
 DB.crachas = DB.rh_colaboradores.slice(0, 3).map((c, i) => ({ id: id('ck'), empresa_id: E, tipo: 'colaborador', colaborador_id: c.id, nome: c.nome, cargo: c.cargo, setor: c.setor, matricula: c.matricula,
   codigo: 'a1b2c3d4e5f6a7b8c9d0e1f' + i, via: 1, emitido_em: '2026-10-30', validade: '2028-10-30', status: 'ativo' }));
 DB.rh_colaboradores.slice(0, 2).forEach(c => { c.autorizacao_imagem = '2026-10-30'; });
+// contratos (SQL 068)
+const CT = (numero, tipo, objeto, fav, valor, per, inicio, fim, extra = {}) => ({ id: id('ct'), empresa_id: E, numero, tipo, natureza: 'pagar', objeto, parte_tipo: 'favorecido', favorecido_id: F(fav).id,
+  parte_nome: F(fav).nome, parte_documento: F(fav).documento, valor, periodicidade: per, dia_vencimento: 10, inicio, fim, renovacao_automatica: false, aviso_previo_dias: 30, indice: 'IPCA',
+  data_base: null, plano_id: P('2.03.01').id, status: 'vigente', responsavel: 'Renata Alves', ...extra });
+DB.contratos = [
+  CT(1, 'locacao_imovel', 'Locação do galpão de expedição', 'IMÓVEIS CENTRO', 18500, 'mensal', '2024-12-01', '2026-11-30', { aviso_previo_dias: 30, data_base: '2026-12-01', indice: 'IGP-M' }),
+  CT(2, 'servico', 'Licença e suporte do sistema de gestão', 'SISTEMAS NUVEM', 3200, 'mensal', '2025-11-05', '2027-11-04', { data_base: '2026-11-05', plano_id: P('2.03.02').id }),
+  CT(3, 'locacao_veiculo_motorista', 'Locação de caminhão baú com motorista para rotas do interior', 'TRANSPORTES RÁPIDO', 14800, 'mensal', '2026-03-01', '2027-02-28', { data_base: '2027-03-01', plano_id: P('2.06.01').id }),
+  CT(4, 'transporte_tac', 'Transporte de cargas por autônomo — rota Caruaru/Recife', 'JOSÉ CARLOS', 0, 'sem_valor', '2026-06-01', null, { natureza: 'sem_valor', indice: 'nenhum', aviso_previo_dias: 15 }),
+  CT(5, 'fornecimento', 'Fornecimento de energia no mercado livre', 'ENERGIA REGIONAL', 46000, 'mensal', '2025-01-01', '2029-12-31', { renovacao_automatica: true, data_base: '2027-01-01', plano_id: P('2.01.03').id, aviso_previo_dias: 180 }),
+];
+DB.contrato_arquivos = DB.contratos.filter(c => c.numero !== 3).map(c => ({ id: id('ca'), empresa_id: E, contrato_id: c.id, tipo: 'assinado', nome: `contrato-${c.numero}-assinado.pdf`, path: `x/${c.numero}.pdf`, assinatura_digital: true, enviado_em: '2026-10-20T10:00:00Z' }));
+DB.contrato_reajustes = [{ id: id('cr'), empresa_id: E, contrato_id: DB.contratos[1].id, data_base: '2026-11-05', indice: 'IPCA', percentual: 4.6812, valor_anterior: 3200, valor_novo: 3349.80,
+  fonte: 'Banco Central, série 433 (IPCA), 10/2025 a 09/2026', status: 'proposto', proposto_em: '2026-10-29T15:00:00Z' }];
+for (const c of DB.contratos.filter(x => x.natureza === 'pagar')) for (const m of ['2026-11', '2026-12', '2027-01'])
+  DB.lancamentos.push({ id: id('lc'), empresa_id: E, data: `${m}-10`, plano_id: c.plano_id, favorecido_id: c.favorecido_id, valor: c.valor, status: 'Em aberto', descricao: `Contrato nº ${c.numero} — ${c.parte_nome}`, documento: 'CT ' + c.numero, origem: 'contrato', contrato_id: c.id });

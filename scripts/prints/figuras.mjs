@@ -23,6 +23,7 @@ export const FIGS = [
   ['notas-fiscais', 'notas', '## 4.', 'Notas fiscais de saída do mês'],
   ['contabilidade', 'dre', '## 3.', 'DRE gerencial'],
   ['empresa-identidade', 'cadastros/empresa', '## 3.', 'Identidade visual com a prévia do crachá'], ['empresa-identidade', 'cadastros/empresa', '## 4.', 'Crachás dos colaboradores', 'cr'],
+  ['contratos', 'contratos', '## 3.', 'Contratos vigentes com os alertas'], ['contratos', 'contratos', '## 4.', 'Ficha do contrato: documentos, parcelas e reajuste', 'click:tr[data-id]:nth-child(4)|scroll:#k-extra'],
   ['cadastros', 'cadastros/plano', '## 3.', 'Plano de contas'], ['cadastros', 'cadastros/contas', '## 4.', 'Contas bancárias'],
   ['empresa-usuarios', 'config', '## 3.', 'Dados da empresa e usuários'], ['empresa-usuarios', 'auditoria', '## 7.', 'Auditoria'],
 ];

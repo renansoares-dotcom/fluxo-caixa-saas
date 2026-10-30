@@ -1,6 +1,6 @@
 // Decision Center: recomendações da semana calculadas com regras explícitas sobre os dados da plataforma (sem IA).
 // Cada recomendação mostra o motivo, o impacto estimado, a urgência, a regra usada e a ação.
-import { sb, state, q, fetchAll, temArea } from '../lib/data.js';
+import { sb, state, q, fetchAll, temArea, isAdmin } from '../lib/data.js';
 import { $, $$, esc, money0, pct, dateBR, fail, today } from '../lib/ui.js';
 
 export const title = 'Decision Center';
@@ -36,7 +36,13 @@ async function carregar() {
   })().catch(() => null);
   const com = await import('../lib/comercial.js').then(m => m.baseComercial()).catch(() => null);
   const prorrog = await q(sb.from('portal_prorrogacoes').select('id,valor,solicitado_em').eq('empresa_id', e).eq('status', 'pendente')).catch(() => []);
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog };
+  // contratos (só administradores): vencimento, aviso prévio e reajuste
+  const contratos = isAdmin() ? await (async () => {
+    const [C, A, R, K] = await Promise.all([q(sb.from('contratos').select('*').eq('empresa_id', e).eq('status', 'vigente')), q(sb.from('contrato_arquivos').select('contrato_id,tipo').eq('empresa_id', e)),
+      q(sb.from('contrato_reajustes').select('contrato_id,data_base,status,percentual').eq('empresa_id', e)), import('../lib/contratos.js')]);
+    return C.map(c => ({ c, al: K.alertas(c, A.filter(a => a.contrato_id === c.id), R.filter(r => r.contrato_id === c.id), hoje).filter(a => a.nivel !== 'info'), mensal: K.valorMensal(c) })).filter(x => x.al.length);
+  })().catch(() => []) : [];
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos };
 }
 
 // ---------------------------------------------------------------- regras
@@ -144,6 +150,13 @@ function regras(D) {
     out.push({ k: 'portal-prorrogacao', origem: 'Financeiro', urg: D.prorrog.some(p => p.solicitado_em < addDias(D.hoje, -2)) ? 'alta' : 'media', titulo: 'Responder os pedidos de prorrogação dos clientes',
       desc: `${D.prorrog.length} pedido(s) feitos pelo Portal do Cliente aguardando resposta. O cliente vê a decisão no portal.`, impacto: v, impactoTxt: money0(v),
       regra: 'Pedidos com situação pendente em Portal do Cliente; urgência alta se algum tem mais de 2 dias.', acao: 'Abrir Portal do Cliente', rota: 'portal-clientes' }); }
+
+  // 13. contratos com vencimento, aviso prévio ou reajuste a tratar
+  if (D.contratos?.length) { const v = D.contratos.reduce((t, x) => t + x.mensal * 12, 0);
+    out.push({ k: 'contratos', origem: 'Contratos', urg: D.contratos.some(x => x.al.some(a => a.nivel === 'neg')) ? 'alta' : 'media', titulo: 'Tratar os contratos com prazo ou reajuste',
+      desc: D.contratos.slice(0, 5).map(x => `nº ${x.c.numero} ${x.c.parte_nome}: ${x.al.map(a => a.txt.toLowerCase()).join('; ')}`).join(' · ') + (D.contratos.length > 5 ? ` · e mais ${D.contratos.length - 5}` : ''),
+      impacto: v, impactoTxt: `${money0(v)} por ano`, regra: 'Contratos vigentes vencendo em até 90 dias, com aviso prévio em até 30 dias ou com reajuste na data-base (até 30 dias) ou para aprovar.',
+      acao: 'Abrir contratos', rota: 'contratos' }); }
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }
