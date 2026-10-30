@@ -177,3 +177,9 @@ DB.fidc_propostas = [[12, 'Pendente', 9, 186400, 34, 2.4], [11, 'Aprovada', 7, 1
 // Auditoria
 DB.auditoria = [['Ana Souza', 'lancamentos', 'alterou', 'Marcou como pago: ENERGIA ELÉTRICA DA FÁBRICA'], ['Renata Alves', 'contas', 'alterou', 'Saldo inicial do BANCO BETA'], ['Beatriz Rocha', 'paraquedas', 'incluiu', 'PA nº 21']]
   .map(([nome, tabela, acao, desc], i) => ({ id: id('au'), empresa_id: E, user_id: 'u' + (i + 1), user_email: nome.split(' ')[0].toLowerCase() + '@exemplo.com.br', tabela, registro_id: null, acao, campos: ['status'], antes: {}, depois: { descricao: desc }, criado_em: `2026-10-2${8 - i}T1${i}:15:00Z` }));
+// Identidade e crachás
+DB.empresa_identidade = [{ empresa_id: E, nome_exibicao: 'PLÁSTICOS EXEMPLO', razao_documentos: 'PLÁSTICOS EXEMPLO INDÚSTRIA LTDA.', cor_primaria: '#2b5598', cor_secundaria: '#2a1f6f', cor_destaque: '#0a8ed3',
+  telefone: '(81) 3333-4444', site: 'www.exemplo.com.br', unidades: [{ nome: 'Matriz', cnpj: '11.222.333/0001-81', endereco: 'Rua das Indústrias, 100', municipio: 'CARUARU', uf: 'PE', cep: '55000-000' }], cracha_validade_meses: 24 }];
+DB.crachas = DB.rh_colaboradores.slice(0, 3).map((c, i) => ({ id: id('ck'), empresa_id: E, tipo: 'colaborador', colaborador_id: c.id, nome: c.nome, cargo: c.cargo, setor: c.setor, matricula: c.matricula,
+  codigo: 'a1b2c3d4e5f6a7b8c9d0e1f' + i, via: 1, emitido_em: '2026-10-30', validade: '2028-10-30', status: 'ativo' }));
+DB.rh_colaboradores.slice(0, 2).forEach(c => { c.autorizacao_imagem = '2026-10-30'; });

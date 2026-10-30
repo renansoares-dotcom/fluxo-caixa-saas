@@ -8,6 +8,7 @@ import { manualDaRota } from './lib/tutoriais.js';
 import { verificarAoEntrar, gerenciar as gerenciarMFA } from './lib/mfa.js';
 import { iniciarChat, pararChat, setAberta as chatFechado } from './lib/chat.js';
 import { alternarMini, fecharMini } from './lib/mini-chat.js';
+import { carregarIdentidade } from './lib/identidade.js';
 import { abrirLancamento } from './lib/lanc-form.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
@@ -75,6 +76,7 @@ const routes = {
   'cadastros/contas': () => import(`./pages/cad-contas.js?v=${V}`),
   'cadastros/favorecidos': () => import(`./pages/cad-favorecidos.js?v=${V}`),
   'cadastros/centros': () => import(`./pages/cad-centros.js?v=${V}`),
+  'cadastros/empresa': () => import(`./pages/cad-empresa.js?v=${V}`),
   'config': () => import(`./pages/config.js?v=${V}`),
   'auditoria': () => import(`./pages/auditoria.js?v=${V}`),
 };
@@ -235,6 +237,7 @@ async function entrarEmpresa(emp, papel, areas) {
   anosSelect($('#ano-global'));
   show('app-view');
   try { await loadCadastros(); } catch (e) { fail(e); }
+  carregarIdentidade(emp.id).catch(() => {});
   // papel "compras": só a tela de paraquedas (o banco também não deixa ler o resto)
   document.body.classList.toggle('so-compras', papel === 'compras');
   document.body.classList.toggle('so-vendas', papel === 'vendas');

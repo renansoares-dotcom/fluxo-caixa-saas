@@ -928,3 +928,17 @@ select.sb-nativo{position:absolute!important;opacity:0!important;width:1px!impor
 .chat-reg-acoes{display:inline-flex;gap:6px;margin-left:auto;margin-right:6px;flex-wrap:wrap}
 @media (max-width:600px){.chat-reg-acoes .btn{padding:4px 8px}}
 .ch-ajuda-mic{padding-left:20px;line-height:1.6}
+
+/* Cadastros › Empresa: identidade e crachás */
+.ce-logo{display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.ce-logo-prev{width:140px;height:64px;border:1px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:#fff;flex:none}
+.ce-logo-prev.escuro{background:#1b2433}
+.ce-logo-prev img{max-width:128px;max-height:56px}
+.ce-cores{display:flex;gap:16px;flex-wrap:wrap}
+.ce-cor{display:flex;gap:8px;align-items:center;flex-direction:row}
+.ce-cor input[type=color]{width:44px;height:36px;padding:2px;border-radius:8px}
+.ce-prev-cr{overflow-x:auto}
+.ce-prev-par{display:flex;gap:10px;flex-wrap:wrap;zoom:1.25}
+.cr-mini{width:30px;height:40px;border-radius:4px;background:var(--surface-2) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px}
+.cr-cam{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:200px}
+.cr-cam video,.cr-cam img{max-width:100%;max-height:60vh;border-radius:10px;background:#000}

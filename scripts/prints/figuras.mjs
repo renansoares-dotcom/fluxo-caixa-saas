@@ -22,6 +22,7 @@ export const FIGS = [
   ['rh', 'rh/colaboradores', '## 3.', 'Colaboradores'], ['rh', 'rh/folha', '## 4.', 'Folha do mês (previsão de caixa)'],
   ['notas-fiscais', 'notas', '## 4.', 'Notas fiscais de saída do mês'],
   ['contabilidade', 'dre', '## 3.', 'DRE gerencial'],
+  ['empresa-identidade', 'cadastros/empresa', '## 3.', 'Identidade visual com a prévia do crachá'], ['empresa-identidade', 'cadastros/empresa', '## 4.', 'Crachás dos colaboradores', 'cr'],
   ['cadastros', 'cadastros/plano', '## 3.', 'Plano de contas'], ['cadastros', 'cadastros/contas', '## 4.', 'Contas bancárias'],
   ['empresa-usuarios', 'config', '## 3.', 'Dados da empresa e usuários'], ['empresa-usuarios', 'auditoria', '## 7.', 'Auditoria'],
 ];

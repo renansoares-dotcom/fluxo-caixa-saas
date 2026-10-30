@@ -117,7 +117,9 @@ export const moneyTick = (v) => {
 };
 
 // Logo da empresa em PNG (para PDFs). Renderiza o SVG de assets/ num canvas; resultado em cache.
-let _logo;
+let _logo, _logoUrl = null;
+/** logo dos relatórios: o da identidade da empresa (URL local) ou o padrão de assets/ */
+export function definirLogo(url) { if (url !== _logoUrl) { _logoUrl = url; _logo = null; } }
 export function logoPNG(alturaPx = 160) {
   return _logo ||= new Promise((resolve) => {
     const img = new Image();
@@ -129,6 +131,6 @@ export function logoPNG(alturaPx = 160) {
     };
     img.onerror = () => resolve(null);
     setTimeout(() => resolve(null), 4000);
-    img.src = new URL('../../assets/iplamm-logo.svg', import.meta.url).href;
+    img.src = _logoUrl || new URL('../../assets/iplamm-logo.svg', import.meta.url).href;
   });
 }

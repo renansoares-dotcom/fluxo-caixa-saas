@@ -1,6 +1,9 @@
 // Parte "pura" do padrão de relatórios (sem acesso ao banco nem à tela): usada pela plataforma (relatorio.js) e pelo
 // gerador dos manuais em PDF (tutoriais/gerar-pdf.mjs), para os dois saírem iguais.
-export const EMPRESA_REL = 'IPLAMM – INDÚSTRIA DE PLÁSTICOS LTDA.';
+export const EMPRESA_PADRAO = 'IPLAMM – INDÚSTRIA DE PLÁSTICOS LTDA.';
+// nome no cabeçalho dos relatórios: vem da identidade da empresa (Cadastros › Empresa); sem ela, o padrão
+export let EMPRESA_REL = EMPRESA_PADRAO;
+export const definirEmpresaRel = (n) => { EMPRESA_REL = String(n || EMPRESA_PADRAO); };
 const FONTE = "'Times New Roman',Times,'Liberation Serif',serif";
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 

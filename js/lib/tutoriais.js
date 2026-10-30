@@ -50,6 +50,8 @@ export const MANUAIS = [
     resumo: 'DRE gerencial, balancete importado e da plataforma, balanço, DRE contábil, DFC e de-para contábil.' },
   { id: 'cadastros', titulo: 'Cadastros — plano de contas, contas, beneficiários e centros de custo', area: 'Cadastros', rotas: ['cadastros/plano', 'cadastros/contas', 'cadastros/favorecidos', 'cadastros/centros'],
     resumo: 'Plano de contas com DRE e prioridade, contas bancárias, beneficiários por aba e centros de custo.' },
+  { id: 'empresa-identidade', titulo: 'Empresa — identidade visual e crachás', area: 'Cadastros', rotas: ['cadastros/empresa'],
+    resumo: 'Logos, cores e dados da empresa nos relatórios e na plataforma; crachás com foto e QR Code, impressos em A4.' },
   { id: 'empresa-usuarios', titulo: 'Empresa, usuários e auditoria', area: 'Cadastros', rotas: ['config', 'auditoria'],
     resumo: 'Dados da empresa, convites, papéis e áreas, importação por planilha e auditoria com desfazer.' },
 ];
