@@ -8,6 +8,7 @@ import { pintarPagamentos } from '../lib/nfe-pag.js';
 import { pintarRecebimentos, autoVincular, marcarCancelada, desfazerCancelamento, gerarContasReceber } from '../lib/nfe-receb.js';
 import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
 import { usosPorNota, usarCredito, desfazerUso } from '../lib/creditos.js';
+import { pintarRelatorios, limparCacheRelatorios } from '../lib/notas-relatorio-ui.js';
 
 export const title = 'Notas fiscais';
 
@@ -42,7 +43,7 @@ export async function render(root) {
         <button class="btn" id="exp">Exportar Excel</button>
         ${podeEditar() ? '<button class="btn primary" id="imp">Importar XML</button>' : ''}
       </div></div>
-      <div class="chips" id="abas" style="margin-top:12px">${[['notas', 'Notas'], ['impostos', 'Impostos por CFOP'], ['recebimentos', ui.tipo === 'entrada' ? 'Pagamentos × Notas' : 'Recebimentos × Notas'], ['borderos', 'Borderôs FIDC']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
+      <div class="chips" id="abas" style="margin-top:12px">${[['notas', 'Notas'], ['impostos', 'Impostos por CFOP'], ['recebimentos', ui.tipo === 'entrada' ? 'Pagamentos × Notas' : 'Recebimentos × Notas'], ['borderos', 'Borderôs FIDC'], ['relatorios', 'Relatórios']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div class="kpis" id="kpis"></div>
     <div id="corpo"></div>`;
   $('#flt', root).addEventListener('change', (e) => {
@@ -162,6 +163,7 @@ function pintar(root) {
   pintarKpis(root);
   const N = filtradas();
   const c = $('#corpo', root);
+  if (ui.aba === 'relatorios') { $('#kpis', root).innerHTML = ''; return pintarRelatorios(c, { ini: D.ini, fim: D.fim, tipoNotas: ui.tipo }); }
   if (ui.aba === 'recebimentos') return ui.tipo === 'saida' ? pintarRecebimentos(c, root, () => carregarSilencioso(), ui.mes) : pintarPagamentos(c, root, () => carregarSilencioso());
   if (!D.notas.length) { c.innerHTML = `<div class="card"><div class="empty">Nenhuma nota ${ui.tipo === 'saida' ? 'de saída' : 'de entrada'} importada com ${D.campo === 'vencimento' ? 'parcela vencendo' : 'emissão'} de ${dateBR(D.ini)} a ${dateBR(D.fim)}. Use “Importar XML”.</div></div>`; return; }
   if (ui.aba === 'impostos') return pintarImpostos(c, N);
@@ -412,7 +414,7 @@ function importar(root) {
       let auto = 0;
       try { const ids = []; for (const lote of chunks(todas.filter(x => x.nota.tipo === 'saida').map(x => x.nota.chave), 100)) for (const r of await q(sb.from('nfe_notas').select('id').eq('empresa_id', e).in('chave', lote))) ids.push(r.id); auto = await autoVincular(ids); }
       catch (err) { console.warn('vínculo automático', err); }
-      toast(`${novas} nota(s) importada(s)${completadas ? ` · ${completadas} completada(s)` : ''}${auto ? ` · ${auto} recebimento(s) vinculado(s) automaticamente` : ''}`); m.close();
+      limparCacheRelatorios(); toast(`${novas} nota(s) importada(s)${completadas ? ` · ${completadas} completada(s)` : ''}${auto ? ` · ${auto} recebimento(s) vinculado(s) automaticamente` : ''}`); m.close();
       const meses = [...new Set(todas.map(n => n.nota.emissao.slice(0, 7)))].sort(); if (meses.length) { ui.mes = meses[0]; ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); }
       if (todas.some(n => n.nota.tipo === 'saida')) ui.tipo = 'saida';
       await render(root);

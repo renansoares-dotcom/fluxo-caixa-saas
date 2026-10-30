@@ -49,7 +49,7 @@ export const MANUAIS = [
   { id: 'rh', titulo: 'RH — colaboradores, folha do mês e 13º', area: 'RH / Trabalhista', rotas: ['rh/colaboradores', 'rh/folha', 'rh/decimo'], rh: true,
     resumo: 'Cadastro e importação da relação, setor por cargo, previsão da folha e do 13º no fluxo de caixa.' },
   { id: 'notas-fiscais', titulo: 'Notas fiscais e apuração de impostos', area: 'CPD', rotas: ['notas', 'fiscal/apuracao'],
-    resumo: 'Importar os XML, ligar parcelas a recebimentos e borderôs, impostos por CFOP e apuração (prévia).' },
+    resumo: 'Importar os XML, ligar parcelas a recebimentos e borderôs, impostos por CFOP, relatórios de faturamento e compras, apuração (prévia) e reforma tributária: conferência da CBS/IBS, simulador 2027 e alíquotas.' },
   { id: 'contabilidade', titulo: 'Contabilidade — DRE, balancete, balanço e DFC', area: 'Contabilidade', rotas: ['dre', 'contab/balancete', 'contab/balanco', 'contab/dre', 'contab/dfc', 'contab/depara'],
     resumo: 'DRE gerencial, balancete importado e da plataforma, balanço, DRE contábil, DFC e de-para contábil.' },
   { id: 'cadastros', titulo: 'Cadastros — plano de contas, contas, beneficiários e centros de custo', area: 'Cadastros', rotas: ['cadastros/plano', 'cadastros/contas', 'cadastros/favorecidos', 'cadastros/centros'],

@@ -255,3 +255,53 @@ DB.log_carga_notas = DB.log_carga_notas || [];
       }
     }
   }); }
+// Notas com itens e impostos para os relatórios de faturamento/compras e a reforma tributária (fictícias)
+{ const r2 = (v) => Math.round(v * 100) / 100;
+  const PROD = [['PA-100', 'SACO PEBD 40X60 0,10', 11.8], ['PA-210', 'BOBINA PEAD 30CM 0,05', 13.4], ['PA-330', 'FILME STRETCH 50CM', 15.2], ['PA-450', 'SACOLA ALÇA CAMISETA', 12.6]];
+  const CLI = [['SUPERMERCADOS BOA COMPRA LTDA', '10111222000101', 'PE'], ['DISTRIBUIDORA NORDESTE LTDA', '20222333000102', 'PB'], ['ATACADO SERTÃO LTDA', '30333444000103', 'PE'],
+    ['FARMÁCIAS SAÚDE MAIS S.A.', '40444555000104', 'AL'], ['MERCADINHO SÃO JOSÉ LTDA', '50555666000105', 'PE'], ['EMBALAGENS LITORAL LTDA', '60666777000106', 'BA']];
+  const FOR = [['RESINAS BRASIL S.A.', '70777888000107', 'BA', 'RESINA PEBD LINEAR', 8.9, '6101'], ['MASTER CORES LTDA', '80888999000108', 'SP', 'MASTERBATCH BRANCO', 21.5, '6101'], ['ENERGIA PE DISTRIBUIDORA', '90999000000109', 'PE', 'ENERGIA ELÉTRICA', 1, '5253']];
+  const imp = (nt, v, uf, ano) => { const icms = r2(v * (uf === 'PE' ? 0.205 : 0.12)), pis = r2(v * 0.0165), cof = r2(v * 0.076), base = r2(v - icms - pis - cof);
+    Object.assign(nt, { v_prod: v, v_desc: 0, v_frete: 0, v_seg: 0, v_outro: 0, v_nf: v, v_bc_icms: v, v_icms: icms, v_ipi: 0, v_pis: pis, v_cofins: cof });
+    if (ano >= 2026) Object.assign(nt, { v_bc_ibscbs: base, v_cbs: r2(base * 0.009), v_ibs: r2(base * 0.001) }); return { icms, pis, cof }; };
+  const itensDe = (nt, cfop, partes) => { let resto = nt.v_prod; partes.forEach(([p, q], k) => { const vp = k === partes.length - 1 ? r2(resto) : r2(q * p[2]); resto -= vp; const f = vp / nt.v_prod;
+    DB.nfe_itens.push({ id: id('ni'), empresa_id: E, nota_id: nt.id, n_item: k + 1, cprod: p[0], xprod: p[1], ncm: '39232190', cfop, ucom: 'KG', qcom: q, vprod: vp, vdesc: 0, vfrete: 0, voutro: 0, cst_icms: '00',
+      v_icms: r2(nt.v_icms * f), v_st: 0, v_ipi: 0, v_pis: r2(nt.v_pis * f), v_cofins: r2(nt.v_cofins * f), cst_ibscbs: nt.v_bc_ibscbs ? '000' : null, cclass_trib: nt.v_bc_ibscbs ? '000001' : null, v_cbs: nt.v_cbs ? r2(nt.v_cbs * f) : null, v_ibs: nt.v_ibs ? r2(nt.v_ibs * f) : null }); }); };
+  // as notas que já existiam (logística, contas a receber): completa impostos e itens
+  for (const nt of DB.nfe_notas) {
+    const c = CLI.find(x => x[0] === nt.dest_nome) || CLI[(nt.numero || 0) % CLI.length];
+    Object.assign(nt, { dest_nome: c[0], dest_doc: c[1], dest_uf: c[2], cfops: [c[2] === 'PE' ? '5101' : '6101'], finalidade: '1', serie: '1', natureza: 'VENDA DE PRODUÇÃO' });
+    imp(nt, +nt.v_nf || +nt.v_prod, c[2], +nt.emissao.slice(0, 4));
+    const p1 = PROD[(nt.numero || 0) % 4], p2 = PROD[((nt.numero || 0) + 1) % 4];
+    itensDe(nt, nt.cfops[0], [[p1, Math.round(nt.v_prod * 0.6 / p1[2])], [p2, 1]]);
+  }
+  let num = 3000, nf = 900;
+  for (let a = 2025; a <= 2026; a++) for (let m = 1; m <= (a === 2026 ? 10 : 12); m++) {
+    const mes = `${a}-${String(m).padStart(2, '0')}`, cresc = a === 2026 ? 1.12 : 1, saz = 1 + 0.12 * Math.sin(m / 2);
+    // vendas
+    CLI.forEach((c, k) => { if (a === 2026 && m >= 5 && k < 4) return;   // de maio/2026 em diante os 4 primeiros já têm as notas da logística
+     for (let rep = 0; rep < (!(a === 2026 && m >= 5) && k < 4 ? 8 : 1); rep++) {   // volume parecido com o das notas da logística
+      const v = r2((rep ? 26000 : 42000 - k * 5200) * cresc * saz * (0.9 + rnd() * 0.2));
+      const nt = { id: id('nf'), empresa_id: E, chave: null, modelo: 55, serie: '1', numero: num++, emissao: `${mes}-${String(Math.min(28, 4 + k * 4 + rep * 2)).padStart(2, '0')}`, tipo: 'saida', emissao_propria: true, finalidade: '1', natureza: 'VENDA DE PRODUÇÃO',
+        cfops: [c[2] === 'PE' ? '5101' : '6101'], emit_doc: '11222333000181', emit_nome: 'PLÁSTICOS EXEMPLO INDÚSTRIA LTDA', dest_doc: c[1], dest_nome: c[0], dest_uf: c[2], situacao: 'autorizada', eventos: [] };
+      imp(nt, v, c[2], a); const p1 = PROD[k % 4], p2 = PROD[(k + 2) % 4];
+      itensDe(nt, nt.cfops[0], [[p1, Math.round(v * 0.55 / p1[2])], [p2, 1]]); DB.nfe_notas.push(nt); } });
+    // devolução de cliente a cada 3 meses (emitida pelo cliente)
+    if (m % 3 === 0) { const c = CLI[m % CLI.length], v = r2(1800 + m * 110);
+      const nt = { id: id('nf'), empresa_id: E, modelo: 55, serie: '1', numero: nf++, emissao: `${mes}-21`, tipo: 'saida', emissao_propria: false, finalidade: '4', natureza: 'DEVOLUÇÃO DE COMPRA', cfops: [c[2] === 'PE' ? '5202' : '6202'],
+        emit_doc: c[1], emit_nome: c[0], dest_doc: '11222333000181', dest_nome: 'PLÁSTICOS EXEMPLO INDÚSTRIA LTDA', situacao: 'autorizada', eventos: [] };
+      imp(nt, v, c[2], a); itensDe(nt, nt.cfops[0], [[PROD[m % 4], 1]]); DB.nfe_notas.push(nt); }
+    // compras
+    FOR.forEach((f, k) => { const v = r2([88000, 14500, 9800][k] * cresc * saz * (0.92 + rnd() * 0.16));
+      const nt = { id: id('nf'), empresa_id: E, modelo: 55, serie: '1', numero: 70000 + nf++, emissao: `${mes}-${String(6 + k * 7).padStart(2, '0')}`, tipo: 'saida', emissao_propria: false, finalidade: '1', natureza: 'VENDA', cfops: [f[5]],
+        emit_doc: f[1], emit_nome: f[0], dest_doc: '11222333000181', dest_nome: 'PLÁSTICOS EXEMPLO INDÚSTRIA LTDA', situacao: 'autorizada', eventos: [] };
+      imp(nt, v, f[2], a); itensDe(nt, f[5], [[[k === 2 ? 'EN-01' : `MP-00${k + 1}`, f[3], f[4]], 1]]); DB.nfe_notas.push(nt); });
+  }
+  // uma cancelada, uma com CBS divergente, uma sem o grupo IBS/CBS e uma com redução (setembro/2026)
+  const set = DB.nfe_notas.filter(n => n.emissao_propria && n.emissao.startsWith('2026-09'));
+  if (set[0]) set[0].situacao = 'cancelada';
+  if (set[1]) set[1].v_cbs = r2(set[1].v_cbs * 1.25);
+  if (set[2]) { set[2].v_bc_ibscbs = null; set[2].v_cbs = null; set[2].v_ibs = null; DB.nfe_itens.filter(i => i.nota_id === set[2].id).forEach(i => { i.cst_ibscbs = null; i.v_cbs = null; i.v_ibs = null; }); }
+  if (set[3]) { set[3].v_cbs = r2(set[3].v_cbs * 0.4); set[3].v_ibs = r2(set[3].v_ibs * 0.4); DB.nfe_itens.filter(i => i.nota_id === set[3].id).forEach(i => { i.cst_ibscbs = '200'; i.cclass_trib = '200034'; }); }
+  DB.trib_aliquotas = [];
+}

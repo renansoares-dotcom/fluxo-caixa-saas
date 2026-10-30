@@ -6,7 +6,7 @@ const RPC = window.RPC = window.RPC || {};
 const USER = { id: 'u1', email: 'renata@exemplo.com.br', user_metadata: { nome: 'Renata Alves' } };
 const uid = () => 'x' + Math.random().toString(36).slice(2, 10);
 // relações para selects com junção: tabela → coluna
-const FK = { empresas: 'empresa_id', plano_contas: 'plano_id', contas: 'conta_id', favorecidos: 'favorecido_id', centros_custo: 'cc_id', grupos: 'grupo_id' };
+const FK = { nfe_notas: 'nota_id', empresas: 'empresa_id', plano_contas: 'plano_id', contas: 'conta_id', favorecidos: 'favorecido_id', centros_custo: 'cc_id', grupos: 'grupo_id' };
 function parseSel(s) {   // "*, empresas(*), conta:contas(nome)" → joins
   const joins = []; let depth = 0, cur = '';
   for (const ch of String(s || '*')) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && !depth) { joins.push(cur.trim()); cur = ''; } else cur += ch; }
@@ -22,7 +22,7 @@ function anexar(tab, row, joins) {
   }
   return o;
 }
-function val(r, c) { return c.includes('->') ? c.split(/->>?/).reduce((a, k) => a?.[k], r) : r[c]; }
+function val(r, c) { return c.includes('->') ? c.split(/->>?/).reduce((a, k) => a?.[k], r) : c.includes('.') ? c.split('.').reduce((a, k) => a?.[k], r) : r[c]; }
 function builder(tab) {
   LOG.tabelas.add(tab);
   const rows = () => DB[tab] || (DB[tab] = []);
@@ -44,12 +44,12 @@ function builder(tab) {
     then(res, rej) { try { res(exec()); } catch (e) { console.error('mock', tab, e); res({ data: null, error: { message: String(e) } }); } },
   };
   function exec() {
-    const R = rows(), m = R.filter(r => f.every(fn => fn(r)));
+    const R = rows(), joins = op === 'select' ? parseSel(sel) : [];
+    const m = (joins.length ? R.map(r => anexar(tab, r, joins)) : R).filter(r => f.every(fn => fn(r)));   // filtros na tabela ligada ("nfe_notas.emissao")
     if (op === 'select') {
       let d = m.slice();
       for (const [c, asc] of ord.slice().reverse()) d.sort((a, b) => { const x = val(a, c), y = val(b, c); return (x == null) - (y == null) || (x > y ? 1 : x < y ? -1 : 0) * (asc ? 1 : -1); });
       const total = d.length; d = d.slice(off, lim != null ? off + lim : undefined);
-      const joins = parseSel(sel); if (joins.length) d = d.map(r => anexar(tab, r, joins));
       if (head) return { data: null, count: total, error: null };
       return { data: single ? (d[0] ?? null) : d, count: cnt ? total : null, error: single && !maybe && !d[0] ? { message: 'not found' } : null };
     }

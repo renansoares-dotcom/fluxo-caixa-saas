@@ -1,8 +1,10 @@
 // CPD › Fiscal › Apuração de impostos — memória de cálculo a partir dos itens das notas importadas.
 // Etapa 1: livro por CFOP/CST (item a item) e resumo dos impostos destacados. Só leitura.
+// Reforma tributária (30/10/2026): conferência IBS/CBS, simulador 2027 e alíquotas por vigência (js/lib/reforma-ui.js, SQL 072).
 // As regras de apuração (PRODEPE, FEEF, AD/DIPER, FECEP, créditos de PIS/COFINS) entram quando os parâmetros forem definidos.
 import { sb, state, fetchAll } from '../lib/data.js';
 import { $, esc, money, dateBR, fail, loading, exportXLSX, MESES_CURTO } from '../lib/ui.js';
+import { pintarAliquotas, pintarSimulador, pintarConferencia } from '../lib/reforma-ui.js';
 
 export const title = 'Apuração de impostos';
 
@@ -45,6 +47,7 @@ export async function render(root) {
   $('#mes', root).onchange = (e) => { ui.mes = e.target.value; carregar(root); };
   $('#abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; pintar(root); } };
   $('#exp', root).onclick = () => { const t = $('#corpo table', root); if (t) exportXLSX(t, `apuracao_${ui.aba}_${ui.mes}`); };
+  if (ui.aba === 'simulador' || ui.aba === 'aliquotas') return pintar(root);   // não dependem do mês
   await carregar(root);
 }
 
@@ -72,10 +75,16 @@ async function carregar(root) {
 }
 
 function pintar(root) {
-  $('#abas', root).innerHTML = [['livro', 'Livro por CFOP / CST'], ['resumo', 'Resumo dos impostos'], ['regras', 'Regras e parâmetros']]
+  $('#abas', root).innerHTML = [['livro', 'Livro por CFOP / CST'], ['resumo', 'Resumo dos impostos'], ['conferencia', 'Conferência IBS/CBS'], ['simulador', 'Reforma: simulador 2027'], ['aliquotas', 'Alíquotas por vigência'], ['regras', 'Regras e parâmetros']]
     .map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('');
-  if (!D) return;
   const c = $('#corpo', root);
+  $('#exp', root).style.display = ['simulador', 'aliquotas', 'conferencia'].includes(ui.aba) ? 'none' : '';
+  $('#info', root).style.display = ['simulador', 'aliquotas', 'conferencia'].includes(ui.aba) ? 'none' : '';
+  $('#mes', root).closest('label').style.display = ['simulador', 'aliquotas'].includes(ui.aba) ? 'none' : '';
+  if (ui.aba === 'aliquotas') return pintarAliquotas(c);
+  if (ui.aba === 'simulador') return pintarSimulador(c);
+  if (ui.aba === 'conferencia') return pintarConferencia(c, ui.mes);
+  if (!D) return carregar(root);
   if (ui.aba === 'livro') return livro(c, root);
   if (ui.aba === 'resumo') return resumo(c);
   c.innerHTML = `<div class="card"><h2>Regras de apuração — aguardando parâmetros</h2>
