@@ -40,6 +40,8 @@ export const MANUAIS = [
     resumo: 'Cadastros, OPs com material e rastreabilidade, programação, OEE, planta da fábrica e importação do Iniflex.' },
   { id: 'logistica', titulo: 'Logística — cargas, entregas e frota', area: 'Logística', rotas: ['logistica', 'logistica/frota'],
     resumo: 'Montagem automática de cargas, romaneio, mapa, baixa das entregas, frota e parâmetros.' },
+  { id: 'frota', titulo: 'Gestão da frota e motoristas', area: 'Logística', rotas: ['logistica/gestao-frota'],
+    resumo: 'Documentos, preventivas, manutenção, abastecimento com km/l, multas, motoristas (CNH e toxicológico) e custo por km.' },
   { id: 'fretes-ciot', titulo: 'Fretes e CIOT', area: 'Logística', rotas: ['logistica/fretes'],
     resumo: 'Ficha do frete, transportadores, piso mínimo da ANTT, CIOT e MDF-e, conformidade do mês.' },
   { id: 'rh', titulo: 'RH — colaboradores, folha do mês e 13º', area: 'RH / Trabalhista', rotas: ['rh/colaboradores', 'rh/folha', 'rh/decimo'], rh: true,

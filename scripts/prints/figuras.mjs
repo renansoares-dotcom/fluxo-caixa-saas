@@ -18,6 +18,7 @@ export const FIGS = [
   ['terminal-producao', 'producao/terminal', '## 3.', 'Terminal do setor de extrusão'],
   ['producao', 'producao/ordens', '## 4.', 'Ordens de produção em aberto'], ['producao', 'producao/programacao', '## 5.', 'Programação da semana'],
   ['logistica', 'logistica/frota', '## 3.', 'Frota e parâmetros'], ['logistica', 'logistica', '## 4.', 'Cargas e entregas'],
+  ['frota', 'logistica/gestao-frota', '## 3.', 'Painel da frota: custo por veículo e alertas'], ['frota', 'logistica/gestao-frota', '## 5.', 'Abastecimentos com o consumo de cada trecho', 'abast'], ['frota', 'logistica/gestao-frota', '## 8.', 'Motoristas com CNH, toxicológico e alertas', 'mot'],
   ['fretes-ciot', 'logistica/fretes', '## 3.', 'Fretes do mês com a situação de cada um'], ['fretes-ciot', 'logistica/fretes', '### 4.6', 'Painel MDF-e · 23/11', 'mdfe'],
   ['rh', 'rh/colaboradores', '## 3.', 'Colaboradores'], ['rh', 'rh/folha', '## 4.', 'Folha do mês (previsão de caixa)'],
   ['notas-fiscais', 'notas', '## 4.', 'Notas fiscais de saída do mês'],

@@ -200,3 +200,38 @@ DB.contrato_reajustes = [{ id: id('cr'), empresa_id: E, contrato_id: DB.contrato
   fonte: 'Banco Central, série 433 (IPCA), 10/2025 a 09/2026', status: 'proposto', proposto_em: '2026-10-29T15:00:00Z' }];
 for (const c of DB.contratos.filter(x => x.natureza === 'pagar')) for (const m of ['2026-11', '2026-12', '2027-01'])
   DB.lancamentos.push({ id: id('lc'), empresa_id: E, data: `${m}-10`, plano_id: c.plano_id, favorecido_id: c.favorecido_id, valor: c.valor, status: 'Em aberto', descricao: `Contrato nº ${c.numero} — ${c.parte_nome}`, documento: 'CT ' + c.numero, origem: 'contrato', contrato_id: c.id });
+// gestão da frota (SQL 070)
+Object.assign(DB.log_veiculos[0], { marca_modelo: 'VW Delivery 11.180', ano_fab: 2021, ano_mod: 2022, cor: 'BRANCA', renavam: '01234567890', propriedade: 'proprio', km_atual: 118900, km_atual_em: '2026-10-28' });
+Object.assign(DB.log_veiculos[1], { marca_modelo: 'Volvo FH 540', ano_fab: 2019, ano_mod: 2019, cor: 'BRANCA', propriedade: 'locado', contrato_id: DB.contratos[2].id, km_atual: 402300, km_atual_em: '2026-10-27' });
+Object.assign(DB.log_veiculos[2], { marca_modelo: 'Mercedes Accelo 815', ano_fab: 2023, ano_mod: 2023, cor: 'BRANCA', propriedade: 'proprio', km_atual: 46100, km_atual_em: '2026-10-29' });
+const [V1, V2, V3] = DB.log_veiculos;
+DB.frota_motoristas = [
+  { id: id('mo'), empresa_id: E, nome: 'PAULO SANTOS', cpf: '39053344705', vinculo: 'empregado', cnh_numero: '01234567890', cnh_categoria: 'E', cnh_validade: '2026-11-20', cnh_ear: true, toxicologico_data: '2024-06-10', toxicologico_validade: '2026-12-10', termo_assinado_em: '2026-02-01', ativo: true },
+  { id: id('mo'), empresa_id: E, nome: 'RICARDO ALMEIDA', cpf: '11144477735', vinculo: 'empregado', cnh_numero: '09876543210', cnh_categoria: 'D', cnh_validade: '2029-03-15', cnh_ear: true, toxicologico_data: '2025-05-02', toxicologico_validade: '2027-11-02', ativo: true },
+  { id: id('mo'), empresa_id: E, nome: 'JOSÉ CARLOS DA SILVA', cpf: '52998224725', vinculo: 'agregado', cnh_numero: '05544332211', cnh_categoria: 'E', cnh_validade: '2028-08-01', cnh_ear: true, toxicologico_validade: '2027-04-01', mopp_validade: '2027-09-30', ativo: true },
+];
+const [M1, M2] = DB.frota_motoristas;
+DB.frota_documentos = [
+  { id: id('fd'), empresa_id: E, veiculo_id: V1.id, tipo: 'crlv', numero: '2026', validade: '2027-09-30' }, { id: id('fd'), empresa_id: E, veiculo_id: V1.id, tipo: 'seguro', numero: 'AP-55120', emissor: 'SEGURADORA EXEMPLO', validade: '2026-12-05', valor: 7400 },
+  { id: id('fd'), empresa_id: E, veiculo_id: V1.id, tipo: 'tacografo', validade: '2027-03-12' }, { id: id('fd'), empresa_id: E, veiculo_id: V3.id, tipo: 'crlv', validade: '2026-11-10' },
+  { id: id('fd'), empresa_id: E, veiculo_id: V3.id, tipo: 'seguro', emissor: 'SEGURADORA EXEMPLO', validade: '2027-05-01', valor: 4300 }, { id: id('fd'), empresa_id: E, veiculo_id: V2.id, tipo: 'crlv', validade: '2027-08-31' },
+];
+DB.frota_planos = [
+  { id: id('fp'), empresa_id: E, veiculo_id: V1.id, descricao: 'Troca de óleo e filtros', a_cada_km: 20000, a_cada_meses: 6, ultimo_km: 100100, ultima_data: '2026-05-20', ativo: true },
+  { id: id('fp'), empresa_id: E, veiculo_id: V1.id, descricao: 'Revisão de freios', a_cada_km: 40000, ultimo_km: 90000, ultima_data: '2026-01-10', ativo: true },
+  { id: id('fp'), empresa_id: E, veiculo_id: V3.id, descricao: 'Troca de óleo e filtros', a_cada_km: 15000, a_cada_meses: 6, ultimo_km: 40200, ultima_data: '2026-08-02', ativo: true },
+];
+DB.frota_manutencoes = [
+  { id: id('fm'), empresa_id: E, veiculo_id: V1.id, data: '2026-10-08', km: 116500, tipo: 'pneus', oficina: 'PNEUS DO AGRESTE', descricao: 'Dois pneus dianteiros 275/80 R22.5 e alinhamento', valor: 4380, lancamento_id: 'x' },
+  { id: id('fm'), empresa_id: E, veiculo_id: V3.id, data: '2026-10-21', km: 45800, tipo: 'corretiva', oficina: 'OFICINA DIESEL CENTRO', descricao: 'Troca do alternador', valor: 1650 },
+];
+DB.frota_abastecimentos = [];
+{ let km1 = 112000, km3 = 42600; const d0 = new Date('2026-09-25T12:00:00Z');
+  for (let i = 0; i < 12; i++) { const d = new Date(d0); d.setUTCDate(d.getUTCDate() + i * 3); const ds = d.toISOString().slice(0, 10);
+    const l1 = 180 + (i % 3) * 15, k1 = Math.round(l1 * (i === 10 ? 2.4 : 3.6)); km1 += k1;
+    DB.frota_abastecimentos.push({ id: id('fa'), empresa_id: E, veiculo_id: V1.id, motorista_id: M1.id, data: ds, km: km1, litros: l1, valor: +(l1 * 6.19).toFixed(2), combustivel: 'diesel_s10', tanque_cheio: true, posto: 'POSTO BR-232' });
+    if (i % 2 === 0) { const l3 = 70, k3 = Math.round(l3 * 6.8); km3 += k3; DB.frota_abastecimentos.push({ id: id('fa'), empresa_id: E, veiculo_id: V3.id, motorista_id: M2.id, data: ds, km: km3, litros: l3, valor: +(l3 * 6.19).toFixed(2), combustivel: 'diesel_s10', tanque_cheio: true, posto: 'POSTO CENTRAL' }); } } }
+DB.frota_multas = [
+  { id: id('fu'), empresa_id: E, veiculo_id: V1.id, motorista_id: M1.id, auto_numero: 'S123456789', orgao: 'PRF', data_infracao: '2026-10-12', local: 'BR-232 km 120', infracao: 'Velocidade superior à máxima em até 20%', codigo: '7455-0', pontos: 4, valor: 130.16, vencimento: '2026-11-25', prazo_indicacao: '2026-11-04', situacao: 'a_indicar' },
+  { id: id('fu'), empresa_id: E, veiculo_id: V3.id, motorista_id: M2.id, auto_numero: 'E987654321', orgao: 'DETRAN-PE', data_infracao: '2026-09-02', infracao: 'Estacionar em local proibido', codigo: '5550-1', pontos: 3, valor: 195.23, vencimento: '2026-10-20', situacao: 'paga', desconto_folha: true },
+];

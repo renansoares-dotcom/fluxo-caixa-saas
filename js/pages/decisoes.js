@@ -42,7 +42,8 @@ async function carregar() {
       q(sb.from('contrato_reajustes').select('contrato_id,data_base,status,percentual').eq('empresa_id', e)), import('../lib/contratos.js')]);
     return C.map(c => ({ c, al: K.alertas(c, A.filter(a => a.contrato_id === c.id), R.filter(r => r.contrato_id === c.id), hoje).filter(a => a.nivel !== 'info'), mensal: K.valorMensal(c) })).filter(x => x.al.length);
   })().catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos };
+  const frota = await import(`./frota.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota };
 }
 
 // ---------------------------------------------------------------- regras
@@ -157,6 +158,13 @@ function regras(D) {
       desc: D.contratos.slice(0, 5).map(x => `nº ${x.c.numero} ${x.c.parte_nome}: ${x.al.map(a => a.txt.toLowerCase()).join('; ')}`).join(' · ') + (D.contratos.length > 5 ? ` · e mais ${D.contratos.length - 5}` : ''),
       impacto: v, impactoTxt: `${money0(v)} por ano`, regra: 'Contratos vigentes vencendo em até 90 dias, com aviso prévio em até 30 dias ou com reajuste na data-base (até 30 dias) ou para aprovar.',
       acao: 'Abrir contratos', rota: 'contratos' }); }
+
+  // 14. frota: documentos, preventivas, motoristas e multas
+  const fr = (D.frota || []).filter(a => a.nivel === 'neg' || a.nivel === 'warn');
+  if (fr.length) out.push({ k: 'frota', origem: 'Logística', urg: fr.some(a => a.nivel === 'neg') ? 'alta' : 'media', titulo: 'Regularizar a frota e os motoristas',
+    desc: fr.slice(0, 5).map(a => `${a.origem}: ${a.txt}`).join(' · ') + (fr.length > 5 ? ` · e mais ${fr.length - 5}` : ''), impacto: 0, impactoTxt: `${fr.length} pendência(s)`,
+    regra: 'Documentos vencendo em até 60 dias, preventivas no limite, CNH/toxicológico/MOPP vencendo, consumo fora da média e multas com prazo de indicação em até 7 dias.',
+    acao: 'Abrir gestão da frota', rota: 'logistica/gestao-frota' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }
