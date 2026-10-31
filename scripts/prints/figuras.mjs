@@ -36,4 +36,6 @@ export const FIGS = [
   ['estoque', 'estoque', '## 3.', 'Posição de estoque com o ponto de pedido'],
   ['logistica-indicadores', 'logistica/indicadores', '## 5.', 'Metas dos indicadores', 'click:#li-metas'],
   ['conciliacao', 'conciliacao', '### 4.2', 'Movimento do extrato com os lançamentos candidatos', 'click:#ext tr[data-id]'],
+  ['estoque-kardex', 'estoque/kardex', '## 3.', 'Kardex: saldo por local ao custo médio'],
+  ['estoque-kardex', 'estoque/parametros', '## 4.', 'Parâmetros do estoque: os locais'],
 ];

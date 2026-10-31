@@ -25,6 +25,8 @@ const routes = {
   'estoque': () => import(`./pages/estoque.js?v=${V}`),
   'estoque/produtos': () => import(`./pages/produtos.js?v=${V}`),
   'estoque/depara': () => import(`./pages/produtos-depara.js?v=${V}`),
+  'estoque/kardex': () => import(`./pages/estoque-kardex.js?v=${V}`),
+  'estoque/parametros': () => import(`./pages/estoque-parametros.js?v=${V}`),
   'comercial': () => import(`./pages/comercial.js?v=${V}`),
   'comercial/carteira': () => import(`./pages/comercial-carteira.js?v=${V}`),
   'comercial/funil': () => import(`./pages/comercial-funil.js?v=${V}`),
@@ -277,9 +279,9 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil compras: Pagamentos Antecipados e o módulo Compras
 // perfil vendas (representante): só a área Comercial
 // perfil producao (operador no terminal do setor)
-const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens', 'tutoriais', 'conversas'].includes(r);
+const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens', 'estoque/kardex', 'tutoriais', 'conversas'].includes(r);
 const rotaDeVendas = (r) => r === 'comercial' || ['comercial/carteira', 'comercial/funil', 'tutoriais', 'conversas'].includes(r);
-const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos', 'tutoriais', 'conversas'].includes(r) || r.startsWith('compras/');
+const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'tutoriais', 'conversas'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;

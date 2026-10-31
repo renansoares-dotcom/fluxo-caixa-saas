@@ -346,3 +346,46 @@ DB.log_carga_notas = DB.log_carga_notas || [];
   DB.produtos.forEach((p, k) => { p.ponto_pedido = [3000, 3000, 12000, 600][k]; });
   DB.estoque_parametros = [{ empresa_id: E, metodo_custo: 'ultima_compra' }];
 }
+// Estoque parametrizado (SQL 075): locais, famílias, tipos de movimento, regras por CFOP e um kardex fictício
+{ const L = (codigo, nome, finalidade, ordem, o = {}) => ({ id: id('el'), empresa_id: E, codigo, nome, finalidade, posse: 'propria', controla_saldo: true, compoe_custo: true, permite_negativo: false, papeis: null, ordem, ativo: true, ...o });
+  DB.est_locais = [L('MP', 'Matéria-prima (resinas, master, aditivos)', 'materia_prima', 10), L('INS', 'Insumos de produção (tintas, solventes, tubetes, embalagens)', 'insumo', 20),
+    L('PROC-1', 'Em processo — Extrusão', 'processo', 31, { setor_id: DB.prod_setores[0].id }), L('PROC-2', 'Em processo — Impressão', 'processo', 32, { setor_id: DB.prod_setores[1].id }), L('PROC-3', 'Em processo — Corte e solda', 'processo', 33, { setor_id: DB.prod_setores[2].id }),
+    L('ACA', 'Produto acabado', 'acabado', 60), L('APA', 'Aparas e reprocesso', 'aparas', 70), L('MAN', 'Manutenção (peças de reposição)', 'manutencao', 80, { papeis: ['producao'] }), L('UC', 'Uso e consumo (EPI, limpeza, escritório)', 'uso_consumo', 90),
+    L('TER', 'Nosso em poder de terceiros (industrialização, conserto)', 'terceiros', 100, { posse: 'em_terceiros' }), L('DTE', 'De terceiros em nosso poder', 'terceiros', 110, { posse: 'de_terceiros', compoe_custo: false }), L('QUA', 'Quarentena (aguardando a qualidade)', 'quarentena', 120)];
+  const lc = (c) => DB.est_locais.find(l => l.codigo === c).id;
+  const F = (codigo, nome, tipo_sped, loc, lote = false) => ({ id: id('ef'), empresa_id: E, codigo, nome, tipo_sped, local_padrao_id: loc ? lc(loc) : null, controla_lote: lote, ativo: true });
+  DB.est_familias = [F('RESINA', 'Resinas', '01', 'MP', true), F('MASTER', 'Master e aditivos', '01', 'MP', true), F('TINTA', 'Tintas e solventes', '10', 'INS'), F('EMBAL', 'Embalagens e tubetes', '02', 'INS'),
+    F('SEMI', 'Semiacabado (bobina, fio)', '03', 'PROC-1', true), F('ACABADO', 'Produto acabado', '04', 'ACA'), F('APARA', 'Aparas e reprocessado', '05', 'APA'), F('PECA', 'Peças de reposição', '07', 'MAN'),
+    F('CONSUMO', 'Uso e consumo (geral)', '07', 'UC'), F('EPI', 'EPI', '07', 'UC'), F('REVENDA', 'Mercadoria para revenda', '00', 'ACA'), F('SERV', 'Serviços', '09'), F('OUTROS', 'Outros', '99')];
+  const T = (codigo, nome, sentido, o = {}) => ({ id: id('et'), empresa_id: E, codigo, nome, sentido, afeta_custo: false, gera_financeiro: false, documento: 'nenhum', sistema: true, ativo: true, ...o });
+  DB.est_tipos_movimento = [T('SI', 'Saldo inicial (implantação)', 'E', { afeta_custo: true, documento: 'inventario' }), T('COMPRA', 'Compra', 'E', { afeta_custo: true, gera_financeiro: true, documento: 'nf' }),
+    T('DEVCLI', 'Devolução de cliente', 'E', { documento: 'nf', local_destino_id: lc('ACA') }), T('PROD', 'Produção (apontamento)', 'E', { afeta_custo: true, documento: 'op' }), T('AJ+', 'Ajuste de inventário (sobra)', 'E', { documento: 'inventario' }),
+    T('VENDA', 'Venda', 'S', { documento: 'nf', local_origem_id: lc('ACA') }), T('REQPROD', 'Requisição para a produção', 'S', { documento: 'requisicao' }), T('REQINT', 'Requisição interna (uso e consumo, manutenção)', 'S', { documento: 'requisicao' }),
+    T('REMTER', 'Remessa para terceiros (industrialização, conserto)', 'S', { documento: 'nf', local_destino_id: lc('TER') }), T('PERDA', 'Perda / sucata', 'S'), T('AJ-', 'Ajuste de inventário (falta)', 'S', { documento: 'inventario' }), T('TRF', 'Transferência entre locais', 'T')];
+  const tm = (c) => DB.est_tipos_movimento.find(t => t.codigo === c).id;
+  const R = (cfop, sentido, t, observacao) => ({ id: id('er'), empresa_id: E, cfop, sentido, tipo_movimento_id: t ? tm(t) : null, prioridade: 100, observacao, ativo: true });
+  DB.est_regras_cfop = [R('101', 'entrada', 'COMPRA', 'Compra para industrialização'), R('102', 'entrada', 'COMPRA', 'Compra para comercialização'), R('556', 'entrada', 'COMPRA', 'Compra de material de uso e consumo'),
+    R('201', 'entrada', 'DEVCLI', 'Devolução de venda de produção'), R('949', 'entrada', null, 'Outra entrada: não movimenta (revise)'), R('101', 'saida', 'VENDA', 'Venda de produção'), R('102', 'saida', 'VENDA', 'Venda de mercadoria'),
+    R('915', 'saida', 'REMTER', 'Remessa para conserto'), R('922', 'saida', null, 'Simples faturamento (entrega futura): não movimenta')];
+  const fam = (c) => DB.est_familias.find(f => f.codigo === c);
+  DB.produtos.forEach(p => { const f = fam(p.tipo === 'produto_acabado' ? 'ACABADO' : p.codigo === 'MP-002' ? 'MASTER' : 'RESINA'); Object.assign(p, { familia_id: f.id, tipo_sped: f.tipo_sped, local_padrao_id: f.local_padrao_id, controla_lote: f.controla_lote }); });
+  DB.produtos.push({ id: id('pr'), empresa_id: E, codigo: 'UC-010', descricao: 'LUVA NITRÍLICA', tipo: 'uso_consumo', unidade: 'PAR', ativo: true, origem: 'manual', familia_id: fam('EPI').id, tipo_sped: '07', local_padrao_id: lc('UC'), controla_lote: false });
+  const P = (c) => DB.produtos.find(p => p.codigo === c);
+  DB.est_lotes = [['MP-001', 'L-2610-01', 'BRK 7781'], ['MP-001', 'L-2610-02', 'BRK 7802'], ['MP-002', 'L-2610-03', 'CAB 1190']].map(([c, codigo, lf]) => ({ id: id('lt'), empresa_id: E, produto_id: P(c).id, codigo, lote_fornecedor: lf, origem: 'compra' }));
+  const lt = (c) => DB.est_lotes.find(l => l.codigo === c).id;
+  const M = [ // [data, produto, local, lote, tipo, qtd, custo]
+    ['2026-10-01', 'MP-001', 'MP', 'L-2610-01', 'SI', 8000, 10.9], ['2026-10-01', 'MP-002', 'MP', 'L-2610-03', 'SI', 1200, 20.8], ['2026-10-01', 'PA-100', 'ACA', null, 'SI', 3500, 15.2], ['2026-10-01', 'PA-210', 'ACA', null, 'SI', 2100, 17.6],
+    ['2026-10-01', 'UC-010', 'UC', null, 'SI', 300, 4.1], ['2026-10-08', 'MP-001', 'MP', 'L-2610-02', 'COMPRA', 12000, 11.75], ['2026-10-09', 'MP-001', 'MP', 'L-2610-01', 'REQPROD', -6500], ['2026-10-09', 'MP-002', 'MP', 'L-2610-03', 'REQPROD', -380],
+    ['2026-10-14', 'PA-100', 'ACA', null, 'PROD', 5200, 15.6], ['2026-10-20', 'PA-100', 'ACA', null, 'VENDA', -4100], ['2026-10-21', 'PA-210', 'ACA', null, 'VENDA', -1300], ['2026-10-22', 'UC-010', 'UC', null, 'REQINT', -60],
+    ['2026-10-27', 'MP-001', 'MP', 'L-2610-02', 'REQPROD', -5200], ['2026-10-29', 'PA-100', 'ACA', null, 'PROD', 3800, 15.9], ['2026-10-30', 'PA-100', 'ACA', null, 'VENDA', -3600]];
+  const cus = {}, sal = {}; DB.est_movimentos = [];
+  M.forEach(([data, c, l, lote, t, qt, cu], k) => { const p = P(c), tt = DB.est_tipos_movimento.find(x => x.codigo === t), x = cus[p.id] ||= { q: 0, v: 0, cm: 0 };
+    const u = qt > 0 && tt.afeta_custo ? cu : (x.q > 0 ? x.v / x.q : x.cm), val = Math.round(qt * u * 100) / 100; x.q += qt; x.v = Math.round((x.v + val) * 100) / 100; if (x.q > 0) x.cm = x.v / x.q;
+    const ks = p.id + '|' + l + '|' + (lote || ''), s = sal[ks] ||= { id: id('ss'), empresa_id: E, produto_id: p.id, local_id: lc(l), lote_id: lote ? lt(lote) : null, quantidade: 0, valor: 0 };
+    s.quantidade += qt; s.valor = Math.round((s.valor + val) * 100) / 100; s.ultimo_movimento = data;
+    DB.est_movimentos.push({ id: id('mv'), empresa_id: E, data, produto_id: p.id, local_id: lc(l), lote_id: lote ? lt(lote) : null, tipo_movimento_id: tt.id, quantidade: qt, custo_unitario: u, valor: val,
+      custo_medio_apos: x.cm, saldo_local_apos: s.quantidade, documento: t === 'VENDA' ? 'NF 90' + (12 + k) : t === 'COMPRA' ? 'NF 55031' : t === 'PROD' ? 'OP 1' + (40 + k) : t === 'SI' ? 'Inventário de implantação' : 'REQ ' + (300 + k), criado_em: data + 'T1' + (k % 10) + ':00:00Z' }); });
+  DB.est_saldos = Object.values(sal);
+  DB.est_custos = Object.entries(cus).map(([pid, x]) => ({ produto_id: pid, empresa_id: E, quantidade: x.q, valor: x.v, custo_medio: x.cm, ultima_entrada: '2026-10-29' }));
+  DB.est_fechamentos = [{ empresa_id: E, mes: '2026-09-01', fechado_em: '2026-10-05T12:00:00Z' }];
+}

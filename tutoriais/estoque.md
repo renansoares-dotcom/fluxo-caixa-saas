@@ -1,7 +1,7 @@
 ---
 titulo: Estoque e produtos
-tela: Compras › Posição de estoque, Produtos e De-para de fornecedores
-versao: 1.2
+tela: Estoque › Posição de estoque, Produtos e De-para de fornecedores
+versao: 1.3
 atualizado: 2026-10-31
 ---
 ## 1. Para que serve
@@ -14,7 +14,7 @@ atualizado: 2026-10-31
   - as compras pelas NF-e e a posição no Iniflex.
 - **De-para de fornecedores**: liga cada código de item que aparece nas notas de entrada (CNPJ do fornecedor + código dele) a um produto do cadastro. Com o de-para, a plataforma calcula o custo de compra e casa o recebimento sozinha.
 
-> O estoque oficial continua no **Iniflex**. A plataforma lê o espelho para analisar e comprar melhor.
+> O estoque oficial passa a ser o da plataforma: o **Kardex**, com saldo por local e lote e custo médio (veja o manual **Kardex e parâmetros do estoque**). O espelho do Iniflex serve para a implantação e a conferência.
 
 ## 2. Quem tem acesso
 
@@ -68,10 +68,11 @@ Confirme com a contabilidade quais impostos marcar.
 1. Clique em **Novo produto**.
 2. Preencha o **tipo**, o **código (Iniflex)**, a **descrição**, a unidade, o NCM, o grupo e o subgrupo.
 3. Em **Plástico flexível**, informe o material, a largura, a espessura, as faces, a cor e a solda.
-4. Em **Estoque e compra**, informe o ponto de pedido, o lote econômico, o estoque máximo, a localização e a unidade de compra.
-5. Clique em **Salvar**.
+4. Em **Classificação no estoque**, confira a **família**, o **tipo do item no SPED**, o **local padrão** e se o item **controla lote**. Deixados em branco, vêm da família, e a família vem do tipo do produto.
+5. Em **Estoque e compra**, informe o ponto de pedido, o lote econômico, o estoque máximo, a localização e a unidade de compra.
+6. Clique em **Salvar**.
 
-**Importar das notas de saída** cadastra de uma vez os códigos vendidos nas NF-e de saída que ainda não estão no cadastro. Eles entram como produto acabado, com a descrição, a unidade e o NCM da nota mais recente. Desmarque o que não for produto (sucata, serviço) e clique em **Cadastrar marcados**.
+**Importar das notas de saída** cadastra de uma vez os códigos vendidos nas NF-e de saída que ainda não estão no cadastro. Eles entram como produto acabado (família Produto acabado, tipo 04 no SPED e local Produto acabado), com a descrição, a unidade e o NCM da nota mais recente. Desmarque o que não for produto (sucata, serviço) e clique em **Cadastrar marcados**.
 
 ### 4.2 A ficha do produto
 
@@ -114,3 +115,4 @@ Clique no produto para ver:
 | 1.0 | 28/10/2026 | Primeira versão do manual: espelho do Iniflex, curva ABC, ponto de pedido, requisição automática, parâmetros de custo, cadastro de produtos com estrutura e de-para de fornecedores. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 31/10/2026 | Nova figura: posição de estoque com o ponto de pedido. |
+| 1.3 | 31/10/2026 | Estoque oficial na plataforma (Kardex). Produto com família, tipo do item no SPED, local padrão e controle de lote; o cadastro pelas notas de saída já entra classificado. |

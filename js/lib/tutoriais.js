@@ -36,6 +36,8 @@ export const MANUAIS = [
     resumo: 'Da requisição à cotação, do pedido à aprovação e do recebimento conferido com a nota.' },
   { id: 'estoque', titulo: 'Estoque e produtos', area: 'Compras', rotas: ['estoque', 'estoque/produtos', 'estoque/depara'],
     resumo: 'Espelho do Iniflex, ponto de pedido e requisição automática, cadastro de produtos e de-para de fornecedores.' },
+  { id: 'estoque-kardex', titulo: 'Kardex e parâmetros do estoque', area: 'Compras', rotas: ['estoque/kardex', 'estoque/parametros'],
+    resumo: 'Estoque oficial por local e lote, custo médio ponderado móvel, movimentos e estorno, locais, famílias, tipos de movimento, regras por CFOP e fechamento do mês.' },
   { id: 'terminal-producao', titulo: 'Terminal de produção', area: 'Produção', rotas: ['producao/terminal'],
     resumo: 'Para o operador: iniciar, registrar bobina com etiqueta, parada e encerramento.' },
   { id: 'producao', titulo: 'Produção — PCP, ordens, programação e planta', area: 'Produção', rotas: ['producao', 'producao/ordens', 'producao/programacao', 'producao/cadastros', 'producao/importar', 'producao/planta'],

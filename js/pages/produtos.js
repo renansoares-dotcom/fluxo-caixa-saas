@@ -4,6 +4,7 @@ import { sb, state, q, fetchAll } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, today, fail, toast, modal, confirmDialog, exportXLSX } from '../lib/ui.js';
 import { TIPOS, MATERIAIS, FORMATOS, pesoTeorico, carregarProdutos, limparCacheProdutos, datalistProdutos, acharProduto } from '../lib/produtos.js';
 import { qtd, inp, unit, num } from '../lib/compras.js';
+import { TIPOS_SPED } from '../lib/estoque-kardex.js';
 
 export const title = 'Produtos';
 const ui = { tipo: '', busca: '', inativos: false };
@@ -47,7 +48,18 @@ function pintar(root) {
 }
 
 // ------------------------------------------------------------ editar
-function editar(p, root) {
+// famílias e locais do estoque parametrizado (SQL 075); sem a tabela, o formulário segue sem esses campos
+let EST = null;
+async function parametrosEstoque() {
+  if (EST && EST.emp === state.empresa.id) return EST;
+  const [fam, loc] = await Promise.all([q(sb.from('est_familias').select('id,codigo,nome,tipo_sped,local_padrao_id,controla_lote').eq('empresa_id', state.empresa.id).eq('ativo', true).order('nome')).catch(() => null),
+    q(sb.from('est_locais').select('id,nome').eq('empresa_id', state.empresa.id).eq('ativo', true).order('ordem')).catch(() => null)]);
+  EST = { emp: state.empresa.id, fam: fam || [], loc: loc || [], ok: !!fam };
+  return EST;
+}
+
+async function editar(p, root) {
+  const E = await parametrosEstoque();
   const v = p || { tipo: 'materia_prima', unidade: 'KG', ativo: true };
   const sel = (id, obj, val, vazio = true) => `<select id="${id}">${vazio ? '<option value="">—</option>' : ''}${Object.entries(obj).map(([k, t]) => `<option value="${k}" ${val === k ? 'selected' : ''}>${typeof t === 'string' ? t : k}</option>`).join('')}</select>`;
   const n = (id, val, ph = '') => `<input id="${id}" value="${val != null ? inp(val) : ''}" placeholder="${ph}">`;
@@ -61,6 +73,13 @@ function editar(p, root) {
       <label>Grupo<input id="pf-gr" value="${esc(v.grupo || '')}"></label>
       <label>Subgrupo<input id="pf-sg" value="${esc(v.subgrupo || '')}"></label>
     </div>
+    ${E.ok ? `<h3 style="margin:14px 0 6px">Classificação no estoque</h3>
+    <div class="grid-form">
+      <label class="span2">Família<select id="pf-fam"><option value="">pelo tipo (automático)</option>${E.fam.map(f => `<option value="${f.id}" ${v.familia_id === f.id ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
+      <label>Tipo do item (SPED)<select id="pf-sped"><option value="">pela família</option>${Object.entries(TIPOS_SPED).map(([k, t]) => `<option value="${k}" ${v.tipo_sped === k ? 'selected' : ''}>${k} – ${t}</option>`).join('')}</select></label>
+      <label>Local padrão<select id="pf-lp"><option value="">pela família</option>${E.loc.map(l => `<option value="${l.id}" ${v.local_padrao_id === l.id ? 'selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
+      <label class="chk"><input type="checkbox" id="pf-lote" ${v.controla_lote ? 'checked' : ''}> Controla lote</label>
+    </div>` : ''}
     <h3 style="margin:14px 0 6px">Plástico flexível</h3>
     <div class="grid-form">
       <label>Material${sel('pf-mat', Object.fromEntries(Object.keys(MATERIAIS).map(k => [k, k])), v.material)}</label>
@@ -98,6 +117,13 @@ function editar(p, root) {
       comprimento_m: N('pf-com'), camadas: N('pf-cam'), formato: V('pf-fmt') || null, cor: V('pf-cor') || null, cores_impressao: N('pf-ci'), solda: V('pf-sol') || null,
       corona: $('#pf-cor2', m.el).checked, sanfona: $('#pf-san', m.el).checked, estoque_minimo: N('pf-min'), estoque_maximo: N('pf-max'), ponto_pedido: N('pf-pp'),
       lote_economico: N('pf-le'), localizacao: V('pf-loc') || null, unidade_compra: V('pf-uc') || null, fator_compra: N('pf-fc'), ativo: $('#pf-at', m.el).checked, observacao: V('pf-obs') || null };
+    if (E.ok) {   // família trocada sem mexer no tipo SPED/local: o banco leva os da nova família
+      const fam = V('pf-fam') || null, famMudou = fam !== (v.familia_id || null);
+      Object.assign(row, { familia_id: fam, controla_lote: $('#pf-lote', m.el).checked,
+        tipo_sped: famMudou && V('pf-sped') === (v.tipo_sped || '') ? (p ? v.tipo_sped : null) : V('pf-sped') || null,
+        local_padrao_id: famMudou && V('pf-lp') === (v.local_padrao_id || '') ? (p ? v.local_padrao_id : null) : V('pf-lp') || null });
+      if (!p && !fam) delete row.familia_id;
+    }
     if (!row.codigo || !row.descricao) return toast('Código e descrição são obrigatórios', true);
     ev.target.disabled = true;
     try {
@@ -136,7 +162,8 @@ async function abrir(p, root) {
   const m = modal({ title: `${p.codigo} — ${p.descricao}`, wide: true, body: `
     <div class="grid-form small">
       <div><span class="muted">Tipo</span><div>${esc(TIPOS[p.tipo] || p.tipo)}</div></div><div><span class="muted">Unidade</span><div>${esc(p.unidade)}</div></div>
-      <div><span class="muted">NCM</span><div>${esc(p.ncm || '–')}</div></div><div><span class="muted">Grupo</span><div>${esc([p.grupo, p.subgrupo].filter(Boolean).join(' / ') || '–')}</div></div>
+      <div><span class="muted">NCM</span><div>${esc(p.ncm || '–')}</div></div>
+      ${p.tipo_sped ? `<div><span class="muted">Tipo do item (SPED)</span><div>${p.tipo_sped} – ${esc(TIPOS_SPED[p.tipo_sped] || '')}${p.controla_lote ? ' · controla lote' : ''}</div></div>` : ''}<div><span class="muted">Grupo</span><div>${esc([p.grupo, p.subgrupo].filter(Boolean).join(' / ') || '–')}</div></div>
       ${p.material || p.largura_mm || p.espessura_um ? `<div class="span2"><span class="muted">Plástico</span><div>${esc([p.material, p.largura_mm && qtd(p.largura_mm) + ' mm', p.espessura_um && qtd(p.espessura_um) + ' µm', p.comprimento_m && qtd(p.comprimento_m) + ' m', p.formato && FORMATOS[p.formato], p.cor, p.cores_impressao && p.cores_impressao + ' cor(es)', p.corona && 'corona', p.sanfona && 'sanfona'].filter(Boolean).join(' · '))}</div></div>` : ''}
       ${pt ? `<div class="span2"><span class="muted">Peso teórico</span><div>${qtd(Math.round(pt.gm2 * 10) / 10)} g/m²${pt.gm ? ` · ${qtd(Math.round(pt.gm * 100) / 100)} g/m` : ''}${pt.peca ? ` · ${qtd(Math.round(pt.milheiroKg * 100) / 100)} kg/milheiro` : ''}</div></div>` : ''}
       <div><span class="muted">Mínimo / ponto de pedido</span><div>${p.estoque_minimo != null ? qtd(p.estoque_minimo) : '–'} / ${p.ponto_pedido != null ? qtd(p.ponto_pedido) : '–'}</div></div>
@@ -182,7 +209,7 @@ async function importarSaidas(root) {
   try { pend = await q(sb.rpc('produto_saida_pendente', { p_empresa: state.empresa.id, p_de: '2025-01-01' })); } catch (err) { return fail(err); }
   pend.sort((a, b) => b.valor - a.valor);
   const m = modal({ title: 'Importar produtos das notas de saída', wide: true, body: `
-    <p class="small" style="margin-top:0">${pend.length} código(s) vendidos nas NF-e de saída ainda não estão no cadastro. Entram como <b>Produto acabado</b>, com a descrição, unidade e NCM da nota mais recente. Desmarque o que não for produto (ex.: sucata, serviço).</p>
+    <p class="small" style="margin-top:0">${pend.length} código(s) vendidos nas NF-e de saída ainda não estão no cadastro. Entram como <b>Produto acabado</b> (família Produto acabado, tipo 04 no SPED, local Produto acabado), com a descrição, unidade e NCM da nota mais recente. Desmarque o que não for produto (ex.: sucata, serviço).</p>
     <div class="toolbar"><label class="chk"><input type="checkbox" id="is-all" checked> Marcar todos</label><input id="is-b" placeholder="Filtrar" style="min-width:220px"></div>
     <div class="table-wrap" style="max-height:55vh"><table><thead><tr><th></th><th>Código</th><th>Descrição</th><th>Unid.</th><th>NCM</th><th class="num">Notas</th><th class="num">Vendido</th><th>Última venda</th></tr></thead><tbody>
       ${pend.map((x, i) => `<tr data-i="${i}"><td><input type="checkbox" class="is-c" checked></td><td>${esc(x.codigo)}</td><td class="wrap">${esc(x.descricao)}</td><td>${esc(x.unidade || '')}</td><td>${esc(x.ncm || '')}</td><td class="num">${x.notas}</td><td class="num">${money(x.valor)}</td><td>${dateBR(x.ultima)}</td></tr>`).join('')
