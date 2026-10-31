@@ -207,7 +207,7 @@ export async function gravarEncargos(t, plano, vals, existentes = []) {
     const nome = { juros: 'Juros', multa: 'Multa', desconto: 'Desconto' }[tipo];
     const row = { empresa_id: t.empresa_id, data: t.data, status: 'Pago', valor: v, plano_id: pl[tipo]?.id, conta_id: t.conta_id,
       favorecido_id: t.favorecido_id, centro_custo_id: t.centro_custo_id, documento: t.documento,
-      descricao: `${nome} — ${t.descricao || t.documento || 'título'}`.slice(0, 500), origem: `encargo:${t.id}:${tipo}` };
+      descricao: `${nome} — ${t.descricao || t.documento || 'título'}`.slice(0, 500), origem: `encargo:${t.id}:${tipo}`, juros_de: t.id };   // juros/multa recebidos (1.02.17) → nota de débito
     if (v > 0 && !pl[tipo]) throw new Error(`plano de ${nome.toLowerCase()} não encontrado`);
     if (ex && v <= 0) { await q(sb.from('lancamentos').delete().eq('id', ex.id)); out.push(`${nome.toLowerCase()} removido`); }
     else if (ex) { await q(sb.from('lancamentos').update(row).eq('id', ex.id)); if (Math.abs(+ex.valor - v) > 0.005) out.push(`${nome.toLowerCase()} ${money(v)}`); }   // mantém data/conta iguais às do título

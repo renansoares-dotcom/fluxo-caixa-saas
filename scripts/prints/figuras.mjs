@@ -25,6 +25,7 @@ export const FIGS = [
   ['rh', 'rh/colaboradores', '## 3.', 'Colaboradores'], ['rh', 'rh/folha', '## 4.', 'Folha do mês (previsão de caixa)'],
   ['notas-fiscais', 'notas', '## 4.', 'Notas fiscais de saída do mês'], ['notas-fiscais', 'notas', '### 5.4', 'Relatório de faturamento por cliente, com o comparativo do ano anterior e a curva ABC', 'relatorios'],
   ['notas-fiscais', 'fiscal/apuracao', '### 6.1', 'Conferência da CBS e do IBS destacados nas notas do mês', 'conferencia'], ['notas-fiscais', 'fiscal/apuracao', '### 6.2', 'Simulador: PIS/Cofins de hoje × CBS e IBS de 2027 sobre as notas dos últimos 12 meses', 'simulador'],
+  ['notas-fiscais', 'fiscal/notas-debito', '### 6.4', 'Notas de débito de juros e multa a emitir'],
   ['contabilidade', 'dre', '## 3.', 'DRE gerencial'],
   ['empresa-identidade', 'cadastros/empresa', '## 3.', 'Identidade visual com a prévia do crachá'], ['empresa-identidade', 'cadastros/empresa', '## 4.', 'Crachás dos colaboradores', 'cr'],
   ['contratos', 'contratos', '## 3.', 'Contratos vigentes com os alertas'], ['contratos', 'contratos', '## 4.', 'Ficha do contrato: documentos, parcelas e reajuste', 'click:tr[data-id]:nth-child(4)|scroll:#k-extra'], ['contratos', 'contratos', '## 5.', 'Minuta para assinatura com os campos do modelo', 'click:tr[data-id]:nth-child(3)|scroll:#k-min'],

@@ -1,8 +1,8 @@
 ---
 titulo: Notas fiscais e apuração de impostos
 tela: CPD › Notas Fiscais e Apuração de impostos
-versao: 1.3
-atualizado: 2026-10-30
+versao: 1.4
+atualizado: 2026-10-31
 ---
 ## 1. Para que serve
 
@@ -12,7 +12,7 @@ atualizado: 2026-10-30
   - liga as parcelas das notas aos recebimentos e pagamentos que já existem nos lançamentos;
   - liga os títulos dos borderôs FIDC às notas;
   - tira os **relatórios de faturamento e de compras** (tela, PDF e Excel).
-- **Apuração de impostos**: a memória de cálculo a partir dos itens das notas, com o livro por CFOP/CST e o resumo dos impostos destacados. Por enquanto é **só leitura e só prévia**. Também traz a **reforma tributária**: a conferência da CBS e do IBS destacados nas notas, o simulador de 2027 e a tabela de alíquotas por ano.
+- **Apuração de impostos**: a memória de cálculo a partir dos itens das notas, com o livro por CFOP/CST e o resumo dos impostos destacados. Por enquanto é **só leitura e só prévia**. Também traz a **reforma tributária**: a conferência da CBS e do IBS destacados nas notas, o simulador de 2027, a tabela de alíquotas por ano e a fila das **notas de débito** de juros e multa.
 
 ## 2. Quem tem acesso
 
@@ -150,6 +150,31 @@ A tabela de CBS e IBS por ano usada no simulador e na conferência. O padrão da
 
 Quando sair a alíquota definitiva, o **administrador** clica no ano, ajusta os percentuais, a situação e a **fonte** (lei ou resolução e a data) e salva. **Voltar ao padrão** apaga o ajuste da empresa para aquele ano.
 
+### 6.4 Notas de débito de juros e multa
+
+![Figura 5 — Notas de débito de juros e multa a emitir (dados fictícios)](img/notas-fiscais-5.jpg)
+
+Juros, multa e acréscimos recebidos por atraso entram na base da CBS e do IBS (LC 214/2025, art. 12, § 1º, II). No **dia do recebimento**, a empresa emite a **NF-e de débito**:
+- finalidade **6** (nota de débito), tipo de débito **04 – Multa e juros**;
+- cada item referencia a chave e o item da NF-e de origem, com a mesma classificação e a alíquota do ano da nota de origem;
+- só CBS e IBS (sem ICMS); o valor é o de juros e multa efetivamente recebido.
+
+Não confunda com a **nota de crédito** de multa e juros (finalidade 5, tipo 01): é a que o **cliente** emite quando o fornecedor não emitiu a nota de débito.
+
+Como a fila se forma (**CPD › Fiscal › Notas de débito**):
+
+1. Todo recebimento de juros vira um lançamento em **1.02.17 JUROS E MULTAS RECEBIDOS**, ligado ao título; o título continua com o valor de face. Isso acontece:
+   - na **Conciliação**, ao clicar em **Conciliar com R$ X de juros/multa** quando o extrato é maior que o título;
+   - no **Importar do ERP**, na ação **Baixar + juros** (recebimento acima do título);
+   - no quadro **Juros e multa** do lançamento pago;
+   - em **Registrar juros recebidos**, na própria tela.
+2. Cada lançamento desses cria uma pendência **A emitir**, com o cliente, a NF-e de origem, a parcela e o valor. Administradores e financeiro recebem notificação, e a pendência aparece no **Decision Center**. Com mais de 5 dias fica em vermelho.
+3. Clique na pendência para ver o rateio por item (CST, cClassTrib, valor, CBS e IBS) e o texto das informações complementares. **Copiar dados para o emissor** copia tudo.
+4. Emita a nota de débito no sistema emissor e informe o **número**, a **série**, a **data** e a **chave**: a pendência passa a **Emitida**. **Dispensar** pede o motivo.
+5. Juros que o cliente pagou ao **fundo** (mora no relatório de pagos da Carteira cedida) entram como **A decidir (contabilidade)**, até a definição sobre quem emite. **Passar para "a emitir"** ou **Dispensar** resolve cada uma.
+
+> Quando a integração com a API de emissão (Focus NF-e) estiver ligada, a pendência já traz os dados da nota de débito no layout da NT 2025.002 para a emissão direta.
+
 ## 7. Regras e travas
 
 - Nota já importada (mesma chave) não entra de novo.
@@ -167,6 +192,8 @@ Quando sair a alíquota definitiva, o **administrador** clica no ano, ajusta os 
 
 **O faturamento do relatório não bate com o do indicador da aba Notas.** O indicador soma o valor das notas de venda (finalidade normal); o relatório vai item a item pelo CFOP e desconta as devoluções. Remessas e simples faturamento ficam fora do relatório.
 
+**Recebi com juros e a nota de débito não apareceu.** Os juros precisam estar num lançamento em 1.02.17 (pago). Se o título foi baixado pelo valor recebido inteiro, corrija: baixe pela face e use **Registrar juros recebidos**.
+
 **A tabela de alíquotas mostra “SQL 072 pendente”.** A tabela da empresa ainda não foi criada no banco: a plataforma usa o padrão e não deixa ajustar até o SQL rodar.
 
 ## 9. Histórico de alterações
@@ -177,3 +204,4 @@ Quando sair a alíquota definitiva, o **administrador** clica no ano, ajusta os 
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 30/10/2026 | Importação aceita XML com o número do item gravado fora do padrão (como o de alguns emissores); antes a nota entrava sem os itens. |
 | 1.3 | 30/10/2026 | Relatórios de faturamento e de compras (tela, PDF e Excel) por mês, cliente/fornecedor, produto, UF e CFOP, com devoluções, comparativo do ano anterior, ticket médio e curva ABC. Reforma tributária na Apuração: conferência da CBS/IBS das notas, simulador de 2027 e alíquotas por vigência com a proposta do TCU de 11,3% (SQL 072). |
+| 1.4 | 31/10/2026 | Notas de débito de juros e multa (finalidade 6, tipo 04): fila gerada pelos recebimentos com juros, rateio pelos itens da nota de origem, registro da emissão e juros recebidos pelo fundo como "a decidir" (SQL 074). |

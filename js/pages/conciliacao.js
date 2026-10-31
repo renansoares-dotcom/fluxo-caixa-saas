@@ -8,6 +8,7 @@ import { lerOFX, decodificarOFX } from '../lib/ofx.js';
 import { lerRelatorioERP } from '../lib/erp-extrato.js';
 import { lerVExpenses } from '../lib/vexpenses.js';
 import { normTxt } from '../lib/nf-titulos.js';
+import { PLANO_JUROS } from '../lib/notas-debito.js';
 
 export const title = 'Conciliação bancária';
 
@@ -374,8 +375,10 @@ function pintarSistema(root) {
     <div class="conc-foot" id="cf"></div>`;
   const rodape = () => {
     const sel = [...ui.marcados].map(id => D.lancById[id]).filter(Boolean); const tot = sel.reduce((s, l) => s + sinal(l), 0); const dif = Math.round((item.valor - tot) * 100) / 100;
+    // recebimento de um título acima da face: a diferença é juros/multa (reforma tributária: nota de débito)
+    const jurosOk = !multi && dif > 0 && item.valor > 0 && sel.length === 1 && sinal(sel[0]) > 0 && !!sel[0].documento && !sel[0].conta_destino_id && state.cad.contasPlano.some(p => p.codigo === PLANO_JUROS);
     $('#cf', c).innerHTML = `<div class="small">Extrato <strong>${money(item.valor)}</strong> · Selecionado <strong>${money(tot)}</strong> (${sel.length}) · Diferença <strong class="${dif ? 'neg' : 'pos'}">${money(dif)}</strong>${sel.some(l => l.status === 'Em aberto') ? ' · <span class="neg">títulos em aberto serão baixados</span>' : ''}</div>
-      ${podeEditar() ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="ign">Ignorar${multi ? ` (${sels.length})` : ''}</button>${multi ? '' : '<button class="btn small" id="cria">Criar lançamento</button>'}<button class="btn small primary" id="conc" ${sel.length && !dif ? '' : 'disabled'}>Conciliar${multi ? ` ${sels.length} × ${sel.length}` : ''}</button></div>` : ''}`;
+      ${podeEditar() ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="ign">Ignorar${multi ? ` (${sels.length})` : ''}</button>${multi ? '' : '<button class="btn small" id="cria">Criar lançamento</button>'}${jurosOk ? `<button class="btn small" id="cjur" title="Baixa o título pela face e lança a diferença em ${PLANO_JUROS} JUROS E MULTAS RECEBIDOS; a nota de débito entra na fila">Conciliar com ${money(dif)} de juros/multa</button>` : ''}<button class="btn small primary" id="conc" ${sel.length && !dif ? '' : 'disabled'}>Conciliar${multi ? ` ${sels.length} × ${sel.length}` : ''}</button></div>` : ''}`;
     // seleção que bate: linhas verdes nos dois lados
     const ok = sel.length > 0 && !dif;
     root.querySelectorAll('#ext tr[data-id]').forEach(tr => tr.classList.toggle('conc-ok', ok && ui.sels.has(tr.dataset.id)));
@@ -389,6 +392,15 @@ function pintarSistema(root) {
       multi ? conciliarGrupo(sels, [...ui.marcados], root) : conciliar([{ item, ids: [...ui.marcados] }], root);
     });
     $('#ign', c) && ($('#ign', c).onclick = () => ignorar(multi ? sels : [item], root));
+    $('#cjur', c) && ($('#cjur', c).onclick = async () => {
+      const t = sel[0], pj = state.cad.contasPlano.find(p => p.codigo === PLANO_JUROS);
+      if (!confirm(`Baixar o título ${t.documento} pela face (${money(t.valor)}) e lançar ${money(dif)} de juros/multa em ${PLANO_JUROS}?\n\nA nota de débito entra na fila de Fiscal › Notas de débito.`)) return;
+      try {
+        const novo = await q(sb.from('lancamentos').insert({ empresa_id: state.empresa.id, data: item.data, plano_id: pj.id, status: 'Pago', valor: dif, conta_id: ui.conta, favorecido_id: t.favorecido_id || null,
+          documento: t.documento, descricao: `Juros/multa recebidos — título ${t.documento}`, juros_de: t.id, origem: `juros:${item.id}` }).select('id').single());
+        await conciliar([{ item, ids: [t.id, novo.id] }], root);
+      } catch (e) { fail(e); }
+    });
     $('#cria', c) && ($('#cria', c).onclick = () => criar(item, root));
   };
   rodape();

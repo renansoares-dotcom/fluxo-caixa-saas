@@ -319,3 +319,13 @@ DB.log_carga_notas = DB.log_carga_notas || [];
     }
   }
 }
+// Notas de débito de juros/multa (fictícias)
+{ const ns = DB.nfe_notas.filter(n => n.emissao_propria && n.cfops && DB.nfe_itens.some(i => i.nota_id === n.id) && n.emissao >= '2026-09-01').slice(0, 4);
+  const mk = (n, k, o) => ({ id: id('nd'), empresa_id: E, origem: 'recebimento', nota_id: n.id, nf_numero: n.numero, parcela: 2, cliente_nome: n.dest_nome, cliente_doc: n.dest_doc, criado_em: '2026-10-20T10:00:00Z', ...o });
+  DB.fiscal_notas_debito = ns.length < 4 ? [] : [
+    mk(ns[0], 0, { data_recebimento: '2026-10-29', valor: 241.75, status: 'pendente' }),
+    mk(ns[1], 1, { data_recebimento: '2026-10-21', valor: 103.70, status: 'pendente' }),
+    mk(ns[2], 2, { origem: 'fidc', data_recebimento: '2026-10-05', valor: 161.19, status: 'a_decidir', motivo: 'Juros recebidos pelo fundo FUNDO ALFA (relatório de pagos): definir com a contabilidade' }),
+    mk(ns[3], 3, { data_recebimento: '2026-10-08', valor: 58.40, status: 'emitida', nd_numero: '4521', nd_serie: '1', emitida_em: '2026-10-08' }),
+  ];
+}

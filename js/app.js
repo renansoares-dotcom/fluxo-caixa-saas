@@ -50,6 +50,7 @@ const routes = {
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),
   'notas': () => import(`./pages/notas.js?v=${V}`),
   'fiscal/apuracao': () => import(`./pages/fiscal-apuracao.js?v=${V}`),
+  'fiscal/notas-debito': () => import(`./pages/fiscal-notas-debito.js?v=${V}`),
   'abertos': () => import(`./pages/abertos.js?v=${V}`),
   'creditos': () => import(`./pages/creditos.js?v=${V}`),
   'conta-fornecedor': () => import(`./pages/conta-fornecedor.js?v=${V}`),

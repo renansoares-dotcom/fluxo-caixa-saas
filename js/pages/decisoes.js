@@ -44,7 +44,8 @@ async function carregar() {
   })().catch(() => []) : [];
   const frota = await import(`./frota.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const cedida = await import(`./fidc-carteira.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida };
+  const ndeb = await import(`./fiscal-notas-debito.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb };
 }
 
 // ---------------------------------------------------------------- regras
@@ -159,6 +160,11 @@ function regras(D) {
       desc: D.contratos.slice(0, 5).map(x => `nº ${x.c.numero} ${x.c.parte_nome}: ${x.al.map(a => a.txt.toLowerCase()).join('; ')}`).join(' · ') + (D.contratos.length > 5 ? ` · e mais ${D.contratos.length - 5}` : ''),
       impacto: v, impactoTxt: `${money0(v)} por ano`, regra: 'Contratos vigentes vencendo em até 90 dias, com aviso prévio em até 30 dias ou com reajuste na data-base (até 30 dias) ou para aprovar.',
       acao: 'Abrir contratos', rota: 'contratos' }); }
+
+  // 16. notas de débito de juros/multa a emitir (reforma tributária)
+  for (const a of D.ndeb || []) out.push({ k: 'nota-debito', origem: 'Fiscal', urg: 'alta', titulo: 'Emitir as notas de débito de juros e multa recebidos',
+    desc: `${a.n} recebimento(s) com juros/multa (${money0(a.valor)}) ainda sem NF-e de débito${a.atrasadas ? `; ${a.atrasadas} há mais de 5 dias` : ''}. A nota de débito (finalidade 6, tipo 04) é emitida no dia do recebimento e referencia a nota de origem (LC 214/2025, art. 12, § 1º, II).`,
+    impacto: a.valor, impactoTxt: money0(a.valor), regra: 'Lançamentos em 1.02.17 JUROS E MULTAS RECEBIDOS sem nota de débito emitida.', acao: 'Abrir notas de débito', rota: 'fiscal/notas-debito' });
 
   // 15. títulos cedidos vencidos sem liquidação informada pelo fundo (risco de recompra)
   for (const a of D.cedida || []) out.push({ k: 'fidc-sem-liquidacao', origem: 'FIDC', urg: a.valor > 50000 ? 'alta' : 'media', titulo: 'Conferir títulos cedidos vencidos sem liquidação',

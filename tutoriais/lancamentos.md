@@ -1,8 +1,8 @@
 ---
 titulo: Lançamentos e contas a pagar / receber
 tela: Financeiro › Lançamentos e Contas a pagar / receber
-versao: 1.2
-atualizado: 2026-10-29
+versao: 1.3
+atualizado: 2026-10-31
 ---
 ## 1. Para que serve
 
@@ -51,7 +51,7 @@ O botão **Histórico** dentro do lançamento, que mostra quem alterou o quê, a
 
 > **Transferência entre contas:** escolha o plano de transferência. Aparecem os campos **De (conta de origem)** e **Para a conta (destino)**. A transferência é **um lançamento só**: sai de uma conta e entra na outra.
 
-> **Pago com atraso:** em lançamento **Pago** aparece o quadro **Juros e multa**. Juros, multa e desconto viram lançamentos separados, na mesma data e conta, e o valor do título continua o original.
+> **Pago com atraso:** em lançamento **Pago** aparece o quadro **Juros e multa**. Juros, multa e desconto viram lançamentos separados, na mesma data e conta, e o valor do título continua o original. Nos recebimentos, juros e multa recebidos (1.02.17) geram a **nota de débito** a emitir em **Fiscal › Notas de débito**.
 
 ### 3.3 Editar, duplicar e excluir
 
@@ -63,7 +63,7 @@ Para mudar vários de uma vez, marque as caixas na lista e use **Marcar como pag
 
 - **+ Lançar NFs**: lança títulos a receber por NF, à mão. Informe o cliente, a NF, a emissão e o valor, e clique em **Gerar parcelas** (por prazos em dias ou por nº de parcelas). Dá para juntar várias NFs antes de **Salvar títulos**.
 - **Importar XML das NFs**: escolha os XML das NF-e de venda (vários de uma vez, ou um .zip). Cada duplicata da nota vira um título em aberto a receber, com o vencimento e o documento NF-parcela. São ignoradas: nota de entrada, nota de outro CNPJ, não autorizada, cancelada e parcela já lançada.
-- **Importar do ERP**: use o relatório **RFLX036 — Extrato de Contas por Quebra por Conta Pagamento**, exportado em XLSX. Cada linha vira um lançamento **Pago** na conta do relatório, com o plano de contas pela "Conta Pagamento" do ERP e o favorecido pelo emitente. O que já existe (mesmo dia, valor e conta) é pulado, e o título em aberto da NF citada é baixado em vez de criar outro. Nada é gravado antes da sua revisão.
+- **Importar do ERP**: use o relatório **RFLX036 — Extrato de Contas por Quebra por Conta Pagamento**, exportado em XLSX. Cada linha vira um lançamento **Pago** na conta do relatório, com o plano de contas pela "Conta Pagamento" do ERP e o favorecido pelo emitente. O que já existe (mesmo dia, valor e conta) é pulado, e o título em aberto da NF citada é baixado em vez de criar outro. Recebimento acima do título vira **Baixar + juros**: o título baixa pela face e a diferença vai para 1.02.17, gerando a nota de débito (desmarque se for pagamento a maior). Nada é gravado antes da sua revisão.
 - **Exportar Excel**: baixa os lançamentos filtrados, com todas as colunas.
 
 ## 4. Contas a pagar / receber
@@ -130,3 +130,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.0 | 28/10/2026 | Primeira versão do manual: lançamentos, transferência única, juros e multa, importações (NFs, XML e ERP) e contas a pagar / receber com baixa em lote e borderô. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do lançamento (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.3 | 31/10/2026 | Juros e multa recebidos geram a nota de débito a emitir; Importar do ERP com a ação Baixar + juros. |

@@ -1,8 +1,8 @@
 ---
 titulo: Conciliação bancária
 tela: Financeiro › Conciliação bancária
-versao: 1.1
-atualizado: 2026-10-29
+versao: 1.2
+atualizado: 2026-10-31
 ---
 ## 1. Para que serve
 
@@ -57,6 +57,8 @@ Para juntar **vários movimentos com um ou vários lançamentos** (por exemplo, 
 
 Se as datas estiverem a mais de 2 dias uma da outra, a plataforma pede confirmação.
 
+**Recebimento com juros:** quando o extrato é maior que o título selecionado (um título a receber), aparece **Conciliar com R$ X de juros/multa**. O título é baixado pelo valor de face, a diferença vira lançamento em **1.02.17 JUROS E MULTAS RECEBIDOS** e a **nota de débito** entra na fila de **Fiscal › Notas de débito** (reforma tributária).
+
 ### 4.3 Quando não há lançamento
 
 - **Criar lançamento**: cria o lançamento a partir do movimento, já com a data, o valor e a conta.
@@ -100,3 +102,4 @@ Use os filtros **Pendentes / Conciliados / Ignorados / Todos** na lista do extra
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: importação OFX, ERP e VExpenses, sugestões, conciliação um a um e em grupo, ignorar, criar lançamento e desfazer. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 31/10/2026 | Conciliar recebimento com juros/multa: baixa pela face, lança a diferença em 1.02.17 e gera a nota de débito a emitir. |

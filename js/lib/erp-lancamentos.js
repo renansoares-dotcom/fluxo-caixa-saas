@@ -8,6 +8,7 @@ import { sb, state, q, fetchAll } from './data.js';
 import { $, esc, money, dateBR, options, fail, toast, modal } from './ui.js';
 import { lerRelatorioERP } from './erp-extrato.js';
 import { casarTitulo } from './casamento.js';
+import { separarJuros, PLANO_JUROS } from './notas-debito.js';
 
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -111,8 +112,11 @@ export function planejar(ctx) {
     if (p.plano?.tipo !== 'T') {
       const r = casarTitulo({ data: it.data, valor: v, entrada: cred, favorecido_id: p.favorecido?.id, documento: it.documento, texto: `${it.obs || ''} ${it.operacao || ''}` }, abertos, usadosAb);
       if (r && r.como !== 'maior') { usadosAb.add(r.titulo.id); p.aberto = r.titulo; p.acao = r.como === 'parcial' ? 'parcial' : 'baixar'; }
-      if (r?.aviso) p.avisos.push(r.aviso);
-      if (r?.como === 'maior') p.semMarcar = true;
+      if (r?.como === 'maior' && cred) {   // recebido acima da face: baixa pela face e a diferença vira juros/multa (1.02.17 → nota de débito)
+        usadosAb.add(r.titulo.id); p.aberto = r.titulo; p.acao = 'juros'; p.juros = separarJuros(r.titulo.valor, v).juros;
+        p.avisos.push(`baixa o título ${r.titulo.documento} pela face (${(+r.titulo.valor).toFixed(2)}) e lança ${p.juros.toFixed(2)} de juros/multa em ${PLANO_JUROS} — gera a nota de débito a emitir. Se foi pagamento a maior, desmarque.`);
+      } else if (r?.aviso) p.avisos.push(r.aviso);
+      if (r?.como === 'maior' && !cred) p.semMarcar = true;
     }
     if (p.acao === 'novo' && (!p.plano || (p.plano.tipo === 'T' && (!p.conta_id || !p.conta_destino_id)))) p.acao = 'pendente';
     return p;
@@ -131,7 +135,7 @@ function contaDoRelatorio(banco, contas, lembradas) {
   return cand.length === 1 ? cand[0].id : '';
 }
 
-const ACOES = { novo: ['Criar', 'pago'], baixar: ['Baixar título', 'conc'], parcial: ['Baixa parcial', 'conc'], existe: ['Já lançado', ''], pular: ['Fora', 'vencido'], pendente: ['Completar', 'aberto'] };
+const ACOES = { novo: ['Criar', 'pago'], baixar: ['Baixar título', 'conc'], parcial: ['Baixa parcial', 'conc'], juros: ['Baixar + juros', 'conc'], existe: ['Já lançado', ''], pular: ['Fora', 'vencido'], pendente: ['Completar', 'aberto'] };
 
 /** Abre o assistente. `onDone` recarrega a tela de lançamentos. */
 export function importarLancamentosERP(onDone = () => {}) {
@@ -167,10 +171,10 @@ export function importarLancamentosERP(onDone = () => {}) {
           ${p.aberto ? `<div class="muted">título ${dateBR(p.aberto.data)} ${esc(p.aberto.favorecido_nome || p.aberto.descricao || '')}</div>` : ''}
           ${p.avisos.map(a => `<div class="muted">⚠ ${esc(a)}</div>`).join('')}</td></tr>`).join('')}</tbody></table></div>`;
     const sel = props.filter(p => p.marcado);
-    $('#rod', m.el).textContent = `Criar ${sel.filter(p => p.acao === 'novo').length} · baixar ${sel.filter(p => p.acao === 'baixar').length} · parcial ${sel.filter(p => p.acao === 'parcial').length} · já lançados ${cont('existe')} · movimento a gravar ${money(sel.reduce((s, p) => s + (p.cred ? p.valor : -p.valor), 0))}`;
+    $('#rod', m.el).textContent = `Criar ${sel.filter(p => p.acao === 'novo').length} · baixar ${sel.filter(p => p.acao === 'baixar').length} · parcial ${sel.filter(p => p.acao === 'parcial').length} · com juros ${sel.filter(p => p.acao === 'juros').length} · já lançados ${cont('existe')} · movimento a gravar ${money(sel.reduce((s, p) => s + (p.cred ? p.valor : -p.valor), 0))}`;
     $('#ok', m.el).disabled = !sel.length || sel.some(p => !valido(p));
   }
-  const valido = (p) => ['baixar', 'parcial'].includes(p.acao) || (p.plano && (p.plano.tipo !== 'T' || (p.conta_id && p.conta_destino_id && p.conta_id !== p.conta_destino_id)));
+  const valido = (p) => ['baixar', 'parcial', 'juros'].includes(p.acao) || (p.plano && (p.plano.tipo !== 'T' || (p.conta_id && p.conta_destino_id && p.conta_id !== p.conta_destino_id)));
   function replanejar() {
     const mapa = lerLS().planos || {};
     const antes = new Map(props.map(p => [p.it.fitid, p]));
@@ -178,7 +182,7 @@ export function importarLancamentosERP(onDone = () => {}) {
     for (const p of props) {
       const a = antes.get(p.it.fitid);
       if (a && p.plano?.tipo === 'T' && a.outraManual) { if (p.cred) p.conta_id = a.conta_id; else p.conta_destino_id = a.conta_destino_id; p.outraManual = true; if (p.acao === 'pendente' && valido(p)) p.acao = 'novo'; }
-      p.marcado = a && a.marcadoManual != null ? a.marcadoManual : ['novo', 'baixar', 'parcial'].includes(p.acao) && !p.semMarcar;
+      p.marcado = a && a.marcadoManual != null ? a.marcadoManual : ['novo', 'baixar', 'parcial', 'juros'].includes(p.acao) && !p.semMarcar;
       if (a) p.marcadoManual = a.marcadoManual;
     }
     desenhar();
@@ -237,7 +241,7 @@ export function importarLancamentosERP(onDone = () => {}) {
   $('#ok', m.el).onclick = async () => {
     const btn = $('#ok', m.el); btn.disabled = true;
     const sel = props.filter(p => p.marcado && valido(p));
-    const novos = sel.filter(p => !['baixar', 'parcial'].includes(p.acao)).map(p => ({
+    const novos = sel.filter(p => !['baixar', 'parcial', 'juros'].includes(p.acao)).map(p => ({
       empresa_id: e, data: p.it.data, plano_id: p.plano.id, status: 'Pago', valor: p.valor,
       conta_id: p.conta_id, conta_destino_id: p.plano.tipo === 'T' ? p.conta_destino_id : null,
       descricao: (p.it.obs || p.it.operacao || '').slice(0, 500) || null, documento: p.it.documento || null,
@@ -252,6 +256,16 @@ export function importarLancamentosERP(onDone = () => {}) {
       let baixados = 0;
       for (const p of sel.filter(x => x.acao === 'baixar')) {
         await q(sb.from('lancamentos').update({ status: 'Pago', data: p.it.data, conta_id: contaId }).eq('id', p.aberto.id).eq('status', 'Em aberto'));
+        baixados++;
+      }
+      const pJuros = c.contasPlano.find(x => x.codigo === PLANO_JUROS);
+      for (const p of sel.filter(x => x.acao === 'juros')) {
+        if (!pJuros) throw new Error(`Cadastre a conta ${PLANO_JUROS} JUROS E MULTAS RECEBIDOS no plano de contas`);
+        const [ja1] = await q(sb.from('lancamentos').select('id').eq('empresa_id', e).eq('origem', p.it.fitid).limit(1));
+        if (ja1) continue;   // linha do ERP já gravada
+        await q(sb.from('lancamentos').update({ status: 'Pago', data: p.it.data, conta_id: contaId }).eq('id', p.aberto.id).eq('status', 'Em aberto'));
+        await q(sb.from('lancamentos').insert({ empresa_id: e, data: p.it.data, plano_id: pJuros.id, status: 'Pago', valor: p.juros, conta_id: contaId, favorecido_id: p.aberto.favorecido_id || p.favorecido?.id || null,
+          documento: p.aberto.documento, descricao: `Juros/multa recebidos — título ${p.aberto.documento}`, juros_de: p.aberto.id, origem: p.it.fitid }));
         baixados++;
       }
       for (const p of sel.filter(x => x.acao === 'parcial')) {
