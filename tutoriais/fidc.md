@@ -1,8 +1,8 @@
 ---
 titulo: FIDC — propostas de borderô e análise
 tela: Financeiro › Propostas de borderô e Análise FIDC
-versao: 1.2
-atualizado: 2026-10-29
+versao: 1.3
+atualizado: 2026-10-31
 ---
 ## 1. Para que serve
 
@@ -76,6 +76,8 @@ Em **Condições por grupo de sacados**, cadastre as taxas diferentes por grupo 
 
 ## 4. Análise FIDC
 
+![Figura 2 — Análise FIDC: custo e prazo por fundo (dados fictícios)](img/fidc-2.jpg)
+
 1. Escolha o **mês** e o **fundo**.
 2. O **Resumo executivo** mostra o valor de face antecipado, o custo total, a taxa do fundo a.m., o prazo cobrado, a coobrigação a vencer, as recompras, o maior sacado e a concentração (HHI).
 3. Os **Alertas** apontam:
@@ -122,3 +124,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.0 | 28/10/2026 | Primeira versão do manual: propostas de borderô (simulação, comparação entre fundos, verificações, aprovação, comparação com o borderô original e condições dos fundos) e análise FIDC. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** da proposta (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.3 | 31/10/2026 | Nova figura: análise fidc: custo e prazo por fundo. |

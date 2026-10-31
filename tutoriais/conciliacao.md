@@ -1,7 +1,7 @@
 ---
 titulo: Conciliação bancária
 tela: Financeiro › Conciliação bancária
-versao: 1.2
+versao: 1.3
 atualizado: 2026-10-31
 ---
 ## 1. Para que serve
@@ -48,6 +48,8 @@ Depois da importação, a plataforma sugere os vínculos:
 Clique em **Aceitar sugestões** para conciliar todas de uma vez. As marcadas **conferir** ficam de fora: há outro lançamento de mesmo valor e o histórico do banco não confirma qual é (por exemplo, saques e PIX de mesmo valor no mesmo dia). Confira essas uma a uma.
 
 ### 4.2 Um a um
+
+![Figura 2 — Movimento do extrato com os lançamentos candidatos (dados fictícios)](img/conciliacao-2.jpg)
 
 1. Clique num movimento do extrato (à esquerda). À direita aparecem os candidatos, com o mais provável no topo. Use os filtros (tipo, ordem, classificação, período, valor entre) para achar o lançamento.
 2. Marque o lançamento, ou os lançamentos, que correspondem ao movimento. O rodapé mostra o valor do extrato, o selecionado e a **diferença**. Quando a diferença é zero, as linhas ficam verdes.
@@ -103,3 +105,4 @@ Use os filtros **Pendentes / Conciliados / Ignorados / Todos** na lista do extra
 | 1.0 | 28/10/2026 | Primeira versão do manual: importação OFX, ERP e VExpenses, sugestões, conciliação um a um e em grupo, ignorar, criar lançamento e desfazer. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 31/10/2026 | Conciliar recebimento com juros/multa: baixa pela face, lança a diferença em 1.02.17 e gera a nota de débito a emitir. |
+| 1.3 | 31/10/2026 | Nova figura: movimento do extrato com os lançamentos candidatos. |

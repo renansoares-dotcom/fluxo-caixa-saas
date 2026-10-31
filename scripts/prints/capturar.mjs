@@ -11,7 +11,7 @@ const cont = {};
 for (const [m, rota, , leg, aba] of FIGS) {
   const n = cont[m] = (cont[m] || 0) + 1; if (so && !so.includes(m)) continue;
   await p.evaluate((r) => { document.querySelectorAll('.modal-back').forEach(m => m.remove()); location.hash = '#/x'; setTimeout(() => { location.hash = '#/' + r; }, 50); }, rota); await p.waitForTimeout(2000);
-  if (aba) { const [a1, rol] = aba.split('|scroll:'); await p.click(a1.startsWith('click:') ? a1.slice(6) : `[data-a="${a1}"]`); await p.waitForTimeout(800); if (rol) { await p.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'start' }), rol); await p.waitForTimeout(300); } }
+  if (aba) { const [a1, rol] = aba.startsWith('scroll:') ? ['', aba.slice(7)] : aba.split('|scroll:'); if (a1) await p.click(a1.startsWith('click:') ? a1.slice(6) : `[data-a="${a1}"]`); await p.waitForTimeout(800); if (rol) { await p.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'start' }), rol); await p.waitForTimeout(300); } }
   await p.evaluate(() => { document.querySelectorAll('#toast-root > *').forEach(t => t.remove()); scrollTo(0, 0); });
   await p.screenshot({ path: `${OUT}${m}-${n}.jpg`, type: 'jpeg', quality: 80 });
   console.log(`${m}-${n}.jpg  ${leg}`);

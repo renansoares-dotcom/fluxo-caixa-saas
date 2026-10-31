@@ -329,3 +329,20 @@ DB.log_carga_notas = DB.log_carga_notas || [];
     mk(ns[3], 3, { data_recebimento: '2026-10-08', valor: 58.40, status: 'emitida', nd_numero: '4521', nd_serie: '1', emitida_em: '2026-10-08' }),
   ];
 }
+// Base FIDC (operações dos borderôs fictícios), CDI e posição de estoque — para Análise FIDC e Posição de estoque
+{ const ops = {};
+  for (const t of DB.fidc_titulos || []) {
+    const k = t.fundo + '|' + t.bordero;
+    const o = ops[k] || (ops[k] = { id: id('fo'), empresa_id: E, fundo: t.fundo, data: t.data_operacao, bordero: t.bordero, conta_id: DB.contas[0].id, qtd_titulos: 0, valor_face: 0, prazoV: 0 });
+    o.qtd_titulos++; o.valor_face += +t.valor; o.prazoV += +t.valor * Math.round((Date.parse(t.vencimento) - Date.parse(t.data_operacao)) / 864e5); t.operacao_id = o.id; t.sacado_agrupado = t.sacado;
+  }
+  DB.fidc_operacoes = Object.values(ops).map(o => { const pm = Math.round(o.prazoV / o.valor_face * 100) / 100, taxa = o.fundo === 'FUNDO ALFA' ? 0.021 : 0.0245, des = Math.round(o.valor_face * taxa * pm / 30 * 100) / 100, tar = 20 + o.qtd_titulos * 4.5;
+    const { prazoV, ...r } = o; return { ...r, valor_face: Math.round(o.valor_face * 100) / 100, desagio: des, ad_valorem: 0, tarifas: tar, iof: 0, encargos: 0, recompra: 0, desc_sacado: 0, liquido: Math.round((o.valor_face - des - tar) * 100) / 100, prazo_medio: pm, prazo_cobrado: pm, custo_total: Math.round((des + tar) * 100) / 100 }; });
+  DB.indices_mensais = [1.01, 0.99, 0.96, 1.05, 1.14, 1.10, 1.28, 1.16, 1.22, 1.25].map((cdi, i) => ({ id: id('ix'), empresa_id: E, ano: 2026, mes: i + 1, cdi }));
+  const esp = (data, f) => { const e = { id: id('es'), empresa_id: E, data_ref: data, arquivo: `posicao_${data}.xlsx`, linhas: DB.produtos.length, criado_em: data + 'T08:00:00Z' }; DB.estoque_espelhos.push(e);
+    DB.produtos.forEach((p, k) => DB.estoque_espelho_itens.push({ id: id('ei'), empresa_id: E, espelho_id: e.id, produto_id: p.id, codigo: p.codigo, descricao: p.descricao, deposito: 'GERAL', unidade: p.unidade, quantidade: f[k], custo_unitario: [11.8, 13.4, 8.9, 21.5][k], valor: Math.round(f[k] * [11.8, 13.4, 8.9, 21.5][k] * 100) / 100 })); };
+  DB.estoque_espelhos = []; DB.estoque_espelho_itens = [];
+  esp('2026-10-15', [6200, 3900, 18400, 950]); esp('2026-10-29', [4800, 2650, 9300, 420]);
+  DB.produtos.forEach((p, k) => { p.ponto_pedido = [3000, 3000, 12000, 600][k]; });
+  DB.estoque_parametros = [{ empresa_id: E, metodo_custo: 'ultima_compra' }];
+}

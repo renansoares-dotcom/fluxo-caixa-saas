@@ -1,8 +1,8 @@
 ---
 titulo: Indicadores de logística
 tela: Logística › Indicadores
-versao: 1.0
-atualizado: 2026-10-30
+versao: 1.1
+atualizado: 2026-10-31
 ---
 ## 1. Para que serve
 
@@ -42,6 +42,8 @@ Quem vê a logística vê os indicadores. As **metas** são ajustadas por quem e
 
 ## 5. Ajustar as metas
 
+![Figura 2 — Metas dos indicadores (dados fictícios)](img/logistica-indicadores-2.jpg)
+
 1. Clique em **Metas**.
 2. Informe: entregas no prazo (mínimo), ocupação por peso (mínimo), custo sobre as notas entregues (máximo) e não entregues e devoluções (máximo).
 3. Clique em **Salvar**. As cores mudam na hora para todos os usuários.
@@ -60,3 +62,4 @@ Metas iniciais: entregas no prazo ≥ 95%, ocupação ≥ 80%, custo logístico 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 30/10/2026 | Primeira versão: nível de serviço, eficiência das cargas, custo logístico e frota, com metas e tendência de 6 meses. |
+| 1.1 | 31/10/2026 | Nova figura: metas dos indicadores. |

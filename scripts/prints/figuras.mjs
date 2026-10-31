@@ -31,4 +31,9 @@ export const FIGS = [
   ['contratos', 'contratos', '## 3.', 'Contratos vigentes com os alertas'], ['contratos', 'contratos', '## 4.', 'Ficha do contrato: documentos, parcelas e reajuste', 'click:tr[data-id]:nth-child(4)|scroll:#k-extra'], ['contratos', 'contratos', '## 5.', 'Minuta para assinatura com os campos do modelo', 'click:tr[data-id]:nth-child(3)|scroll:#k-min'],
   ['cadastros', 'cadastros/plano', '## 3.', 'Plano de contas'], ['cadastros', 'cadastros/contas', '## 4.', 'Contas bancárias'],
   ['empresa-usuarios', 'config', '## 3.', 'Dados da empresa e usuários'], ['empresa-usuarios', 'auditoria', '## 7.', 'Auditoria'],
+  // 2ª figura dos manuais que tinham uma só (31/10/2026)
+  ['fidc', 'fidc', '## 4.', 'Análise FIDC: custo e prazo por fundo'],
+  ['estoque', 'estoque', '## 3.', 'Posição de estoque com o ponto de pedido'],
+  ['logistica-indicadores', 'logistica/indicadores', '## 5.', 'Metas dos indicadores', 'click:#li-metas'],
+  ['conciliacao', 'conciliacao', '### 4.2', 'Movimento do extrato com os lançamentos candidatos', 'click:#ext tr[data-id]'],
 ];
