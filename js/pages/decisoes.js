@@ -43,7 +43,8 @@ async function carregar() {
     return C.map(c => ({ c, al: K.alertas(c, A.filter(a => a.contrato_id === c.id), R.filter(r => r.contrato_id === c.id), hoje).filter(a => a.nivel !== 'info'), mensal: K.valorMensal(c) })).filter(x => x.al.length);
   })().catch(() => []) : [];
   const frota = await import(`./frota.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota };
+  const cedida = await import(`./fidc-carteira.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida };
 }
 
 // ---------------------------------------------------------------- regras
@@ -158,6 +159,11 @@ function regras(D) {
       desc: D.contratos.slice(0, 5).map(x => `nº ${x.c.numero} ${x.c.parte_nome}: ${x.al.map(a => a.txt.toLowerCase()).join('; ')}`).join(' · ') + (D.contratos.length > 5 ? ` · e mais ${D.contratos.length - 5}` : ''),
       impacto: v, impactoTxt: `${money0(v)} por ano`, regra: 'Contratos vigentes vencendo em até 90 dias, com aviso prévio em até 30 dias ou com reajuste na data-base (até 30 dias) ou para aprovar.',
       acao: 'Abrir contratos', rota: 'contratos' }); }
+
+  // 15. títulos cedidos vencidos sem liquidação informada pelo fundo (risco de recompra)
+  for (const a of D.cedida || []) out.push({ k: 'fidc-sem-liquidacao', origem: 'FIDC', urg: a.valor > 50000 ? 'alta' : 'media', titulo: 'Conferir títulos cedidos vencidos sem liquidação',
+    desc: `${a.n} título(s) cedidos a ${a.fundos.join(', ')} venceram e o relatório de pagos do fundo, que já vai mais de 3 dias úteis além do vencimento, não trouxe o pagamento (${money0(a.valor)}). Maiores: ${a.maiores.map(i => `${i.titulo} ${i.sacado || ''} ${money0(i.valor)}`).join(' · ')}. Importe o relatório de pagos do fundo ou cobre o cliente antes da recompra.`,
+    impacto: a.valor, impactoTxt: money0(a.valor), regra: 'Títulos da base FIDC sem liquidação no relatório de pagos do fundo, quando o relatório cobre o vencimento + 3 dias úteis. Fundos sem relatório importado não entram.', acao: 'Abrir carteira cedida', rota: 'fidc-carteira' });
 
   // 14. frota: documentos, preventivas, motoristas e multas
   const fr = (D.frota || []).filter(a => a.nivel === 'neg' || a.nivel === 'warn');

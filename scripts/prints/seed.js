@@ -305,3 +305,17 @@ DB.log_carga_notas = DB.log_carga_notas || [];
   if (set[3]) { set[3].v_cbs = r2(set[3].v_cbs * 0.4); set[3].v_ibs = r2(set[3].v_ibs * 0.4); DB.nfe_itens.filter(i => i.nota_id === set[3].id).forEach(i => { i.cst_ibscbs = '200'; i.cclass_trib = '200034'; }); }
   DB.trib_aliquotas = [];
 }
+// Carteira cedida: títulos cedidos a dois fundos fictícios e o relatório de pagos de um deles
+{ const CL = ['SUPERMERCADOS BOA COMPRA LTDA', 'DISTRIBUIDORA NORDESTE LTDA', 'ATACADO SERTÃO LTDA', 'FARMÁCIAS SAÚDE MAIS S.A.', 'MERCADINHO SÃO JOSÉ LTDA'];
+  DB.fidc_titulos = []; DB.fidc_liquidacoes = []; let nf = 8000, b = 900;
+  for (const fundo of ['FUNDO ALFA', 'FUNDO BETA']) for (let k = 0; k < 16; k++) {
+    const dop = dia('2026-08-03', k * 5), bord = String(b++);
+    for (let p = 1; p <= 3; p++) {
+      const venc = dia(dop, 21 * p + (k % 3)), v = Math.round((4200 + ((k * 37 + p * 11) % 9) * 950) * 100) / 100, t = { id: id('ft'), empresa_id: E, fundo, bordero: bord, data_operacao: dop, titulo: `${nf}-00${p}`, vencimento: venc, valor: v, sacado: CL[(k + p) % 5] };
+      DB.fidc_titulos.push(t);
+      if (fundo === 'FUNDO ALFA' && venc <= '2026-10-22' && !(k === 5 && p === 2) && !(k === 9 && p === 1))
+        DB.fidc_liquidacoes.push({ id: id('fl'), empresa_id: E, fundo, titulo: t.titulo, bordero: bord, fidc_titulo_id: t.id, vencimento: venc, quitacao: k === 3 && p === 3 ? dia(venc, 2) : venc, sacado: t.sacado, valor_face: v, desconto: 0, mora: 0, valor_pago: v, tipo: k === 3 && p === 3 ? 'recompra' : 'normal', tipo_fundo: k === 3 && p === 3 ? 'RECOMPRA' : 'NORMAL' });
+      nf++;
+    }
+  }
+}

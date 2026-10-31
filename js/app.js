@@ -73,6 +73,7 @@ const routes = {
   'controle-orcamento': () => import(`./pages/controle-orcamento.js?v=${V}`),
   'fidc': () => import(`./pages/fidc.js?v=${V}`),
   'fidc-propostas': () => import(`./pages/fidc-propostas.js?v=${V}`),
+  'fidc-carteira': () => import(`./pages/fidc-carteira.js?v=${V}`),
   'duplicatas': () => import(`./pages/duplicatas.js?v=${V}`),
   'cadastros/plano': () => import(`./pages/cad-plano.js?v=${V}`),
   'cadastros/contas': () => import(`./pages/cad-contas.js?v=${V}`),

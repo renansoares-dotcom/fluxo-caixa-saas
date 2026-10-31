@@ -26,6 +26,8 @@ export const MANUAIS = [
     resumo: 'Lançar o budget e o forecast, comparar com o realizado, semáforo, justificativas e rateio por centro de custo.' },
   { id: 'fidc', titulo: 'FIDC — propostas de borderô e análise', area: 'Financeiro', rotas: ['fidc', 'fidc-propostas'],
     resumo: 'Simular o borderô, comparar fundos, enviar ao diretor, comparar com o original e analisar custos.' },
+  { id: 'fidc-carteira', titulo: 'Carteira cedida — liquidação dos títulos nos fundos', area: 'Financeiro', rotas: ['fidc-carteira'],
+    resumo: 'Acompanhar os títulos cedidos até o cliente pagar o fundo, importar o relatório de pagos e ver o risco de recompra.' },
   { id: 'duplicatas', titulo: 'Duplicatas para endosso', area: 'Financeiro', rotas: ['duplicatas'],
     resumo: 'Montar as duplicatas e o endosso, gerar o PDF para assinatura digital e cancelar com termo.' },
   { id: 'comercial', titulo: 'Comercial — painel, carteira, funil e metas', area: 'Comercial', rotas: ['comercial', 'comercial/carteira', 'comercial/funil', 'comercial/vendedores'],

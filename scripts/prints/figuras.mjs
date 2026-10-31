@@ -11,6 +11,7 @@ export const FIGS = [
   ['fluxo-caixa', 'fluxo-mensal', '## 3.', 'Fluxo de caixa mensal'], ['fluxo-caixa', 'necessidade-caixa', '## 4.', 'Necessidade de caixa por semana'],
   ['orcamento', 'orcado-realizado', '## 4.', 'Orçado x Realizado'], ['orcamento', 'controle-orcamento', '## 5.', 'Controle orçamentário'],
   ['fidc', 'fidc-propostas', '## 3.', 'Títulos disponíveis para a proposta de borderô'],
+  ['fidc-carteira', 'fidc-carteira', '## 3.', 'Carteira cedida por fundo, com os títulos vencidos sem liquidação'],
   ['duplicatas', 'duplicatas', '## 3.', 'Duplicatas para endosso'],
   ['comercial', 'comercial', '## 3.', 'Painel comercial'], ['comercial', 'comercial/carteira', '## 4.', 'Carteira de clientes'], ['comercial', 'comercial/funil', '## 5.', 'Funil de oportunidades'],
   ['compras', 'compras', '## 3.', 'Painel de Compras'], ['compras', 'compras/pedidos', '### 4.5', 'Pedidos de compra'],
