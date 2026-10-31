@@ -115,7 +115,7 @@ function importar(root) {
     try {
       const txt = await lerArquivo(file);
       if (!L.reconhece(txt)) throw new Error(`O arquivo não parece o relatório de pagos da ${fundo}.`);
-      const linhas = L.ler(txt); if (!linhas.length) throw new Error('Nenhum título encontrado no arquivo.');
+      const linhas = L.ler(txt, { cnpjCedente: String(state.empresa.cnpj || '').replace(/\D/g, '') }); if (!linhas.length) throw new Error('Nenhum título encontrado no arquivo.');
       const cs = casar(linhas, B.tit.filter(t => t.fundo === fundo));
       const ja = new Set(B.liq.filter(l => l.fundo === fundo).map(l => `${l.titulo}|${l.bordero}`));
       const novos = cs.linhas.filter(l => !ja.has(`${l.titulo}|${l.bordero}`));

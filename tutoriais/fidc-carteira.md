@@ -1,7 +1,7 @@
 ---
 titulo: Carteira cedida — liquidação dos títulos nos fundos
 tela: Financeiro › Crédito / FIDC › Carteira cedida
-versao: 1.0
+versao: 1.1
 atualizado: 2026-10-30
 ---
 ## 1. Para que serve
@@ -36,7 +36,9 @@ Todos os usuários da empresa consultam. O administrador e o financeiro importam
 
 ## 4. Importar o relatório de pagos do fundo
 
-1. Tire no site do fundo o relatório de títulos pagos (na Negocial: **Consulta de títulos pagos**, PDF "PAGOS - ANALÍTICO"). Pode ser o ano inteiro.
+1. Tire no site do fundo o relatório de títulos pagos. Pode ser o ano inteiro.
+   - **Negocial:** Consulta de títulos pagos, PDF "PAGOS - ANALÍTICO".
+   - **Contato:** Títulos Liquidados (CONTROLE FIDC), em PDF.
 2. Clique em **Importar relatório de pagos**, escolha o **fundo** e o arquivo.
 3. A plataforma mostra:
    - o período e o total pago;
@@ -47,7 +49,20 @@ Todos os usuários da empresa consultam. O administrador e o financeiro importam
    - os títulos com valor diferente do borderô.
 4. Clique em **Importar**. Reimportar o mesmo relatório atualiza as linhas, sem duplicar.
 
-> **Fundos:** o leitor da **Negocial** está pronto. Os de FS, Contato e Vector entram quando chegarem os exemplos dos relatórios de cada um.
+> **Fundos:** os leitores da **Negocial** e da **Contato** estão prontos. Os da FS e da Vector entram quando chegarem os exemplos dos relatórios de cada um.
+
+Como a plataforma entende cada tipo de baixa:
+
+| Fundo | No relatório | Na plataforma |
+|---|---|---|
+| Negocial | NORMAL | Pago pelo cliente |
+| Negocial | DEPÓSITO SACADO | Depósito do cliente |
+| Negocial | RECOMPRA | Recomprado |
+| Contato | LIQ BANCO BOLETO, PGTO EM CARTORIO | Pago pelo cliente |
+| Contato | PGTO BORDERO TITULO, BAIXA NAO COMISSIONADO | Recomprado (descontado num borderô) |
+| Contato | Documento com o CNPJ da empresa (NC…, acordos) | Recomprado; cada pagamento parcial fica separado, pela data |
+
+O relatório da Contato não traz o borderô: o título é ligado pela nota e parcela, na cessão mais recente antes do pagamento.
 
 ## 5. O que fazer com os vencidos sem liquidação
 
@@ -69,3 +84,4 @@ Todos os usuários da empresa consultam. O administrador e o financeiro importam
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 30/10/2026 | Primeira versão: carteira cedida por fundo, situação de cada título, importação do relatório de pagos da Negocial e alerta no Decision Center (SQL 073). |
+| 1.1 | 30/10/2026 | Leitor do relatório de títulos liquidados da Contato; tabela dos tipos de baixa de cada fundo. |

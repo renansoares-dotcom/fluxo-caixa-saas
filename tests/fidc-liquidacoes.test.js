@@ -51,3 +51,35 @@ test('situação do título cedido e coobrigação', () => {
   assert.equal(C.fundos.find(f => f.fundo === 'F1').cobertura, '2026-10-27');
   assert.equal(L.tipoDe('Liquidação por depósito'), 'deposito_sacado');
 });
+
+const CONT = `CONTATO FIDC                                                     CONTROLE FIDC
+                                            Títulos Liquidados
+Documento   Venc.   CPF/CNPJ          Sacado             Orig.        Encargos Desc.    Vlr.Pago Tp.    Dt Liqu      Tp de Baixa    C.S. Fl
+EMPRESA EXEMPLO
+10001-4     01/10/26 11222333000181   CLIENTE ALFA LTD    15,560.74       0.00   0.00   15,560.74   D   01/10/26     LIQ BANCO           31
+                                                                                                                       BOLETO
+10002-1     01/10/26 22333444000105   CLIENTE BETA LTD     3,111.00     103.70   0.00    3,214.70   D   05/10/26     LIQ BANCO           31
+                                                                                                                       BOLETO
+10003       26/10/26 33444555000110   CLIENTE GAMA LTD    39,370.00       0.00   0.00   39,370.00   D   20/10/26     BAIXA NAO         31
+                                                                                                                     COMISSIONADO
+NC9-15      26/05/26 11222333000999   EMPRESA EXEMPLO     30,000.00     487.23   0.00    5,000.00   D   21/10/26   PGTO BORDERO        31
+                                                                                                                         TITULO
+NC9-15      26/05/26 11222333000999   EMPRESA EXEMPLO     30,000.00     490.36   0.00    5,000.00   D   22/10/26   PGTO BORDERO        31
+                                                                                                                         TITULO
+                                                        118,041.74   1,081.29   0.00   68,145.44
+Total                                                   118,041.74   1,081.29   0.00   68,145.44`;
+
+test('lê o relatório de liquidados da Contato e casa sem borderô', () => {
+  assert.ok(L.LEITORES.Contato.reconhece(CONT)); assert.ok(!L.LEITORES.Negocial.reconhece(CONT));
+  const r = L.LEITORES.Contato.ler(CONT, { cnpjCedente: '11222333000999' });
+  assert.equal(r.length, 5);
+  assert.equal(r.reduce((s, x) => s + x.valor_pago, 0).toFixed(2), '68145.44');
+  assert.deepEqual(r.map(x => x.tipo), ['normal', 'normal', 'recompra', 'recompra', 'recompra']);
+  assert.deepEqual(r[1], { titulo: '10002-1', bordero: '', vencimento: '2026-10-01', quitacao: '2026-10-05', sacado: 'CLIENTE BETA LTD', cnpj_sacado: '22333444000105',
+    valor_face: 3111, mora: 103.7, desconto: 0, valor_pago: 3214.7, tipo_fundo: 'LIQ BANCO BOLETO', tipo: 'normal' });
+  assert.deepEqual(r.slice(3).map(x => x.bordero), ['pgto 21/10/2026', 'pgto 22/10/2026']);   // pagamentos parciais do acordo ficam separados
+  const tit = [{ id: 'v', titulo: '10001-4', bordero: '400', data_operacao: '2026-08-14', valor: 15560.74 }, { id: 'n', titulo: '10001-4', bordero: '500', data_operacao: '2026-11-01', valor: 15560.74 },
+    { id: 'g', titulo: '10003', bordero: '450', data_operacao: '2026-09-25', valor: 39370 }];
+  const c = L.casar(r, tit);
+  assert.deepEqual(c.linhas.map(l => l.fidc_titulo_id), ['v', null, 'g', null, null]);   // cessão mais recente antes do pagamento
+});

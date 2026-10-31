@@ -40,8 +40,41 @@ export function parseNegocial(texto) {
   return out;
 }
 
+/**
+ * Contato — "Títulos Liquidados" (CONTROLE FIDC, Reporting Services). Valores no formato 15,560.74 e datas dd/mm/aa; sem borderô.
+ * Linha: Documento | Venc. | CPF/CNPJ | Sacado | Orig. | Encargos | Desc. | Vlr.Pago | Tp. | Dt Liqu | Tp de Baixa (quebra em 2 linhas) | C.S. Fl
+ * Tipos de baixa: LIQ BANCO BOLETO e PGTO EM CARTORIO = cliente pagou; PGTO BORDERO TITULO e BAIXA NAO COMISSIONADO = recompra
+ * descontada no borderô; documento com o CNPJ da cedente (NC…, acordos) = recompra. Pagamentos parciais do mesmo documento
+ * (acordos NC) ficam um por data: o borderô da chave recebe "pgto dd/mm/aaaa".
+ */
+const usd = (s) => parseFloat(String(s).replace(/,/g, '')) || 0;
+const iso2 = (s) => { const [d, m, a] = s.split('/'); return `${a.length === 2 ? '20' + a : a}-${m}-${d}`; };
+const RX_CONT = /^\s*(\S+(?: \S+)?)\s+(\d\d\/\d\d\/\d\d)\s+(\d{11,14})\s+(.+?)\s+([\d,]+\.\d\d)\s+([\d,]+\.\d\d)\s+([\d,]+\.\d\d)\s+([\d,]+\.\d\d)\s+([A-Z])\s+(\d\d\/\d\d\/\d\d)\s+(.+?)\s+(\d+)\s*$/;
+export function tipoContato(baixa, cnpj, cnpjCedente) {
+  const t = String(baixa || '').toUpperCase();
+  if (cnpjCedente && cnpj === cnpjCedente) return 'recompra';
+  if (/BORDERO|NAO COMISSIONADO|RECOMPRA/.test(t)) return 'recompra';
+  if (/VINCULAD|DEPOSITO/.test(t)) return 'deposito_sacado';
+  if (/LIQ|BOLETO|CARTORIO|PGTO|PAGAMENTO/.test(t)) return 'normal';
+  return 'outro';
+}
+export function parseContato(texto, { cnpjCedente = '' } = {}) {
+  const L = String(texto).split(/\r?\n/), out = [];
+  for (let i = 0; i < L.length; i++) {
+    const m = L[i].match(RX_CONT); if (!m) continue;
+    const cont = (L[i + 1] || '').trim();
+    const baixa = (m[11] + (/^[A-ZÇÃÁÉÍÓÚ ]+$/.test(cont) && cont ? ' ' + cont : '')).replace(/\s+/g, ' ').trim();
+    const cnpj = m[3], cedente = cnpjCedente && cnpj === cnpjCedente.replace(/\D/g, '');
+    const quit = iso2(m[10]);
+    out.push({ titulo: m[1].trim(), bordero: cedente || /^NC/i.test(m[1]) ? `pgto ${m[10].replace(/(\d\d)$/, '20$1')}` : '', vencimento: iso2(m[2]), quitacao: quit, sacado: m[4].trim(), cnpj_sacado: cnpj,
+      valor_face: usd(m[5]), mora: usd(m[6]), desconto: usd(m[7]), valor_pago: usd(m[8]), tipo_fundo: baixa, tipo: cedente || /^NC/i.test(m[1]) ? 'recompra' : tipoContato(baixa) });
+  }
+  return out;
+}
+
 export const LEITORES = {
   Negocial: { nome: 'Negocial — Consulta de títulos pagos (PDF "PAGOS - ANALÍTICO")', ler: parseNegocial, reconhece: (t) => /PAGOS\s*-\s*ANAL[IÍ]TICO/i.test(t) },
+  Contato: { nome: 'Contato — Títulos Liquidados (PDF "CONTROLE FIDC")', ler: (t, o) => parseContato(t, o), reconhece: (t) => /T[ií]tulos\s+Liquidados/i.test(t) && /CONTATO/i.test(t) },
 };
 
 /** título da plataforma é o mesmo do fundo? (36479-001 = 36479-1 = 36479/1) */
@@ -54,8 +87,13 @@ export const chaveTitulo = (t) => { const m = String(t || '').match(/^(\d+)\s*[-
 export function casar(linhas, titulos) {
   const por = new Map();
   for (const t of titulos) { const k = `${chaveTitulo(t.titulo)}|${String(t.bordero || '').replace(/^0+/, '')}`; (por.get(k) || por.set(k, []).get(k)).push(t); }
+  const porChave = new Map();
+  for (const t of titulos) { const k = chaveTitulo(t.titulo); (porChave.get(k) || porChave.set(k, []).get(k)).push(t); }
   const res = linhas.map(l => {
-    const c = por.get(`${chaveTitulo(l.titulo)}|${String(l.bordero || '').replace(/^0+/, '')}`) || [];
+    let c;
+    if (l.bordero && !/^pgto /.test(l.bordero)) c = por.get(`${chaveTitulo(l.titulo)}|${String(l.bordero).replace(/^0+/, '')}`) || [];
+    else if (/^pgto /.test(l.bordero || '')) c = [];   // pagamento de acordo/nota de crédito: não é título da base
+    else c = (porChave.get(chaveTitulo(l.titulo)) || []).filter(x => !x.data_operacao || x.data_operacao <= l.quitacao).sort((a, b) => String(b.data_operacao || '').localeCompare(String(a.data_operacao || '')));   // sem borderô no relatório: a cessão mais recente antes do pagamento
     const t = c.find(x => Math.abs(+x.valor - l.valor_face) < 0.01) || c[0];
     return { ...l, fidc_titulo_id: t?.id || null, aviso: !t ? 'sem título na base (borderô fora da base)' : Math.abs(+t.valor - l.valor_face) >= 0.01 ? `face na base ${r2(+t.valor)}` : null };
   });
