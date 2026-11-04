@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
       const end = { Bairro: 'INDIANOPOLIS', CEP: '55024740', CodigoMunicipio: 2604106, Rua: 'AV ADJAR DA SILVA CASE', Numero: '800' };
       passo('Gravar proprietário', await chamar('/Services/proprietarios/gravarV2', 'POST', { ...I, Versao: 4, CNPJ: T.cnpj, Endereco: end, RNTRC: T.rntrc, RazaoSocial: 'TRANSPORTADOR TESTE HOMOLOGACAO' }));
       passo('Gravar veículo', await chamar('/Services/veiculos/gravar', 'POST', { ...I, Versao: 1, Veiculo: { Chassi: '9BM384078KB123456', NumeroDeEixos: 2, Placa: T.placa, RNTRC: Number(T.rntrc), Renavam: 12345678901, TipoCarroceria: 'FechadaOuBau', TipoRodado: 'Toco' } }));
-      passo('Gravar motorista', await chamar('/Services/motoristas/gravar', 'POST', { ...I, Versao: 2, CNH: 12345678900, CPF: 11144477735, DataNascimento: '1985-06-15T00:00:00', Endereco: end, Nome: 'MOTORISTA TESTE HOMOLOGACAO', Telefones: { Celular: { DDD: 81, Numero: 999999999 } } }));
+      passo('Gravar motorista', await chamar('/Services/motoristas/gravar', 'POST', { ...I, Versao: 2, CNH: 12345678900, CPF: 11144477735, DataNascimento: '1985-06-15T00:00:00', Endereco: end, Nome: 'MOTORISTA TESTE HOMOLOGACAO', Telefones: { Celular: { DDD: 81, Numero: 987654321 } } }));
       // viagem Caruaru → Recife começando daqui a 1 hora (a data de início não pode ser anterior ao registro)
       const iso = (d: Date) => new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 19);
       const ini = new Date(Date.now() + 3600e3), fim = new Date(Date.now() + 26 * 3600e3);
@@ -209,19 +209,20 @@ Deno.serve(async (req) => {
       const op = {
         ...I, Versao: 8, TipoViagem: 'Padrao', MatrizCNPJ: cnpj, IdOperacaoCliente: id,
         DataInicioViagem: iso(ini), DataFimViagem: iso(fim), CodigoNCMNaturezaCarga: '3923', PesoCarga: 5000.0,
-        Viagens: {
+        // a API espera listas (o exemplo do manual mostra objeto, mas o servidor exige array)
+        Viagens: [{
           DocumentoViagem: 'TESTE-1', CodigoMunicipioOrigem: 2604106, CodigoMunicipioDestino: 2611606, DistanciaPercorrida: 140,
           LatitudeOrigem: '-8.2845', LongitudeOrigem: '-35.9699', LatitudeDestino: '-8.0467', LongitudeDestino: '-34.8771',
           Valores: { TotalOperacao: valor, TotalViagem: valor, TotalDeAdiantamento: 0, TotalDeQuitacao: valor, Combustivel: 0, Pedagio: 0, Seguro: 0 },
           TipoPagamento: 'eFRETE',
-          NotasFiscais: { NotaFiscal: [{ Numero: '1', Serie: '1', ValorTotal: 30000.0, ValorDaMercadoriaPorUnidade: 6.0, CodigoNCMNaturezaCarga: '3923',
-            UnidadeDeMedidaDaMercadoria: 'Kg', TipoDeCalculo: 'SemQuebra', QuantidadeDaMercadoriaNoEmbarque: 5000, ToleranciaDePerdaDeMercadoria: { Tipo: 'Nenhum', Valor: 0 } }] },
-        },
+          NotasFiscais: [{ Numero: '1', Serie: '1', ValorTotal: 30000.0, ValorDaMercadoriaPorUnidade: 6.0, CodigoNCMNaturezaCarga: '3923',
+            UnidadeDeMedidaDaMercadoria: 'Kg', TipoDeCalculo: 'SemQuebra', QuantidadeDaMercadoriaNoEmbarque: 5000, ToleranciaDePerdaDeMercadoria: { Tipo: 'Nenhum', Valor: 0 } }],
+        }],
         Impostos: { IRRF: 0, SestSenat: 0, INSS: 0, ISSQN: 0, OutrosImpostos: 0 },
         Pagamentos: [{ IdPagamentoCliente: id + '-Q', DataDeLiberacao: iso(fim), Valor: valor, TipoPagamento: 'eFRETE', Categoria: 'Quitacao', Documento: 'TESTE-1',
           IndicadorPagamento: 'AVista', CpfCnpjCreditado: T.cnpj, NumeroParcela: 1 }],
         Contratado: { CpfOuCnpj: T.cnpj, RNTRC: T.rntrc },
-        Motorista: { CpfOuCnpj: '11144477735', CNH: '12345678900', Celular: { DDD: 81, Numero: 999999999 } },
+        Motorista: { CpfOuCnpj: '11144477735', CNH: '12345678900', Celular: { DDD: 81, Numero: 987654321 } },
         Destinatario: { NomeOuRazaoSocial: 'DESTINATARIO TESTE', CpfOuCnpj: cnpj, Endereco: { Bairro: 'BOA VISTA', Rua: 'RUA DA AURORA', Numero: '100', CEP: '50050000', CodigoMunicipio: 2611606 } },
         Contratante: { NomeOuRazaoSocial: 'KRATOS TRANSPORTES E LOGISTICA LTDA', CpfOuCnpj: cnpj, ResponsavelPeloPagamento: true, Endereco: end },
         Veiculos: [{ Placa: T.placa }], CodigoTipoCarga: 5, AltoDesempenho: false, ComposicaoVeicular: false, RetornoVazio: false, TipoPagamento: 'eFRETE',
