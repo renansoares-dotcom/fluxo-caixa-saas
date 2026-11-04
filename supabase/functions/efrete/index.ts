@@ -65,7 +65,25 @@ function http11(url: URL, metodo: string, corpo?: string): Promise<Response> {
 // mensagem de erro sem o endereço com parâmetros (que podem levar a senha) e sem credenciais
 const erroLimpo = (e: unknown) => mascarar(String((e as Error)?.message || e).replace(/https?:\/\/\S+/g, (u) => u.split('?')[0]));
 
+// ponte Node.js na Vercel (ponte-efrete/): aceita a renegociação TLS do e-frete e leva o certificado A1.
+// Ligada quando existirem os segredos EFRETE_PONTE_URL e EFRETE_PONTE_CHAVE.
+async function pelaPonte(path: string, http: 'GET' | 'POST', corpo: Record<string, unknown>) {
+  const ini = Date.now();
+  let caminho = path;
+  if (http === 'GET') { const q = new URLSearchParams(); for (const [k, v] of Object.entries(corpo)) if (v != null && typeof v !== 'object') q.set(k, String(v)); caminho += '?' + q.toString(); }
+  try {
+    const r = await fetch(env('EFRETE_PONTE_URL'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ponte-chave': env('EFRETE_PONTE_CHAVE') },
+      body: JSON.stringify({ ambiente: BASE().includes('dev.') ? 'homologacao' : 'producao', metodo: http, caminho, corpo: http === 'POST' ? corpo : undefined }) });
+    const p = await r.json().catch(() => ({ ok: false, erro: `ponte respondeu HTTP ${r.status}` }));
+    if (!p.ok) return { status: 0, ms: Date.now() - ini, dados: null, texto: 'Falha de conexão (ponte): ' + erroLimpo(p.erro || p.codigo || 'erro') };
+    let dados: unknown = null; try { dados = JSON.parse(p.corpo); } catch { /* não é JSON */ }
+    return { status: p.status, ms: Date.now() - ini, dados, texto: dados ? undefined : mascarar(String(p.corpo || '').slice(0, 600)) };
+  } catch (e) { return { status: 0, ms: Date.now() - ini, dados: null, texto: 'Ponte inacessível: ' + erroLimpo(e) }; }
+}
+const usaPonte = () => !!(env('EFRETE_PONTE_URL') && env('EFRETE_PONTE_CHAVE'));
+
 async function chamar(path: string, http: 'GET' | 'POST', corpo: Record<string, unknown>) {
+  if (usaPonte()) { const res = await pelaPonte(path, http, corpo); await registrar(`${http} ${path.split('/').pop()} (ponte)`, corpo, res); return res; }
   const url = new URL(BASE() + path);
   const ini = Date.now();
   let r: Response;
@@ -157,7 +175,7 @@ Deno.serve(async (req) => {
         tipos = resumo(t); if ((t.dados as { Sucesso?: boolean })?.Sucesso) tipos = { ...resumo(t), dados: t.dados };
         await logout(L.token);
       }
-      return json({ ambiente, base: BASE(), rede, login: { ok: !!L.token, via: L.via, tentativas: L.tentativas }, tiposDeCarga: tipos });
+      return json({ ambiente, base: BASE(), ponte: usaPonte(), rede, login: { ok: !!L.token, via: L.via, tentativas: L.tentativas }, tiposDeCarga: tipos });
     }
 
     const m = LEITURA[acao];

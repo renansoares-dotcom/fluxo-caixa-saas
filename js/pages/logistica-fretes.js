@@ -726,6 +726,7 @@ async function testarEfrete() {
     const tipos = r?.tiposDeCarga?.dados;
     b.innerHTML = r?.erro ? `<p class="neg">${esc(r.erro)}</p>` : `<table>
       ${lin('Ambiente', esc(r.ambiente === 'producao' ? 'Produção' : 'Homologação') + ` <span class="muted small">${esc(r.base || '')}</span>`)}
+      ${lin('Caminho', r.ponte ? 'pela ponte (Vercel, Node.js)' : 'direto do Supabase')}
       ${Object.entries(r.rede || {}).map(([pg, v]) => lin('Rede ' + pg, esc(v), /^HTTP/.test(v))).join('')}
       ${lin('Login', r.login?.ok ? `✓ conectado (${esc(r.login.via)})` : '✗ não conectou', !!r.login?.ok)}
       ${(r.login?.tentativas || []).map((t, i) => lin(`Tentativa ${i + 1}`, `HTTP ${t.status} · ${t.ms} ms${t.excecao ? ' · ' + esc(t.excecao.Mensagem || JSON.stringify(t.excecao)) : ''}${t.texto ? ' · ' + esc(t.texto.slice(0, 160)) : ''}`)).join('')}

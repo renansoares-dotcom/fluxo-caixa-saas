@@ -1,0 +1,1 @@
+{ "name": "efrete-ponte", "private": true, "description": "Ponte HTTPS (OpenSSL) entre a plataforma e o e-frete", "engines": { "node": "22.x" } }
