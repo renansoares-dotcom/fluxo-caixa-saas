@@ -225,6 +225,27 @@ Deno.serve(async (req) => {
       if (!L.token) return json({ ambiente, erro: 'Login no e-frete falhou', tentativas: L.tentativas }, 502);
       const I = { Integrador: env('EFRETE_INTEGRADOR'), Token: L.token };
       const cnpj = soDig(env('EFRETE_CNPJ'));
+      // CIOTs de teste que ficaram abertos (cancelamento sem resposta do e-frete): cancela antes de emitir outro
+      const cancelar = async (c: string, nome: string) => {
+        const corpo = { ...I, Versao: 1, CodigoIdentificacaoOperacao: c, Motivo: 'Teste de integração em homologação (plataforma Kratos).' };
+        let r = await chamar('/Services/Pef/CancelarOperacaoTransporte', 'POST', corpo);
+        if (!r.dados) r = await chamar('/Services/Pef/CancelarOperacaoTransporte', 'POST', corpo); // sem resposta: tenta mais uma vez
+        const msg = String(((r.dados as { Excecao?: { Mensagem?: string } } | null)?.Excecao?.Mensagem) || '');
+        if (/cancelad|encerrad/i.test(msg)) (r.dados as Record<string, unknown>).Sucesso = true; // já estava cancelado
+        return passo(nome, r, { ciot: c });
+      };
+      if (ctx.adm) {
+        const { data: ch } = await ctx.adm.from('efrete_chamadas').select('metodo, ok, pedido, resposta').eq('acao', 'ciot_teste').order('id');
+        const abertos = new Set<string>();
+        for (const x of (ch ?? []) as { metodo: string; ok: boolean; pedido: Record<string, unknown>; resposta: Record<string, unknown> }[]) {
+          if (x.ok && x.metodo.includes('AdicionarOperacao') && x.resposta?.CodigoIdentificacaoOperacao) abertos.add(String(x.resposta.CodigoIdentificacaoOperacao));
+          if (x.metodo.includes('CancelarOperacao')) {
+            const msg = String((x.resposta?.Excecao as { Mensagem?: string } | undefined)?.Mensagem || '');
+            if (x.ok || /cancelad|encerrad/i.test(msg)) abertos.delete(String(x.pedido?.CodigoIdentificacaoOperacao || ''));
+          }
+        }
+        for (const c of abertos) await cancelar(c, `Cancelar CIOT de teste anterior ${c}`);
+      }
       // massa ANTT: transportador com um único caminhão simples (sem implemento)
       const T = { cnpj: '48386287000166', rntrc: '56216399', placa: 'OSK7D95' };
       const end = { Bairro: 'INDIANOPOLIS', CEP: '55024740', CodigoMunicipio: 2604106, Rua: 'AV ADJAR DA SILVA CASE', Numero: '800' };
@@ -273,7 +294,7 @@ Deno.serve(async (req) => {
         if (c) passos[passos.length - 1].estado = c.EstadoCiot ?? null;
         const p = passo('Baixar PDF do CIOT', await consultar('/Services/Pef/ObterOperacaoTransportePdf', { ...I, Versao: 1, CodigoIdentificacaoOperacao: ciot }));
         pdf = (p?.Pdf as string) || null;
-        passo('Cancelar CIOT de teste', await chamar('/Services/Pef/CancelarOperacaoTransporte', 'POST', { ...I, Versao: 1, CodigoIdentificacaoOperacao: ciot, Motivo: 'Teste de integração em homologação (plataforma Kratos).' }));
+        await cancelar(ciot, 'Cancelar CIOT de teste');
       }
       await logout(L.token);
       return json({ ambiente, ponte: usaPonte(), ciot, passos, pdf });
