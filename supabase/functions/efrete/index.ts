@@ -1,11 +1,15 @@
 // e-frete (nstech IP) — CIOT e Pagamento Eletrônico de Frete pela API REST (Manual de Integração v8.2, 15/07/2026).
 // Fica no servidor: o hash do integrador, o usuário/senha (e depois o certificado A1) nunca vão para o navegador.
-// Segredos: EFRETE_INTEGRADOR, EFRETE_USUARIO, EFRETE_SENHA, EFRETE_CNPJ (só dígitos; a empresa da plataforma que pode usar),
-//           EFRETE_BASE (opcional; padrão homologação https://dev.efrete.com.br — produção: https://sistema.efrete.com.br).
+// Segredos (credenciais nunca vão para a tela nem para o banco):
+//   homologação: EFRETE_INTEGRADOR, EFRETE_USUARIO, EFRETE_SENHA   ·   produção: EFRETE_PROD_INTEGRADOR, EFRETE_PROD_USUARIO, EFRETE_PROD_SENHA
+//   EFRETE_CNPJ (só dígitos; a empresa da plataforma que usa o e-frete); EFRETE_PONTE_URL + EFRETE_PONTE_CHAVE (ponte Node na Vercel).
+// Parâmetros (ambiente, forma de pagamento, documentos ao posto, embalagem, quebra, tipos de carga…) vêm da plataforma: efrete_config e
+// efrete_tipos_carga (SQL 082) — regra do Renan: nada fixo no código. A montagem da operação fica em operacao.js (testada em tests/efrete.test.js).
 // Quem chama: usuário logado que seja admin/financeiro/diretor da empresa com o CNPJ de EFRETE_CNPJ, ou admin da plataforma.
 // Etapa 1 (04/11/2026): só diagnóstico e consultas (login, situação do transportador, tipos de carga) — nada é emitido.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import https from 'node:https';
+import { montarOperacao, ciot12, periodoPadrao, enderecoDest, pesoNota } from './operacao.js';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -15,7 +19,10 @@ const cors = {
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 const env = (k: string) => Deno.env.get(k) ?? '';
 const soDig = (s: string) => String(s || '').replace(/\D/g, '');
-const BASE = () => (env('EFRETE_BASE') || 'https://dev.efrete.com.br').replace(/\/+$/, '');
+// ambiente vem dos parâmetros da empresa (efrete_config.ambiente); o teste de CIOT força a homologação
+const AMB = { atual: 'homologacao' as 'homologacao' | 'producao' };
+const BASE = () => AMB.atual === 'producao' ? 'https://sistema.efrete.com.br' : (env('EFRETE_BASE') || 'https://dev.efrete.com.br').replace(/\/+$/, '');
+const cred = (k: 'INTEGRADOR' | 'USUARIO' | 'SENHA') => env(AMB.atual === 'producao' ? `EFRETE_PROD_${k}` : `EFRETE_${k}`);
 
 // métodos liberados nesta etapa (só leitura)
 const LEITURA: Record<string, { path: string; http: 'GET' | 'POST'; versao: number }> = {
@@ -36,7 +43,7 @@ async function registrar(metodo: string, corpo: Record<string, unknown>, r: { st
   const d = r.dados as Record<string, unknown> | null;
   const resp = d ? Object.fromEntries(Object.entries(d).filter(([k]) => !SECRETOS.has(k)).map(([k, v]) => k === 'Pdf' && typeof v === 'string' ? [k, `[PDF ${Math.round(v.length * 0.75 / 1024)} KB]`] : [k, v])) : { texto: r.texto };
   try {
-    await ctx.adm.from('efrete_chamadas').insert({ empresa_id: ctx.empresa, user_id: ctx.uid, acao: ctx.acao, ambiente: BASE().includes('dev.') ? 'homologacao' : 'producao',
+    await ctx.adm.from('efrete_chamadas').insert({ empresa_id: ctx.empresa, user_id: ctx.uid, acao: ctx.acao, ambiente: AMB.atual,
       metodo, ok: !!(d?.Sucesso === true || d?.Token), http_status: r.status, ms: r.ms, pedido: limpar(corpo), resposta: resp });
   } catch { /* SQL 079 ainda não rodou: segue sem registro */ }
 }
@@ -73,7 +80,7 @@ async function pelaPonte(path: string, http: 'GET' | 'POST', corpo: Record<strin
   if (http === 'GET') { const q = new URLSearchParams(); for (const [k, v] of Object.entries(corpo)) if (v != null && typeof v !== 'object') q.set(k, String(v)); caminho += '?' + q.toString(); }
   try {
     const r = await fetch(env('EFRETE_PONTE_URL'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ponte-chave': env('EFRETE_PONTE_CHAVE') },
-      body: JSON.stringify({ ambiente: BASE().includes('dev.') ? 'homologacao' : 'producao', metodo: http, caminho, corpo: http === 'POST' ? corpo : undefined }) });
+      body: JSON.stringify({ ambiente: AMB.atual, metodo: http, caminho, corpo: http === 'POST' ? corpo : undefined }) });
     const p = await r.json().catch(() => ({ ok: false, erro: `ponte respondeu HTTP ${r.status}` }));
     if (!p.ok) return { status: 0, ms: Date.now() - ini, dados: null, texto: 'Falha de conexão (ponte): ' + erroLimpo(p.erro || p.codigo || 'erro') };
     let dados: unknown = null; try { dados = JSON.parse(p.corpo); } catch { /* não é JSON */ }
@@ -123,7 +130,7 @@ async function consultar(path: string, corpo: Record<string, unknown>) {
 }
 
 async function login() {
-  const corpo = { Usuario: env('EFRETE_USUARIO'), Senha: env('EFRETE_SENHA'), Integrador: env('EFRETE_INTEGRADOR'), Versao: 1 };
+  const corpo = { Usuario: cred('USUARIO'), Senha: cred('SENHA'), Integrador: cred('INTEGRADOR'), Versao: 1 };
   // o exemplo do manual é JSON (POST, senha no corpo); a lista de URLs do kit diz GET — tenta POST primeiro
   const ok = (x: { dados: unknown }) => !!(x.dados as { Token?: string; Sucesso?: boolean })?.Token;
   const a = await chamar('/Services/Logon/Login', 'POST', corpo);
@@ -137,7 +144,7 @@ const resumo = (x: { status: number; ms: number; dados: unknown; texto?: string 
   return { status: x.status, ms: x.ms, sucesso: d?.Sucesso ?? null, temToken: !!d?.Token, excecao: d?.Excecao ?? null, texto: x.texto };
 };
 async function logout(token: string) {
-  try { await chamar('/Services/Logon/Logout', 'POST', { Integrador: env('EFRETE_INTEGRADOR'), Versao: 1, Token: token }); } catch { /* silencioso, como o próprio Logout */ }
+  try { await chamar('/Services/Logon/Logout', 'POST', { Integrador: cred('INTEGRADOR'), Versao: 1, Token: token }); } catch { /* silencioso, como o próprio Logout */ }
 }
 
 async function autorizado(req: Request) {
@@ -179,16 +186,136 @@ function cnhFicticia(): string {
 }
 const motoristaFicticio = () => ({ cpf: cpfFicticio(), cnh: cnhFicticia(), cel: { DDD: 81, Numero: 900000000 + Math.floor(Math.random() * 99999999) } });
 
+// ---- CIOT do frete real (Logística › Fretes e CIOT › ficha do frete). Tudo lido do banco pelo id do frete.
+type Res = { status: number; ms: number; dados: unknown; texto?: string };
+const msgDe = (r: Res) => String(((r.dados as { Excecao?: { Mensagem?: string } } | null)?.Excecao?.Mensagem) || r.texto || '');
+const okDe = (r: Res) => (r.dados as { Sucesso?: boolean } | null)?.Sucesso === true;
+
+async function dadosDoFrete(freteId: string) {
+  const adm = ctx.adm!;
+  const { data: f } = await adm.from('log_fretes').select('*').eq('id', freteId).eq('empresa_id', ctx.empresa).maybeSingle();
+  if (!f) throw new Error('Frete não encontrado nesta empresa.');
+  const { data: t } = await adm.from('log_transportadores').select('*').eq('id', f.transportador_id).maybeSingle();
+  const { data: emp } = await adm.from('empresas').select('cnpj, razao_social, nome').eq('id', ctx.empresa).maybeSingle();
+  const { data: tc } = await adm.from('efrete_tipos_carga').select('tipo_carga, codigo').eq('empresa_id', ctx.empresa);
+  const tipos = Object.fromEntries((tc ?? []).map((x: { tipo_carga: string; codigo: number }) => [x.tipo_carga, x.codigo]));
+  // NF-e da viagem: chaves do MDF-e; da própria empresa ou de cliente que autorizou (SQL 081)
+  const chaves = [...new Set(((f.mdfe?.descarga || []) as { chaves?: string[] }[]).flatMap(d => d.chaves || []).map(c => soDig(c)).filter(c => c.length === 44))];
+  let origens: string[] = [ctx.empresa as string];
+  try { const { data: o } = await adm.from('nfe_compartilhamento').select('empresa_origem').eq('empresa_destino', ctx.empresa).eq('ativo', true); origens = origens.concat((o ?? []).map((x: { empresa_origem: string }) => x.empresa_origem)); } catch { /* SQL 081 ainda não rodou */ }
+  let notas: Record<string, unknown>[] = [];
+  if (chaves.length) {
+    const { data: ns } = await adm.from('nfe_notas').select('id, empresa_id, numero, serie, emissao, v_nf, emit_doc, dest_doc, dest_nome, situacao, xml').in('chave', chaves).in('empresa_id', origens);
+    const ids = (ns ?? []).map((n: { id: string }) => n.id);
+    const { data: its } = ids.length ? await adm.from('nfe_itens').select('nota_id, ncm, vprod').in('nota_id', ids) : { data: [] };
+    notas = (ns ?? []).filter((n: { situacao: string }) => n.situacao === 'autorizada').map((n: Record<string, unknown>) => {
+      const it = ((its ?? []) as { nota_id: string; ncm: string; vprod: number }[]).filter(i => i.nota_id === n.id).sort((a, b) => (+b.vprod || 0) - (+a.vprod || 0))[0];
+      return { numero: n.numero, serie: n.serie, emissao: n.emissao, v_nf: n.v_nf, emit_doc: n.emit_doc, dest_doc: n.dest_doc, dest_nome: n.dest_nome,
+        dest_end: enderecoDest(n.xml as string), peso_kg: pesoNota(n.xml as string), ncm: it?.ncm || '' };
+    });
+  }
+  return { f, t, emp, tipos, notas, chaves };
+}
+
+async function ciotDoFrete(acao: string, body: Record<string, unknown>, cfg: Record<string, unknown>) {
+  const ambiente = AMB.atual;
+  if (!ctx.adm || !ctx.empresa) return json({ erro: 'A empresa do e-frete não está na plataforma.' }, 400);
+  const { f, t, emp, tipos, notas } = await dadosDoFrete(String(body.frete_id || ''));
+  const cd = (f.ciot_dados || {}) as Record<string, unknown>;
+
+  if (acao === 'ciot_previa' || acao === 'ciot_emitir') {
+    if (cd.situacao === 'emitido') return json({ erro: `Este frete já tem o CIOT ${cd.codigo}. Cancele antes de emitir outro.` }, 400);
+    const p = periodoPadrao(f.data, +(cfg.prazo_viagem_horas as number) || 48);
+    const inicio = String(body.inicio || p.inicio), fim = String(body.fim || p.fim);
+    const idOperacao = `F${f.numero}-${Date.now().toString(36).toUpperCase()}`;
+    const m = montarOperacao({ frete: f, transp: t, empresa: emp, config: cfg, tipos, notas, inicio, fim, idOperacao });
+    if (acao === 'ciot_previa' || m.faltas.length) return json({ ambiente, faltas: m.faltas, resumo: m.resumo, inicio, fim, notas_encontradas: notas.length }, m.faltas.length && acao === 'ciot_emitir' ? 400 : 200);
+    if (Date.parse(inicio) < Date.now() - 60e3) return json({ erro: 'O início da viagem não pode ser antes de agora (o e-frete recusa).' }, 400);
+
+    const L = await login();
+    if (!L.token) return json({ ambiente, erro: 'Login no e-frete falhou', tentativas: L.tentativas }, 502);
+    const I = { Integrador: cred('INTEGRADOR'), Token: L.token };
+    const passos: Record<string, unknown>[] = [];
+    const passo = (nome: string, r: Res, extra: Record<string, unknown> = {}) => { passos.push({ nome, ok: okDe(r), status: r.status, ms: r.ms, mensagem: msgDe(r), protocolo: (r.dados as { ProtocoloServico?: number } | null)?.ProtocoloServico ?? null, ...extra }); return r; };
+    const fim_ = async (st = 200) => { await logout(L.token as string); return json({ ambiente, passos, ciot: (f as Record<string, unknown>).ciot_novo || null, pdf: (f as Record<string, unknown>).pdf_novo || null }, st); };
+    if (!okDe(passo('Gravar proprietário', await chamar('/Services/proprietarios/gravarV2', 'POST', { ...I, ...m.cadastros.proprietario })))) return await fim_(400);
+    for (const v of m.cadastros.veiculos) if (!okDe(passo(`Gravar veículo ${v.Veiculo.Placa}`, await chamar('/Services/veiculos/gravar', 'POST', { ...I, ...v })))) return await fim_(400);
+    if (!okDe(passo('Gravar motorista', await chamar('/Services/motoristas/gravar', 'POST', { ...I, ...m.cadastros.motorista })))) return await fim_(400);
+    const r = passo('Emitir CIOT', await chamar('/Services/Pef/AdicionarOperacaoTransporteV2', 'POST', { ...I, ...m.op }), { idOperacao });
+    const codigo = (r.dados as { CodigoIdentificacaoOperacao?: string } | null)?.CodigoIdentificacaoOperacao || null;
+    if (!codigo) return await fim_(400);
+    const dados = { provedor: 'efrete', ambiente, codigo, id_operacao: idOperacao, protocolo: (r.dados as { ProtocoloServico?: number }).ProtocoloServico, situacao: 'emitido',
+      emitido_em: new Date().toISOString(), emitido_por: ctx.uid, inicio: m.op.DataInicioViagem, fim: m.op.DataFimViagem, valor: m.resumo.valor, historico: [...((cd.historico as unknown[]) || [])] };
+    await adm().from('log_fretes').update({ ciot: codigo, ciot_por: 'iplamm', ciot_dados: dados }).eq('id', f.id);
+    (f as Record<string, unknown>).ciot_novo = codigo;
+    // PDF obrigatório na emissão: guarda nos anexos do frete
+    const pr = passo('Baixar PDF do CIOT', await consultar('/Services/Pef/ObterOperacaoTransportePdf', { ...I, Versao: 1, CodigoIdentificacaoOperacao: codigo }));
+    const pdf = (pr.dados as { Pdf?: string } | null)?.Pdf || null;
+    if (pdf) {
+      (f as Record<string, unknown>).pdf_novo = pdf;
+      try {
+        const path = `${ctx.empresa}/${f.id}/${Date.now()}-CIOT_${ciot12(codigo)}.pdf`;
+        const bin = Uint8Array.from(atob(pdf), c => c.charCodeAt(0));
+        const up = await adm().storage.from('logistica').upload(path, bin, { contentType: 'application/pdf', upsert: false });
+        if (!up.error) {
+          const { data: a } = await adm().from('log_frete_anexos').insert({ empresa_id: ctx.empresa, frete_id: f.id, tipo: 'ciot', path, nome: `CIOT ${codigo}.pdf`, enviado_por: 'e-frete' }).select('id').single();
+          await adm().from('log_fretes').update({ ciot_dados: { ...dados, anexo_id: a?.id || null } }).eq('id', f.id);
+        }
+      } catch { /* o PDF fica disponível pelo botão "PDF do CIOT" */ }
+    }
+    return await fim_(200);
+  }
+
+  if (!cd.codigo) return json({ erro: 'Este frete não tem CIOT emitido pelo e-frete.' }, 400);
+  if (cd.ambiente && cd.ambiente !== ambiente) return json({ erro: `O CIOT ${cd.codigo} foi emitido em ${cd.ambiente}; os parâmetros estão em ${ambiente}.` }, 400);
+  const L = await login();
+  if (!L.token) return json({ ambiente, erro: 'Login no e-frete falhou', tentativas: L.tentativas }, 502);
+  const I = { Integrador: cred('INTEGRADOR'), Token: L.token };
+  try {
+    if (acao === 'ciot_pdf') {
+      const r = await consultar('/Services/Pef/ObterOperacaoTransportePdf', { ...I, Versao: 1, CodigoIdentificacaoOperacao: cd.codigo });
+      return json({ ok: okDe(r), pdf: (r.dados as { Pdf?: string } | null)?.Pdf || null, mensagem: msgDe(r) }, okDe(r) ? 200 : 400);
+    }
+    // ciot_cancelar
+    const motivo = String(body.motivo || '').trim();
+    if (motivo.length < 15) return json({ erro: 'Escreva o motivo do cancelamento (mínimo 15 caracteres).' }, 400);
+    const corpo = { ...I, Versao: 1, CodigoIdentificacaoOperacao: cd.codigo, Motivo: motivo.slice(0, 250) };
+    let r = await chamar('/Services/Pef/CancelarOperacaoTransporte', 'POST', corpo);
+    if (!r.dados) r = await chamar('/Services/Pef/CancelarOperacaoTransporte', 'POST', corpo);
+    const ja = /cancelad/i.test(msgDe(r));
+    if (!okDe(r) && !ja) return json({ ok: false, mensagem: msgDe(r) || 'O e-frete não respondeu. Tente de novo em alguns minutos.' }, 400);
+    const hist = [...((cd.historico as unknown[]) || []), { codigo: cd.codigo, emitido_em: cd.emitido_em, cancelado_em: new Date().toISOString(), motivo, por: ctx.uid }];
+    await adm().from('log_fretes').update({ ciot: null, ciot_dados: { ...cd, situacao: 'cancelado', cancelado_em: new Date().toISOString(), motivo, protocolo_cancelamento: (r.dados as { Protocolo?: string } | null)?.Protocolo || null, historico: hist } }).eq('id', f.id);
+    return json({ ok: true, protocolo: (r.dados as { Protocolo?: string } | null)?.Protocolo || null });
+  } finally { await logout(L.token); }
+}
+const adm = () => ctx.adm!;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
     if (!(await autorizado(req))) return json({ erro: 'Sem permissão para usar a integração e-frete.' }, 403);
-    const faltam = ['EFRETE_INTEGRADOR', 'EFRETE_USUARIO', 'EFRETE_SENHA', 'EFRETE_CNPJ'].filter(k => !env(k));
     const body = await req.json().catch(() => ({}));
     const acao = String(body.acao || 'diagnostico');
     ctx.acao = acao; ctx.empresa = await empresaDaIntegracao();
-    const ambiente = BASE().includes('dev.') ? 'homologacao' : 'producao';
-    if (faltam.length) return json({ ambiente, erro: 'Segredos não cadastrados: ' + faltam.join(', ') }, 400);
+    // parâmetros da empresa (SQL 082); sem a tabela, valores padrão
+    let cfg: Record<string, unknown> = {};
+    if (ctx.adm && ctx.empresa) { try { const { data } = await ctx.adm.from('efrete_config').select('*').eq('empresa_id', ctx.empresa).maybeSingle(); cfg = data || {}; } catch { /* SQL 082 ainda não rodou */ } }
+    AMB.atual = acao === 'ciot_teste' ? 'homologacao' : (cfg.ambiente === 'producao' ? 'producao' : 'homologacao');
+    const ambiente = AMB.atual;
+
+    if (acao === 'status') {
+      // só diz SE cada segredo existe — nunca o valor
+      const tem = (k: string) => !!env(k);
+      return json({ ambiente, ponte: usaPonte(), empresa_integrada: !!ctx.empresa,
+        segredos: { homologacao: { integrador: tem('EFRETE_INTEGRADOR'), usuario: tem('EFRETE_USUARIO'), senha: tem('EFRETE_SENHA') },
+          producao: { integrador: tem('EFRETE_PROD_INTEGRADOR'), usuario: tem('EFRETE_PROD_USUARIO'), senha: tem('EFRETE_PROD_SENHA') }, cnpj: tem('EFRETE_CNPJ') } });
+    }
+    const faltam = ['INTEGRADOR', 'USUARIO', 'SENHA'].filter(k => !cred(k as 'INTEGRADOR')).map(k => (ambiente === 'producao' ? 'EFRETE_PROD_' : 'EFRETE_') + k);
+    if (!env('EFRETE_CNPJ')) faltam.push('EFRETE_CNPJ');
+    if (faltam.length) return json({ ambiente, erro: `Segredos não cadastrados (${ambiente === 'producao' ? 'produção' : 'homologação'}): ` + faltam.join(', ') }, 400);
+
+    if (['ciot_previa', 'ciot_emitir', 'ciot_cancelar', 'ciot_pdf'].includes(acao)) return await ciotDoFrete(acao, body, cfg);
 
     if (acao === 'diagnostico') {
       // rede direta (só quando não há ponte): separa bloqueio de rede × exigência de certificado na pasta /Services
@@ -202,10 +329,12 @@ Deno.serve(async (req) => {
       let consulta: unknown = null;
       if (L.token) {
         // consulta de teste com um transportador da massa de testes da ANTT (kit e-frete): só leitura
-        const pedido = body.teste || { InteressadoCpfOuCnpj: soDig(env('EFRETE_CNPJ')), TransportadorCpfOuCnpj: '48384601000171', TransportadorRNTRC: '55887888', Veiculos: [{ Placa: 'BWP6E54' }] };
-        const t = await chamar(LEITURA.ConsultaSituacaoTransportador.path, 'POST', { ...pedido, Integrador: env('EFRETE_INTEGRADOR'), Token: L.token, Versao: 1 });
+        const pedido = body.teste || (ambiente === 'producao' ? null : { InteressadoCpfOuCnpj: soDig(env('EFRETE_CNPJ')), TransportadorCpfOuCnpj: '48384601000171', TransportadorRNTRC: '55887888', Veiculos: [{ Placa: 'BWP6E54' }] });
+        if (pedido) {
+        const t = await chamar(LEITURA.ConsultaSituacaoTransportador.path, 'POST', { ...pedido, Integrador: cred('INTEGRADOR'), Token: L.token, Versao: 1 });
         const d = t.dados as Record<string, unknown> | null;
         consulta = { ...resumo(t), dados: d ? Object.fromEntries(Object.entries(d).filter(([k]) => !SECRETOS.has(k))) : null };
+        }
         await logout(L.token);
       }
       return json({ ambiente, base: BASE(), ponte: usaPonte(), rede, login: { ok: !!L.token, via: L.via, tentativas: L.tentativas }, consultaTransportador: consulta });
@@ -223,7 +352,7 @@ Deno.serve(async (req) => {
       };
       const L = await login();
       if (!L.token) return json({ ambiente, erro: 'Login no e-frete falhou', tentativas: L.tentativas }, 502);
-      const I = { Integrador: env('EFRETE_INTEGRADOR'), Token: L.token };
+      const I = { Integrador: cred('INTEGRADOR'), Token: L.token };
       const cnpj = soDig(env('EFRETE_CNPJ'));
       // CIOTs de teste que ficaram abertos (cancelamento sem resposta do e-frete): cancela antes de emitir outro
       const cancelar = async (c: string, nome: string) => {
@@ -305,7 +434,7 @@ Deno.serve(async (req) => {
     const L = await login();
     if (!L.token) return json({ ambiente, erro: 'Login no e-frete falhou', tentativas: L.tentativas }, 502);
     const params = (body.params && typeof body.params === 'object') ? body.params : {};
-    const r = m.http === 'GET' ? await consultar(m.path, { ...params, Integrador: env('EFRETE_INTEGRADOR'), Token: L.token, Versao: m.versao }) : await chamar(m.path, m.http, { ...params, Integrador: env('EFRETE_INTEGRADOR'), Token: L.token, Versao: m.versao });
+    const r = m.http === 'GET' ? await consultar(m.path, { ...params, Integrador: cred('INTEGRADOR'), Token: L.token, Versao: m.versao }) : await chamar(m.path, m.http, { ...params, Integrador: cred('INTEGRADOR'), Token: L.token, Versao: m.versao });
     await logout(L.token);
     return json({ ambiente, status: r.status, dados: r.dados, texto: r.texto });
   } catch (e) {

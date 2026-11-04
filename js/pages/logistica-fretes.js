@@ -10,7 +10,8 @@ import { conversaNoModal } from '../lib/mini-chat.js';
 import * as MD from '../lib/mdfe.js';
 import { gerarXMLMDFe } from '../lib/mdfe-xml.js';
 import { pedidoCIOT, faltasCIOT, empresaGeraCIOT } from '../lib/ipef.js';
-import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, coefDe, pendencias, pendenciasTransp, tipoPeloDoc, lerVeiculos, veiculosTxt } from '../lib/fretes.js';
+import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, coefDe, pendencias, pendenciasTransp, tipoPeloDoc, lerVeiculos, veiculosTxt, lerMotoristas, motoristasTxt } from '../lib/fretes.js';
+import { janelaCiot, situacaoCiot, camposEndereco, lerEndereco } from '../lib/efrete-ui.js';
 
 export const title = 'Logística — fretes e CIOT';
 const ui = { aba: 'fretes', mes: today().slice(0, 7), busca: '' };
@@ -151,6 +152,9 @@ function ficha(f0, root, pre = {}) {
       <label>Motorista<input id="fr-mo" value="${esc(f.motorista || '')}" ${dis}></label>
       <label>CIOT<input id="fr-ci" value="${esc(f.ciot || '')}" placeholder="nº gerado pela IPEF / transportadora" ${dis}></label>
       <label>CIOT gerado por<select id="fr-cp" ${dis} data-nobusca><option value="">—</option><option value="iplamm" ${f.ciot_por === 'iplamm' ? 'selected' : ''}>${esc(nomeCurto())} (IPEF)</option><option value="transportadora" ${f.ciot_por === 'transportadora' ? 'selected' : ''}>Transportadora</option></select></label>
+      ${f0 && f0.status !== 'cancelado' && f0.ciot_por !== 'transportadora' ? `<div class="span2 small" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn small ${situacaoCiot(f0).emitido ? '' : 'primary'}" id="fr-efrete">${situacaoCiot(f0).emitido ? 'CIOT pelo e-frete (PDF / cancelar)' : 'Emitir CIOT pelo e-frete'}</button>
+        <span class="muted">${esc(situacaoCiot(f0).txt || 'Salve a ficha antes: o CIOT usa os dados salvos do frete, do MDF-e e do transportador.')}</span></div>` : ''}
       <label class="grow">Chave do MDF-e<input id="fr-mdf" value="${esc(f.mdfe_chave || '')}" placeholder="44 dígitos" ${dis}></label>
       <label class="grow">Chave do CT-e (transportadora)<input id="fr-cte" value="${esc(f.cte_chave || '')}" ${dis}></label>
       <label>Vale-pedágio (R$)<input id="fr-pv" value="${inp(f.pedagio_valor)}" ${dis}></label>
@@ -213,6 +217,7 @@ function ficha(f0, root, pre = {}) {
     g('fr-n').value = [...new Set([...atuais, ...ns.map(n => String(n.numero))])].join(', ');
     const d = ns.find(n => n.xmun); if (d && !g('fr-de').value.trim()) g('fr-de').value = `${d.xmun}/${d.dest_uf || ''}`;
   }); });
+  g('fr-efrete') && (g('fr-efrete').onclick = () => janelaCiot(f0, () => { md.close(); render(root); }));
   g('fr-ok') && (g('fr-ok').onclick = async (ev) => { ev.target.disabled = true; try { await salvar(); md.close(); toast('Frete salvo'); render(root); } catch (err) { fail(err); ev.target.disabled = false; } });
   md.el.addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
@@ -293,7 +298,11 @@ function editarTransp(t, root, depois = null) {
       <label>Tipo *<select id="ct-t" ${dis} data-nobusca>${Object.entries(TIPOS_TRANSP).map(([k, v]) => `<option value="${k}" ${(t?.tipo || 'etc') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       <label class="grow">Favorecido no cadastro (pagamentos)<select id="ct-f" ${dis}><option value="">—</option>${favs.map(f => `<option value="${f.id}" ${f.id === t?.favorecido_id ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
       <label>RNTRC<input id="ct-r" value="${esc(t?.rntrc || '')}" ${dis}></label><label>RNTRC válido até<input type="date" id="ct-rv" value="${t?.rntrc_validade || ''}" ${dis}></label>
-      <label class="span2">Veículos (uma linha por veículo: placa;eixos;tipo)<textarea id="ct-vs" rows="3" ${dis} placeholder="ABC1D23;5;carreta">${esc(veiculosTxt(t?.veiculos))}</textarea></label>
+      <label class="span2">Veículos (uma linha por veículo: placa;eixos;tipo;renavam;chassi)<textarea id="ct-vs" rows="3" ${dis} placeholder="ABC1D23;5;carreta;12345678901;9BM384078KB123456">${esc(veiculosTxt(t?.veiculos))}</textarea>
+        <span class="small muted">RENAVAM e chassi (17 caracteres) são exigidos pelo e-frete para emitir o CIOT.</span></label>
+      <label class="span2">Motoristas (uma linha por motorista: CPF;nome;CNH;nascimento dd/mm/aaaa;celular com DDD)<textarea id="ct-ms" rows="2" ${dis} placeholder="12345678909;JOSE DA SILVA;01234567890;15/06/1985;81999990000">${esc(motoristasTxt(t?.motoristas))}</textarea>
+        <span class="small muted">O e-frete cadastra o motorista com esses dados; o celular não pode ser o mesmo de outra pessoa.</span></label>
+      <div class="span2"><div class="small" style="margin:6px 0 2px"><b>Endereço do transportador</b> <span class="muted">(exigido pelo e-frete; também usado para o motorista)</span></div><div class="grid2">${camposEndereco('ct-en', t?.endereco || {}, dis)}</div></div>
       <h3 class="span2" style="margin:8px 0 0">Conta para pagamento do frete</h3>
       <label>Banco<input id="ct-b" value="${esc(t?.conta_banco || '')}" ${dis}></label><label>Agência<input id="ct-ag" value="${esc(t?.conta_agencia || '')}" ${dis}></label>
       <label>Conta<input id="ct-c" value="${esc(t?.conta_numero || '')}" ${dis}></label><label>Pix<input id="ct-px" value="${esc(t?.conta_pix || '')}" ${dis}></label>
@@ -314,6 +323,7 @@ function editarTransp(t, root, depois = null) {
     if (doc && ![11, 14].includes(doc.length)) return toast('CPF com 11 ou CNPJ com 14 dígitos', true);
     const row = { nome: g('ct-n').value.trim().toUpperCase(), documento: doc || null, tipo: g('ct-t').value, favorecido_id: g('ct-f').value || null, rntrc: g('ct-r').value.trim() || null, rntrc_validade: g('ct-rv').value || null,
       veiculos: lerVeiculos(g('ct-vs').value).map(v => ({ ...((t?.veiculos || []).find(o => o.placa === v.placa) || {}), ...Object.fromEntries(Object.entries(v).filter(([, x]) => x != null)) })), conta_banco: g('ct-b').value.trim() || null, conta_agencia: g('ct-ag').value.trim() || null, conta_numero: g('ct-c').value.trim() || null, conta_pix: g('ct-px').value.trim() || null,
+      motoristas: lerMotoristas(g('ct-ms').value, t?.motoristas || []), endereco: lerEndereco('ct-en', md.el),
       conta_titular: g('ct-ti').value.trim() || null, conta_vinculo: g('ct-vi').value || null, ipef: g('ct-ip').value.trim() || null, contrato_validade: g('ct-cv').value || null, observacao: g('ct-o').value.trim() || null, ativo: g('ct-at').checked };
     ev.target.disabled = true;
     try {

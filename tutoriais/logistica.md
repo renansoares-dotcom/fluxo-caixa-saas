@@ -1,8 +1,8 @@
 ---
 titulo: Logística — cargas, entregas e frota
 tela: Logística › Cargas e entregas e Frota e parâmetros
-versao: 1.1
-atualizado: 2026-10-29
+versao: 1.2
+atualizado: 2026-11-04
 ---
 ## 1. Para que serve
 
@@ -58,6 +58,10 @@ Clique em **Salvar parâmetros**.
 
 Clique em **Incluir cliente** e informe o CNPJ/CPF, se ele **só recebe veículo pequeno**, os dias e o horário de recebimento e uma observação.
 
+### 3.4 Parâmetros do e-frete (CIOT)
+
+A aba **e-frete (CIOT)** guarda os parâmetros do CIOT e do pagamento do frete pelo e-frete: ambiente (homologação ou produção), forma de pagamento, adiantamento, quitação, documentos que o posto retém, embalagem, quebra de carga, endereço da empresa e o tipo de carga × código da ANTT. Só o administrador altera. O passo a passo da emissão está no manual **Fretes e CIOT**.
+
 ## 4. Cargas e entregas
 
 ![Figura 2 — Cargas e entregas (dados fictícios)](img/logistica-2.jpg)
@@ -109,3 +113,4 @@ Para as notas que foram entregues **antes** de usar a plataforma, use **Baixa in
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: frota, parâmetros, clientes com restrição, montagem automática de cargas, romaneio, mapa, baixa das entregas e baixa inicial. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 04/11/2026 | Aba **e-frete (CIOT)** em Frota e parâmetros. |

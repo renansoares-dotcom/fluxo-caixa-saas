@@ -52,7 +52,18 @@ export function pendenciasTransp(t, anexos = [], hoje = new Date().toISOString()
 }
 /** tipo sugerido pelo documento: CPF = autônomo; CNPJ = transportadora (confirmar a frota no RNTRC: até 3 veículos = equiparado) */
 export const tipoPeloDoc = (doc) => (String(doc || '').replace(/\D/g, '').length === 11 ? 'tac' : 'etc');
-/** placas: "ABC1D23;5;carreta" por linha */
+/** veículos: "placa;eixos;tipo;renavam;chassi" por linha (renavam e chassi são exigidos pelo e-frete) */
 export const lerVeiculos = (txt) => String(txt || '').split(/\n+/).map(l => l.split(/[;,\t]/).map(x => x.trim())).filter(p => p[0])
-  .map(([placa, eixos, tipo]) => ({ placa: placa.toUpperCase().replace(/[^A-Z0-9]/g, ''), eixos: +eixos || null, tipo: tipo || null }));
-export const veiculosTxt = (vs) => (vs || []).map(v => [v.placa, v.eixos || '', v.tipo || ''].join(';')).join('\n');
+  .map(([placa, eixos, tipo, renavam, chassi]) => ({ placa: placa.toUpperCase().replace(/[^A-Z0-9]/g, ''), eixos: +eixos || null, tipo: tipo || null,
+    renavam: String(renavam || '').replace(/\D/g, '') || null, chassi: String(chassi || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || null }));
+export const veiculosTxt = (vs) => (vs || []).map(v => [v.placa, v.eixos || '', v.tipo || '', v.renavam || '', v.chassi || ''].join(';').replace(/;+$/, '')).join('\n');
+/** motoristas do transportador: "CPF;nome;CNH;nascimento dd/mm/aaaa;celular (DDD+número)" por linha (o e-frete exige no cadastro) */
+export function lerMotoristas(txt, antigos = []) {
+  return String(txt || '').split(/\n+/).map(l => l.split(/;/).map(x => x.trim())).filter(p => p[0]).map(([cpf, nome, cnh, nasc, cel]) => {
+    const d = String(cpf).replace(/\D/g, ''), c = String(cel || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+    const m = String(nasc || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return { ...(antigos.find(a => a.cpf === d) || {}), cpf: d, nome: (nome || '').toUpperCase(), cnh: String(cnh || '').replace(/\D/g, ''),
+      nascimento: m ? `${m[3]}-${m[2]}-${m[1]}` : (/^\d{4}-\d{2}-\d{2}$/.test(nasc || '') ? nasc : ''), ddd: c.slice(0, 2), celular: c.slice(2) };
+  });
+}
+export const motoristasTxt = (ms) => (ms || []).map(m => [m.cpf, m.nome || '', m.cnh || '', m.nascimento ? m.nascimento.split('-').reverse().join('/') : '', `${m.ddd || ''}${m.celular || ''}`].join(';')).join('\n');

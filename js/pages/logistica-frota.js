@@ -1,8 +1,9 @@
-// Logística › Frota e parâmetros: caminhões (capacidade, baú, custo), parâmetros da montagem de cargas e clientes com restrição.
+// Logística › Frota e parâmetros: caminhões (capacidade, baú, custo), parâmetros da montagem de cargas, clientes com restrição e parâmetros do e-frete.
 import { sb, state, q } from '../lib/data.js';
 import { erroTela, $, $$, esc, fail, toast, modal, confirmDialog } from '../lib/ui.js';
 import { carregarBase, podeLogistica, TIPOS_VEICULO, PARAM_PADRAO, municipios } from '../lib/logistica.js';
 import { qtd, inp, num } from '../lib/compras.js';
+import { parametrosEfrete } from '../lib/efrete-ui.js';
 
 export const title = 'Logística — frota e parâmetros';
 const ui = { aba: 'frota' };
@@ -12,13 +13,14 @@ const soDig = (s) => String(s || '').replace(/\D/g, '');
 export async function render(root) {
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Frota e parâmetros</h2><div class="muted small">Base da montagem automática das cargas. ${podeLogistica() ? '' : 'Só admin, financeiro ou diretor alteram.'}</div></div>
       <a class="btn ghost" href="#/logistica">Voltar às cargas</a></div>
-    <div class="card toolbar"><div class="chips" id="lf-abas">${[['frota', 'Veículos'], ['param', 'Parâmetros'], ['cli', 'Clientes com restrição']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
+    <div class="card toolbar"><div class="chips" id="lf-abas">${[['frota', 'Veículos'], ['param', 'Parâmetros'], ['cli', 'Clientes com restrição'], ['efrete', 'e-frete (CIOT)']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div id="lf-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#lf-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
   let B; try { B = await carregarBase(); } catch (err) { fail(err); $('#lf-corpo', root).innerHTML = erroTela(); return; }
   const corpo = $('#lf-corpo', root);
   if (ui.aba === 'frota') return frota(corpo, B, root);
   if (ui.aba === 'param') return parametros(corpo, B, root);
+  if (ui.aba === 'efrete') return parametrosEfrete(corpo, () => render(root));
   return clientes(corpo, B, root);
 }
 

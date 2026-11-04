@@ -1,7 +1,7 @@
 ---
 titulo: Fretes e CIOT
 tela: Logística › Fretes e CIOT
-versao: 1.6
+versao: 1.7
 atualizado: 2026-11-04
 ---
 ## 1. Para que serve
@@ -158,6 +158,29 @@ Para deixar o MDF-e da IPLAMM pronto:
 
 **Padrões do MDF-e**: seguradora, apólice, IPEF, produto, carregamento e responsável pelo CIOT se repetem em quase toda viagem. Grave uma vez em **Salvar como padrão** (na janela do MDF-e) ou em **Padrões do MDF-e** (no painel). Os próximos fretes já vêm preenchidos, e dá para mudar em cada frete.
 
+### 4.7 Emitir o CIOT pelo e-frete
+
+Quando a empresa usa o e-frete, o CIOT sai da própria ficha do frete. Antes da primeira emissão:
+
+1. Em **Logística › Frota e parâmetros › e-frete (CIOT)**, o administrador confere os parâmetros: ambiente, forma de pagamento ao transportador, % de adiantamento, prazo da quitação, documentos que o posto retém, embalagem, quebra de carga, endereço da empresa e o **tipo de carga × código da ANTT**. Nada disso fica fixo no sistema: tudo se ajusta nessa tela.
+2. O quadro do topo mostra se as **credenciais** do e-frete estão cadastradas no servidor (homologação e produção). Os valores nunca aparecem na tela.
+3. No **cadastro do transportador**, preencha o endereço, os **motoristas** (CPF;nome;CNH;nascimento;celular, um por linha) e, em cada veículo, o **RENAVAM** e o **chassi** (placa;eixos;tipo;renavam;chassi).
+
+![Figura — Parâmetros do e-frete (dados fictícios)](img/fretes-ciot-efrete-parametros.jpg)
+
+Para emitir:
+
+1. Salve a ficha do frete e preencha os **Dados do MDF-e** (veículo, condutor, carregamento, descarga e **Buscar NF-e**).
+2. Clique em **Emitir CIOT pelo e-frete**. A plataforma confere tudo e mostra o que falta, separado por onde corrigir: cadastro do transportador, ficha do frete ou parâmetros.
+3. Confira o resumo (contratado, motorista, veículos, rota, NF-e, tipo de carga, valor, adiantamento e quitação) e ajuste o **início** e o **fim previstos** da viagem. O início não pode ser antes de agora.
+4. Clique em **Emitir CIOT**. A plataforma cadastra o proprietário, o veículo e o motorista no e-frete, emite o CIOT, grava o número no frete e guarda o **PDF** nos anexos.
+
+![Figura — Conferência antes de emitir o CIOT (dados fictícios)](img/fretes-ciot-efrete-ciot.jpg)
+
+Depois de emitido, o mesmo botão abre o **PDF do CIOT** e o **Cancelar CIOT** (com motivo). Na carga lotação o CIOT não pode ser corrigido: cancele (e o MDF-e, se já emitido) e emita de novo.
+
+> **Atenção:** no ambiente **Produção** cada CIOT é real e o pagamento pelo e-frete é cobrado. Use **Homologação** para testar. Os impostos retidos do autônomo (INSS, SEST/SENAT e IRRF) ainda vão zerados no CIOT: confira com a contabilidade antes da produção.
+
 ## 5. Regras e travas
 
 - **Piso mínimo** = km × CCD + CC. Com retorno vazio obrigatório, soma 0,92 × CCD × km de retorno. Vale só para **carga lotação**; o pedágio é pago à parte, pelo vale-pedágio.
@@ -211,3 +234,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.4 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.5 | 04/11/2026 | Tabela completa da ANTT (Portaria SUROC nº 22/2026: Tabelas A a D, 12 tipos de carga) carregada no piso mínimo, com filtros por tabela, tipo de carga e só vigentes. |
 | 1.6 | 04/11/2026 | **NF-e do cliente**: a transportadora do grupo escolhe as NF-e do cliente na ficha do frete e no MDF-e, sem importar de novo (autorização IPLAMM → KRATOS). |
+| 1.7 | 04/11/2026 | **CIOT pelo e-frete** na ficha do frete (conferência, emissão, PDF e cancelamento) e **parâmetros do e-frete** em Frota e parâmetros; motoristas, endereço, RENAVAM e chassi no cadastro do transportador. |

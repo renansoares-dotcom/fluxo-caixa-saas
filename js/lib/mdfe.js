@@ -37,7 +37,9 @@ export const limparPlaca = (p) => String(p || '').toUpperCase().replace(/[^A-Z0-
 /** RNTRC: 8 dígitos */
 export const rntrcValido = (r) => /^\d{8}$/.test(String(r ?? '').replace(/[\s.\-/]/g, ''));
 /** CIOT: 12 dígitos (tipo TCIOT do leiaute) */
-export const ciotValido = (c) => /^\d{12}$/.test(soDig(c));
+// CIOT: 12 dígitos; o e-frete devolve "NNNNNNNNNNNN/VVVV" (código + verificador) — vale o número antes da barra
+export const ciot12 = (c) => soDig(String(c || '').split('/')[0]);
+export const ciotValido = (c) => /^\d{12}$/.test(ciot12(c));
 export const docValido = (d) => { const x = soDig(d); return x.length === 11 ? cpfValido(x) : x.length === 14 ? cnpjValido(x) : false; };
 
 /** a IPLAMM emite o MDF-e (carga própria) com veículo de terceiro: CIOT obrigatório (NT 2026.001, rejeição 684) */
@@ -170,7 +172,7 @@ export function montarMDFe(f, t, emp, padrao = {}) {
     emit: { CNPJ: soDig(emp?.cnpj), IE: soDig(emp?.ie), xNome: emp?.razao_social || emp?.nome || '' },
     infModal: { rodo: {
       infANTT: {
-        infCIOT: ciotValido(f.ciot) ? [{ CIOT: soDig(f.ciot), [soDig(d.ciot_resp).length === 11 ? 'CPF' : 'CNPJ']: soDig(d.ciot_resp) }] : [],
+        infCIOT: ciotValido(f.ciot) ? [{ CIOT: ciot12(f.ciot), [soDig(d.ciot_resp).length === 11 ? 'CPF' : 'CNPJ']: soDig(d.ciot_resp) }] : [],
         valePed: !f.pedagio_nao_ha && +f.pedagio_valor > 0 ? { disp: [{ CNPJForn: soDig(d.pedagio.cnpj_forn), CNPJPg: soDig(d.pedagio.cnpj_pagador) || undefined, nCompra: f.pedagio_comprovante || '', vValePed: r2(f.pedagio_valor) }] } : null,
         infContratante: [{ CNPJ: soDig(emp?.cnpj), xNome: emp?.razao_social || emp?.nome || '' }],
         infPag: ehAutonomo(t) ? [{

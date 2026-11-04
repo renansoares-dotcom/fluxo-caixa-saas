@@ -409,3 +409,17 @@ Object.assign(window.RPC, {
     { nota_id: 'n3', origem: 'INDÚSTRIA EXEMPLO LTDA', numero: 50095, serie: '1', chave: '2626', emissao: '2026-10-18', dest_nome: 'DISTRIBUIDORA GAMA', dest_uf: 'AL', xmun: 'Maceió', v_nf: 12780, peso_kg: null, transp_doc: null, transp_nome: null, mod_frete: '9', desta_empresa: false },
   ],
 });
+
+// e-frete (SQL 082) — parâmetros e tipos de carga FICTÍCIOS
+DB.efrete_config = [{ empresa_id: E, ambiente: 'homologacao', tipo_viagem: 'Padrao', tipo_pagamento: 'eFRETE', pct_adiantamento: 40, dias_liberacao_quitacao: 2, prazo_viagem_horas: 48,
+  docs_credenciado: ['Canhoto da NF-e assinado pelo destinatario', 'Comprovante de entrega da carga'], entrega_documentacao: 'RedeCredenciada', tipo_embalagem: 'Pallet', unidade_medida: 'Kg',
+  tipo_calculo: 'SemQuebra', tolerancia_tipo: 'Nenhum', tolerancia_valor: 0, contratante_endereco: { rua: 'RUA DO EXEMPLO', numero: '100', bairro: 'CENTRO', cep: '55000000', cmun: '2604106' }, observacoes_transportador: [] }];
+DB.efrete_tipos_carga = [['granel sólido', 1], ['granel líquido', 2], ['frigorificada', 3], ['conteinerizada', 4], ['geral', 5], ['neogranel', 6], ['perigosa granel sólido', 7], ['perigosa granel líquido', 8],
+  ['perigosa frigorificada', 9], ['perigosa conteinerizada', 10], ['perigosa geral', 11], ['granel pressurizada', 12]].map(([tipo_carga, codigo]) => ({ empresa_id: E, tipo_carga, codigo }));
+// respostas FICTÍCIAS da função e-frete para as figuras do manual
+window.FN = {
+  status: () => ({ ambiente: 'homologacao', ponte: true, empresa_integrada: true, segredos: { homologacao: { integrador: true, usuario: true, senha: true }, producao: { integrador: false, usuario: false, senha: false } } }),
+  ciot_previa: () => ({ ambiente: 'homologacao', faltas: [{ onde: 'transportador', txt: 'chassi do veículo JKL2M34 (17 caracteres)' }, { onde: 'transportador', txt: 'motorista do CPF 11144477735 no cadastro do transportador (CNH, nascimento, celular)' }],
+    resumo: { contratado: 'JOSÉ CARLOS DA SILVA', motorista: null, placas: ['JKL2M34'], origem: 'Caruaru', destino: 'Salvador', valor: 6300, adiantamento: 2520, quitacao: 3780, pagamento: 'eFRETE',
+      notas: [4521, 4522], peso: 12400, tipo_carga: 'geral', codigo_antt: 5 }, inicio: '2026-10-30T11:00:00.000Z', fim: '2026-11-01T11:00:00.000Z' }),
+};
