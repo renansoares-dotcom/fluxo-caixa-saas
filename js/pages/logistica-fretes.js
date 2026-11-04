@@ -1,7 +1,7 @@
 // Logística › Fretes e CIOT (SQL 054): ficha de cada frete contratado, cadastro de transportadores, piso mínimo da ANTT,
 // conformidade do mês (fretes pagos sem ficha, pelo caixa, a pessoa física) e relatório para imprimir.
 // Autônomo: pagamento só é liberado sem pendências (trava no banco). Transportadora: CIOT/MDF-e/piso viram aviso.
-import { sb, state, q, fetchAll, loadCadastros } from '../lib/data.js';
+import { sb, state, q, fetchAll, loadCadastros, isAdmin } from '../lib/data.js';
 import { erroTela, $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, options, today } from '../lib/ui.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 import { podeLogistica } from '../lib/logistica.js';
@@ -696,7 +696,7 @@ function prontidao(corpo, root) {
       ${kpi(`Viagens com MDF-e da ${esc(nomeCurto())}`, ipl.length, 'últimos 45 dias e futuras')}${kpi('Prontas para emitir', prontos.length, ipl.length ? `${Math.round(prontos.length / ipl.length * 100)}%` : '', prontos.length === ipl.length && ipl.length ? 'pos' : '')}
       ${kpi('Sem CIOT', semCiot.length, semCiot.length ? 'seriam recusadas após 23/11' : 'nenhuma', semCiot.length ? 'neg' : '')}</div>
     <div class="grid2" style="margin-top:12px;align-items:start">
-      <div class="card"><div class="card-head"><h3 style="margin:0">Preparação da empresa</h3>${pode ? '<button class="btn small" id="pr-pad">Padrões do MDF-e</button>' : ''}</div>
+      <div class="card"><div class="card-head"><h3 style="margin:0">Preparação da empresa</h3><span>${isAdmin() ? '<button class="btn small ghost" id="pr-efrete" title="Confere a conexão com a API do e-frete (login e consulta, sem emitir nada)">Testar e-frete</button> ' : ''}${pode ? '<button class="btn small" id="pr-pad">Padrões do MDF-e</button>' : ''}</span></div>
         ${conf.map(([t, ok]) => `<div class="small" style="padding:4px 0">${ok ? '<span class="pos">✓</span>' : '<span class="neg">✗</span>'} ${esc(t)}</div>`).join('')}
         <p class="small muted" style="margin-bottom:0">A IPEF gera o CIOT e paga o autônomo (Res. ANTT 6.078/2026). Sem IPEF contratada, o MDF-e com autônomo é recusado a partir de 23/11.</p></div>
       <div class="card"><h3 style="margin:0 0 6px">Como usar</h3><ol class="small" style="margin:0;padding-left:18px;line-height:1.6">
@@ -710,5 +710,26 @@ function prontidao(corpo, root) {
       <td class="small">${f.mdfe_chave ? '<span class="badge pago">Emitido</span>' : f.mdfe_emissor !== 'iplamm' ? '<span class="muted">—</span>' : gr.length ? `<span class="badge vencido">Falta ${gr.length}</span><div class="muted">${esc(gr.slice(0, 3).map(x => x.txt).join('; '))}${gr.length > 3 ? '…' : ''}</div>` : '<span class="badge pago">Pronto para emitir</span>'}</td></tr>`).join('')
       || '<tr><td colspan="6" class="empty">Nenhum frete nos últimos 45 dias. Cadastre em Fretes › Novo frete.</td></tr>'}</tbody></table></div></div>`;
   $('#pr-pad', corpo) && ($('#pr-pad', corpo).onclick = () => padroesMDFe(root));
+  $('#pr-efrete', corpo) && ($('#pr-efrete', corpo).onclick = testarEfrete);
   $$('tr[data-id]', corpo).forEach(tr => tr.onclick = () => { const f = B.F.find(x => x.id === tr.dataset.id); f.mdfe_emissor === 'iplamm' ? fichaMDFe(f, root) : ficha(f, root); });
+}
+
+// Integração e-frete (função de servidor "efrete"): login + consulta de tipos de carga, sem emitir nada. Resultado também fica em efrete_chamadas.
+async function testarEfrete() {
+  const m = modal({ title: 'Integração e-frete — teste de conexão', body: '<div class="loading">Conectando ao e-frete…</div>' });
+  const b = m.el.querySelector('.modal-body');
+  try {
+    const { data, error } = await sb.functions.invoke('efrete', { body: { acao: 'diagnostico' } });
+    let r = data;
+    if (error) { try { r = await error.context.json(); } catch { r = { erro: error.message }; } }
+    const lin = (t, v, ok) => `<tr><td>${esc(t)}</td><td class="${ok == null ? '' : ok ? 'pos' : 'neg'}">${v}</td></tr>`;
+    const tipos = r?.tiposDeCarga?.dados;
+    b.innerHTML = r?.erro ? `<p class="neg">${esc(r.erro)}</p>` : `<table>
+      ${lin('Ambiente', esc(r.ambiente === 'producao' ? 'Produção' : 'Homologação') + ` <span class="muted small">${esc(r.base || '')}</span>`)}
+      ${lin('Login', r.login?.ok ? `✓ conectado (${esc(r.login.via)})` : '✗ não conectou', !!r.login?.ok)}
+      ${(r.login?.tentativas || []).map((t, i) => lin(`Tentativa ${i + 1}`, `HTTP ${t.status} · ${t.ms} ms${t.excecao ? ' · ' + esc(t.excecao.Mensagem || JSON.stringify(t.excecao)) : ''}${t.texto ? ' · ' + esc(t.texto.slice(0, 160)) : ''}`)).join('')}
+      ${r.tiposDeCarga ? lin('Consulta de tipos de carga', r.tiposDeCarga.sucesso ? '✓ respondeu' : `✗ HTTP ${r.tiposDeCarga.status}`, !!r.tiposDeCarga.sucesso) : ''}
+      </table>${tipos ? `<details style="margin-top:8px"><summary class="small">Resposta da consulta</summary><pre class="small" style="white-space:pre-wrap">${esc(JSON.stringify(tipos, null, 1).slice(0, 3000))}</pre></details>` : ''}
+      <p class="small muted">Nenhum CIOT foi emitido. A senha e o hash ficam só no servidor.</p>`;
+  } catch (e) { b.innerHTML = `<p class="neg">${esc(e.message || String(e))}</p>`; }
 }
