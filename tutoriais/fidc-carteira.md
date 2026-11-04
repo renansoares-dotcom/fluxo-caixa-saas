@@ -1,7 +1,7 @@
 ---
 titulo: Carteira cedida — liquidação dos títulos nos fundos
 tela: Financeiro › Crédito / FIDC › Carteira cedida
-versao: 1.2
+versao: 1.3
 atualizado: 2026-11-04
 ---
 ## 1. Para que serve
@@ -39,6 +39,7 @@ Todos os usuários da empresa consultam. O administrador e o financeiro importam
 1. Tire no site do fundo o relatório de títulos pagos. Pode ser o ano inteiro.
    - **Negocial:** Consulta de títulos pagos, PDF "PAGOS - ANALÍTICO".
    - **Contato:** Títulos Liquidados (CONTROLE FIDC), em PDF.
+   - **Vector:** Títulos Liquidados (Controle de Factoring), em PDF. É o mesmo leiaute da Contato.
    - **FS:** Extrato de Títulos por Sacado, em PDF, com **Situação: Liquidados** e **Layout: Analítico**.
 2. Clique em **Importar relatório de pagos**, escolha o **fundo** e o arquivo.
 3. A plataforma mostra:
@@ -50,7 +51,7 @@ Todos os usuários da empresa consultam. O administrador e o financeiro importam
    - os títulos com valor diferente do borderô.
 4. Clique em **Importar**. Reimportar o mesmo relatório atualiza as linhas, sem duplicar.
 
-> **Fundos:** os leitores da **Negocial**, da **Contato** e da **FS** estão prontos. O da Vector entra quando chegar um exemplo do relatório dela.
+> **Fundos:** os quatro leitores estão prontos: **Negocial**, **Contato**, **Vector** e **FS**.
 
 Como a plataforma entende cada tipo de baixa:
 
@@ -62,11 +63,12 @@ Como a plataforma entende cada tipo de baixa:
 | Contato | LIQ BANCO BOLETO, PGTO EM CARTORIO | Pago pelo cliente |
 | Contato | PGTO BORDERO TITULO, BAIXA NAO COMISSIONADO | Recomprado (descontado num borderô) |
 | Contato | Documento com o CNPJ da empresa (NC…, acordos) | Recomprado; cada pagamento parcial fica separado, pela data |
+| Vector | LIQUIDACAO COBRANCA | Pago pelo cliente (os demais tipos de baixa seguem a regra da Contato) |
 | FS | Sem ocorrência, PR (prorrogado), CT (cartório), PT (protestado) | Pago pelo cliente |
 | FS | BX (baixado) | Outro: confira com o fundo |
 | FS | RC (recomprado), IR (indicado para recompra) | Recomprado |
 
-O relatório da Contato não traz o borderô: o título é ligado pela nota e parcela, na cessão mais recente antes do pagamento.
+Os relatórios da Contato e da Vector não trazem o borderô: o título é ligado pela nota e parcela, na cessão mais recente antes do pagamento.
 
 O relatório da FS também não traz o borderô. O título é ligado pela nota e parcela, na cessão com a **mesma data de operação**; a coluna Emissão do extrato é essa data. No extrato da FS:
 
@@ -97,3 +99,4 @@ O relatório da FS também não traz o borderô. O título é ligado pela nota e
 | 1.0 | 30/10/2026 | Primeira versão: carteira cedida por fundo, situação de cada título, importação do relatório de pagos da Negocial e alerta no Decision Center (SQL 073). |
 | 1.1 | 30/10/2026 | Leitor do relatório de títulos liquidados da Contato; tabela dos tipos de baixa de cada fundo. |
 | 1.2 | 04/11/2026 | Leitor do extrato de títulos liquidados da FS, ligado pela data da operação. |
+| 1.3 | 04/11/2026 | Leitor do relatório de títulos liquidados da Vector. |

@@ -98,6 +98,8 @@ export function parseFS(texto) {
 export const LEITORES = {
   Negocial: { nome: 'Negocial — Consulta de títulos pagos (PDF "PAGOS - ANALÍTICO")', ler: parseNegocial, reconhece: (t) => /PAGOS\s*-\s*ANAL[IÍ]TICO/i.test(t) },
   Contato: { nome: 'Contato — Títulos Liquidados (PDF "CONTROLE FIDC")', ler: (t, o) => parseContato(t, o), reconhece: (t) => /T[ií]tulos\s+Liquidados/i.test(t) && /CONTATO/i.test(t) },
+  Vector: { nome: 'Vector — Títulos Liquidados (PDF "Controle de Factoring", mesmo leiaute da Contato)', ler: (t, o) => parseContato(t, o),
+    reconhece: (t) => /T[ií]tulos\s+Liquidados/i.test(t) && /VECTOR/i.test(t) },
   FS: { nome: 'FS — Extrato de Títulos por Sacado, situação Liquidados, layout Analítico (PDF da GPA Factoring)', ler: parseFS,
     reconhece: (t) => /Extrato de T[ií]tulos/i.test(t) && /Liquidados/i.test(t) && /Anal[ií]tico/i.test(t) },
 };

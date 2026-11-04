@@ -112,3 +112,20 @@ test('lê o extrato de liquidados da FS e casa pela data da operação', () => {
   const c = L.casar([r[1]], [{ id: 'velho', titulo: '20002-002', bordero: '10', data_operacao: '2026-01-10', valor: 5181.6 }, { id: 'novo', titulo: '20002-002', bordero: '20', data_operacao: '2026-05-08', valor: 5181.6 }, { id: 'depois', titulo: '20002-002', bordero: '30', data_operacao: '2026-06-01', valor: 5181.6 }]);
   assert.equal(c.linhas[0].fidc_titulo_id, 'novo');
 });
+
+test('lê o relatório de liquidados da Vector (mesmo leiaute da Contato)', () => {
+  const V = `VECTOR   Controle de Factoring
+Títulos Liquidados
+Documento Venc.   CPF/CNPJ   Sacado   Orig.   Encargos Desc.   Vlr.Pago Tp. Dt Liqu   Tp de Baixa   C.S. Fl
+EMPRESA EXEMPLO
+30001   25/08/26 11222333000181 CLIENTE ALFA LTD   55,388.20   0.00 0.00   55,388.20 D 25/08/26   LIQUIDACAO   20
+COBRANCA
+30002-1   01/10/26 22333444000105 CLIENTE BETA LTD   12,775.56   12.40 0.00   12,787.96 D 03/10/26   LIQUIDACAO   20
+COBRANCA
+68,163.76   12.40 0.00   68,176.16
+Total   68,163.76   12.40 0.00   68,176.16`;
+  assert.ok(L.LEITORES.Vector.reconhece(V)); assert.ok(!L.LEITORES.Contato.reconhece(V)); assert.ok(!L.LEITORES.FS.reconhece(V));
+  const r = L.LEITORES.Vector.ler(V, {});
+  assert.deepEqual(r.map(x => [x.titulo, x.quitacao, x.valor_face, x.mora, x.valor_pago, x.tipo, x.tipo_fundo]),
+    [['30001', '2026-08-25', 55388.2, 0, 55388.2, 'normal', 'LIQUIDACAO COBRANCA'], ['30002-1', '2026-10-03', 12775.56, 12.4, 12787.96, 'normal', 'LIQUIDACAO COBRANCA']]);
+});
