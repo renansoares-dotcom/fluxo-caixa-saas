@@ -143,6 +143,13 @@ Deno.serve(async (req) => {
     if (faltam.length) return json({ ambiente, erro: 'Segredos não cadastrados: ' + faltam.join(', ') }, 400);
 
     if (acao === 'diagnostico') {
+      // rede: mesmas conexões em páginas sem login, para separar bloqueio de rede × exigência de certificado na pasta /Services
+      const rede: Record<string, string> = {};
+      for (const p of ['/', '/Suporte', '/Services/LogonService.asmx']) {
+        const ini = Date.now();
+        try { const c = cliente(); const r = await fetch(BASE() + p, { method: 'GET', redirect: 'manual', ...(c ? { client: c } : {}) } as RequestInit); await r.body?.cancel(); rede[p] = `HTTP ${r.status} · ${Date.now() - ini} ms`; }
+        catch (e) { rede[p] = 'falha · ' + erroLimpo(e).replace(/^.*?\): /, '').slice(0, 160); }
+      }
       const L = await login();
       let tipos: unknown = null;
       if (L.token) {
@@ -150,7 +157,7 @@ Deno.serve(async (req) => {
         tipos = resumo(t); if ((t.dados as { Sucesso?: boolean })?.Sucesso) tipos = { ...resumo(t), dados: t.dados };
         await logout(L.token);
       }
-      return json({ ambiente, base: BASE(), login: { ok: !!L.token, via: L.via, tentativas: L.tentativas }, tiposDeCarga: tipos });
+      return json({ ambiente, base: BASE(), rede, login: { ok: !!L.token, via: L.via, tentativas: L.tentativas }, tiposDeCarga: tipos });
     }
 
     const m = LEITURA[acao];
