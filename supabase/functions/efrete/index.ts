@@ -5,6 +5,7 @@
 // Quem chama: usuário logado que seja admin/financeiro/diretor da empresa com o CNPJ de EFRETE_CNPJ, ou admin da plataforma.
 // Etapa 1 (04/11/2026): só diagnóstico e consultas (login, situação do transportador, tipos de carga) — nada é emitido.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
+import https from 'node:https';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +25,7 @@ const LEITURA: Record<string, { path: string; http: 'GET' | 'POST'; versao: numb
 };
 
 // esconde token/senha de qualquer texto devolvido
-const mascarar = (t: string) => t.replace(/("?(Token|Senha)"?\s*[:=]\s*"?)[^",&}\s]+/gi, '$1***');
+const mascarar = (t: string) => t.replace(/("?(Token|Senha|Usuario|Integrador)"?\s*[:=]\s*"?)[^",&}\s]+/gi, '$1***');
 
 // registro de cada chamada (tabela efrete_chamadas, SQL 079) — sem token, senha nem hash
 const SECRETOS = new Set(['Token', 'Senha', 'Integrador', 'Usuario']);
@@ -40,15 +41,52 @@ async function registrar(metodo: string, corpo: Record<string, unknown>, r: { st
   } catch { /* SQL 079 ainda não rodou: segue sem registro */ }
 }
 
+// o servidor do e-frete recusa HTTP/2 ("endpoint requires HTTP/1.1"): cliente só com HTTP/1.1
+let _cli: unknown = null;
+function cliente() {
+  if (_cli === null) {
+    try { _cli = (Deno as unknown as { createHttpClient: (o: Record<string, unknown>) => unknown }).createHttpClient({ http1: true, http2: false }); }
+    catch { _cli = undefined; }
+  }
+  return _cli || undefined;
+}
+// alternativa quando o fetch não aceita forçar HTTP/1.1: node:https (sempre HTTP/1.1)
+function http11(url: URL, metodo: string, corpo?: string): Promise<Response> {
+  return new Promise((ok, falha) => {
+    const req = https.request(url, { method: metodo, headers: { Accept: 'application/json', ...(corpo ? { 'Content-Type': 'application/json', 'Content-Length': String(new TextEncoder().encode(corpo).length) } : {}) } }, (res) => {
+      const partes: Uint8Array[] = [];
+      res.on('data', (c: Uint8Array) => partes.push(c));
+      res.on('end', () => ok(new Response(new Blob(partes), { status: res.statusCode || 0 })));
+    });
+    req.on('error', falha); req.setTimeout(30000, () => req.destroy(new Error('tempo esgotado (30 s)')));
+    if (corpo) req.write(corpo); req.end();
+  });
+}
+// mensagem de erro sem o endereço com parâmetros (que podem levar a senha) e sem credenciais
+const erroLimpo = (e: unknown) => mascarar(String((e as Error)?.message || e).replace(/https?:\/\/\S+/g, (u) => u.split('?')[0]));
+
 async function chamar(path: string, http: 'GET' | 'POST', corpo: Record<string, unknown>) {
   const url = new URL(BASE() + path);
   const ini = Date.now();
   let r: Response;
-  if (http === 'GET') {
-    for (const [k, v] of Object.entries(corpo)) if (v != null && typeof v !== 'object') url.searchParams.set(k, String(v));
-    r = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } });
-  } else {
-    r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(corpo) });
+  const client = cliente();
+  try {
+    if (http === 'GET') {
+      for (const [k, v] of Object.entries(corpo)) if (v != null && typeof v !== 'object') url.searchParams.set(k, String(v));
+      r = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' }, ...(client ? { client } : {}) } as RequestInit);
+    } else {
+      r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(corpo), ...(client ? { client } : {}) } as RequestInit);
+    }
+  } catch (e) {
+    try {
+      if (!/http2|HTTP\/1\.1/i.test(String((e as Error)?.message))) throw e;
+      if (http === 'GET') r = await http11(url, 'GET');
+      else r = await http11(url, 'POST', JSON.stringify(corpo));
+    } catch (e2) {
+      const res = { status: 0, ms: Date.now() - ini, dados: null, texto: 'Falha de conexão: ' + erroLimpo(e2) };
+      await registrar(`${http} ${path.split('/').pop()}`, corpo, res);
+      return res;
+    }
   }
   const texto = await r.text();
   let dados: unknown = null; try { dados = JSON.parse(texto); } catch { /* não é JSON */ }
@@ -59,12 +97,12 @@ async function chamar(path: string, http: 'GET' | 'POST', corpo: Record<string, 
 
 async function login() {
   const corpo = { Usuario: env('EFRETE_USUARIO'), Senha: env('EFRETE_SENHA'), Integrador: env('EFRETE_INTEGRADOR'), Versao: 1 };
-  // a lista de URLs do kit diz GET; o exemplo do manual é JSON — tenta os dois e informa qual funcionou
-  const a = await chamar('/Services/Logon/Login', 'GET', corpo);
+  // o exemplo do manual é JSON (POST, senha no corpo); a lista de URLs do kit diz GET — tenta POST primeiro
   const ok = (x: { dados: unknown }) => !!(x.dados as { Token?: string; Sucesso?: boolean })?.Token;
-  if (ok(a)) return { token: (a.dados as { Token: string }).Token, via: 'GET', tentativas: [resumo(a)] };
-  const b = await chamar('/Services/Logon/Login', 'POST', corpo);
-  if (ok(b)) return { token: (b.dados as { Token: string }).Token, via: 'POST', tentativas: [resumo(a), resumo(b)] };
+  const a = await chamar('/Services/Logon/Login', 'POST', corpo);
+  if (ok(a)) return { token: (a.dados as { Token: string }).Token, via: 'POST', tentativas: [resumo(a)] };
+  const b = await chamar('/Services/Logon/Login', 'GET', corpo);
+  if (ok(b)) return { token: (b.dados as { Token: string }).Token, via: 'GET', tentativas: [resumo(a), resumo(b)] };
   return { token: null, via: null, tentativas: [resumo(a), resumo(b)] };
 }
 const resumo = (x: { status: number; ms: number; dados: unknown; texto?: string }) => {
@@ -124,7 +162,7 @@ Deno.serve(async (req) => {
     await logout(L.token);
     return json({ ambiente, status: r.status, dados: r.dados, texto: r.texto });
   } catch (e) {
-    console.error(e);
-    return json({ erro: (e as Error).message }, 500);
+    console.error(erroLimpo(e));
+    return json({ erro: erroLimpo(e) }, 500);
   }
 });
