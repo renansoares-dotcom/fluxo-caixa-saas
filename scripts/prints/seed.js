@@ -399,3 +399,13 @@ DB.empresa_tributacao = [
     simples_atividades: [{ cnae: '2222-6/00', descricao: 'Fabricação de embalagens de material plástico', anexo: 'II', fator_r: false }, { cnae: '4930-2/02', descricao: 'Transporte rodoviário de cargas intermunicipal', anexo: 'III', fator_r: false }],
     sublimite_excedido: false, ibscbs_regular: true, incentivos: null, uf: 'PE', municipio_ibge: '2604106', cnae_principal: '2222-6/00', contabilidade: 'Escritório Contábil Exemplo', fonte: 'Opção no Portal do Simples (setembro/2026)' },
 ];
+
+// NF-e do cliente para o transporte (SQL 081) — dados FICTÍCIOS
+DB.nfe_compartilhamento = [{ id: id('nc'), empresa_origem: 'emp-cliente', empresa_destino: E, empresa_id: 'emp-cliente', finalidade: 'transporte', ativo: true, desde: '2026-01-01' }];
+Object.assign(window.RPC, {
+  log_nfe_cliente: () => [
+    { nota_id: 'n1', origem: 'INDÚSTRIA EXEMPLO LTDA', numero: 50101, serie: '1', chave: '2626', emissao: '2026-10-20', dest_nome: 'COMERCIAL ALFA LTDA', dest_uf: 'PE', xmun: 'Recife', v_nf: 18450.5, peso_kg: 2300, transp_doc: '00000000000100', transp_nome: 'TRANSPORTADORA EXEMPLO', mod_frete: '0', desta_empresa: true },
+    { nota_id: 'n2', origem: 'INDÚSTRIA EXEMPLO LTDA', numero: 50098, serie: '1', chave: '2626', emissao: '2026-10-19', dest_nome: 'MERCADO BETA LTDA', dest_uf: 'PB', xmun: 'Campina Grande', v_nf: 9200, peso_kg: 1100, transp_doc: null, transp_nome: null, mod_frete: '0', desta_empresa: false },
+    { nota_id: 'n3', origem: 'INDÚSTRIA EXEMPLO LTDA', numero: 50095, serie: '1', chave: '2626', emissao: '2026-10-18', dest_nome: 'DISTRIBUIDORA GAMA', dest_uf: 'AL', xmun: 'Maceió', v_nf: 12780, peso_kg: null, transp_doc: null, transp_nome: null, mod_frete: '9', desta_empresa: false },
+  ],
+});

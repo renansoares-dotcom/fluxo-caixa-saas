@@ -1,7 +1,7 @@
 ---
 titulo: Fretes e CIOT
 tela: Logística › Fretes e CIOT
-versao: 1.5
+versao: 1.6
 atualizado: 2026-11-04
 ---
 ## 1. Para que serve
@@ -66,6 +66,24 @@ O registro de cada frete é a **ficha do frete**. A tela também guarda o cadast
 8. Abra a ficha de novo e anexe os documentos: CIOT, MDF-e, CT-e, vale-pedágio, contrato e comprovantes.
 
 A ficha mostra na hora o que falta. Para autônomo aparece **Pagamento travado (autônomo): falta ...**; para transportadora, **Avisos: falta ...**.
+
+#### NF-e do cliente (transportadora do grupo)
+
+Quando a empresa é a **transportadora** e o cliente também usa a plataforma (por exemplo, a KRATOS levando as cargas da IPLAMM), não é preciso importar de novo as notas do cliente. Elas já estão na empresa do cliente.
+
+1. O **administrador do cliente** autoriza a transportadora a usar as NF-e de saída no transporte. A autorização da IPLAMM para a KRATOS já está feita.
+2. Na ficha do frete da transportadora, clique em **+ escolher NF-e do cliente**, logo abaixo de **NF-e transportadas**.
+3. Escolha o período (a plataforma sugere 7 dias antes da viagem até o dia seguinte) e, se quiser, o número ou o nome do destinatário. Clique em **Buscar**.
+4. As notas que já trazem a transportadora no campo **Transportadora** da NF-e vêm primeiro e já marcadas. As outras mostram "não informada" ou "sem frete": confira pelo destino e pela data.
+5. Clique em **Usar as marcadas**. Os números entram em **NF-e transportadas** e, se o destino estiver vazio, ele é preenchido.
+
+![Figura — Escolher as NF-e do cliente na ficha do frete (dados fictícios)](img/fretes-ciot-nfe-cliente.jpg)
+
+No **MDF-e**, o botão **Buscar NF-e** também acha essas notas pelo número, com a chave, o destino, o peso e o valor.
+
+> **Importante:** as notas do cliente **não** entram no faturamento nem nos impostos da transportadora. A receita da transportadora é o documento que ela emite (CT-e ou NFS-e). A transportadora vê só o que o transporte precisa; as notas canceladas ficam de fora. O cliente pode desligar a autorização a qualquer momento.
+
+> **Dica:** peça ao faturamento do cliente para informar a transportadora na NF-e (grupo **Transportador**). Assim as notas aparecem marcadas sozinhas.
 
 ### 4.3 Pagar o frete
 
@@ -192,3 +210,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.3 | 29/10/2026 | Conferência do pedido de CIOT à IPEF na janela do MDF-e e botão **XML (teste)** com o XML do MDF-e no leiaute 3.00, conferido contra os esquemas oficiais. |
 | 1.4 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.5 | 04/11/2026 | Tabela completa da ANTT (Portaria SUROC nº 22/2026: Tabelas A a D, 12 tipos de carga) carregada no piso mínimo, com filtros por tabela, tipo de carga e só vigentes. |
+| 1.6 | 04/11/2026 | **NF-e do cliente**: a transportadora do grupo escolhe as NF-e do cliente na ficha do frete e no MDF-e, sem importar de novo (autorização IPLAMM → KRATOS). |

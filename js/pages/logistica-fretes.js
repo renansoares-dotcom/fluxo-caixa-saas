@@ -40,7 +40,9 @@ async function carregar() {
   const ids = F.map(f => f.lancamento_id).filter(Boolean);
   const L = new Map();
   for (let i = 0; i < ids.length; i += 150) for (const l of await q(sb.from('lancamentos').select('id,status,data,valor,conta_id').in('id', ids.slice(i, i + 150)))) L.set(l.id, l);
-  B = { T, F, A, C, K, L, P, semMdfe, parId, tById: Object.fromEntries(T.map(t => [t.id, t])), plano: state.cad.contasPlano.find(p => p.codigo === PLANO_FRETE) };
+  // NF-e de clientes que autorizaram esta empresa a usar as notas no transporte (SQL 081)
+  const NC = await q(sb.from('nfe_compartilhamento').select('empresa_origem, desde').eq('empresa_destino', e).eq('ativo', true)).catch(() => []);
+  B = { T, F, A, C, K, L, P, NC, semMdfe, parId, tById: Object.fromEntries(T.map(t => [t.id, t])), plano: state.cad.contasPlano.find(p => p.codigo === PLANO_FRETE) };
   return B;
 }
 const anexosDe = (f) => B.A.filter(a => (f.id && a.frete_id === f.id) || (a.transportador_id && a.transportador_id === f.transportador_id && a.tipo === 'contrato'));
@@ -134,7 +136,7 @@ function ficha(f0, root, pre = {}) {
         ${pode ? '<a href="#" id="fr-novo-t" class="small">+ cadastrar transportador</a>' : ''}</label>
       <label>Data da viagem *<input type="date" id="fr-d" value="${f.data}" ${dis}></label>
       <label>Carga da logística<select id="fr-k" ${dis} data-nobusca><option value="">—</option>${cargas.map(k => `<option value="${k.id}" ${k.id === f.carga_id ? 'selected' : ''}>Carga ${k.numero} · ${dateBR(k.data)}</option>`).join('')}</select></label>
-      <label class="grow">NF-e transportadas<input id="fr-n" value="${esc(f.notas || '')}" placeholder="36435, 36440" ${dis}></label>
+      <label class="grow">NF-e transportadas<input id="fr-n" value="${esc(f.notas || '')}" placeholder="36435, 36440" ${dis}>${pode && B.NC?.length ? '<a href="#" id="fr-nc" class="small">+ escolher NF-e do cliente</a>' : ''}</label>
       <label>Origem<input id="fr-o" value="${esc(f.origem || 'Caruaru/PE')}" ${dis}></label>
       <label>Destino<input id="fr-de" value="${esc(f.destino || '')}" placeholder="cidade/UF" ${dis}></label>
       <label>Distância (km, ida) *<input id="fr-km" value="${inp(f.km)}" ${dis}></label>
@@ -206,6 +208,11 @@ function ficha(f0, root, pre = {}) {
     const [r] = await q(sb.from('log_fretes').insert({ ...x, empresa_id: state.empresa.id, lancamento_id: pre.lancamento_id || null }).select('id'));
     return r.id;
   };
+  g('fr-nc') && (g('fr-nc').onclick = (ev) => { ev.preventDefault(); escolherNotasCliente(g('fr-d').value || today(), (ns) => {
+    const atuais = String(g('fr-n').value || '').split(/[^\d]+/).filter(Boolean);
+    g('fr-n').value = [...new Set([...atuais, ...ns.map(n => String(n.numero))])].join(', ');
+    const d = ns.find(n => n.xmun); if (d && !g('fr-de').value.trim()) g('fr-de').value = `${d.xmun}/${d.dest_uf || ''}`;
+  }); });
   g('fr-ok') && (g('fr-ok').onclick = async (ev) => { ev.target.disabled = true; try { await salvar(); md.close(); toast('Frete salvo'); render(root); } catch (err) { fail(err); ev.target.disabled = false; } });
   md.el.addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
@@ -414,6 +421,37 @@ async function relatorio(F, semFicha, caixa, pf, dispensados = []) {
     <h2>3. Dispensados com justificativa (${dispensados.length} · ${tot(dispensados)})</h2>
     <table><thead><tr><th>Data</th><th>Favorecido / descrição</th><th class="n">Valor</th><th>Motivo</th><th>Justificativa</th><th>Por</th></tr></thead><tbody>${dispensados.map(l => `<tr><td>${dateBR(l.data)}</td><td>${esc(state.cad.favById[l.favorecido_id]?.nome || l.descricao || '')}</td><td class="n">${money(l.valor)}</td><td>${MOTIVOS[l.d.motivo]}</td><td>${esc(l.d.justificativa)}</td><td>${esc((l.d.criado_email || '').split('@')[0])} ${dateBR(l.d.criado_em)}</td></tr>`).join('') || '<tr><td colspan="6">Nenhum.</td></tr>'}</tbody></table>`,
     rodape: 'Base: Resolução ANTT nº 6.078/2026, MP nº 1.343/2026 e NT MDF-e 2026.001. Frete com autônomo deve ter CIOT gerado pela IPLAMM via IPEF, MDF-e com o CIOT, valor ≥ piso mínimo e pagamento pela IPEF na conta indicada pelo autônomo.' });
+}
+
+// ---------------------------------------------------------------- NF-e do cliente (SQL 081)
+// A transportadora escolhe as NF-e de saída do cliente que autorizou (ex.: IPLAMM → KRATOS). As notas ficam na empresa do cliente:
+// não entram no faturamento nem nos impostos desta empresa. As que já indicam esta empresa como transportadora vêm primeiro.
+function escolherNotasCliente(data, aoEscolher) {
+  const soma = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+  const md = modal({ title: 'NF-e do cliente', wide: true, body: `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <label>De<input type="date" id="nc-de" value="${soma(data, -7)}"></label><label>Até<input type="date" id="nc-ate" value="${soma(data, 1)}"></label>
+      <label class="grow">Número ou destinatário<input id="nc-b" placeholder="ex.: 36435 ou nome do cliente"></label><button class="btn" id="nc-ir">Buscar</button></div>
+    <div id="nc-lista" style="margin-top:10px"></div>`,
+    foot: '<span class="small muted" id="nc-sel" style="margin-right:auto"></span><button class="btn" data-close>Cancelar</button><button class="btn primary" id="nc-ok">Usar as marcadas</button>' });
+  let R = [];
+  const contar = () => { const n = $$('[data-nc]:checked', md.el).length; $('#nc-sel', md.el).textContent = n ? `${n} marcada(s)` : ''; };
+  const buscar = async () => {
+    const el = $('#nc-lista', md.el); el.innerHTML = '<p class="small muted">Buscando…</p>';
+    try {
+      R = await q(sb.rpc('log_nfe_cliente', { p_empresa: state.empresa.id, p_de: $('#nc-de', md.el).value, p_ate: $('#nc-ate', md.el).value, p_busca: $('#nc-b', md.el).value.trim() || null }));
+      const desta = R.filter(r => r.desta_empresa).length;
+      el.innerHTML = `<p class="small muted" style="margin:0 0 6px">${R.length} nota(s)${R.length >= 500 ? ' (mostrando as 500 primeiras: estreite o período)' : ''}${desta ? ` · ${desta} já indicam esta empresa como transportadora` : ' · nenhuma indica esta empresa como transportadora: confira pelo destino e pela data'}.</p>
+        <div class="table-wrap" style="max-height:55vh"><table><thead><tr><th></th><th>NF</th><th>Emissão</th><th>Cliente da nota</th><th>Destino</th><th class="num">Valor</th><th class="num">Peso (kg)</th><th>Transportadora na nota</th></tr></thead><tbody>
+        ${R.map((r, i) => `<tr><td><input type="checkbox" data-nc="${i}" ${r.desta_empresa ? 'checked' : ''}></td><td>${r.numero}</td><td>${dateBR(r.emissao)}</td><td>${esc(r.dest_nome || '')}<br><span class="small muted">${esc(r.origem || '')}</span></td>
+          <td>${esc(r.xmun || '')}/${esc(r.dest_uf || '')}</td><td class="num">${money(r.v_nf)}</td><td class="num">${r.peso_kg != null ? (+r.peso_kg).toLocaleString('pt-BR') : '–'}</td>
+          <td class="small">${r.desta_empresa ? '<span class="pos">esta empresa</span>' : esc(r.transp_nome || (r.mod_frete === '9' ? 'sem frete' : 'não informada'))}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Nenhuma NF-e no período.</td></tr>'}</tbody></table></div>`;
+      $$('[data-nc]', el).forEach(x => (x.onchange = contar)); contar();
+    } catch (err) { el.innerHTML = ''; fail(err); }
+  };
+  $('#nc-ir', md.el).onclick = buscar;
+  $('#nc-b', md.el).onkeydown = (ev) => { if (ev.key === 'Enter') buscar(); };
+  $('#nc-ok', md.el).onclick = () => { const ns = $$('[data-nc]:checked', md.el).map(x => R[+x.dataset.nc]); if (!ns.length) return toast('Marque ao menos uma nota', true); aoEscolher(ns); md.close(); };
+  buscar();
 }
 
 // ---------------------------------------------------------------- Piso mínimo
