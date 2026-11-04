@@ -731,6 +731,22 @@ async function testarEfrete() {
       ${(r.login?.ok ? [] : (r.login?.tentativas || [])).map((t, i) => lin(`Tentativa ${i + 1}`, `HTTP ${t.status} · ${t.ms} ms${t.excecao ? ' · ' + esc(t.excecao.Mensagem || JSON.stringify(t.excecao)) : ''}${t.texto ? ' · ' + esc(t.texto.slice(0, 160)) : ''}`)).join('')}
       ${r.consultaTransportador ? lin('Consulta de transportador (massa ANTT)', r.consultaTransportador.sucesso ? '✓ respondeu' : `✗ ${esc(r.consultaTransportador.excecao?.Mensagem || 'HTTP ' + r.consultaTransportador.status)}`, !!r.consultaTransportador.sucesso) : ''}
       </table>${r.consultaTransportador?.dados ? `<details style="margin-top:8px"><summary class="small">Resposta da consulta</summary><pre class="small" style="white-space:pre-wrap">${esc(JSON.stringify(r.consultaTransportador.dados, null, 1).slice(0, 3000))}</pre></details>` : ''}
-      <p class="small muted">Nenhum CIOT foi emitido. A senha e o hash ficam só no servidor.</p>`;
+      <p class="small muted">Nenhum CIOT foi emitido. A senha e o hash ficam só no servidor.</p>
+      ${r.login?.ok && r.ambiente === 'homologacao' ? '<div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn" id="ef-ciot">Emitir CIOT de teste (homologação)</button></div><div id="ef-ciot-res"></div>' : ''}`;
+    const bt = b.querySelector('#ef-ciot');
+    if (bt) bt.onclick = async () => {
+      bt.disabled = true; const out = b.querySelector('#ef-ciot-res'); out.innerHTML = '<div class="loading">Emitindo CIOT de teste com a massa da ANTT…</div>';
+      try {
+        const { data, error } = await sb.functions.invoke('efrete', { body: { acao: 'ciot_teste' } });
+        let x = data; if (error) { try { x = await error.context.json(); } catch { x = { erro: error.message }; } }
+        if (x?.erro) { out.innerHTML = `<p class="neg">${esc(x.erro)}</p>`; return; }
+        out.innerHTML = `<h3 style="margin:12px 0 6px">CIOT de teste ${x.ciot ? '<span class="pos">' + esc(x.ciot) + '</span>' : '<span class="neg">não emitido</span>'}</h3><table>
+          ${(x.passos || []).map(p => `<tr><td>${esc(p.nome)}</td><td class="${p.ok ? 'pos' : 'neg'}">${p.ok ? '✓' : '✗'} ${esc(p.mensagem || (p.ok ? 'ok' : 'HTTP ' + p.status))}${p.estado ? ' · ' + esc(p.estado) : ''}${p.protocolo ? ` <span class="muted small">prot. ${esc(String(p.protocolo))}</span>` : ''}</td></tr>`).join('')}</table>
+          ${x.pdf ? '<button class="btn small" id="ef-pdf" style="margin-top:8px">Baixar PDF do CIOT de teste</button>' : ''}
+          <p class="small muted">Teste na homologação com dados fictícios da massa da ANTT; o CIOT é cancelado no fim. Nada é real nem gera cobrança.</p>`;
+        const bp = out.querySelector('#ef-pdf');
+        if (bp) bp.onclick = () => { const a = document.createElement('a'); a.href = 'data:application/pdf;base64,' + x.pdf; a.download = `CIOT-teste-${x.ciot}.pdf`; a.click(); };
+      } catch (e) { out.innerHTML = `<p class="neg">${esc(e.message || String(e))}</p>`; } finally { bt.disabled = false; }
+    };
   } catch (e) { b.innerHTML = `<p class="neg">${esc(e.message || String(e))}</p>`; }
 }

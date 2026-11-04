@@ -34,7 +34,7 @@ const ctx: { adm: ReturnType<typeof createClient> | null; uid: string | null; em
 async function registrar(metodo: string, corpo: Record<string, unknown>, r: { status: number; ms: number; dados: unknown; texto?: string }) {
   if (!ctx.adm) return;
   const d = r.dados as Record<string, unknown> | null;
-  const resp = d ? Object.fromEntries(Object.entries(d).filter(([k]) => !SECRETOS.has(k))) : { texto: r.texto };
+  const resp = d ? Object.fromEntries(Object.entries(d).filter(([k]) => !SECRETOS.has(k)).map(([k, v]) => k === 'Pdf' && typeof v === 'string' ? [k, `[PDF ${Math.round(v.length * 0.75 / 1024)} KB]`] : [k, v])) : { texto: r.texto };
   try {
     await ctx.adm.from('efrete_chamadas').insert({ empresa_id: ctx.empresa, user_id: ctx.uid, acao: ctx.acao, ambiente: BASE().includes('dev.') ? 'homologacao' : 'producao',
       metodo, ok: !!(d?.Sucesso === true || d?.Token), http_status: r.status, ms: r.ms, pedido: limpar(corpo), resposta: resp });
@@ -179,6 +179,67 @@ Deno.serve(async (req) => {
         await logout(L.token);
       }
       return json({ ambiente, base: BASE(), ponte: usaPonte(), rede, login: { ok: !!L.token, via: L.via, tentativas: L.tentativas }, consultaTransportador: consulta });
+    }
+
+    if (acao === 'ciot_teste') {
+      // Emissão de TESTE na homologação, com a massa de testes da ANTT do kit e-frete: grava proprietário, veículo e motorista,
+      // emite um CIOT de Lotação, baixa o PDF e cancela. Nunca roda em produção.
+      if (ambiente !== 'homologacao') return json({ erro: 'O CIOT de teste só roda na homologação.' }, 400);
+      const passos: Record<string, unknown>[] = [];
+      const passo = (nome: string, r: { status: number; ms: number; dados: unknown; texto?: string }, extra: Record<string, unknown> = {}) => {
+        const d = r.dados as Record<string, unknown> | null;
+        passos.push({ nome, ok: d?.Sucesso === true, status: r.status, ms: r.ms, mensagem: (d?.Excecao as { Mensagem?: string })?.Mensagem || r.texto || '', protocolo: d?.ProtocoloServico ?? null, ...extra });
+        return d;
+      };
+      const L = await login();
+      if (!L.token) return json({ ambiente, erro: 'Login no e-frete falhou', tentativas: L.tentativas }, 502);
+      const I = { Integrador: env('EFRETE_INTEGRADOR'), Token: L.token };
+      const cnpj = soDig(env('EFRETE_CNPJ'));
+      // massa ANTT: transportador com um único caminhão simples (sem implemento)
+      const T = { cnpj: '48386287000166', rntrc: '56216399', placa: 'OSK7D95' };
+      const end = { Bairro: 'INDIANOPOLIS', CEP: '55024740', CodigoMunicipio: 2604106, Rua: 'AV ADJAR DA SILVA CASE', Numero: '800' };
+      passo('Gravar proprietário', await chamar('/Services/proprietarios/gravarV2', 'POST', { ...I, Versao: 4, CNPJ: T.cnpj, Endereco: end, RNTRC: T.rntrc, RazaoSocial: 'TRANSPORTADOR TESTE HOMOLOGACAO' }));
+      passo('Gravar veículo', await chamar('/Services/veiculos/gravar', 'POST', { ...I, Versao: 1, Veiculo: { Chassi: '9BM384078KB123456', NumeroDeEixos: 2, Placa: T.placa, RNTRC: Number(T.rntrc), Renavam: 12345678901, TipoCarroceria: 'FechadaOuBau', TipoRodado: 'Toco' } }));
+      passo('Gravar motorista', await chamar('/Services/motoristas/gravar', 'POST', { ...I, Versao: 2, CNH: 12345678900, CPF: 11144477735, DataNascimento: '1985-06-15T00:00:00', Endereco: end, Nome: 'MOTORISTA TESTE HOMOLOGACAO', Telefones: { Celular: { DDD: 81, Numero: 999999999 } } }));
+      // viagem Caruaru → Recife começando daqui a 1 hora (a data de início não pode ser anterior ao registro)
+      const iso = (d: Date) => new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 19);
+      const ini = new Date(Date.now() + 3600e3), fim = new Date(Date.now() + 26 * 3600e3);
+      const id = 'TESTE-' + Date.now();
+      const valor = 2500;
+      const op = {
+        ...I, Versao: 8, TipoViagem: 'Padrao', MatrizCNPJ: cnpj, IdOperacaoCliente: id,
+        DataInicioViagem: iso(ini), DataFimViagem: iso(fim), CodigoNCMNaturezaCarga: '3923', PesoCarga: 5000.0,
+        Viagens: {
+          DocumentoViagem: 'TESTE-1', CodigoMunicipioOrigem: 2604106, CodigoMunicipioDestino: 2611606, DistanciaPercorrida: 140,
+          LatitudeOrigem: '-8.2845', LongitudeOrigem: '-35.9699', LatitudeDestino: '-8.0467', LongitudeDestino: '-34.8771',
+          Valores: { TotalOperacao: valor, TotalViagem: valor, TotalDeAdiantamento: 0, TotalDeQuitacao: valor, Combustivel: 0, Pedagio: 0, Seguro: 0 },
+          TipoPagamento: 'eFRETE',
+          NotasFiscais: { NotaFiscal: [{ Numero: '1', Serie: '1', ValorTotal: 30000.0, ValorDaMercadoriaPorUnidade: 6.0, CodigoNCMNaturezaCarga: '3923',
+            UnidadeDeMedidaDaMercadoria: 'Kg', TipoDeCalculo: 'SemQuebra', QuantidadeDaMercadoriaNoEmbarque: 5000, ToleranciaDePerdaDeMercadoria: { Tipo: 'Nenhum', Valor: 0 } }] },
+        },
+        Impostos: { IRRF: 0, SestSenat: 0, INSS: 0, ISSQN: 0, OutrosImpostos: 0 },
+        Pagamentos: [{ IdPagamentoCliente: id + '-Q', DataDeLiberacao: iso(fim), Valor: valor, TipoPagamento: 'eFRETE', Categoria: 'Quitacao', Documento: 'TESTE-1',
+          IndicadorPagamento: 'AVista', CpfCnpjCreditado: T.cnpj, NumeroParcela: 1 }],
+        Contratado: { CpfOuCnpj: T.cnpj, RNTRC: T.rntrc },
+        Motorista: { CpfOuCnpj: '11144477735', CNH: '12345678900', Celular: { DDD: 81, Numero: 999999999 } },
+        Destinatario: { NomeOuRazaoSocial: 'DESTINATARIO TESTE', CpfOuCnpj: cnpj, Endereco: { Bairro: 'BOA VISTA', Rua: 'RUA DA AURORA', Numero: '100', CEP: '50050000', CodigoMunicipio: 2611606 } },
+        Contratante: { NomeOuRazaoSocial: 'KRATOS TRANSPORTES E LOGISTICA LTDA', CpfOuCnpj: cnpj, ResponsavelPeloPagamento: true, Endereco: end },
+        Veiculos: [{ Placa: T.placa }], CodigoTipoCarga: 5, AltoDesempenho: false, ComposicaoVeicular: false, RetornoVazio: false, TipoPagamento: 'eFRETE',
+        TipoEmbalagem: 'Pallet',
+      };
+      const d = passo('Emitir CIOT (Lotação)', await chamar('/Services/Pef/AdicionarOperacaoTransporteV2', 'POST', op), { idOperacaoCliente: id });
+      const ciot = (d?.CodigoIdentificacaoOperacao as string) || null;
+      let pdf: string | null = null;
+      if (ciot) {
+        passos[passos.length - 1].ciot = ciot;
+        const c = passo('Consultar CIOT pelo Id da operação', await chamar('/Services/Pef/ObterCodigoIdentificacaoOperacaoTransportePorIdOperacaoCliente', 'GET', { ...I, Versao: 1, MatrizCNPJ: cnpj, IdOperacaoCliente: id }));
+        if (c) passos[passos.length - 1].estado = c.EstadoCiot ?? null;
+        const p = passo('Baixar PDF do CIOT', await chamar('/Services/Pef/ObterOperacaoTransportePdf', 'GET', { ...I, Versao: 1, CodigoIdentificacaoOperacao: ciot }));
+        pdf = (p?.Pdf as string) || null;
+        passo('Cancelar CIOT de teste', await chamar('/Services/Pef/CancelarOperacaoTransporte', 'POST', { ...I, Versao: 1, CodigoIdentificacaoOperacao: ciot, Motivo: 'Teste de integração em homologação (plataforma Kratos).' }));
+      }
+      await logout(L.token);
+      return json({ ambiente, ponte: usaPonte(), ciot, passos, pdf });
     }
 
     const m = LEITURA[acao];
