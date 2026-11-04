@@ -149,6 +149,27 @@ async function empresaDaIntegracao() {
   return (data ?? []).find((e: { cnpj: string }) => soDig(e.cnpj) === soDig(env('EFRETE_CNPJ')))?.id ?? null;
 }
 
+// ---- dados FICTÍCIOS para o teste na homologação (nunca usados em produção)
+const rnd = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 10));
+function cpfFicticio(): string {
+  for (;;) {
+    const d = rnd(9); if (new Set(d).size === 1) continue;
+    const dv = (b: number[]) => { const s = b.reduce((a, x, i) => a + x * (b.length + 1 - i), 0) % 11; return s < 2 ? 0 : 11 - s; };
+    const d1 = dv(d), d2 = dv([...d, d1]); return [...d, d1, d2].join('');
+  }
+}
+function cnhFicticia(): string {
+  for (;;) {
+    const d = rnd(9); if (new Set(d).size === 1) continue;
+    let v = 0; for (let i = 0, j = 9; i < 9; i++, j--) v += d[i] * j;
+    let d1 = v % 11, dsc = 0; if (d1 >= 10) { d1 = 0; dsc = 2; }
+    v = 0; for (let i = 0, j = 1; i < 9; i++, j++) v += d[i] * j;
+    const x = v % 11, d2 = x >= 10 ? 0 : x - dsc; if (d2 < 0) continue;
+    return [...d, d1, d2].join('');
+  }
+}
+const motoristaFicticio = () => ({ cpf: cpfFicticio(), cnh: cnhFicticia(), cel: { DDD: 81, Numero: 900000000 + Math.floor(Math.random() * 99999999) } });
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
@@ -200,7 +221,10 @@ Deno.serve(async (req) => {
       const end = { Bairro: 'INDIANOPOLIS', CEP: '55024740', CodigoMunicipio: 2604106, Rua: 'AV ADJAR DA SILVA CASE', Numero: '800' };
       passo('Gravar proprietário', await chamar('/Services/proprietarios/gravarV2', 'POST', { ...I, Versao: 4, CNPJ: T.cnpj, Endereco: end, RNTRC: T.rntrc, RazaoSocial: 'TRANSPORTADOR TESTE HOMOLOGACAO' }));
       passo('Gravar veículo', await chamar('/Services/veiculos/gravar', 'POST', { ...I, Versao: 1, Veiculo: { Chassi: '9BM384078KB123456', NumeroDeEixos: 2, Placa: T.placa, RNTRC: Number(T.rntrc), Renavam: 12345678901, TipoCarroceria: 'FechadaOuBau', TipoRodado: 'Toco' } }));
-      passo('Gravar motorista', await chamar('/Services/motoristas/gravar', 'POST', { ...I, Versao: 2, CNH: 12345678900, CPF: 11144477735, DataNascimento: '1985-06-15T00:00:00', Endereco: end, Nome: 'MOTORISTA TESTE HOMOLOGACAO', Telefones: { Celular: { DDD: 81, Numero: 987654321 } } }));
+      // motorista FICTÍCIO novo a cada teste: CPF e CNH com dígitos válidos e celular único
+      // (na homologação a CNH/CPF genéricos já estão cadastrados para outras pessoas e o celular não pode repetir)
+      const M = motoristaFicticio();
+      passo('Gravar motorista', await chamar('/Services/motoristas/gravar', 'POST', { ...I, Versao: 2, CNH: Number(M.cnh), CPF: Number(M.cpf), DataNascimento: '1985-06-15T00:00:00', Endereco: end, Nome: 'MOTORISTA TESTE ' + M.cpf.slice(-4), Telefones: { Celular: M.cel } }), { motorista: `CPF ${M.cpf} · CNH ${M.cnh}` });
       // viagem Caruaru → Recife começando daqui a 1 hora (a data de início não pode ser anterior ao registro)
       const iso = (d: Date) => new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 19);
       const ini = new Date(Date.now() + 3600e3), fim = new Date(Date.now() + 26 * 3600e3);
@@ -222,7 +246,7 @@ Deno.serve(async (req) => {
         Pagamentos: [{ IdPagamentoCliente: id + '-Q', DataDeLiberacao: iso(fim), Valor: valor, TipoPagamento: 'eFRETE', Categoria: 'Quitacao', Documento: 'TESTE-1',
           IndicadorPagamento: 'AVista', CpfCnpjCreditado: T.cnpj, NumeroParcela: 1 }],
         Contratado: { CpfOuCnpj: T.cnpj, RNTRC: T.rntrc },
-        Motorista: { CpfOuCnpj: '11144477735', CNH: '12345678900', Celular: { DDD: 81, Numero: 987654321 } },
+        Motorista: { CpfOuCnpj: M.cpf, CNH: M.cnh, Celular: M.cel },
         Destinatario: { NomeOuRazaoSocial: 'DESTINATARIO TESTE', CpfOuCnpj: cnpj, Endereco: { Bairro: 'BOA VISTA', Rua: 'RUA DA AURORA', Numero: '100', CEP: '50050000', CodigoMunicipio: 2611606 } },
         Contratante: { NomeOuRazaoSocial: 'KRATOS TRANSPORTES E LOGISTICA LTDA', CpfOuCnpj: cnpj, ResponsavelPeloPagamento: true, Endereco: end },
         Veiculos: [{ Placa: T.placa }], CodigoTipoCarga: 5, AltoDesempenho: false, ComposicaoVeicular: false, RetornoVazio: false, TipoPagamento: 'eFRETE',
