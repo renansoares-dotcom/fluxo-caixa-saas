@@ -125,7 +125,7 @@ const listaAnexos = (lista, pode) => lista.map(a => `<div class="small" style="d
 function ficha(f0, root, pre = {}) {
   const pode = podeLogistica(), dis = pode ? '' : 'disabled';
   const f = f0 || { data: today(), lotacao: true, tabela: 'A', tipo_carga: 'geral', pedagio_nao_ha: false, ...pre };
-  const tipos = [...new Set(B.C.map(c => `${c.tabela}|${c.tipo_carga}`))];
+  const tipos = [...new Set(B.C.map(c => `${c.tabela}|${c.tipo_carga}`))].sort((x, y) => (x === 'A|geral' ? -1 : y === 'A|geral' ? 1 : x.localeCompare(y)));
   const cargas = B.K.filter(k => k.status !== 'cancelada');
   const l = B.L.get(f.lancamento_id);
   const md = modal({ title: f0 ? `Frete nº ${f0.numero}` : 'Novo frete contratado', wide: true, body: `
@@ -419,11 +419,29 @@ async function relatorio(F, semFicha, caixa, pf, dispensados = []) {
 // ---------------------------------------------------------------- Piso mínimo
 function piso(corpo, root) {
   const pode = podeLogistica();
-  corpo.innerHTML = `<div class="card flush"><div class="card-head" style="padding:14px 16px 0"><h2 style="margin:0">Coeficientes do piso mínimo</h2>${pode ? '<button class="btn small" id="pc-novo">Incluir coeficiente</button>' : ''}</div>
+  const hoje = today();
+  // vigente = a vigência mais recente ≤ hoje para cada tabela/tipo/eixos (a mesma regra do cálculo do frete)
+  const chave = (c) => `${c.tabela}|${c.tipo_carga}|${c.eixos}`;
+  const vig = {}; B.C.forEach(c => { if (c.vigencia <= hoje && (!vig[chave(c)] || c.vigencia > vig[chave(c)])) vig[chave(c)] = c.vigencia; });
+  const ehVigente = (c) => vig[chave(c)] === c.vigencia;
+  const tiposC = [...new Set(B.C.map(c => c.tipo_carga))].sort((a, b) => (a === 'geral' ? -1 : b === 'geral' ? 1 : a.localeCompare(b)));
+  const fl = (ui.pisoF ||= { tabela: 'A', tipo: 'geral', vigentes: true });
+  const linhas = B.C.filter(c => (!fl.tabela || c.tabela === fl.tabela) && (!fl.tipo || c.tipo_carga === fl.tipo) && (!fl.vigentes || ehVigente(c)));
+  const ultima = B.C.reduce((m, c) => (c.vigencia > m ? c.vigencia : m), '');
+  corpo.innerHTML = `<div class="card flush"><div class="card-head" style="padding:14px 16px 0;flex-wrap:wrap;gap:8px"><h2 style="margin:0">Coeficientes do piso mínimo</h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto">
+        <select id="pf-t" data-nobusca><option value="">Todas as tabelas</option>${['A', 'B', 'C', 'D'].map(x => `<option value="${x}" ${fl.tabela === x ? 'selected' : ''}>Tabela ${x}</option>`).join('')}</select>
+        <select id="pf-tc" data-nobusca><option value="">Todos os tipos de carga</option>${tiposC.map(x => `<option ${fl.tipo === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+        <label class="chk small"><input type="checkbox" id="pf-v" ${fl.vigentes ? 'checked' : ''}> só vigentes</label>
+        ${pode ? '<button class="btn small" id="pc-novo">Incluir coeficiente</button>' : ''}</div></div>
     <div class="table-wrap"><table><thead><tr><th>Tabela</th><th>Tipo de carga</th><th class="num">Eixos</th><th class="num">CCD (R$/km)</th><th class="num">CC (R$)</th><th>Vigência</th><th>Fonte</th><th class="num">Piso de 500 km</th></tr></thead><tbody>
-    ${B.C.map(c => `<tr class="${pode ? 'clickable' : ''}" data-id="${c.id}"><td>${c.tabela}</td><td>${esc(c.tipo_carga)}</td><td class="num">${c.eixos}</td><td class="num">${(+c.ccd).toLocaleString('pt-BR', { minimumFractionDigits: 4 })}</td><td class="num">${money(c.cc)}</td><td>${dateBR(c.vigencia)}</td><td class="small muted">${esc(c.fonte || '')}</td><td class="num">${money(500 * c.ccd + +c.cc)}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Sem coeficientes.</td></tr>'}</tbody></table></div></div>
-    <p class="small muted">Piso = km × CCD + CC; com retorno vazio obrigatório soma 0,92 × CCD × km de retorno. Vale para carga lotação. Pedágio é à parte (vale-pedágio). Tabela A = carga lotação; B = só o cavalo; C e D = alta performance (exige contrato e frota dedicada).
-      Os coeficientes carregados são da Tabela A, carga geral, com o reajuste da Portaria SUROC nº 22/2026 — confira na calculadora oficial da ANTT e ajuste aqui quando a ANTT reajustar (inclua uma linha nova com a nova vigência).</p>`;
+    ${linhas.map(c => `<tr class="${pode ? 'clickable' : ''}" data-id="${c.id}"><td>${c.tabela}</td><td>${esc(c.tipo_carga)}</td><td class="num">${c.eixos}</td><td class="num">${(+c.ccd).toLocaleString('pt-BR', { minimumFractionDigits: 4 })}</td><td class="num">${money(c.cc)}</td><td>${dateBR(c.vigencia)}${ehVigente(c) ? '' : ' <span class="small muted">(histórico)</span>'}</td><td class="small muted">${esc(c.fonte || '')}</td><td class="num">${money(500 * c.ccd + +c.cc)}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Sem coeficientes para o filtro.</td></tr>'}</tbody></table></div></div>
+    <p class="small muted">${linhas.length} de ${B.C.length} coeficientes. Piso = km × CCD + CC; com retorno vazio obrigatório soma 0,92 × CCD × km de retorno. Vale para carga lotação. Pedágio é à parte (vale-pedágio).
+      Tabela A = lotação (veículo completo); B = só o veículo automotor (cavalo); C e D = alta performance (exige contrato e frota dedicada). B e D não têm 2 e 3 eixos.
+      Tabela carregada: Portaria SUROC nº 22/2026 (DOU 29/09/2026), vigente desde 30/09/2026, diesel S10 R$ 7,33${ultima ? ` · vigência mais recente aqui: ${dateBR(ultima)}` : ''}.
+      Quando a ANTT reajustar, inclua as linhas novas com a nova vigência: o frete usa a vigência mais recente até a data dele, e as antigas ficam como histórico.</p>`;
+  const refiltrar = () => { fl.tabela = $('#pf-t', corpo).value; fl.tipo = $('#pf-tc', corpo).value; fl.vigentes = $('#pf-v', corpo).checked; piso(corpo, root); };
+  ['#pf-t', '#pf-tc', '#pf-v'].forEach(id => ($(id, corpo).onchange = refiltrar));
   const editar = (c) => {
     const md = modal({ title: c ? 'Coeficiente do piso' : 'Incluir coeficiente', body: `<div class="grid2">
         <label>Tabela<select id="pc-t" data-nobusca>${['A', 'B', 'C', 'D'].map(x => `<option ${(c?.tabela || 'A') === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>

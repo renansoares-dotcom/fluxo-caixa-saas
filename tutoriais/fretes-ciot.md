@@ -1,8 +1,8 @@
 ---
 titulo: Fretes e CIOT
 tela: Logística › Fretes e CIOT
-versao: 1.4
-atualizado: 2026-10-29
+versao: 1.5
+atualizado: 2026-11-04
 ---
 ## 1. Para que serve
 
@@ -87,9 +87,24 @@ Na ficha salva há dois botões:
 
 ### 4.5 Atualizar o piso mínimo
 
-Quando a ANTT reajustar a tabela, abra a aba **Piso mínimo** e clique em **Incluir coeficiente**. Informe a tabela, o tipo de carga, os eixos, o **CCD** (R$/km), o **CC** (R$), a **vigência** e a fonte.
+A aba **Piso mínimo** já vem com a tabela completa da ANTT em vigor: **Portaria SUROC nº 22/2026** (DOU de 29/09/2026), vigente desde **30/09/2026**, com diesel S10 a R$ 7,33. São as Tabelas A, B, C e D, os 12 tipos de carga e de 2 a 9 eixos. Empresa nova já nasce com essa tabela.
 
-Inclua sempre uma linha nova com a nova vigência, sem apagar a antiga: os fretes antigos continuam calculados pela tabela da época.
+Use os filtros do topo para achar o coeficiente: **tabela**, **tipo de carga** e **só vigentes**. Desmarque **só vigentes** para ver as tabelas antigas, marcadas como *(histórico)*.
+
+| Tabela | Quando usar |
+|---|---|
+| A | Carga lotação com o veículo completo (caminhão ou composição). É a mais comum. |
+| B | Contratação só do veículo automotor (cavalo). Não tem 2 e 3 eixos. |
+| C | Carga lotação de alto desempenho (exige contrato e frota dedicada). |
+| D | Só o veículo automotor, em alto desempenho. Não tem 2 e 3 eixos. |
+
+Na ficha do frete, escolha a **tabela e o tipo de carga** certos. O piso muda bastante: carga frigorificada ou perigosa tem piso maior que carga geral.
+
+Quando a ANTT reajustar a tabela, clique em **Incluir coeficiente**. Informe a tabela, o tipo de carga, os eixos, o **CCD** (R$/km), o **CC** (R$), a **vigência** e a fonte.
+
+Inclua sempre uma linha nova com a nova vigência, sem apagar a antiga. Cada frete usa a vigência mais recente até a data dele, e os fretes antigos continuam calculados pela tabela da época.
+
+> **Atenção:** confira os valores na calculadora oficial da ANTT antes de fechar um frete perto do piso. O e-frete recusa o CIOT de carga lotação abaixo do piso.
 
 ### 4.6 Preparar o MDF-e da viagem
 
@@ -176,3 +191,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.2 | 29/10/2026 | Preparo do MDF-e com CIOT (NT 2026.001): campo **Quem emite o MDF-e**, janela **Dados do MDF-e** com busca das NF-e, painel **MDF-e · 23/11**, padrões do MDF-e e resumo para impressão. |
 | 1.3 | 29/10/2026 | Conferência do pedido de CIOT à IPEF na janela do MDF-e e botão **XML (teste)** com o XML do MDF-e no leiaute 3.00, conferido contra os esquemas oficiais. |
 | 1.4 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.5 | 04/11/2026 | Tabela completa da ANTT (Portaria SUROC nº 22/2026: Tabelas A a D, 12 tipos de carga) carregada no piso mínimo, com filtros por tabela, tipo de carga e só vigentes. |
