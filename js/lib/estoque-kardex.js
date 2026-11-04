@@ -63,3 +63,26 @@ export function periodoAberto(fechamentos) {
   const d = new Date(ult + 'T12:00:00'); d.setMonth(d.getMonth() + 1);
   return { fechadoAte: ult, abertoDesde: d.toISOString().slice(0, 10) };
 }
+
+/** pendências do estoque pelas notas (SQL 077) */
+export const MOTIVOS = { sem_produto: 'Sem produto / de-para', sem_regra: 'Sem regra para o CFOP', sem_local: 'Sem local', saldo: 'Saldo insuficiente', erro: 'Erro' };
+
+/**
+ * prévia da implantação: por depósito do espelho, as linhas que entram (cadastradas, quantidade > 0), as sem cadastro e as sem custo.
+ * mapa: { deposito: local_id } — depósito sem local fica de fora.
+ */
+export function previaImplantacao(itens, mapa = {}) {
+  const por = new Map();
+  for (const i of itens) {
+    const d = i.deposito || 'GERAL', x = por.get(d) || { deposito: d, linhas: 0, entram: 0, semCadastro: 0, semCusto: 0, zeradas: 0, valor: 0 };
+    x.linhas++;
+    if (!(+i.quantidade > 0)) x.zeradas++;
+    else if (!i.produto_id) x.semCadastro++;
+    else { x.entram++; if (i.valor == null && i.custo_unitario == null) x.semCusto++; else x.valor = r2(x.valor + (i.valor != null ? +i.valor : +i.quantidade * +i.custo_unitario)); }
+    por.set(d, x);
+  }
+  const linhas = [...por.values()].sort((a, b) => b.valor - a.valor).map(x => ({ ...x, local_id: mapa[x.deposito] || null }));
+  const usadas = linhas.filter(x => x.local_id);
+  return { linhas, entram: usadas.reduce((t, x) => t + x.entram, 0), valor: r2(usadas.reduce((t, x) => t + x.valor, 0)),
+    semCadastro: linhas.reduce((t, x) => t + x.semCadastro, 0), semCusto: usadas.reduce((t, x) => t + x.semCusto, 0), foraDoMapa: linhas.filter(x => !x.local_id).reduce((t, x) => t + x.entram, 0) };
+}

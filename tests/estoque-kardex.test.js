@@ -41,3 +41,11 @@ test('resumo por local e período aberto', () => {
   assert.deepEqual(K.periodoAberto([{ mes: '2026-09-01' }, { mes: '2026-10-01' }]), { fechadoAte: '2026-10-01', abertoDesde: '2026-11-01' });
   assert.deepEqual(K.periodoAberto([]), { fechadoAte: null, abertoDesde: null });
 });
+
+test('prévia da implantação por depósito', () => {
+  const it = [{ deposito: 'ALMOX', produto_id: 'a', quantidade: 10, custo_unitario: 2 }, { deposito: 'ALMOX', produto_id: null, quantidade: 3 }, { deposito: 'ALMOX', produto_id: 'b', quantidade: 0 },
+    { deposito: 'EXPED', produto_id: 'c', quantidade: 5, valor: 50 }, { deposito: 'EXPED', produto_id: 'd', quantidade: 1 }, { deposito: 'SUCATA', produto_id: 'e', quantidade: 9, valor: 9 }];
+  const p = K.previaImplantacao(it, { ALMOX: 'L1', EXPED: 'L2' });
+  assert.deepEqual(p.linhas.map(x => [x.deposito, x.entram, x.semCadastro, x.semCusto, x.zeradas, x.valor]), [['EXPED', 2, 0, 1, 0, 50], ['ALMOX', 1, 1, 0, 1, 20], ['SUCATA', 1, 0, 0, 0, 9]]);
+  assert.equal(p.entram, 3); assert.equal(p.valor, 70); assert.equal(p.semCadastro, 1); assert.equal(p.semCusto, 1); assert.equal(p.foraDoMapa, 1);
+});

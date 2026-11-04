@@ -4,10 +4,12 @@ import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, today, toast, fail, modal, confirmDialog, exportXLSX, erroTela } from '../lib/ui.js';
 import { carregarProdutos, datalistProdutos, acharProduto } from '../lib/produtos.js';
 import { qtd, unit, num } from '../lib/compras.js';
-import { FINALIDADES, SENTIDOS, TIPOS_SPED, PODE_MOVIMENTAR, resumoLocais, periodoAberto } from '../lib/estoque-kardex.js';
+import { FINALIDADES, SENTIDOS, TIPOS_SPED, PODE_MOVIMENTAR, MOTIVOS, resumoLocais, periodoAberto, previaImplantacao } from '../lib/estoque-kardex.js';
+import { isAdmin } from '../lib/data.js';
+const _pe = podeEditar;
 
 export const title = 'Kardex';
-const ui = { aba: 'locais', local: '', busca: '', tipo: '' };
+const ui = { aba: 'locais', local: '', busca: '', tipo: '', motivo: '' };
 let D = null;
 const podeMov = () => PODE_MOVIMENTAR.includes(state.papel);
 
@@ -22,7 +24,9 @@ async function carregar() {
     fetchAll(() => sb.from('est_lotes').select('*').eq('empresa_id', e).order('id')),
     q(sb.from('est_fechamentos').select('mes').eq('empresa_id', e)),
     carregarProdutos(true)]);
-  D = { locais, tipos, saldos, custos, movs, lotes, fech, prods, loc: Object.fromEntries(locais.map(l => [l.id, l])), tm: Object.fromEntries(tipos.map(t => [t.id, t])),
+  const [cfg, pend] = await Promise.all([q(sb.from('est_config').select('*').eq('empresa_id', e)).catch(() => null),
+    fetchAll(() => sb.from('est_pendencias').select('*, nfe_notas(numero,emissao,tipo,emit_nome,dest_nome,emissao_propria), nfe_itens(cprod,xprod,cfop,qcom,ucom)').eq('empresa_id', e).eq('status', 'aberta').order('criado_em')).catch(() => null)]);
+  D = { cfg: cfg?.[0] || null, semB: cfg === null, pend: pend || [], locais, tipos, saldos, custos, movs, lotes, fech, prods, loc: Object.fromEntries(locais.map(l => [l.id, l])), tm: Object.fromEntries(tipos.map(t => [t.id, t])),
     prod: Object.fromEntries(prods.map(p => [p.id, p])), lote: Object.fromEntries(lotes.map(l => [l.id, l])), custo: Object.fromEntries(custos.map(c => [c.produto_id, c])) };
   // tipos inativos também aparecem no histórico
   const falta = [...new Set(movs.map(m => m.tipo_movimento_id))].filter(id => !D.tm[id]);
@@ -46,14 +50,15 @@ function pintar(root) {
   const movMes = D.movs.filter(m => m.data.startsWith(mes));
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Kardex</h2><div class="muted small">Estoque oficial: saldo por local e lote, custo médio ponderado móvel por produto. Movimento não se altera nem se exclui — corrige-se por estorno.</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="kx-xls">Excel</button>${podeMov() ? '<button class="btn" id="kx-trf">Transferir</button><button class="btn primary" id="kx-novo">Novo movimento</button>' : ''}</div></div>
+    ${faixaImplantacao()}
     <div class="kpis">
       <div class="kpi"><div class="k-label">Valor do estoque</div><div class="k-value">${money(R.total)}</div><div class="k-sub">ao custo médio, locais que compõem custo</div></div>
       <div class="kpi"><div class="k-label">Produtos com saldo</div><div class="k-value">${comSaldo.size}</div><div class="k-sub">de ${D.prods.filter(p => p.ativo).length} cadastrados</div></div>
       <div class="kpi"><div class="k-label">Movimentos no mês</div><div class="k-value">${movMes.length}</div><div class="k-sub">${movMes.filter(m => m.quantidade > 0).length} entradas · ${movMes.filter(m => m.quantidade < 0).length} saídas</div></div>
       <div class="kpi"><div class="k-label">Fechado até</div><div class="k-value">${per.fechadoAte ? per.fechadoAte.slice(5, 7) + '/' + per.fechadoAte.slice(0, 4) : '—'}</div><div class="k-sub">${per.abertoDesde ? 'lançamentos a partir de ' + dateBR(per.abertoDesde) : 'nenhum mês fechado'}</div></div>
     </div>
-    <div class="toolbar"><div class="chips" id="kx-abas">${[['locais', 'Saldo por local'], ['produtos', 'Saldo por produto'], ['movs', 'Movimentos']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div>
-      ${ui.aba !== 'locais' ? `<label>Local<select id="kx-loc"><option value="">Todos</option>${D.locais.map(l => `<option value="${l.id}" ${ui.local === l.id ? 'selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
+    <div class="toolbar"><div class="chips" id="kx-abas">${[['locais', 'Saldo por local'], ['produtos', 'Saldo por produto'], ['movs', 'Movimentos'], ['pend', `Pendências das notas${D.pend.length ? ' · ' + D.pend.length : ''}`]].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div>
+      ${!['locais', 'pend'].includes(ui.aba) ? `<label>Local<select id="kx-loc"><option value="">Todos</option>${D.locais.map(l => `<option value="${l.id}" ${ui.local === l.id ? 'selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
       <input id="kx-bus" placeholder="Código ou descrição" value="${esc(ui.busca)}" style="min-width:240px">` : ''}</div>
     <div id="kx-corpo"></div>`;
   $('#kx-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; pintar(root); } };
@@ -61,6 +66,11 @@ function pintar(root) {
   let t; $('#kx-bus', root) && ($('#kx-bus', root).oninput = (e) => { clearTimeout(t); t = setTimeout(() => { ui.busca = e.target.value; corpoAba(root, R); }, 250); });
   $('#kx-xls', root).onclick = () => { const tb = $('#kx-corpo table', root); if (tb) exportXLSX(tb, 'kardex_' + ui.aba); };
   $('#kx-novo', root) && ($('#kx-novo', root).onclick = () => movimento(root));
+  $('#kx-impl', root) && ($('#kx-impl', root).onclick = () => implantar(root));
+  $('#kx-auto', root) && ($('#kx-auto', root).onclick = async () => {
+    const lig = !D.cfg.automatico; if (!await confirmDialog(lig ? 'Ligar os movimentos automáticos pelas notas?' : 'Desligar os movimentos automáticos? As notas importadas enquanto desligado não movimentam (dá para reprocessar o período depois).')) return;
+    try { await q(sb.rpc('est_automatico', { p_empresa: state.empresa.id, p_ligar: lig })); toast(lig ? 'Automático ligado' : 'Automático desligado'); await recarregar(root); } catch (err) { fail(err); }
+  });
   $('#kx-trf', root) && ($('#kx-trf', root).onclick = () => movimento(root, { transferencia: true }));
   corpoAba(root, R);
 }
@@ -68,6 +78,7 @@ function pintar(root) {
 const casa = (p) => { const b = ui.busca.trim().toLowerCase(); return !b || `${p?.codigo || ''} ${p?.descricao || ''}`.toLowerCase().includes(b); };
 function corpoAba(root, R) {
   const c = $('#kx-corpo', root);
+  if (ui.aba === 'pend') return pendencias(root, c);
   if (ui.aba === 'locais') {
     c.innerHTML = `<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Local</th><th>Finalidade</th><th class="num">Itens com saldo</th><th class="num">Valor</th><th class="num">% do estoque</th></tr></thead><tbody>
       ${R.linhas.filter(x => x.local.ativo || x.itens).map(x => `<tr class="clickable" data-l="${x.local.id}"><td>${esc(x.local.nome)}${x.local.compoe_custo ? '' : ' <span class="badge" title="Não entra no valor do estoque">de terceiros</span>'}</td><td>${FINALIDADES[x.local.finalidade]}</td>
@@ -199,6 +210,87 @@ function movimento(root, { produto = null, transferencia = false } = {}) {
       else await q(sb.from('est_movimentos').insert({ empresa_id: state.empresa.id, data: V('mv-dt'), produto_id: p.id, local_id: V('mv-l'), lote_id: lote, tipo_movimento_id: t.id,
         quantidade: t.sentido === 'S' ? -qv : qv, custo_unitario: entradaCusto ? cu : null, documento: V('mv-doc') || null, observacao: V('mv-obs') || null }));
       toast('Movimento lançado'); m.close(); await recarregar(root);
+    } catch (err) { fail(err); ev.target.disabled = false; }
+  };
+}
+
+// ------------------------------------------------------------ implantação e pendências (SQL 077)
+function faixaImplantacao() {
+  if (D.semB) return '<div class="card"><span class="badge vencido">SQL 077 pendente</span> A implantação e os movimentos pelas notas ainda não foram criados no banco.</div>';
+  const c = D.cfg;
+  if (!c?.implantado_em) return `<div class="card" style="border-left:4px solid var(--warn, #eda100)"><strong>Estoque ainda não implantado.</strong> Importe o relatório de saldo do Iniflex em <a href="#/estoque">Posição de estoque</a> e implante o saldo inicial: a partir do dia seguinte, as notas de entrada e de saída passam a movimentar o estoque sozinhas.
+    ${_pe() ? '<div style="margin-top:8px"><button class="btn primary" id="kx-impl">Implantar saldo inicial</button></div>' : ''}</div>`;
+  return `<div class="card small" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span>Implantado com o saldo de <b>${dateBR(addDia(c.implantado_em, -1))}</b>. Notas a partir de ${dateBR(c.implantado_em)}:
+    ${c.automatico ? '<span class="badge pago">movimentam sozinhas</span>' : '<span class="badge vencido">automático desligado</span>'}</span>
+    ${D.pend.length ? `<span class="badge vencido">${D.pend.length} pendência(s)</span>` : ''}<span class="spacer"></span>${isAdmin() ? `<button class="btn small" id="kx-auto">${c.automatico ? 'Desligar' : 'Ligar'} automático</button>` : ''}</div>`;
+}
+const addDia = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+
+function pendencias(root, c) {
+  const ed = _pe(), cont = {}; for (const p of D.pend) cont[p.motivo] = (cont[p.motivo] || 0) + 1;
+  const L = D.pend.filter(p => !ui.motivo || p.motivo === ui.motivo);
+  c.innerHTML = `<div class="chips" id="kp-mot" style="margin-bottom:8px"><span class="chip ${!ui.motivo ? 'on' : ''}" data-m="">Todas · ${D.pend.length}</span>${Object.entries(cont).map(([k, n]) => `<span class="chip ${ui.motivo === k ? 'on' : ''}" data-m="${k}">${MOTIVOS[k]} · ${n}</span>`).join('')}</div>
+    <div class="card flush"><div class="table-wrap" style="max-height:60vh"><table><thead><tr><th>Nota</th><th>Data</th><th>Emitente / destinatário</th><th>Item</th><th>CFOP</th><th class="num">Qtde</th><th>Motivo</th>${ed ? '<th></th>' : ''}</tr></thead><tbody>
+    ${L.map(p => { const n = p.nfe_notas || {}, i = p.nfe_itens || {};
+      return `<tr data-id="${p.id}"><td>${n.tipo === 'saida' ? 'Saída' : 'Entrada'} ${n.numero || ''}</td><td>${dateBR(n.emissao)}</td><td class="wrap small">${esc(n.emissao_propria ? n.dest_nome || '' : n.emit_nome || '')}</td>
+        <td class="wrap">${esc(i.cprod || '')} <span class="small muted">${esc(i.xprod || '')}</span></td><td>${esc(i.cfop || '')}</td><td class="num">${qtd(i.qcom)} ${esc(i.ucom || '')}</td>
+        <td><span class="badge ${p.motivo === 'saldo' || p.motivo === 'erro' ? 'vencido' : 'aberto'}">${MOTIVOS[p.motivo]}</span><div class="small muted">${esc(p.mensagem || '')}</div></td>
+        ${ed ? `<td style="white-space:nowrap"><button class="btn small" data-rep="${p.nfe_item_id}">Reprocessar</button> <button class="btn ghost small" data-ign="${p.id}" title="Não movimentar este item">Ignorar</button></td>` : ''}</tr>`; }).join('') || `<tr><td colspan="${ed ? 8 : 7}" class="empty">Nenhuma pendência. Cada item de nota que não puder movimentar o estoque aparece aqui.</td></tr>`}
+    </tbody></table></div></div>
+    <p class="small muted">Sem produto: na entrada, faça o <a href="#/estoque/depara">de-para do fornecedor</a>; na saída, cadastre o código em <a href="#/estoque/produtos">Produtos</a>. Sem regra: crie a regra do CFOP em <a href="#/estoque/parametros">Parâmetros</a>. Saldo insuficiente: lance a entrada que falta (ou transfira) e reprocesse. A importação da nota nunca é barrada pelo estoque.</p>
+    ${ed && D.cfg?.implantado_em ? `<div class="toolbar"><label>Reprocessar notas de<input type="date" id="kp-de" value="${D.cfg.implantado_em}"></label><label>até<input type="date" id="kp-ate" value="${today()}"></label><button class="btn" id="kp-per">Reprocessar período</button></div>` : ''}`;
+  $('#kp-mot', c).onclick = (e) => { const m = e.target.closest('[data-m]')?.dataset.m; if (m != null) { ui.motivo = m; pendencias(root, c); } };
+  $$('[data-rep]', c).forEach(b => b.onclick = async () => { try { const r = await q(sb.rpc('est_processar_item', { p_item: b.dataset.rep })); toast(r === 'ok' || r === 'ja' || r === 'nao_movimenta' ? 'Resolvido' : `Continua pendente: ${MOTIVOS[r] || r}`, !(r === 'ok' || r === 'ja' || r === 'nao_movimenta')); await recarregar(root); } catch (err) { fail(err); } });
+  $$('[data-ign]', c).forEach(b => b.onclick = async () => { if (!await confirmDialog('Ignorar este item? Ele não movimenta o estoque e sai da lista.')) return;
+    try { await q(sb.from('est_pendencias').update({ status: 'ignorada', resolvido_em: new Date().toISOString() }).eq('id', b.dataset.ign)); toast('Ignorado'); await recarregar(root); } catch (err) { fail(err); } });
+  $('#kp-per', c) && ($('#kp-per', c).onclick = async () => {
+    const de = $('#kp-de', c).value, ate = $('#kp-ate', c).value; if (!de || !ate) return;
+    if (de < D.cfg.implantado_em) return toast(`Antes de ${dateBR(D.cfg.implantado_em)} o saldo já está no saldo inicial`, true);
+    if (!await confirmDialog(`Reprocessar as notas de ${dateBR(de)} a ${dateBR(ate)}? O que já movimentou não duplica.`)) return;
+    try { const r = await q(sb.rpc('est_processar_periodo', { p_empresa: state.empresa.id, p_de: de, p_ate: ate })); toast((r || []).map(x => `${x.resultado}: ${x.itens}`).join(' · ') || 'Nada a processar'); await recarregar(root); } catch (err) { fail(err); }
+  });
+}
+
+async function implantar(root) {
+  let esps = [];
+  try { esps = await q(sb.from('estoque_espelhos').select('id,data_ref,arquivo,linhas,valor_total').eq('empresa_id', state.empresa.id).order('data_ref', { ascending: false })); } catch (err) { return fail(err); }
+  if (!esps.length) return toast('Importe primeiro o relatório de saldo do Iniflex em Posição de estoque › Importar espelho do Iniflex', true);
+  const m = modal({ title: 'Implantar o saldo inicial do estoque', wide: true, body: `
+    <p class="small" style="margin-top:0">O saldo do espelho entra no kardex como <b>Saldo inicial</b>, na data do espelho, ao custo do relatório. A partir do dia seguinte, as notas de entrada e de saída movimentam o estoque sozinhas (e as já importadas desde então são processadas agora). Só pode ser feito uma vez, com o kardex vazio.</p>
+    <div class="grid2"><label>Espelho do Iniflex<select id="im-esp">${esps.map(e => `<option value="${e.id}">${dateBR(e.data_ref)} · ${esc(e.arquivo || '')} · ${e.linhas} linha(s)</option>`).join('')}</select></label>
+      <label>Data do saldo (fim do dia)<input type="date" id="im-dt" value="${esps[0].data_ref}"></label></div>
+    <h3 style="margin:14px 0 6px">Depósito do Iniflex → local da plataforma</h3><div id="im-map"><div class="loading">Carregando…</div></div><p class="small" id="im-res"></p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="im-ok" disabled>Implantar</button>' });
+  let itens = [];
+  const sugerir = (dep) => { const d = dep.toUpperCase(); const f = (re, fin) => re.test(d) && D.locais.find(l => l.finalidade === fin && l.ativo);
+    return (f(/MAT|MP|RESIN|PRIMA/, 'materia_prima') || f(/ACAB|EXPED|PA\b|PRODUTO/, 'acabado') || f(/INSUM|TINTA|EMBAL|TUBET/, 'insumo') || f(/APAR|REPROC|SUCAT/, 'aparas') || f(/MANUT|PE[CÇ]A/, 'manutencao') || f(/CONSUM|EPI|ALMOX/, 'uso_consumo') || f(/PROC|EXTRU/, 'processo') || f(/QUARENT|QUALID/, 'quarentena') || null)?.id || ''; };
+  const pintarMapa = () => {
+    const mapa = Object.fromEntries($$('[data-dep]', m.el).map(s => [s.dataset.dep, s.value]).filter(([, v]) => v));
+    const P = previaImplantacao(itens, mapa);
+    if (!$('[data-dep]', m.el)) {
+      $('#im-map', m.el).innerHTML = `<div class="table-wrap"><table><thead><tr><th>Depósito</th><th class="num">Linhas</th><th class="num">Entram</th><th class="num">Sem cadastro</th><th class="num">Sem custo</th><th class="num">Valor</th><th>Local</th></tr></thead><tbody>
+        ${P.linhas.map(x => `<tr><td>${esc(x.deposito)}</td><td class="num">${x.linhas}</td><td class="num">${x.entram}</td><td class="num ${x.semCadastro ? 'neg' : ''}">${x.semCadastro}</td><td class="num ${x.semCusto ? 'neg' : ''}">${x.semCusto}</td><td class="num">${money(x.valor)}</td>
+          <td><select data-dep="${esc(x.deposito)}"><option value="">não implantar</option>${D.locais.filter(l => l.ativo && l.controla_saldo).map(l => `<option value="${l.id}" ${sugerir(x.deposito) === l.id ? 'selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>`;
+      return pintarMapa();
+    }
+    $('#im-res', m.el).innerHTML = `Entram <b>${P.entram}</b> linha(s), <b>${money(P.valor)}</b>.${P.semCadastro ? ` <span class="neg">${P.semCadastro} código(s) sem cadastro ficam de fora — cadastre em Produtos antes de implantar.</span>` : ''}${P.semCusto ? ` <span class="neg">${P.semCusto} sem custo no relatório: entram pelo último custo do de-para ou a custo zero.</span>` : ''}${P.foraDoMapa ? ` ${P.foraDoMapa} linha(s) de depósitos sem local não entram.` : ''}`;
+    $('#im-ok', m.el).disabled = !P.entram; m.el._mapa = mapa;
+  };
+  const carregarEsp = async () => {
+    const id = $('#im-esp', m.el).value, e = esps.find(x => x.id === id); $('#im-dt', m.el).value = e.data_ref;
+    try { itens = await fetchAll(() => sb.from('estoque_espelho_itens').select('produto_id,deposito,quantidade,custo_unitario,valor').eq('espelho_id', id).order('id')); } catch (err) { return fail(err); }
+    $('#im-map', m.el).innerHTML = ''; pintarMapa();
+  };
+  $('#im-esp', m.el).onchange = carregarEsp; m.el.addEventListener('change', (ev) => { if (ev.target.dataset.dep != null) pintarMapa(); });
+  await carregarEsp();
+  $('#im-ok', m.el).onclick = async (ev) => {
+    const dt = $('#im-dt', m.el).value; if (!dt) return toast('Informe a data', true);
+    if (!await confirmDialog(`Implantar o saldo de ${dateBR(dt)}? Depois disso, as notas a partir de ${dateBR(addDia(dt, 1))} movimentam o estoque. Não dá para implantar de novo.`)) return;
+    ev.target.disabled = true;
+    try {
+      const r = await q(sb.rpc('est_implantar', { p_empresa: state.empresa.id, p_espelho: $('#im-esp', m.el).value, p_data: dt, p_mapa: m.el._mapa }));
+      m.close(); toast(`${r.movimentos} saldo(s) implantado(s) · ${money(r.valor)}${(r.notas || []).length ? ' · notas: ' + r.notas.map(x => `${x.resultado} ${x.itens}`).join(', ') : ''}`);
+      await recarregar(root);
     } catch (err) { fail(err); ev.target.disabled = false; }
   };
 }
