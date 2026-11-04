@@ -19,8 +19,8 @@ const BASE = () => (env('EFRETE_BASE') || 'https://dev.efrete.com.br').replace(/
 
 // métodos liberados nesta etapa (só leitura)
 const LEITURA: Record<string, { path: string; http: 'GET' | 'POST'; versao: number }> = {
-  ConsultaSituacaoTransportador: { path: '/Services/Pef/ConsultaSituacaoTransportador', http: 'GET', versao: 1 },
-  ConsultarTipoCarga: { path: '/Services/Pef/ConsultarTipoCarga', http: 'GET', versao: 1 },
+  // tem lista de veículos: vai por POST (JSON); ConsultarTipoCarga foi desabilitado pelo e-frete ("não é requisito para emissão de CIOT")
+  ConsultaSituacaoTransportador: { path: '/Services/Pef/ConsultaSituacaoTransportador', http: 'POST', versao: 1 },
   ObterCodigoIdentificacaoOperacaoTransportePorIdOperacaoCliente: { path: '/Services/Pef/ObterCodigoIdentificacaoOperacaoTransportePorIdOperacaoCliente', http: 'GET', versao: 1 },
 };
 
@@ -161,21 +161,24 @@ Deno.serve(async (req) => {
     if (faltam.length) return json({ ambiente, erro: 'Segredos não cadastrados: ' + faltam.join(', ') }, 400);
 
     if (acao === 'diagnostico') {
-      // rede: mesmas conexões em páginas sem login, para separar bloqueio de rede × exigência de certificado na pasta /Services
+      // rede direta (só quando não há ponte): separa bloqueio de rede × exigência de certificado na pasta /Services
       const rede: Record<string, string> = {};
-      for (const p of ['/', '/Suporte', '/Services/LogonService.asmx']) {
+      if (!usaPonte()) for (const p of ['/', '/Suporte', '/Services/LogonService.asmx']) {
         const ini = Date.now();
         try { const c = cliente(); const r = await fetch(BASE() + p, { method: 'GET', redirect: 'manual', ...(c ? { client: c } : {}) } as RequestInit); await r.body?.cancel(); rede[p] = `HTTP ${r.status} · ${Date.now() - ini} ms`; }
         catch (e) { rede[p] = 'falha · ' + erroLimpo(e).replace(/^.*?\): /, '').slice(0, 160); }
       }
       const L = await login();
-      let tipos: unknown = null;
+      let consulta: unknown = null;
       if (L.token) {
-        const t = await chamar(LEITURA.ConsultarTipoCarga.path, 'GET', { Integrador: env('EFRETE_INTEGRADOR'), Token: L.token, Versao: 1 });
-        tipos = resumo(t); if ((t.dados as { Sucesso?: boolean })?.Sucesso) tipos = { ...resumo(t), dados: t.dados };
+        // consulta de teste com um transportador da massa de testes da ANTT (kit e-frete): só leitura
+        const pedido = body.teste || { InteressadoCpfOuCnpj: soDig(env('EFRETE_CNPJ')), TransportadorCpfOuCnpj: '48384601000171', TransportadorRNTRC: '55887888', Veiculos: [{ Placa: 'BWP6E54' }] };
+        const t = await chamar(LEITURA.ConsultaSituacaoTransportador.path, 'POST', { ...pedido, Integrador: env('EFRETE_INTEGRADOR'), Token: L.token, Versao: 1 });
+        const d = t.dados as Record<string, unknown> | null;
+        consulta = { ...resumo(t), dados: d ? Object.fromEntries(Object.entries(d).filter(([k]) => !SECRETOS.has(k))) : null };
         await logout(L.token);
       }
-      return json({ ambiente, base: BASE(), ponte: usaPonte(), rede, login: { ok: !!L.token, via: L.via, tentativas: L.tentativas }, tiposDeCarga: tipos });
+      return json({ ambiente, base: BASE(), ponte: usaPonte(), rede, login: { ok: !!L.token, via: L.via, tentativas: L.tentativas }, consultaTransportador: consulta });
     }
 
     const m = LEITURA[acao];

@@ -714,7 +714,7 @@ function prontidao(corpo, root) {
   $$('tr[data-id]', corpo).forEach(tr => tr.onclick = () => { const f = B.F.find(x => x.id === tr.dataset.id); f.mdfe_emissor === 'iplamm' ? fichaMDFe(f, root) : ficha(f, root); });
 }
 
-// Integração e-frete (função de servidor "efrete"): login + consulta de tipos de carga, sem emitir nada. Resultado também fica em efrete_chamadas.
+// Integração e-frete (função de servidor "efrete"): login + consulta de transportador da massa de testes, sem emitir nada. Resultado também fica em efrete_chamadas.
 async function testarEfrete() {
   const m = modal({ title: 'Integração e-frete — teste de conexão', body: '<div class="loading">Conectando ao e-frete…</div>' });
   const b = m.el.querySelector('.modal-body');
@@ -723,15 +723,14 @@ async function testarEfrete() {
     let r = data;
     if (error) { try { r = await error.context.json(); } catch { r = { erro: error.message }; } }
     const lin = (t, v, ok) => `<tr><td>${esc(t)}</td><td class="${ok == null ? '' : ok ? 'pos' : 'neg'}">${v}</td></tr>`;
-    const tipos = r?.tiposDeCarga?.dados;
     b.innerHTML = r?.erro ? `<p class="neg">${esc(r.erro)}</p>` : `<table>
       ${lin('Ambiente', esc(r.ambiente === 'producao' ? 'Produção' : 'Homologação') + ` <span class="muted small">${esc(r.base || '')}</span>`)}
       ${lin('Caminho', r.ponte ? 'pela ponte (Vercel, Node.js)' : 'direto do Supabase')}
       ${Object.entries(r.rede || {}).map(([pg, v]) => lin('Rede ' + pg, esc(v), /^HTTP/.test(v))).join('')}
       ${lin('Login', r.login?.ok ? `✓ conectado (${esc(r.login.via)})` : '✗ não conectou', !!r.login?.ok)}
-      ${(r.login?.tentativas || []).map((t, i) => lin(`Tentativa ${i + 1}`, `HTTP ${t.status} · ${t.ms} ms${t.excecao ? ' · ' + esc(t.excecao.Mensagem || JSON.stringify(t.excecao)) : ''}${t.texto ? ' · ' + esc(t.texto.slice(0, 160)) : ''}`)).join('')}
-      ${r.tiposDeCarga ? lin('Consulta de tipos de carga', r.tiposDeCarga.sucesso ? '✓ respondeu' : `✗ HTTP ${r.tiposDeCarga.status}`, !!r.tiposDeCarga.sucesso) : ''}
-      </table>${tipos ? `<details style="margin-top:8px"><summary class="small">Resposta da consulta</summary><pre class="small" style="white-space:pre-wrap">${esc(JSON.stringify(tipos, null, 1).slice(0, 3000))}</pre></details>` : ''}
+      ${(r.login?.ok ? [] : (r.login?.tentativas || [])).map((t, i) => lin(`Tentativa ${i + 1}`, `HTTP ${t.status} · ${t.ms} ms${t.excecao ? ' · ' + esc(t.excecao.Mensagem || JSON.stringify(t.excecao)) : ''}${t.texto ? ' · ' + esc(t.texto.slice(0, 160)) : ''}`)).join('')}
+      ${r.consultaTransportador ? lin('Consulta de transportador (massa ANTT)', r.consultaTransportador.sucesso ? '✓ respondeu' : `✗ ${esc(r.consultaTransportador.excecao?.Mensagem || 'HTTP ' + r.consultaTransportador.status)}`, !!r.consultaTransportador.sucesso) : ''}
+      </table>${r.consultaTransportador?.dados ? `<details style="margin-top:8px"><summary class="small">Resposta da consulta</summary><pre class="small" style="white-space:pre-wrap">${esc(JSON.stringify(r.consultaTransportador.dados, null, 1).slice(0, 3000))}</pre></details>` : ''}
       <p class="small muted">Nenhum CIOT foi emitido. A senha e o hash ficam só no servidor.</p>`;
   } catch (e) { b.innerHTML = `<p class="neg">${esc(e.message || String(e))}</p>`; }
 }
