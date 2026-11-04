@@ -251,6 +251,9 @@ Deno.serve(async (req) => {
         Contratante: { NomeOuRazaoSocial: 'KRATOS TRANSPORTES E LOGISTICA LTDA', CpfOuCnpj: cnpj, ResponsavelPeloPagamento: true, Endereco: end },
         Veiculos: [{ Placa: T.placa }], CodigoTipoCarga: 5, AltoDesempenho: false, ComposicaoVeicular: false, RetornoVazio: false, TipoPagamento: 'eFRETE',
         TipoEmbalagem: 'Pallet',
+        // quitação pelo meio de pagamento (eFRETE): documentos que o posto/credenciado retém (mín. 10 caracteres cada)
+        ObservacoesAoCredenciado: ['Canhoto da NF-e assinado pelo destinatario', 'Comprovante de entrega da carga'],
+        EntregaDocumentacao: 'RedeCredenciada',
       };
       const d = passo('Emitir CIOT (Lotação)', await chamar('/Services/Pef/AdicionarOperacaoTransporteV2', 'POST', op), { idOperacaoCliente: id });
       const ciot = (d?.CodigoIdentificacaoOperacao as string) || null;
