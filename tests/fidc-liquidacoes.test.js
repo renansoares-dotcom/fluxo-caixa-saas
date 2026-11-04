@@ -83,3 +83,32 @@ test('lê o relatório de liquidados da Contato e casa sem borderô', () => {
   const c = L.casar(r, tit);
   assert.deepEqual(c.linhas.map(l => l.fidc_titulo_id), ['v', null, 'g', null, null]);   // cessão mais recente antes do pagamento
 });
+
+// FS (GPA Factoring) — extrato por sacado, liquidados, analítico (dados fictícios no mesmo leiaute)
+const FS = `FACTORING EXEMPLO LTDA.   Página 0001/0001
+Extrato de Titulos - POR SACADO
+Operações   : 000000 - 999999   Data Operações   : 09/07/2020 - 03/11/2026   Tipo de Operação : Todas   Situação   : Liquidados
+Valor dos titulos: 0,00 - 999.999.999,99   Liquidação   : 01/01/2026 - 31/10/2026   Layout   : Analítico   Quebra de página : Não
+Por Emissão Título   Ocorrências   Vcto   Dias Vlr Original   Vlr Abat   Vlr Atual   Cap Rec   Corr Rec Total Recdo Liquidação   Saldo Cap Dt Sal   %   Correção Total à Rec
+SACADO: CLIENTE ALFA LTDA-11.222.333/0001-81
+CEDENTE: 0001-EMPRESA EXEMPLO LTDA
+001 08/12/25 20001-001   19/01/26 0   2.128,96   0,00   2.128,96   2.128,96   0,00   2.128,96 19/01/26   0,00   -   0,00   0,00   0,00
+001 08/05/26 20002-002   CT   18/06/26 21   5.181,60   0,00   5.181,60   5.181,60   62,16   5.243,76 09/07/26   0,00   -   0,00   0,00   0,00
+Total Liquidados [2] - SACADO ->   7.310,56   0,00   7.310,56   7.310,56   62,16   7.372,72   0,00   0,00   0,00
+SACADO: CLIENTE BETA LTDA-22.333.444/0001-05
+001 04/05/26 20003-001   25/05/26 -3   5.454,16   900,00   4.554,16   4.554,16   0,00   4.554,16 22/05/26   0,00   -   0,00   0,00   0,00
+001 08/05/26 20004-001   BX ST   06/02/26 6   2.586,26   0,00   2.586,26   2.586,26   0,00   2.586,26 12/02/26   0,00   -   0,00   0,00   0,00
+Total Liquidados [4] - GERAL ->   15.351,98   900,00   14.451,98   14.451,98   62,16   14.513,14   0,00   0,00   0,00`;
+
+test('lê o extrato de liquidados da FS e casa pela data da operação', () => {
+  assert.ok(L.LEITORES.FS.reconhece(FS)); assert.ok(!L.LEITORES.Negocial.reconhece(FS)); assert.ok(!L.LEITORES.Contato.reconhece(FS));
+  const r = L.LEITORES.FS.ler(FS);
+  assert.equal(r.length, 4);
+  assert.deepEqual(r[1], { titulo: '20002-002', bordero: '', data_operacao: '2026-05-08', vencimento: '2026-06-18', quitacao: '2026-07-09', sacado: 'CLIENTE ALFA LTDA', cnpj_sacado: '11.222.333/0001-81',
+    valor_face: 5181.6, desconto: 0, mora: 62.16, valor_pago: 5243.76, tipo_fundo: 'CT - Cartório', tipo: 'normal' });
+  assert.equal(r[2].desconto, 900); assert.equal(r[2].sacado, 'CLIENTE BETA LTDA');
+  assert.equal(r[3].tipo, 'outro'); assert.equal(r[3].tipo_fundo, 'BX - Baixado · ST - Sustado');
+  assert.equal(Math.round(r.reduce((s, x) => s + x.valor_pago, 0) * 100) / 100, 14513.14);
+  const c = L.casar([r[1]], [{ id: 'velho', titulo: '20002-002', bordero: '10', data_operacao: '2026-01-10', valor: 5181.6 }, { id: 'novo', titulo: '20002-002', bordero: '20', data_operacao: '2026-05-08', valor: 5181.6 }, { id: 'depois', titulo: '20002-002', bordero: '30', data_operacao: '2026-06-01', valor: 5181.6 }]);
+  assert.equal(c.linhas[0].fidc_titulo_id, 'novo');
+});

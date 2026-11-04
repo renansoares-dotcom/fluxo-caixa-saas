@@ -137,7 +137,7 @@ function importar(root) {
   $('#li-ok', m.el).onclick = async () => {
     if (!prev) return; const bt = $('#li-ok', m.el); bt.disabled = true; bt.textContent = 'Importando…';
     try {
-      const rows = prev.linhas.map(({ aviso, ...l }) => ({ ...l, empresa_id: state.empresa.id, fundo: prev.fundo, arquivo: prev.arquivo, importado_em: new Date().toISOString() }));
+      const rows = prev.linhas.map(({ aviso, data_operacao, ...l }) => ({ ...l, empresa_id: state.empresa.id, fundo: prev.fundo, arquivo: prev.arquivo, importado_em: new Date().toISOString() }));
       const unicos = [...new Map(rows.map(r => [`${r.titulo}|${r.bordero}`, r])).values()];   // a mesma linha duas vezes no arquivo: fica a última
       for (let i = 0; i < unicos.length; i += 500) await q(sb.from('fidc_liquidacoes').upsert(unicos.slice(i, i + 500), { onConflict: 'empresa_id,fundo,titulo,bordero' }));
       toast(`${unicos.length} liquidação(ões) da ${prev.fundo} registradas`); m.close(); render(root);

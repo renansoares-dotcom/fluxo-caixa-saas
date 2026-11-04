@@ -72,9 +72,34 @@ export function parseContato(texto, { cnpjCedente = '' } = {}) {
   return out;
 }
 
+/**
+ * FS (GPA Factoring) — "Extrato de Titulos - POR SACADO", situação Liquidados, layout Analítico. Valores 1.234,56; datas dd/mm/aa; sem borderô.
+ * Bloco por sacado: "SACADO: NOME-CNPJ" e, depois, uma linha por título:
+ * Por | Emissão (= data da operação) | Título | Ocorrências (PR, CT, PT, BX, ST…; nenhuma, uma ou mais) | Vcto | Dias | Vlr Original | Vlr Abat | Vlr Atual | Cap Rec | Corr Rec | Total Recdo | Liquidação | …
+ * Corr Rec = juros/mora recebidos; Vlr Abat = abatimento. O relatório já desconsidera os recomprados. BX (baixado) fica como "outro" para conferência.
+ */
+const RX_FS = /^\s*(\d{3})\s+(\d\d\/\d\d\/\d\d)\s+(\S+)\s+((?:[A-Z]{2}\s+)*)(\d\d\/\d\d\/\d\d)\s+(-?\d+)\s+([\d.]+,\d\d)\s+([\d.]+,\d\d)\s+([\d.]+,\d\d)\s+([\d.]+,\d\d)\s+([\d.]+,\d\d)\s+([\d.]+,\d\d)\s+(\d\d\/\d\d\/\d\d)\b/;
+export const OCORRENCIAS_FS = { PR: 'Prorrogado', CT: 'Cartório', PT: 'Protestado', BX: 'Baixado', DV: 'Devolvido', IR: 'Indicado para recompra', RC: 'Recomprado', ST: 'Sustado' };
+export function parseFS(texto) {
+  const out = []; let sacado = '', cnpj = '';
+  for (const l of String(texto).split(/\r?\n/)) {
+    const s = l.match(/^\s*SACADO:\s*(.+?)-(\d\d\.\d{3}\.\d{3}\/\d{4}-\d\d|\d{3}\.\d{3}\.\d{3}-\d\d)\s*$/);
+    if (s) { sacado = s[1].trim(); cnpj = s[2]; continue; }
+    const m = l.match(RX_FS); if (!m) continue;
+    const ocs = m[4].trim().split(/\s+/).filter(Boolean), oc = ocs[0] || '';
+    out.push({ titulo: m[3], bordero: '', data_operacao: iso2(m[2]), vencimento: iso2(m[5]), quitacao: iso2(m[13]), sacado, cnpj_sacado: cnpj,
+      valor_face: num(m[7]), desconto: num(m[8]), mora: num(m[11]), valor_pago: num(m[12]),
+      tipo_fundo: ocs.length ? ocs.map(o => `${o} - ${OCORRENCIAS_FS[o] || o}`).join(' · ') : 'Liquidado',
+      tipo: ocs.some(o => o === 'RC' || o === 'IR') ? 'recompra' : ocs.includes('BX') ? 'outro' : 'normal' });
+  }
+  return out;
+}
+
 export const LEITORES = {
   Negocial: { nome: 'Negocial — Consulta de títulos pagos (PDF "PAGOS - ANALÍTICO")', ler: parseNegocial, reconhece: (t) => /PAGOS\s*-\s*ANAL[IÍ]TICO/i.test(t) },
   Contato: { nome: 'Contato — Títulos Liquidados (PDF "CONTROLE FIDC")', ler: (t, o) => parseContato(t, o), reconhece: (t) => /T[ií]tulos\s+Liquidados/i.test(t) && /CONTATO/i.test(t) },
+  FS: { nome: 'FS — Extrato de Títulos por Sacado, situação Liquidados, layout Analítico (PDF da GPA Factoring)', ler: parseFS,
+    reconhece: (t) => /Extrato de T[ií]tulos/i.test(t) && /Liquidados/i.test(t) && /Anal[ií]tico/i.test(t) },
 };
 
 /** título da plataforma é o mesmo do fundo? (36479-001 = 36479-1 = 36479/1) */
@@ -94,6 +119,7 @@ export function casar(linhas, titulos) {
     if (l.bordero && !/^pgto /.test(l.bordero)) c = por.get(`${chaveTitulo(l.titulo)}|${String(l.bordero).replace(/^0+/, '')}`) || [];
     else if (/^pgto /.test(l.bordero || '')) c = [];   // pagamento de acordo/nota de crédito: não é título da base
     else c = (porChave.get(chaveTitulo(l.titulo)) || []).filter(x => !x.data_operacao || x.data_operacao <= l.quitacao).sort((a, b) => String(b.data_operacao || '').localeCompare(String(a.data_operacao || '')));   // sem borderô no relatório: a cessão mais recente antes do pagamento
+    if (l.data_operacao && c.some(x => x.data_operacao === l.data_operacao)) c = c.filter(x => x.data_operacao === l.data_operacao);   // FS: a emissão é a data da operação
     const t = c.find(x => Math.abs(+x.valor - l.valor_face) < 0.01) || c[0];
     return { ...l, fidc_titulo_id: t?.id || null, aviso: !t ? 'sem título na base (borderô fora da base)' : Math.abs(+t.valor - l.valor_face) >= 0.01 ? `face na base ${r2(+t.valor)}` : null };
   });
