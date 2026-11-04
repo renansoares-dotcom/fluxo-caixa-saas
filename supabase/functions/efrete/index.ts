@@ -113,6 +113,15 @@ async function chamar(path: string, http: 'GET' | 'POST', corpo: Record<string, 
   return res;
 }
 
+// consultas que a lista de URLs do kit marca como GET: com parâmetros na URL o e-frete devolve "Requisicao.Nula"
+// (o servidor só lê o corpo JSON). Tenta POST com JSON e, se o método não for aceito, volta para GET.
+async function consultar(path: string, corpo: Record<string, unknown>) {
+  const a = await chamar(path, 'POST', corpo);
+  const cod = ((a.dados as { Excecao?: { Codigo?: string } } | null)?.Excecao?.Codigo) || '';
+  if (a.dados && cod !== 'Requisicao.Nula') return a;
+  return await chamar(path, 'GET', corpo);
+}
+
 async function login() {
   const corpo = { Usuario: env('EFRETE_USUARIO'), Senha: env('EFRETE_SENHA'), Integrador: env('EFRETE_INTEGRADOR'), Versao: 1 };
   // o exemplo do manual é JSON (POST, senha no corpo); a lista de URLs do kit diz GET — tenta POST primeiro
@@ -260,9 +269,9 @@ Deno.serve(async (req) => {
       let pdf: string | null = null;
       if (ciot) {
         passos[passos.length - 1].ciot = ciot;
-        const c = passo('Consultar CIOT pelo Id da operação', await chamar('/Services/Pef/ObterCodigoIdentificacaoOperacaoTransportePorIdOperacaoCliente', 'GET', { ...I, Versao: 1, MatrizCNPJ: cnpj, IdOperacaoCliente: id }));
+        const c = passo('Consultar CIOT pelo Id da operação', await consultar('/Services/Pef/ObterCodigoIdentificacaoOperacaoTransportePorIdOperacaoCliente', { ...I, Versao: 1, MatrizCNPJ: cnpj, IdOperacaoCliente: id }));
         if (c) passos[passos.length - 1].estado = c.EstadoCiot ?? null;
-        const p = passo('Baixar PDF do CIOT', await chamar('/Services/Pef/ObterOperacaoTransportePdf', 'GET', { ...I, Versao: 1, CodigoIdentificacaoOperacao: ciot }));
+        const p = passo('Baixar PDF do CIOT', await consultar('/Services/Pef/ObterOperacaoTransportePdf', { ...I, Versao: 1, CodigoIdentificacaoOperacao: ciot }));
         pdf = (p?.Pdf as string) || null;
         passo('Cancelar CIOT de teste', await chamar('/Services/Pef/CancelarOperacaoTransporte', 'POST', { ...I, Versao: 1, CodigoIdentificacaoOperacao: ciot, Motivo: 'Teste de integração em homologação (plataforma Kratos).' }));
       }
@@ -275,7 +284,7 @@ Deno.serve(async (req) => {
     const L = await login();
     if (!L.token) return json({ ambiente, erro: 'Login no e-frete falhou', tentativas: L.tentativas }, 502);
     const params = (body.params && typeof body.params === 'object') ? body.params : {};
-    const r = await chamar(m.path, m.http, { ...params, Integrador: env('EFRETE_INTEGRADOR'), Token: L.token, Versao: m.versao });
+    const r = m.http === 'GET' ? await consultar(m.path, { ...params, Integrador: env('EFRETE_INTEGRADOR'), Token: L.token, Versao: m.versao }) : await chamar(m.path, m.http, { ...params, Integrador: env('EFRETE_INTEGRADOR'), Token: L.token, Versao: m.versao });
     await logout(L.token);
     return json({ ambiente, status: r.status, dados: r.dados, texto: r.texto });
   } catch (e) {
