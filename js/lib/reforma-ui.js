@@ -5,6 +5,7 @@
 import { sb, state, q, fetchAll, isAdmin } from './data.js';
 import { $, esc, money, pct, dateBR, fail, toast, modal, loading, exportXLSX, MESES_CURTO } from './ui.js';
 import { aliquotas, doAno, total, ibs, simular, conferir, SITUACAO, PIS_COFINS, pctBR } from './reforma.js';
+import { carregarRegimes, vigente, ehSimples, descricao } from './regime.js';
 
 let TAB = null, semTabela = false;
 const sim = { ano: 2027, credAtual: 100, credNovo: 100, notas: null, chave: null };
@@ -70,10 +71,15 @@ export async function pintarSimulador(c) {
     catch (e) { fail(e); c.innerHTML = ''; return; }
   }
   const a = doAno(L, sim.ano), S = simular(sim.notas, a, sim), T = S.total;
+  // o simulador compara com PIS/Cofins não cumulativo (Lucro Real); no Simples e no Presumido avisa antes dos números
+  const rg = vigente(await carregarRegimes(state.empresa.id));
+  const avisoRegime = !rg ? `<div class="card" style="border-left:4px solid var(--warn,#c80)"><p class="small" style="margin:0"><strong>Regime tributário não cadastrado.</strong> O simulador abaixo compara com o PIS/Cofins não cumulativo (Lucro Real). Cadastre o regime em Cadastros › Empresa › Regime tributário.</p></div>`
+    : ehSimples(rg) ? `<div class="card" style="border-left:4px solid var(--warn,#c80)"><p class="small" style="margin:0"><strong>${esc(descricao(rg))}.</strong> Este simulador é do regime regular (débito e crédito, comparado com o PIS/Cofins não cumulativo) e não vale para o DAS. No Simples, com IBS/CBS no DAS a empresa não toma crédito e o cliente recebe só o crédito transferido; pelo regime regular, apura débito e crédito como aqui. A comparação das duas opções entra com a apuração do Simples.</p></div>`
+    : rg.regime === 'presumido' ? `<div class="card" style="border-left:4px solid var(--warn,#c80)"><p class="small" style="margin:0"><strong>Lucro Presumido.</strong> O lado “hoje” do simulador usa o PIS/Cofins não cumulativo; no Presumido ele é cumulativo (3,65%, sem crédito). Ajuste para 0% as compras com crédito de PIS/Cofins hoje.</p></div>` : '';
   const neg = (v) => v ? money(-v) : '–';
   const lin = (m, rot) => `<tr class="${m.mes === 'total' ? 'row-sec' : ''}"><td class="nowrap">${rot}</td><td class="num">${money(m.faturamento)}</td><td class="num">${money(m.debAtual - m.devAtual)}</td><td class="num">${neg(m.credAtual)}</td><td class="num"><strong>${money(m.atual)}</strong></td><td class="num">${pct(m.pctAtual)}</td>
     <td class="num">${money(m.base)}</td><td class="num">${money(m.debNovo - m.devNovo)}</td><td class="num">${neg(m.credNovo)}</td><td class="num"><strong>${money(m.novo)}</strong></td><td class="num">${pct(m.pctNovo)}</td><td class="num ${m.dif > 0 ? 'neg' : 'pos'}">${m.dif > 0 ? '+' : ''}${money(m.dif)}</td></tr>`;
-  c.innerHTML = `<div class="card"><div class="toolbar" style="margin-bottom:0">
+  c.innerHTML = `${avisoRegime}<div class="card"><div class="toolbar" style="margin-bottom:0">
       <label>Simular o ano<select id="sm-ano">${L.filter(x => x.ano >= 2027).map(x => `<option value="${x.ano}" ${x.ano === sim.ano ? 'selected' : ''}>${x.ano} · ${pctBR(total(x))}</option>`).join('')}</select></label>
       <label>Compras com crédito de PIS/Cofins hoje (%)<input type="number" min="0" max="100" step="5" id="sm-ca" value="${sim.credAtual}" style="width:90px"></label>
       <label>Compras com crédito de CBS/IBS (%)<input type="number" min="0" max="100" step="5" id="sm-cn" value="${sim.credNovo}" style="width:90px"></label>
@@ -107,7 +113,8 @@ export async function pintarConferencia(c, mes) {
   } catch (e) { fail(e); c.innerHTML = ''; return; }
   const porNota = new Map(); for (const i of itens) (porNota.get(i.nota_id) || porNota.set(i.nota_id, []).get(i.nota_id)).push(i);
   const lado = (n) => n.emissao_propria ? 'saidas' : 'entradas';
-  const R = notas.map(n => ({ n, r: conferir(n, L, porNota.get(n.id) || []) }));
+  const RG = await carregarRegimes(state.empresa.id);
+  const R = notas.map(n => { const rg = vigente(RG, n.emissao); return { n, r: conferir(n, L, porNota.get(n.id) || [], { simplesDentro: ehSimples(rg) && !rg.ibscbs_regular }) }; });
   const sel = R.filter(x => lado(x.n) === conf.lado);
   const cont = (nv) => sel.filter(x => x.r.nivel === nv).length;
   const vis = conf.filtro === 'problemas' ? sel.filter(x => x.r.nivel !== 'ok') : sel;

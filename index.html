@@ -7,7 +7,7 @@
   <title>IPLAMM · Fluxo de Caixa</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20261020b">
+  <link rel="stylesheet" href="css/app.css?v=20261104a">
   <link rel="icon" type="image/svg+xml" href="assets/iplamm-icon.svg">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
@@ -46,6 +46,19 @@
         <h3>Criar nova empresa</h3>
         <label>Nome<input name="nome" required></label>
         <label>CNPJ (opcional)<input name="cnpj"></label>
+        <div class="nova-trib">
+          <label>Regime tributário<select name="regime">
+            <option value="">— definir depois —</option><option value="simples">Simples Nacional</option><option value="mei">MEI (Simei)</option>
+            <option value="presumido">Lucro Presumido</option><option value="real">Lucro Real</option></select></label>
+          <label>Início do uso na plataforma<input type="date" name="vigencia_inicio"></label>
+          <div class="nt-simples" hidden>
+            <label>CNAE principal<input name="cnae" placeholder="0000-0/00"></label>
+            <label>Anexo do Simples<select name="anexo"><option value="">—</option><option value="I">Anexo I — comércio</option><option value="II">Anexo II — indústria</option>
+              <option value="III">Anexo III — serviços / transporte de cargas</option><option value="IV">Anexo IV — serviços (INSS fora do DAS)</option><option value="V">Anexo V — serviços (Fator R)</option></select></label>
+          </div>
+          <label>UF<input name="uf" maxlength="2" style="text-transform:uppercase"></label>
+          <p class="muted small" style="margin:0">Com o Simples ou o MEI, o plano de contas modelo já vem com a conta do DAS no lugar de PIS/COFINS e IRPJ/CSLL. Os demais dados ficam em Cadastros › Empresa › Regime tributário.</p>
+        </div>
         <button class="btn primary" type="submit">Criar empresa</button>
       </form>
       <button class="btn link" id="logout-2">Sair</button>

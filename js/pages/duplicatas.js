@@ -283,7 +283,7 @@ function endossos(root) {
     foot: '<button class="btn" data-close>Fechar</button>',
   });
   const cancelar = async (ids, rotulo) => {
-    const mot = prompt(`Cancelar ${rotulo}?\nOs títulos ficam livres para novo endosso; o registro continua no histórico.\n\nMotivo (ex.: recusado pelo beneficiário, desistência da IPLAMM):`, '');
+    const mot = prompt(`Cancelar ${rotulo}?\nOs títulos ficam livres para novo endosso; o registro continua no histórico.\n\nMotivo (ex.: recusado pelo beneficiário, desistência da empresa):`, '');
     if (mot === null) return; if (!mot.trim()) return toast('Informe o motivo', true);
     try {
       await q(sb.from('duplicatas').update({ status: 'cancelada', cancelada_em: new Date().toISOString(), motivo_cancelamento: mot.trim() }).in('id', ids));

@@ -5,8 +5,9 @@ import { $, $$, esc, toast, fail, modal, confirmDialog, today, dateBR } from '..
 import { temRH, podeRH } from '../lib/rh-dados.js';
 import { BUCKET, urlArquivo, esquecerArquivo, aplicarIdentidade } from '../lib/identidade.js';
 import * as CR from '../lib/crachas.js';
+import { pintarTributacao } from '../lib/regime-ui.js';
 
-export const title = 'Empresa — identidade e crachás';
+export const title = 'Empresa — identidade, regime tributário e crachás';
 const ui = { aba: 'id', filtro: 'ativos', busca: '' };
 let D = null;
 
@@ -33,14 +34,15 @@ export async function render(root) {
   root.innerHTML = '<div class="loading">Carregando…</div>';
   try { await carregar(); } catch (err) { fail(err); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Recarregue a página.</div></div>'; return; }
   if (D.sem) { root.innerHTML = '<div class="card"><div class="empty">Esta tela ainda não está disponível. Recarregue a página; se continuar, avise o administrador da plataforma.</div></div>'; return; }
-  const abas = [['id', 'Identidade visual'], ...(temRH() ? [['cr', 'Crachás'], ['ter', 'Terceiros e visitantes'], ['hist', 'Histórico de crachás']] : [])];
+  const abas = [['id', 'Identidade visual'], ['trib', 'Regime tributário'], ...(temRH() ? [['cr', 'Crachás'], ['ter', 'Terceiros e visitantes'], ['hist', 'Histórico de crachás']] : [])];
   if (!abas.some(a => a[0] === ui.aba)) ui.aba = 'id';
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Empresa</h2><div class="muted small">Identidade visual usada na plataforma, nos relatórios, nos contratos e nos crachás.</div></div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Empresa</h2><div class="muted small">Identidade visual, regime tributário e crachás.</div></div></div>
     <div class="card toolbar"><div class="chips" id="ce-abas">${abas.map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div id="ce-corpo"></div>`;
   $('#ce-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
   const corpo = $('#ce-corpo', root);
   if (ui.aba === 'id') return identidade(corpo, root);
+  if (ui.aba === 'trib') return pintarTributacao(corpo);
   if (ui.aba === 'cr') return crachasColab(corpo, root);
   if (ui.aba === 'ter') return terceiros(corpo, root);
   return historico(corpo, root);

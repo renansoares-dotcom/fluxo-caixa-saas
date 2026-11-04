@@ -17,7 +17,7 @@ export const TP_CAR = { '00': 'Não aplicável', '01': 'Aberta', '02': 'Fechada 
 export const TP_PROP = { '0': 'TAC agregado', '1': 'TAC independente', '2': 'Outros (transportadora/cooperativa)' };
 // infPag/Comp/tpComp
 export const TP_COMP = { '01': 'Vale-pedágio', '02': 'Impostos, taxas e contribuições', '03': 'Despesas (bancárias, meio de pagamento, outras)', '99': 'Outros' };
-export const RESP_SEG = { '1': 'Emitente do MDF-e (IPLAMM)', '2': 'Contratante do serviço de transporte' };
+export const RESP_SEG = { '1': 'Emitente do MDF-e (a própria empresa)', '2': 'Contratante do serviço de transporte' };
 
 export const soDig = (s) => String(s ?? '').replace(/\D/g, '');
 const vazio = (s) => !String(s ?? '').trim();
@@ -72,7 +72,7 @@ export const chavesDe = (d) => (d.descarga || []).flatMap(x => x.chaves || []);
 export function faltasMDFe(f, t, padrao = {}) {
   const r = [], add = (campo, txt, grave = true) => r.push({ campo, txt, grave });
   if (!f) return [{ campo: 'frete', txt: 'frete', grave: true }];
-  if (!f.mdfe_emissor) { add('emissor', 'quem emite o MDF-e (IPLAMM ou transportadora)'); return r; }
+  if (!f.mdfe_emissor) { add('emissor', 'quem emite o MDF-e (a própria empresa ou a transportadora)'); return r; }
   if (f.mdfe_emissor === 'transportadora') {
     if (vazio(f.mdfe_chave) && vazio(f.cte_chave)) add('cte', 'chave do CT-e ou do MDF-e da transportadora', false);
     if (vazio(f.ciot)) add('ciot', 'CIOT gerado pela transportadora', false);

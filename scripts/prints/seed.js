@@ -389,3 +389,13 @@ DB.log_carga_notas = DB.log_carga_notas || [];
   DB.est_custos = Object.entries(cus).map(([pid, x]) => ({ produto_id: pid, empresa_id: E, quantidade: x.q, valor: x.v, custo_medio: x.cm, ultima_entrada: '2026-10-29' }));
   DB.est_fechamentos = [{ empresa_id: E, mes: '2026-09-01', fechado_em: '2026-10-05T12:00:00Z' }];
 }
+
+// regime tributário (SQL 078) — fictício: a empresa de exemplo entrou no Simples e optou pelo IBS/CBS no regime regular em 2027
+DB.empresa_tributacao = [
+  { id: 'trib1', empresa_id: E, vigencia_inicio: '2026-01-01', regime: 'simples', pis_cofins: null, irpj_apuracao: null,
+    simples_atividades: [{ cnae: '2222-6/00', descricao: 'Fabricação de embalagens de material plástico', anexo: 'II', fator_r: false }, { cnae: '4930-2/02', descricao: 'Transporte rodoviário de cargas intermunicipal', anexo: 'III', fator_r: false }],
+    sublimite_excedido: false, ibscbs_regular: false, incentivos: null, uf: 'PE', municipio_ibge: '2604106', cnae_principal: '2222-6/00', contabilidade: 'Escritório Contábil Exemplo', fonte: 'Cartão CNPJ e contabilidade' },
+  { id: 'trib2', empresa_id: E, vigencia_inicio: '2027-01-01', regime: 'simples', pis_cofins: null, irpj_apuracao: null,
+    simples_atividades: [{ cnae: '2222-6/00', descricao: 'Fabricação de embalagens de material plástico', anexo: 'II', fator_r: false }, { cnae: '4930-2/02', descricao: 'Transporte rodoviário de cargas intermunicipal', anexo: 'III', fator_r: false }],
+    sublimite_excedido: false, ibscbs_regular: true, incentivos: null, uf: 'PE', municipio_ibge: '2604106', cnae_principal: '2222-6/00', contabilidade: 'Escritório Contábil Exemplo', fonte: 'Opção no Portal do Simples (setembro/2026)' },
+];

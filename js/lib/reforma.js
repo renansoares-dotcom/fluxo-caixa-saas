@@ -84,7 +84,7 @@ export function simular(notas, aliq, o = {}) {
  * nt: cabeçalho da nota (v_bc_ibscbs, v_cbs, v_ibs, valores) + itens [{ cst_ibscbs, cclass_trib }]
  * devolve { nivel: 'ok'|'neg'|'warn'|'info', motivos: [..], esperadoCbs, esperadoIbs, base }
  */
-export function conferir(nt, lista, itens = []) {
+export function conferir(nt, lista, itens = [], o = {}) {
   const a = doAno(lista, +nt.emissao.slice(0, 4));
   if (!a) return { nivel: 'ok', motivos: ['antes da reforma'], base: null };
   const base = n(nt.v_bc_ibscbs), est = baseEstimada(nt), tol = (v) => Math.max(0.05, v * 0.005);
@@ -92,7 +92,11 @@ export function conferir(nt, lista, itens = []) {
   const reducao = csts.filter(c => c !== '000');
   const out = { base, baseEstimada: est, esperadoCbs: r2(base * a.cbs / 100), esperadoIbs: r2(base * ibs(a) / 100), csts, motivos: [], nivel: 'ok', aliq: a };
   const add = (nv, txt) => { out.motivos.push(txt); const ord = { ok: 0, info: 1, warn: 2, neg: 3 }; if (ord[nv] > ord[out.nivel]) out.nivel = nv; };
-  if (!base && !n(nt.v_cbs) && !n(nt.v_ibs)) { add(nt.emissao_propria ? 'neg' : 'warn', 'sem o grupo IBS/CBS na nota'); return out; }
+  if (!base && !n(nt.v_cbs) && !n(nt.v_ibs)) {
+    // o.simplesDentro: a empresa é do Simples com IBS/CBS no DAS (SQL 078) — o destaque segue a regra do Simples
+    if (nt.emissao_propria && o.simplesDentro) { add('info', 'sem o grupo IBS/CBS: empresa do Simples com IBS/CBS no DAS (confira a regra de destaque com a contabilidade)'); return out; }
+    add(nt.emissao_propria ? 'neg' : 'warn', 'sem o grupo IBS/CBS na nota'); return out;
+  }
   if (reducao.length) add('info', `CST ${reducao.join(', ')} (redução, isenção, suspensão ou diferimento): conferir o cClassTrib`);
   if (!reducao.length) {
     if (Math.abs(n(nt.v_cbs) - out.esperadoCbs) > tol(out.esperadoCbs)) add('neg', `CBS ${fmt(nt.v_cbs)}; esperado ${fmt(out.esperadoCbs)} (${pctBR(a.cbs)} da base)`);

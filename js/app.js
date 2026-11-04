@@ -9,6 +9,7 @@ import { verificarAoEntrar, gerenciar as gerenciarMFA } from './lib/mfa.js';
 import { iniciarChat, pararChat, setAberta as chatFechado } from './lib/chat.js';
 import { alternarMini, fecharMini } from './lib/mini-chat.js';
 import { carregarIdentidade } from './lib/identidade.js';
+import { esquecerRegimes } from './lib/regime.js';
 import { abrirLancamento } from './lib/lanc-form.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
@@ -204,14 +205,19 @@ async function escolherEmpresa() {
 }
 $('#empresa-form').onsubmit = async (e) => {
   e.preventDefault();
-  const { nome, cnpj } = formData(e.target);
+  const { nome, cnpj, regime, vigencia_inicio, cnae, anexo, uf } = formData(e.target);
   try {
-    const id = await q(sb.rpc('criar_empresa', { p_nome: nome, p_cnpj: cnpj }));
+    // com o regime: criar_empresa_completa (SQL 078) grava o regime e ajusta as contas de tributos do plano modelo
+    const trib = regime ? { regime, vigencia_inicio: vigencia_inicio || null, uf: uf || null, cnae_principal: cnae || null, fonte: 'Informado na criação da empresa',
+      simples_atividades: regime === 'simples' && (anexo || cnae) ? [{ cnae: cnae || null, descricao: null, anexo: anexo || null, fator_r: anexo === 'V' }] : [] } : null;
+    const id = trib ? await q(sb.rpc('criar_empresa_completa', { p_nome: nome, p_cnpj: cnpj || null, p_ano: vigencia_inicio ? +vigencia_inicio.slice(0, 4) : null, p_trib: trib }))
+      : await q(sb.rpc('criar_empresa', { p_nome: nome, p_cnpj: cnpj }));
     const emp = await q(sb.from('empresas').select('*').eq('id', id).single());
     toast('Empresa criada com um plano de contas modelo');
     entrarEmpresa(emp, 'admin');
   } catch (err) { fail(err); }
 };
+$('#empresa-form [name=regime]').onchange = (e) => { $('#empresa-form .nt-simples').hidden = e.target.value !== 'simples'; };
 $('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'); fecharMini(); pararChat(); state.empresa = null; state.cad = null; escolherEmpresa(); };
 
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
@@ -231,7 +237,7 @@ const areaDaRota = (route) => ['dashboard', 'hoje', 'decisao-dia', 'decisoes', '
 
 async function entrarEmpresa(emp, papel, areas) {
   sessionStorage.removeItem('fc-escolher');
-  state.empresa = emp; state.papel = papel; state.cad = null;
+  state.empresa = emp; state.papel = papel; state.cad = null; esquecerRegimes();
   state.areas = Array.isArray(areas) && areas.length ? areas : null;
   aplicarAreas();
   iniciarNotificacoes();

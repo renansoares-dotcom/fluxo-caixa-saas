@@ -15,7 +15,9 @@ import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, c
 export const title = 'Logística — fretes e CIOT';
 const ui = { aba: 'fretes', mes: today().slice(0, 7), busca: '' };
 const PLANO_FRETE = '2.06.01';
-const MOTIVOS = { relacao_encerrada: 'Relação encerrada (histórico)', contratado_terceiro: 'Contratado por terceiro (CT-e em nome da IPLAMM)', nao_e_frete: 'Não é frete rodoviário', outro: 'Outro' };
+// nome curto da empresa nos rótulos (o valor gravado continua 'iplamm' = a própria empresa emite)
+const nomeCurto = () => state.identidade?.nome_exibicao || String(state.empresa?.nome || 'Empresa').split(/\s+[-–]\s+/)[0];
+const MOTIVOS = { relacao_encerrada: 'Relação encerrada (histórico)', contratado_terceiro: 'Contratado por terceiro (CT-e em nome da empresa)', nao_e_frete: 'Não é frete rodoviário', outro: 'Outro' };
 const soDig = (s) => String(s || '').replace(/\D/g, '');
 const fmtDoc = (d) => { d = soDig(d); return d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d; };
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -146,14 +148,14 @@ function ficha(f0, root, pre = {}) {
       <label>Placa<input id="fr-pl" value="${esc(f.placa || '')}" list="fr-placas" ${dis}><datalist id="fr-placas"></datalist></label>
       <label>Motorista<input id="fr-mo" value="${esc(f.motorista || '')}" ${dis}></label>
       <label>CIOT<input id="fr-ci" value="${esc(f.ciot || '')}" placeholder="nº gerado pela IPEF / transportadora" ${dis}></label>
-      <label>CIOT gerado por<select id="fr-cp" ${dis} data-nobusca><option value="">—</option><option value="iplamm" ${f.ciot_por === 'iplamm' ? 'selected' : ''}>IPLAMM (IPEF)</option><option value="transportadora" ${f.ciot_por === 'transportadora' ? 'selected' : ''}>Transportadora</option></select></label>
+      <label>CIOT gerado por<select id="fr-cp" ${dis} data-nobusca><option value="">—</option><option value="iplamm" ${f.ciot_por === 'iplamm' ? 'selected' : ''}>${esc(nomeCurto())} (IPEF)</option><option value="transportadora" ${f.ciot_por === 'transportadora' ? 'selected' : ''}>Transportadora</option></select></label>
       <label class="grow">Chave do MDF-e<input id="fr-mdf" value="${esc(f.mdfe_chave || '')}" placeholder="44 dígitos" ${dis}></label>
       <label class="grow">Chave do CT-e (transportadora)<input id="fr-cte" value="${esc(f.cte_chave || '')}" ${dis}></label>
       <label>Vale-pedágio (R$)<input id="fr-pv" value="${inp(f.pedagio_valor)}" ${dis}></label>
       <label>Comprovante do vale-pedágio<input id="fr-pc" value="${esc(f.pedagio_comprovante || '')}" ${dis}></label>
       <label class="chk"><input type="checkbox" id="fr-pn" ${f.pedagio_nao_ha ? 'checked' : ''} ${dis}> Rota sem pedágio</label>
       <label class="span2">Observação<input id="fr-obs" value="${esc(f.observacao || '')}" ${dis}></label>
-      ${B.semMdfe ? '' : `<label>Quem emite o MDF-e<select id="fr-em" ${dis} data-nobusca><option value="">—</option><option value="iplamm" ${f.mdfe_emissor === 'iplamm' ? 'selected' : ''}>IPLAMM (carga própria)</option><option value="transportadora" ${f.mdfe_emissor === 'transportadora' ? 'selected' : ''}>Transportadora (com CT-e)</option></select></label>
+      ${B.semMdfe ? '' : `<label>Quem emite o MDF-e<select id="fr-em" ${dis} data-nobusca><option value="">—</option><option value="iplamm" ${f.mdfe_emissor === 'iplamm' ? 'selected' : ''}>${esc(nomeCurto())} (carga própria)</option><option value="transportadora" ${f.mdfe_emissor === 'transportadora' ? 'selected' : ''}>Transportadora (com CT-e)</option></select></label>
       <div class="small" id="fr-mdfe-st" style="align-self:end"></div>`}
     </div>
     <div id="fr-pend" style="margin-top:10px"></div>
@@ -385,7 +387,7 @@ async function conformidade(corpo, root) {
   $$('[data-dsp]', corpo).forEach(b => b.onclick = () => { const l = semFicha.find(x => x.id === b.dataset.dsp);
     const md = modal({ title: 'Dispensar da conformidade', body: `<p class="small muted" style="margin-top:0">${dateBR(l.data)} · ${money(l.valor)} · ${esc(state.cad.favById[l.favorecido_id]?.nome || l.descricao || '')}<br>O lançamento não muda; sai dos alertas com o motivo registrado (quem e quando). Dá para desfazer.</p>
       <label>Motivo<select id="ds-m" data-nobusca>${Object.entries(MOTIVOS).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label>
-      <label>Justificativa *<input id="ds-j" placeholder="ex.: frete Manaus contratado pelo fornecedor; CT-e em nome da IPLAMM"></label>`,
+      <label>Justificativa *<input id="ds-j" placeholder="ex.: frete Manaus contratado pelo fornecedor; CT-e em nome da empresa"></label>`,
       foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ds-ok">Dispensar</button>' });
     $('#ds-ok', md.el).onclick = async () => { const j = $('#ds-j', md.el).value.trim(); if (!j) return toast('Escreva a justificativa', true);
       try { await q(sb.from('log_frete_dispensas').insert({ empresa_id: state.empresa.id, lancamento_id: l.id, motivo: $('#ds-m', md.el).value, justificativa: j })); md.close(); conformidade(corpo, root); } catch (err) { fail(err); } }; });
@@ -654,7 +656,7 @@ function resumoMDFe(f, t) {
 async function padroesMDFe(root) {
   const p = B.P || {}, s = p.seguro || {}, pr = p.prod || {}, pg = p.pag || {};
   await municipiosNF();
-  const md = modal({ title: 'Padrões do MDF-e', wide: true, body: `<p class="small muted" style="margin-top:0">O que se repete em todo MDF-e da IPLAMM. Vem preenchido em cada frete (dá para mudar no frete).</p>
+  const md = modal({ title: 'Padrões do MDF-e', wide: true, body: `<p class="small muted" style="margin-top:0">O que se repete em todo MDF-e da empresa. Vem preenchido em cada frete (dá para mudar no frete).</p>
     <datalist id="pd-muns">${(MUNS || []).map(x => `<option value="${esc(munTxt(x))}">`).join('')}</datalist>
     <div class="grid2"><label class="grow">Município de carregamento<input id="pd-car" list="pd-muns" value="${esc(munTxt((p.carregamento || [])[0]))}"></label>
       <label>CPF/CNPJ de quem gera o CIOT<input id="pd-cr" value="${esc(p.ciot_resp || soDig(state.empresa.cnpj))}"></label>
@@ -691,7 +693,7 @@ function prontidao(corpo, root) {
     ['Transportadores autônomos com CPF/CNPJ e RNTRC', B.T.filter(t => t.ativo && ehAutonomo(t)).every(t => MD.docValido(t.documento) && MD.rntrcValido(t.rntrc))]];
   const kpi = (r, v, s = '', c = '') => `<div class="kpi"><div class="k-label">${r}</div><div class="k-value ${c}">${v}</div>${s ? `<div class="k-sub">${s}</div>` : ''}</div>`;
   corpo.innerHTML = `<div class="kpis">${kpi('CIOT no MDF-e', dias > 0 ? `${dias} dias` : 'em vigor', dias > 0 ? 'até 23/11/2026 (rejeição 684)' : 'MDF-e sem CIOT é recusado', dias <= 15 ? 'neg' : '')}
-      ${kpi('Viagens com MDF-e da IPLAMM', ipl.length, 'últimos 45 dias e futuras')}${kpi('Prontas para emitir', prontos.length, ipl.length ? `${Math.round(prontos.length / ipl.length * 100)}%` : '', prontos.length === ipl.length && ipl.length ? 'pos' : '')}
+      ${kpi(`Viagens com MDF-e da ${esc(nomeCurto())}`, ipl.length, 'últimos 45 dias e futuras')}${kpi('Prontas para emitir', prontos.length, ipl.length ? `${Math.round(prontos.length / ipl.length * 100)}%` : '', prontos.length === ipl.length && ipl.length ? 'pos' : '')}
       ${kpi('Sem CIOT', semCiot.length, semCiot.length ? 'seriam recusadas após 23/11' : 'nenhuma', semCiot.length ? 'neg' : '')}</div>
     <div class="grid2" style="margin-top:12px;align-items:start">
       <div class="card"><div class="card-head"><h3 style="margin:0">Preparação da empresa</h3>${pode ? '<button class="btn small" id="pr-pad">Padrões do MDF-e</button>' : ''}</div>
@@ -703,7 +705,7 @@ function prontidao(corpo, root) {
     ${semEm.length ? `<div class="card warn small" style="margin-top:12px">${semEm.length} frete(s) sem "Quem emite o MDF-e" definido.</div>` : ''}
     <div class="card flush" style="margin-top:12px"><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Transportador</th><th>Emite o MDF-e</th><th>CIOT</th><th>Situação do MDF-e</th></tr></thead><tbody>
     ${info.map(({ f, t, gr, ciotFalta }) => `<tr class="clickable" data-id="${f.id}"><td><b>${f.numero}</b></td><td>${dateBR(f.data)}</td><td>${esc(t?.nome || '—')}<div class="small muted">${TIPO_CURTO[t?.tipo] || ''}</div></td>
-      <td class="small">${f.mdfe_emissor === 'iplamm' ? 'IPLAMM' : f.mdfe_emissor === 'transportadora' ? 'Transportadora' : '<span class="warn">definir</span>'}</td>
+      <td class="small">${f.mdfe_emissor === 'iplamm' ? esc(nomeCurto()) : f.mdfe_emissor === 'transportadora' ? 'Transportadora' : '<span class="warn">definir</span>'}</td>
       <td class="small">${MD.ciotValido(f.ciot) ? esc(f.ciot) : ciotFalta ? '<span class="neg">falta</span>' : '<span class="muted">—</span>'}</td>
       <td class="small">${f.mdfe_chave ? '<span class="badge pago">Emitido</span>' : f.mdfe_emissor !== 'iplamm' ? '<span class="muted">—</span>' : gr.length ? `<span class="badge vencido">Falta ${gr.length}</span><div class="muted">${esc(gr.slice(0, 3).map(x => x.txt).join('; '))}${gr.length > 3 ? '…' : ''}</div>` : '<span class="badge pago">Pronto para emitir</span>'}</td></tr>`).join('')
       || '<tr><td colspan="6" class="empty">Nenhum frete nos últimos 45 dias. Cadastre em Fretes › Novo frete.</td></tr>'}</tbody></table></div></div>`;

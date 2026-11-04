@@ -47,7 +47,7 @@ export async function render(root) {
     ${card('opo', 'Custo de oportunidade', 'Quanto custaria cada operação no fundo de menor taxa do mesmo mês e da mesma faixa de prazo (ou do mês, quando só um fundo operou a faixa), mantendo valor e prazo cobrado. Não considera limites de crédito, sacados aceitos nem disponibilidade dos fundos. Segue o filtro de mês.')}
     ${card('simu', 'Simulador de antecipação', 'Custo estimado = valor × taxa × prazo/30 ÷ (1 + taxa × prazo/30), a mesma convenção da taxa do fundo (use o prazo que o fundo cobra). Taxa do período segue o filtro de mês; taxa do ano usa todos os meses.', `<form id="simf" class="toolbar sim-form"><label>Valor de face (R$)<input name="valor" inputmode="decimal" value="${esc(sim.valor)}" placeholder="ex.: 500.000,00"></label><label>Prazo médio (dias)<input name="prazo" inputmode="decimal" value="${esc(sim.prazo)}" placeholder="ex.: 45"></label></form>`)}
     <div class="grid2">
-      ${card('cart', 'Carteira cedida a vencer', 'Coobrigação: títulos cedidos ainda não vencidos. Se o sacado não pagar, o fundo cobra a recompra da IPLAMM. Posição de hoje, todos os meses.')}
+      ${card('cart', 'Carteira cedida a vencer', 'Coobrigação: títulos cedidos ainda não vencidos. Se o sacado não pagar, o fundo cobra a recompra da empresa. Posição de hoje, todos os meses.')}
       <div class="card"><h2>Coobrigação por prazo de vencimento</h2><div class="chart-box"><canvas id="ch-cart"></canvas></div></div>
     </div>
     <div class="grid2">

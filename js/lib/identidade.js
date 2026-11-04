@@ -43,7 +43,8 @@ export async function aplicarIdentidade(i = state.identidade) {
   let st = document.getElementById('identidade-css');
   if (!st) { st = document.createElement('style'); st.id = 'identidade-css'; document.head.appendChild(st); }
   st.textContent = vars ? `@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){${vars}}} :root[data-theme="light"]{${vars}}` : '';
-  definirEmpresaRel(i?.razao_documentos || EMPRESA_PADRAO);
+  // sem razão social na identidade: o nome da empresa cadastrada (antes era sempre o da IPLAMM)
+  definirEmpresaRel(i?.razao_documentos || (state.empresa?.nome ? String(state.empresa.nome).toUpperCase() : EMPRESA_PADRAO));
   const [claro, escuro] = await Promise.all([urlArquivo(i?.logo_path), urlArquivo(i?.logo_escuro_path)]);
   definirLogo(claro || null);
   document.querySelectorAll('.brand-logo img.logo-light').forEach(img => { img.dataset.padrao ||= img.getAttribute('src'); img.src = claro || img.dataset.padrao; });
