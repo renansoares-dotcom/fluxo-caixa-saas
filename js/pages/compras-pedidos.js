@@ -63,22 +63,22 @@ function editar(p, root) {
   const v = p || { data_pedido: today(), parcelas_dias: [28], frete: 0, desconto: 0, itens: [{}] };
   const so = (id, lista, sel, rot) => `<select id="${id}"><option value="">—</option>${lista.map(x => `<option value="${x.id}" ${sel === x.id ? 'selected' : ''}>${esc(rot(x))}</option>`).join('')}</select>`;
   const m = modal({ title: p ? `PC ${p.numero} — editar` : 'Novo pedido de compra (avulso)', wide: true, body: `
-    <div class="grid-form">
+    <fieldset><legend>Pedido</legend><div class="grid-form">
       <label class="span2">Fornecedor *${so('pe-f', C.fornecedores, v.favorecido_id, f => f.nome + (f.documento ? ' · ' + f.documento : ''))}</label>
-      <label>Data do pedido<input type="date" id="pe-dt" value="${v.data_pedido || today()}"></label>
-      <label>Entrega prevista<input type="date" id="pe-ent" value="${v.entrega_prevista || ''}"></label>
+      <label class="xs">Data do pedido<input type="date" id="pe-dt" value="${v.data_pedido || today()}"></label>
+      <label class="xs">Entrega prevista<input type="date" id="pe-ent" value="${v.entrega_prevista || ''}"></label>
+      <label class="xs">Nº do pedido no Iniflex<input id="pe-ini" value="${esc(v.pedido_iniflex || '')}"></label>
       <label>Parcelas (dias após a entrega)<input id="pe-pd" value="${(v.parcelas_dias || []).join('/')}" placeholder="28/56/84 ou 0 à vista"></label>
       <label>Condição (texto)<input id="pe-cd" value="${esc(v.condicao_pagamento || '')}" placeholder="ex.: boleto 28 ddl"></label>
-      <label class="span2">Classificação (plano de contas) <span class="muted small">obrigatória para aprovar</span>${so('pe-pl', C.planos, v.plano_id, x => `${x.codigo} - ${x.nome}`)}</label>
-      <label>Centro de custo${so('pe-cc', C.centros, v.centro_custo_id, x => x.nome)}</label>
-      <label>Nº do pedido no Iniflex<input id="pe-ini" value="${esc(v.pedido_iniflex || '')}"></label>
-      <label>Frete<input id="pe-fr" value="${(+v.frete || 0).toFixed(2).replace('.', ',')}"></label>
-      <label>Desconto<input id="pe-ds" value="${(+v.desconto || 0).toFixed(2).replace('.', ',')}"></label>
-      <label class="span2">Observação<input id="pe-obs" value="${esc(v.observacao || '')}"></label>
-    </div>
-    <h3 style="margin:14px 0 6px">Itens <span class="muted small" style="font-weight:400">escolha o produto do cadastro na lista ou escreva livre</span></h3>${datalistProdutos('dl-prod', PRODS)}
+      <label class="span2"><span>Classificação (plano de contas) <span class="muted small">obrigatória para aprovar</span></span>${so('pe-pl', C.planos, v.plano_id, x => `${x.codigo} - ${x.nome}`)}</label>
+      <label class="c4">Centro de custo${so('pe-cc', C.centros, v.centro_custo_id, x => x.nome)}</label>
+      <label class="xs">Frete<input id="pe-fr" value="${(+v.frete || 0).toFixed(2).replace('.', ',')}"></label>
+      <label class="xs">Desconto<input id="pe-ds" value="${(+v.desconto || 0).toFixed(2).replace('.', ',')}"></label>
+      <label class="c4">Observação<input id="pe-obs" value="${esc(v.observacao || '')}"></label>
+    </div></fieldset>
+    <fieldset><legend>Itens</legend><p class="small muted" style="margin:0 0 6px">Escolha o produto do cadastro na lista ou escreva livre.</p>${datalistProdutos('dl-prod', PRODS)}
     <div class="table-wrap"><table><thead><tr><th>Descrição *</th><th>Unid.</th><th>Quantidade *</th><th>Valor unit. *</th><th>NCM</th><th class="num">Total</th><th></th></tr></thead><tbody id="pe-itens">${v.itens.map(linhaItem).join('')}</tbody></table></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><button class="btn ghost small" id="pe-mais">+ Item</button><b id="pe-tot"></b></div>`,
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><button class="btn ghost small" id="pe-mais">+ Item</button><b id="pe-tot"></b></div></fieldset>`,
     foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pe-ok">Salvar</button>` });
   const tb = $('#pe-itens', m.el);
   ligarItensProduto(tb, PRODS);

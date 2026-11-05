@@ -169,7 +169,7 @@ function movimento(root, { produto = null, transferencia = false } = {}) {
       <label>Quantidade<input id="mv-q" inputmode="decimal"></label>
       <label id="mv-cu-l">Custo unitário (sem impostos recuperáveis)<input id="mv-cu" inputmode="decimal"></label>
       <label>Documento<input id="mv-doc" placeholder="NF, OP, requisição"></label>
-      <label class="span2">Observação<input id="mv-obs"></label>
+      <label class="full">Observação<input id="mv-obs"></label>
     </div>
     <p class="small" id="mv-info" style="margin:8px 0 0"></p>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="mv-ok">Lançar</button>' });

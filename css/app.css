@@ -1031,7 +1031,6 @@ a.active .nav-cod{color:inherit;opacity:.8}
   .grid-form>.span2{grid-column:span 8}
   .grid-form>.full{grid-column:1/-1}
 }
-}
 @container (min-width:820px){
   .grid-form{grid-template-columns:repeat(12,minmax(0,1fr))}
   .grid-form>*{grid-column:span 3}
@@ -1046,3 +1045,25 @@ label{font-size:12.5px}
 /* tamanhos extras: c4 = um terço da linha, c8 = dois terços */
 @container (min-width:520px){.grid-form>.c4{grid-column:span 4}.grid-form>.c8{grid-column:span 8}}
 @container (min-width:820px){.grid-form>.c4{grid-column:span 4}.grid-form>.c8{grid-column:span 8}}
+
+/* ===================== Auditoria de design 11/2026 (docs/auditoria-design-2026-11.md) ===================== */
+/* segunda linha dentro do cabeçalho da tabela (ex.: "Vencimento / emissão"): mesmo peso do texto da célula */
+th .small{font-weight:400;font-size:11px}
+/* Propostas de borderô (FIN018) e Duplicatas para endosso (FIN020): lista de títulos compacta à esquerda (NF e situação na 2ª linha do cliente) e o painel, que tem as tabelas largas, à direita */
+@media (min-width:901px){.prop-grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}}
+.prop-grid table.tit-disp td.wrap{min-width:150px}
+/* comparação entre fundos no painel da proposta: cabeçalhos quebram em duas linhas para caber sem rolagem em 1366 */
+.prop-grid table.cmp-fundos th{white-space:normal;vertical-align:bottom}
+.prop-grid table.cmp-fundos :is(th,td){padding-left:6px;padding-right:6px}
+.prop-grid table.cmp-fundos td:first-child{white-space:normal;min-width:110px}
+/* celular: o título da tela ia a zero e o código passava por cima da busca; o título desce para a 2ª linha do topo */
+@media (max-width:600px){
+  .topbar{flex-wrap:wrap;row-gap:2px}
+  .topbar .titulo-pag{order:3;flex:1 1 100%}
+  .topbar .trilha{display:none}
+}
+/* celular: cabeçalho de tela (.mm-topo, 35 telas) com título e ações lado a lado espremia o título; as ações descem */
+@media (max-width:600px){
+  .mm-topo{flex-wrap:wrap;align-items:flex-start}
+  .mm-topo>:first-child{flex:1 1 100%;min-width:0}
+}

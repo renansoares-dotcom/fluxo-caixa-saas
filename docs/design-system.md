@@ -53,13 +53,14 @@ Use `<fieldset><legend>Seção</legend><div class="grid-form">…</div></fieldse
 - **`xs`** é para campo curto: UF, número, CEP, DDD, quantidade, %, datas e valores curtos. A grade já aplica sozinha a UF (`maxlength=2`), o número, o CEP e as caixas de seleção.
 - **`span2`** é para texto médio: razão social, logradouro, plano de contas. **`full`** é para observação e texto longo.
 - Obrigatório: `*` no rótulo e `required` no campo.
-- Nenhuma linha deve ficar com mais de um terço vazio. Reordene os campos ou ajuste o tamanho.
+- Nenhuma linha deve ficar com mais de um terço vazio. Reordene os campos ou ajuste o tamanho. Texto livre que sobra sozinho na última linha (Observação) usa `full`.
 - Ações no rodapé do modal: destrutiva à esquerda (`danger`), Cancelar e principal (`primary`) à direita.
 
 ## 5. Tabelas e listas
 - Números à direita com `class="num"`, moeda com `money()` e datas com `dateBR()`.
 - Coluna vazia em mais de 80 % das linhas: esconda ou mostre só ao filtrar.
 - Lista longa: `.table-wrap` com cabeçalho fixo. Linha clicável: `class="clickable"`.
+- Tabela em painel lado a lado (lista + painel, como em Propostas de Borderô): a coluna de valor tem de caber sem rolagem em 1366. Colunas secundárias (emissão, NF / parcela, situação) vão para a 2ª linha da célula principal com `<div class="small muted">`, e o rótulo para a 2ª linha do cabeçalho com `<div class="small">`.
 - Toolbar: filtros à esquerda, ações à direita (Excel, Gerar relatório, ação principal por último).
 
 ## 6. Relatórios
@@ -67,3 +68,4 @@ Sempre por `abrirRelatorio()` de `js/lib/relatorio.js`. O padrão é o de Fretes
 
 ## 7. Responsivo
 Teste em 1366, 1920 e 390 px. Nada pode estourar a largura, e os alvos de toque têm no mínimo 40 px no celular.
+- No celular (até 600 px), o título da tela desce para a 2ª linha do topo, e o cabeçalho de tela (`.mm-topo`) empilha o título e, embaixo, as ações. Não ponha largura fixa no título.

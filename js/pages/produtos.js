@@ -64,48 +64,46 @@ async function editar(p, root) {
   const sel = (id, obj, val, vazio = true) => `<select id="${id}">${vazio ? '<option value="">—</option>' : ''}${Object.entries(obj).map(([k, t]) => `<option value="${k}" ${val === k ? 'selected' : ''}>${typeof t === 'string' ? t : k}</option>`).join('')}</select>`;
   const n = (id, val, ph = '') => `<input id="${id}" value="${val != null ? inp(val) : ''}" placeholder="${ph}">`;
   const m = modal({ title: p ? `${p.codigo} — editar` : 'Novo produto', wide: true, body: `
-    <div class="grid-form">
+    <fieldset><legend>Identificação</legend><div class="grid-form">
       <label>Código (Iniflex) *<input id="pf-cod" value="${esc(v.codigo || '')}"></label>
       <label class="span2">Descrição *<input id="pf-des" value="${esc(v.descricao || '')}"></label>
       <label>Tipo${sel('pf-tipo', TIPOS, v.tipo, false)}</label>
-      <label>Unidade<input id="pf-un" value="${esc(v.unidade || 'KG')}"></label>
-      <label>NCM<input id="pf-ncm" value="${esc(v.ncm || '')}"></label>
-      <label>Grupo<input id="pf-gr" value="${esc(v.grupo || '')}"></label>
-      <label>Subgrupo<input id="pf-sg" value="${esc(v.subgrupo || '')}"></label>
-    </div>
-    ${E.ok ? `<h3 style="margin:14px 0 6px">Classificação no estoque</h3>
-    <div class="grid-form">
-      <label class="span2">Família<select id="pf-fam"><option value="">pelo tipo (automático)</option>${E.fam.map(f => `<option value="${f.id}" ${v.familia_id === f.id ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
+      <label class="xs">Unidade<input id="pf-un" value="${esc(v.unidade || 'KG')}"></label>
+      <label class="xs">NCM<input id="pf-ncm" value="${esc(v.ncm || '')}"></label>
+      <label class="c4">Grupo<input id="pf-gr" value="${esc(v.grupo || '')}"></label>
+      <label class="c4">Subgrupo<input id="pf-sg" value="${esc(v.subgrupo || '')}"></label>
+    </div></fieldset>
+    ${E.ok ? `<fieldset><legend>Classificação no estoque</legend><div class="grid-form">
+      <label class="c4">Família<select id="pf-fam"><option value="">pelo tipo (automático)</option>${E.fam.map(f => `<option value="${f.id}" ${v.familia_id === f.id ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
       <label>Tipo do item (SPED)<select id="pf-sped"><option value="">pela família</option>${Object.entries(TIPOS_SPED).map(([k, t]) => `<option value="${k}" ${v.tipo_sped === k ? 'selected' : ''}>${k} – ${t}</option>`).join('')}</select></label>
       <label>Local padrão<select id="pf-lp"><option value="">pela família</option>${E.loc.map(l => `<option value="${l.id}" ${v.local_padrao_id === l.id ? 'selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
       <label class="chk"><input type="checkbox" id="pf-lote" ${v.controla_lote ? 'checked' : ''}> Controla lote</label>
-    </div>` : ''}
-    <h3 style="margin:14px 0 6px">Plástico flexível</h3>
-    <div class="grid-form">
+    </div></fieldset>` : ''}
+    <fieldset><legend>Plástico flexível</legend><div class="grid-form">
       <label>Material${sel('pf-mat', Object.fromEntries(Object.keys(MATERIAIS).map(k => [k, k])), v.material)}</label>
-      <label>Densidade (g/cm³)${n('pf-den', v.densidade, 'pelo material')}</label>
-      <label>Largura (mm)${n('pf-lar', v.largura_mm)}</label>
-      <label>Espessura (µm)${n('pf-esp', v.espessura_um)}</label>
+      <label class="xs">Densidade (g/cm³)${n('pf-den', v.densidade, 'pelo material')}</label>
+      <label class="xs">Largura (mm)${n('pf-lar', v.largura_mm)}</label>
+      <label class="xs">Espessura (µm)${n('pf-esp', v.espessura_um)}</label>
       <label>Comprimento (m)${n('pf-com', v.comprimento_m)}</label>
       <label>Faces<select id="pf-cam"><option value="">—</option><option value="1" ${+v.camadas === 1 ? 'selected' : ''}>1 (folha)</option><option value="2" ${+v.camadas === 2 ? 'selected' : ''}>2 (tubular / saco)</option></select></label>
       <label>Formato${sel('pf-fmt', FORMATOS, v.formato)}</label>
       <label>Cor<input id="pf-cor" value="${esc(v.cor || '')}"></label>
       <label>Cores de impressão${n('pf-ci', v.cores_impressao)}</label>
-      <label>Solda<input id="pf-sol" value="${esc(v.solda || '')}" placeholder="fundo, lateral…"></label>
+      <label class="c8">Solda<input id="pf-sol" value="${esc(v.solda || '')}" placeholder="fundo, lateral…"></label>
       <label class="chk"><input type="checkbox" id="pf-cor2" ${v.corona ? 'checked' : ''}> Tratamento corona</label>
       <label class="chk"><input type="checkbox" id="pf-san" ${v.sanfona ? 'checked' : ''}> Sanfona</label>
     </div>
-    <p class="small" id="pf-peso" style="margin:6px 0 0"></p>
-    <h3 style="margin:14px 0 6px">Estoque e compra</h3>
-    <div class="grid-form">
-      <label>Estoque mínimo${n('pf-min', v.estoque_minimo)}</label><label>Estoque máximo${n('pf-max', v.estoque_maximo)}</label>
-      <label>Ponto de pedido${n('pf-pp', v.ponto_pedido)}</label><label>Lote econômico${n('pf-le', v.lote_economico)}</label>
+    <p class="small" id="pf-peso" style="margin:8px 0 0"></p></fieldset>
+    <fieldset><legend>Estoque e compra</legend><div class="grid-form">
+      <label class="xs">Estoque mínimo${n('pf-min', v.estoque_minimo)}</label><label class="xs">Estoque máximo${n('pf-max', v.estoque_maximo)}</label>
+      <label class="xs">Ponto de pedido${n('pf-pp', v.ponto_pedido)}</label><label class="xs">Lote econômico${n('pf-le', v.lote_economico)}</label>
+      <label class="xs">Unidade de compra<input id="pf-uc" value="${esc(v.unidade_compra || '')}" placeholder="ex.: SC"></label>
+      <label class="xs">Fator de compra${n('pf-fc', v.fator_compra, 'ex.: 25')}</label>
       <label>Localização<input id="pf-loc" value="${esc(v.localizacao || '')}"></label>
-      <label>Unidade de compra<input id="pf-uc" value="${esc(v.unidade_compra || '')}" placeholder="ex.: SC"></label>
-      <label>Fator (1 un. de compra = ? un.)${n('pf-fc', v.fator_compra, 'ex.: 25')}</label>
-      <label class="chk"><input type="checkbox" id="pf-at" ${v.ativo !== false ? 'checked' : ''}> Ativo</label>
       <label class="span2">Observação<input id="pf-obs" value="${esc(v.observacao || '')}"></label>
-    </div>`,
+      <label class="chk"><input type="checkbox" id="pf-at" ${v.ativo !== false ? 'checked' : ''}> Ativo</label>
+    </div>
+    <p class="small muted" style="margin:6px 0 0">Fator de compra: quantas unidades de estoque vêm em 1 unidade de compra (ex.: 1 SC = 25 KG).</p></fieldset>`,
     foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pf-ok">Salvar</button>` });
   const V = (id) => $('#' + id, m.el).value.trim(), N = (id) => (V(id) ? num(V(id)) : null);
   const peso = () => { const pt = pesoTeorico({ material: V('pf-mat'), densidade: N('pf-den'), largura_mm: N('pf-lar'), espessura_um: N('pf-esp'), comprimento_m: N('pf-com'), camadas: N('pf-cam') });

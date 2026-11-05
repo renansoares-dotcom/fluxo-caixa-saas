@@ -103,12 +103,12 @@ function desenhar(root) {
     <div class="grid2 prop-grid">
       <div class="card flush"><div class="card-head"><div><h2>Títulos</h2><p class="muted small">Duplicatas a receber em aberto e títulos de propostas de borderô. Marque os que vão ser endossados.</p></div>
         ${ed ? `<div class="toolbar"><button class="btn small" id="sel-todos">Marcar filtrados</button><button class="btn small" id="sel-nenhum">Limpar</button></div>` : ''}</div>
-        <div class="table-wrap" style="max-height:620px">${filt.length ? `<table id="tt"><thead><tr><th></th><th>Vencimento</th><th>Cliente (sacado)</th><th>NF / parcela</th><th class="num">Valor</th><th>Situação</th></tr></thead><tbody>
+        <div class="table-wrap" style="max-height:620px">${filt.length ? `<table id="tt" class="tit-disp"><thead><tr><th></th><th>Vencimento</th><th>Cliente (sacado)<div class="small">NF / parcela · situação</div></th><th class="num">Valor</th></tr></thead><tbody>
           ${filt.map(t => { const em = emitidas[t.id]; const ult = em?.[em.length - 1]; const p = itensProp[t.id]; const f = fav(t);
             return `<tr class="clickable" data-id="${t.id}"><td><input type="checkbox" ${ui.sel.has(t.id) ? 'checked' : ''} ${ed ? '' : 'disabled'} aria-label="Selecionar"></td>
-            <td>${dateBR(t.data)}</td><td class="wrap">${esc(f.nome || t.descricao || '')}${!f.logradouro ? '<div class="small neg">sem endereço no cadastro</div>' : ''}</td><td>${esc(t.documento || '—')}</td><td class="num">${money(t.valor)}</td>
-            <td class="small">${p ? `<span class="badge ${p.status === 'Aprovada' ? 'pago' : 'aberto'}">proposta nº ${p.numero} · ${esc(nomeFundo(p.fundo_id))}</span>` : ''}
-              ${ult ? `<div>endossada${ult.modalidade === 'garantia' ? ' em garantia' : ''} ${esc(benefs.find(b => b.id === ult.beneficiario_id)?.nome || '')} em ${dateBR((ult.emitida_em || new Date().toISOString()).slice(0, 10))}${em.length > 1 ? ` (${em.length}×)` : ''}</div>` : ''}</td></tr>`; }).join('')}
+            <td>${dateBR(t.data)}</td><td class="wrap">${esc(f.nome || t.descricao || '')}${!f.logradouro ? '<div class="small neg">sem endereço no cadastro</div>' : ''}${t.documento ? `<div class="small muted">${esc(t.documento)}</div>` : ''}
+            <div class="small">${p ? `<span class="badge ${p.status === 'Aprovada' ? 'pago' : 'aberto'}">proposta nº ${p.numero} · ${esc(nomeFundo(p.fundo_id))}</span>` : ''}
+              ${ult ? `<div>endossada${ult.modalidade === 'garantia' ? ' em garantia' : ''} ${esc(benefs.find(b => b.id === ult.beneficiario_id)?.nome || '')} em ${dateBR((ult.emitida_em || new Date().toISOString()).slice(0, 10))}${em.length > 1 ? ` (${em.length}×)` : ''}</div>` : ''}</div></td><td class="num">${money(t.valor)}</td></tr>`; }).join('')}
           </tbody></table>` : `<div class="empty">${titulos.length ? 'Nenhum título no filtro.' : 'Nenhum título em aberto.'}</div>`}</div></div>
       <div id="painel"></div>
     </div>`;

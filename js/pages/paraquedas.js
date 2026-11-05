@@ -184,34 +184,31 @@ function editar(p, root, soVer = false, pre = null) {
   const dis = soVer ? 'disabled' : '';
   const m = modal({ title: novo ? 'Novo pagamento antecipado' : `Pagamento antecipado — PA nº ${p.numero}${soVer ? '' : ' — editar'}`, wide: true, body: `
     ${p?.motivo && p.status === 'rejeitado' ? `<p class="neg small" style="margin-top:0">Rejeitado: ${esc(p.motivo)}. Corrija e salve para reenviar à aprovação.</p>` : ''}
-    <h3 style="margin:0 0 6px">Quem recebe</h3>
-    <div class="grid2">
-      <label class="grow">Razão social / nome *<input id="rs" ${dis} list="pq-favs" value="${esc(v.razao_social || '')}" placeholder="como está no CNPJ">${favs.length ? `<datalist id="pq-favs">${favs.map(f => `<option value="${esc(f.nome)}"></option>`).join('')}</datalist>` : ''}</label>
+    <fieldset><legend>Quem recebe</legend><div class="grid-form">
+      <label class="span2">Razão social / nome *<input id="rs" ${dis} list="pq-favs" value="${esc(v.razao_social || '')}" placeholder="como está no CNPJ">${favs.length ? `<datalist id="pq-favs">${favs.map(f => `<option value="${esc(f.nome)}"></option>`).join('')}</datalist>` : ''}</label>
       <label>CNPJ / CPF<input id="doc" ${dis} value="${esc(fmtDoc(v.cnpj))}" placeholder="00.000.000/0000-00"></label>
       <label>Pix — tipo<select id="pxt" ${dis}><option value="">—</option>${Object.entries(PIX).map(([k, t]) => `<option value="${k}" ${v.pix_tipo === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label class="grow">Pix — chave<input id="pxc" ${dis} value="${esc(v.pix_chave || '')}"></label>
+      <label class="c4">Pix — chave<input id="pxc" ${dis} value="${esc(v.pix_chave || '')}"></label>
       <label>Banco<input id="bco" ${dis} value="${esc(v.banco || '')}" placeholder="ex.: 237 Bradesco"></label>
-      <label>Agência<input id="ag" ${dis} value="${esc(v.agencia || '')}"></label>
-      <label>Conta<input id="cc" ${dis} value="${esc(v.conta_bancaria || '')}"></label>
-    </div>
-    <h3 style="margin:12px 0 6px">O pagamento</h3>
-    <div class="grid2">
-      <label>Valor *<input id="vl" ${dis} value="${v.valor ? (+v.valor).toFixed(2).replace('.', ',') : ''}" placeholder="0,00"></label>
-      <label>Pagar em *<input type="date" id="dt" ${dis} value="${v.data_pagamento || ''}"></label>
-      <label>Prioridade<select id="pri" ${dis}><option value="normal">Normal</option><option value="urgente" ${v.prioridade === 'urgente' ? 'selected' : ''}>Urgente</option></select></label>
-      <label>Terá nota fiscal? *<select id="nf" ${dis}><option value="sim">Sim</option><option value="nao" ${v.tera_nota === false ? 'selected' : ''}>Não</option></select></label>
-      <label>Previsão da nota<input type="date" id="pnf" ${dis} value="${v.previsao_nota || ''}"></label>
-      <label>Pedido / proforma<input id="ped" ${dis} value="${esc(v.pedido || '')}"></label>
-      <label class="grow">Descrição / motivo *<input id="ds" ${dis} value="${esc(v.descricao || '')}" placeholder="ex.: adiantamento resina importação 3; frete Manaus"></label>
-      <label class="grow">Anexo (link do pedido, proforma, boleto)<input id="anx" ${dis} value="${esc(v.anexo_url || '')}" placeholder="https://…"></label>
-      <label>Solicitante<input id="sol" ${dis} value="${esc(v.solicitante || '')}"></label>
-    </div>
-    ${!compras() ? `<h3 style="margin:12px 0 6px">Classificação (financeiro)</h3>
-    <div class="grid2">
-      <label class="grow">Plano de contas<select id="pl" ${soVer || !ed ? 'disabled' : ''}>${options(cad.contasPlano.filter(x => x.natureza !== 'C'), { label: 'label', selected: v.plano_id, empty: '— definir ao programar —' })}</select></label>
+      <label class="xs">Agência<input id="ag" ${dis} value="${esc(v.agencia || '')}"></label>
+      <label class="xs">Conta<input id="cc" ${dis} value="${esc(v.conta_bancaria || '')}"></label>
+    </div></fieldset>
+    <fieldset><legend>O pagamento</legend><div class="grid-form">
+      <label class="xs">Valor *<input id="vl" ${dis} value="${v.valor ? (+v.valor).toFixed(2).replace('.', ',') : ''}" placeholder="0,00"></label>
+      <label class="xs">Pagar em *<input type="date" id="dt" ${dis} value="${v.data_pagamento || ''}"></label>
+      <label class="xs">Prioridade<select id="pri" ${dis}><option value="normal">Normal</option><option value="urgente" ${v.prioridade === 'urgente' ? 'selected' : ''}>Urgente</option></select></label>
+      <label class="xs">Terá nota fiscal? *<select id="nf" ${dis}><option value="sim">Sim</option><option value="nao" ${v.tera_nota === false ? 'selected' : ''}>Não</option></select></label>
+      <label class="xs">Previsão da nota<input type="date" id="pnf" ${dis} value="${v.previsao_nota || ''}"></label>
+      <label class="xs">Pedido / proforma<input id="ped" ${dis} value="${esc(v.pedido || '')}"></label>
+      <label class="span2">Descrição / motivo *<input id="ds" ${dis} value="${esc(v.descricao || '')}" placeholder="ex.: adiantamento resina importação 3; frete Manaus"></label>
+      <label class="c4">Anexo (link do pedido, proforma, boleto)<input id="anx" ${dis} value="${esc(v.anexo_url || '')}" placeholder="https://…"></label>
+      <label class="xs">Solicitante<input id="sol" ${dis} value="${esc(v.solicitante || '')}"></label>
+    </div></fieldset>
+    ${!compras() ? `<fieldset><legend>Classificação (financeiro)</legend><div class="grid-form">
+      <label class="span2">Plano de contas<select id="pl" ${soVer || !ed ? 'disabled' : ''}>${options(cad.contasPlano.filter(x => x.natureza !== 'C'), { label: 'label', selected: v.plano_id, empty: '— definir ao programar —' })}</select></label>
       <label>Centro de custo<select id="ccu" ${soVer || !ed ? 'disabled' : ''}>${options(cad.cc, { selected: v.centro_custo_id, empty: '—' })}</select></label>
       <label>Conta de saída<select id="cta" ${soVer || !ed ? 'disabled' : ''}>${options(cad.contas, { selected: v.conta_id, empty: '—' })}</select></label>
-    </div>` : ''}
+    </div></fieldset>` : ''}
     ${p?.aprovado_em ? `<p class="small muted">${p.status === 'rejeitado' ? 'Rejeitado' : 'Aprovado'} em ${dateBR(p.aprovado_em)}.</p>` : ''}`,
     foot: soVer ? '<button class="btn" data-close>Fechar</button>' : `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">${novo ? 'Enviar para aprovação' : p.status === 'rejeitado' ? 'Reenviar para aprovação' : 'Salvar'}</button>` });
   if (!novo) conversaNoModal(m, 'paraquedas', p.id);

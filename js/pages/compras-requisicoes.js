@@ -71,7 +71,7 @@ function editar(r, root) {
       <label>Setor (centro de custo)<select id="rq-cc"><option value="">—</option>${C.centros.map(c => `<option value="${c.id}" ${v.centro_custo_id === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></label>
       <label>Precisa até<input type="date" id="rq-nec" value="${v.necessidade || ''}"></label>
       <label>Prioridade<select id="rq-pri"><option value="normal">Normal</option><option value="urgente" ${v.prioridade === 'urgente' ? 'selected' : ''}>Urgente</option></select></label>
-      <label class="span2">Observação / justificativa<input id="rq-obs" value="${esc(v.observacao || '')}"></label>
+      <label class="full">Observação / justificativa<input id="rq-obs" value="${esc(v.observacao || '')}"></label>
     </div>
     <h3 style="margin:14px 0 6px">Itens <span class="muted small" style="font-weight:400">escolha o produto do cadastro na lista ou escreva livre</span></h3>${datalistProdutos('dl-prod', PRODS)}
     <div class="table-wrap"><table><thead><tr><th>Descrição *</th><th>Unid.</th><th>Quantidade *</th><th>Valor unit. estimado</th><th>NCM</th><th></th></tr></thead><tbody id="rq-itens">${v.itens.map(linhaItem).join('')}</tbody></table></div>

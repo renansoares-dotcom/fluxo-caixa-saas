@@ -538,7 +538,7 @@ function editar(o, root) {
       <label>Prazo real (dias)<input name="prazo_medio" inputmode="decimal" value="${o.prazo_medio ?? ''}"></label>
       <label>Prazo cobrado pelo fundo (dias)<input name="prazo_cobrado" inputmode="decimal" value="${o.prazo_cobrado ?? ''}" placeholder="igual ao real"></label>
       ${campos.map(([k, n]) => `<label>${n}<input name="${k}" inputmode="decimal" value="${o[k] != null ? money(o[k]) : ''}"></label>`).join('')}
-      <label class="span2">Observação<input name="observacao" value="${esc(o.observacao || '')}"></label>
+      <label class="full">Observação<input name="observacao" value="${esc(o.observacao || '')}"></label>
     </form>
     ${tlist.length ? `<h3 style="margin-top:18px">Títulos cedidos (${tlist.length})</h3><div class="table-wrap" style="max-height:260px"><table><thead><tr><th>Vencimento</th><th>Sacado</th><th class="num">Valor</th></tr></thead><tbody>
       ${tlist.map(t => `<tr><td>${dateBR(t.vencimento)}</td><td>${esc(t.sacado_agrupado || t.sacado || '')}</td><td class="num">${money(t.valor)}</td></tr>`).join('')}</tbody></table></div>` : ''}`,

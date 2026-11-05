@@ -184,10 +184,10 @@ function abaTitulos(c, root) {
     <div class="grid2 prop-grid">
       <div class="card flush"><div class="card-head"><div><h2>Títulos disponíveis</h2><p class="muted small">Duplicatas em aberto (receita 1.01). Marque os títulos que vão para o borderô.</p></div>
         ${ed ? `<div class="toolbar"><button class="btn small" id="sel-todos">Marcar filtrados</button><button class="btn small" id="sel-nenhum">Limpar</button></div>` : ''}</div>
-        <div class="table-wrap" style="max-height:560px">${filt.length ? `<table><thead><tr><th></th><th>Emissão</th><th>Vencimento</th><th class="num">Prazo</th><th>Cliente (sacado)</th><th>NF / parcela</th><th class="num">Valor</th></tr></thead><tbody>
+        <div class="table-wrap" style="max-height:560px">${filt.length ? `<table class="tit-disp"><thead><tr><th></th><th>Vencimento<div class="small">emissão</div></th><th class="num">Prazo</th><th>Cliente (sacado)<div class="small">NF / parcela</div></th><th class="num">Valor</th></tr></thead><tbody>
           ${filt.map(t => { const ep = emProposta[t.id]; const pz = dias(ui.dataOp, t.data); return `<tr class="${ep ? 'muted' : 'clickable'}" data-id="${t.id}">
             <td>${ep ? `<span class="badge ${STATUS_CLS[ep.status]}" title="Já está na proposta nº ${ep.numero}">nº ${ep.numero}</span>` : `<input type="checkbox" ${ui.sel.has(t.id) ? 'checked' : ''} ${ed ? '' : 'disabled'} aria-label="Selecionar">`}</td>
-            <td>${dateBR(t.emissao)}</td><td>${dateBR(t.data)}</td><td class="num${pz < 7 ? ' neg' : ''}">${pz}</td><td class="wrap">${esc(sacadoDe(t))}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td></tr>`; }).join('')}
+            <td>${dateBR(t.data)}${t.emissao ? `<div class="small muted">${dateBR(t.emissao)}</div>` : ''}</td><td class="num${pz < 7 ? ' neg' : ''}">${pz}</td><td class="wrap">${esc(sacadoDe(t))}${t.documento ? `<div class="small muted">${esc(t.documento)}</div>` : ''}</td><td class="num">${money(t.valor)}</td></tr>`; }).join('')}
           </tbody></table>` : `<div class="empty">${titulos.length ? 'Nenhum título no filtro.' : 'Nenhum título em aberto. Use “Importar XML das NFs”.'}</div>`}</div></div>
       <div id="painel"></div>
     </div>`;

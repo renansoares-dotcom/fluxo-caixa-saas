@@ -132,38 +132,42 @@ function ficha(f0, root, pre = {}) {
   const cargas = B.K.filter(k => k.status !== 'cancelada');
   const l = B.L.get(f.lancamento_id);
   const md = modal({ title: f0 ? `Frete nº ${f0.numero}` : 'Novo frete contratado', wide: true, body: `
-    <div class="grid2">
-      <label class="grow">Transportador *<select id="fr-t" ${dis} data-nobusca><option value="">— escolha —</option>${B.T.filter(t => t.ativo || t.id === f.transportador_id).map(t => `<option value="${t.id}" ${t.id === f.transportador_id ? 'selected' : ''}>${esc(t.nome)} · ${TIPO_CURTO[t.tipo]}</option>`).join('')}</select>
+    <fieldset><legend>Viagem e piso mínimo</legend><div class="grid-form">
+      <label class="span2">Transportador *<select id="fr-t" ${dis} data-nobusca><option value="">— escolha —</option>${B.T.filter(t => t.ativo || t.id === f.transportador_id).map(t => `<option value="${t.id}" ${t.id === f.transportador_id ? 'selected' : ''}>${esc(t.nome)} · ${TIPO_CURTO[t.tipo]}</option>`).join('')}</select>
         ${pode ? '<a href="#" id="fr-novo-t" class="small">+ cadastrar transportador</a>' : ''}</label>
-      <label>Data da viagem *<input type="date" id="fr-d" value="${f.data}" ${dis}></label>
-      <label>Carga da logística<select id="fr-k" ${dis} data-nobusca><option value="">—</option>${cargas.map(k => `<option value="${k.id}" ${k.id === f.carga_id ? 'selected' : ''}>Carga ${k.numero} · ${dateBR(k.data)}</option>`).join('')}</select></label>
-      <label class="grow">NF-e transportadas<input id="fr-n" value="${esc(f.notas || '')}" placeholder="36435, 36440" ${dis}>${pode && B.NC?.length ? '<a href="#" id="fr-nc" class="small">+ escolher NF-e do cliente</a>' : ''}</label>
+      <label class="xs">Data da viagem *<input type="date" id="fr-d" value="${f.data}" ${dis}></label>
+      <label class="c4">Carga da logística<select id="fr-k" ${dis} data-nobusca><option value="">—</option>${cargas.map(k => `<option value="${k.id}" ${k.id === f.carga_id ? 'selected' : ''}>Carga ${k.numero} · ${dateBR(k.data)}</option>`).join('')}</select></label>
+      <label class="c4">NF-e transportadas<input id="fr-n" value="${esc(f.notas || '')}" placeholder="36435, 36440" ${dis}>${pode && B.NC?.length ? '<a href="#" id="fr-nc" class="small">+ escolher NF-e do cliente</a>' : ''}</label>
       <label>Origem<input id="fr-o" value="${esc(f.origem || 'Caruaru/PE')}" ${dis}></label>
       <label>Destino<input id="fr-de" value="${esc(f.destino || '')}" placeholder="cidade/UF" ${dis}></label>
-      <label>Distância (km, ida) *<input id="fr-km" value="${inp(f.km)}" ${dis}></label>
-      <label>Eixos carregados *<select id="fr-e" ${dis} data-nobusca><option value="">—</option>${[2, 3, 4, 5, 6, 7, 9].map(e => `<option ${+f.eixos === e ? 'selected' : ''}>${e}</option>`).join('')}</select></label>
-      <label>Tabela / tipo de carga<select id="fr-tc" ${dis} data-nobusca>${tipos.map(x => { const [tb, tc] = x.split('|'); return `<option value="${x}" ${f.tabela === tb && f.tipo_carga === tc ? 'selected' : ''}>Tabela ${tb} · ${esc(tc)}</option>`; }).join('') || '<option value="A|geral">Tabela A · geral</option>'}</select></label>
+      <label class="xs">Distância (km, ida) *<input id="fr-km" value="${inp(f.km)}" ${dis}></label>
+      <label class="xs">Eixos carregados *<select id="fr-e" ${dis} data-nobusca><option value="">—</option>${[2, 3, 4, 5, 6, 7, 9].map(e => `<option ${+f.eixos === e ? 'selected' : ''}>${e}</option>`).join('')}</select></label>
+      <label class="c4">Tabela / tipo de carga<select id="fr-tc" ${dis} data-nobusca>${tipos.map(x => { const [tb, tc] = x.split('|'); return `<option value="${x}" ${f.tabela === tb && f.tipo_carga === tc ? 'selected' : ''}>Tabela ${tb} · ${esc(tc)}</option>`; }).join('') || '<option value="A|geral">Tabela A · geral</option>'}</select></label>
       <label class="chk"><input type="checkbox" id="fr-lot" ${f.lotacao ? 'checked' : ''} ${dis}> Carga lotação (o piso se aplica)</label>
       <label class="chk"><input type="checkbox" id="fr-rv" ${f.retorno_vazio ? 'checked' : ''} ${dis}> Retorno vazio obrigatório</label>
-      <label>Km de retorno<input id="fr-kr" value="${inp(f.km_retorno)}" ${dis}></label>
+      <label class="xs">Km de retorno<input id="fr-kr" value="${inp(f.km_retorno)}" ${dis}></label>
       <label>Valor do frete (R$) *<input id="fr-v" value="${inp(f.valor)}" ${dis}></label>
-      <div class="span2 small" id="fr-piso"></div>
-      <label>Placa<input id="fr-pl" value="${esc(f.placa || '')}" list="fr-placas" ${dis}><datalist id="fr-placas"></datalist></label>
-      <label>Motorista<input id="fr-mo" value="${esc(f.motorista || '')}" ${dis}></label>
+      <div class="c8 small" id="fr-piso" style="align-self:end"></div>
+    </div></fieldset>
+    <fieldset><legend>Veículo, CIOT e MDF-e</legend><div class="grid-form">
+      <label class="xs">Placa<input id="fr-pl" value="${esc(f.placa || '')}" list="fr-placas" ${dis}><datalist id="fr-placas"></datalist></label>
+      <label class="c4">Motorista<input id="fr-mo" value="${esc(f.motorista || '')}" ${dis}></label>
       <label>CIOT<input id="fr-ci" value="${esc(f.ciot || '')}" placeholder="nº gerado pela IPEF / transportadora" ${dis}></label>
       <label>CIOT gerado por<select id="fr-cp" ${dis} data-nobusca><option value="">—</option><option value="iplamm" ${f.ciot_por === 'iplamm' ? 'selected' : ''}>${esc(nomeCurto())} (IPEF)</option><option value="transportadora" ${f.ciot_por === 'transportadora' ? 'selected' : ''}>Transportadora</option></select></label>
-      ${f0 && f0.status !== 'cancelado' && f0.ciot_por !== 'transportadora' ? `<div class="span2 small" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${f0 && f0.status !== 'cancelado' && f0.ciot_por !== 'transportadora' ? `<div class="full small" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button type="button" class="btn small ${situacaoCiot(f0).emitido ? '' : 'primary'}" id="fr-efrete">${situacaoCiot(f0).emitido ? 'CIOT pelo e-frete (PDF / cancelar)' : 'Emitir CIOT pelo e-frete'}</button>
         <span class="muted">${esc(situacaoCiot(f0).txt || 'Salve a ficha antes: o CIOT usa os dados salvos do frete, do MDF-e e do transportador.')}</span></div>` : ''}
-      <label class="grow">Chave do MDF-e<input id="fr-mdf" value="${esc(f.mdfe_chave || '')}" placeholder="44 dígitos" ${dis}></label>
-      <label class="grow">Chave do CT-e (transportadora)<input id="fr-cte" value="${esc(f.cte_chave || '')}" ${dis}></label>
-      <label>Vale-pedágio (R$)<input id="fr-pv" value="${inp(f.pedagio_valor)}" ${dis}></label>
-      <label>Comprovante do vale-pedágio<input id="fr-pc" value="${esc(f.pedagio_comprovante || '')}" ${dis}></label>
-      <label class="chk"><input type="checkbox" id="fr-pn" ${f.pedagio_nao_ha ? 'checked' : ''} ${dis}> Rota sem pedágio</label>
-      <label class="span2">Observação<input id="fr-obs" value="${esc(f.observacao || '')}" ${dis}></label>
+      <label class="span2">Chave do MDF-e<input id="fr-mdf" value="${esc(f.mdfe_chave || '')}" placeholder="44 dígitos" ${dis}></label>
+      <label class="span2">Chave do CT-e (transportadora)<input id="fr-cte" value="${esc(f.cte_chave || '')}" ${dis}></label>
       ${B.semMdfe ? '' : `<label>Quem emite o MDF-e<select id="fr-em" ${dis} data-nobusca><option value="">—</option><option value="iplamm" ${f.mdfe_emissor === 'iplamm' ? 'selected' : ''}>${esc(nomeCurto())} (carga própria)</option><option value="transportadora" ${f.mdfe_emissor === 'transportadora' ? 'selected' : ''}>Transportadora (com CT-e)</option></select></label>
-      <div class="small" id="fr-mdfe-st" style="align-self:end"></div>`}
-    </div>
+      <div class="c8 small" id="fr-mdfe-st" style="align-self:end"></div>`}
+    </div></fieldset>
+    <fieldset><legend>Pedágio e observação</legend><div class="grid-form">
+      <label class="xs">Vale-pedágio (R$)<input id="fr-pv" value="${inp(f.pedagio_valor)}" ${dis}></label>
+      <label class="c4">Comprovante do vale-pedágio<input id="fr-pc" value="${esc(f.pedagio_comprovante || '')}" ${dis}></label>
+      <label class="chk"><input type="checkbox" id="fr-pn" ${f.pedagio_nao_ha ? 'checked' : ''} ${dis}> Rota sem pedágio</label>
+      <label class="c4">Observação<input id="fr-obs" value="${esc(f.observacao || '')}" ${dis}></label>
+    </div></fieldset>
     <div id="fr-pend" style="margin-top:10px"></div>
     <h3 style="margin:14px 0 6px">Pagamento</h3>
     <div id="fr-pag" class="small">${l ? `Lançamento ${l.status === 'Pago' ? '<b>pago</b>' : 'programado'} em ${dateBR(l.data)} · ${money(l.valor)} · ${esc(state.cad.contaById[l.conta_id]?.nome || '')}` : 'Sem lançamento ligado.'}</div>
