@@ -40,8 +40,9 @@ export async function render(root) {
 }
 
 const horaBR = (iso) => iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-const HORAS_SEM_ROBO = 26;   // o robô roda 07h e 13h: mais de 26 h sem execução = parado
-function roboAtrasado(r) { return r && (Date.now() - new Date(r.inicio).getTime()) / 36e5 > HORAS_SEM_ROBO; }
+// o robô roda de segunda a sexta (10h): parado = não rodou desde o último dia útil antes de hoje
+function diaUtilAnterior(iso) { const d = new Date(iso + 'T12:00:00Z'); do d.setUTCDate(d.getUTCDate() - 1); while ([0, 6].includes(d.getUTCDay())); return d.toISOString().slice(0, 10); }
+function roboAtrasado(r) { if (!r) return false; const dia = new Date(new Date(r.inicio).getTime() - 3 * 36e5).toISOString().slice(0, 10); return dia < diaUtilAnterior(B.hoje); }
 function seloRobo(fundo) {
   const r = B.robo[fundo]; if (!r) return '';
   if (r.status === 'erro') return `<div class="small"><span class="badge vencido" title="${esc(r.mensagem || '')}">robô com erro ${horaBR(r.inicio)}</span></div>`;
