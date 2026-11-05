@@ -517,7 +517,6 @@ async function gerarPDF(root) {
   if (sac) { const clone = sac.cloneNode(true); [...clone.tBodies[0].rows].slice(10).forEach(r => { if (!r.classList.contains('row-total')) r.remove(); }); const tmp = document.createElement('div'); tmp.id = 'tmp-sac'; tmp.style.display = 'none'; tmp.appendChild(clone); root.appendChild(tmp); tabela('#tmp-sac', `Concentração por sacado — top 10 · ${$('#hhi', root).textContent.trim()}`); tmp.remove(); }
   tabela('#conc', 'Conciliação borderôs × fluxo de caixa');
   pdfRodapes(doc, 'Fonte: borderôs dos fundos e lançamentos do fluxo de caixa', { M: 14 });
-  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(130); doc.text(`Página ${i} de ${n}`, W - 14, H - 7, { align: 'right' }); doc.text('Fonte: borderôs dos fundos e lançamentos do fluxo de caixa', 14, H - 7); }
   doc.save(`analise_fidc_${periodo.replace(/[^\wÀ-ú]+/g, '_')}.pdf`);
 }
 
