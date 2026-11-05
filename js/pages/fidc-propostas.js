@@ -341,11 +341,22 @@ async function gravarProposta(S, chk, sims, status) {
       p = await q(sb.from('fidc_propostas').update(row).eq('id', ui.propostaEdit.id).select().single());
       await q(sb.from('fidc_proposta_itens').delete().eq('proposta_id', p.id));
     } else p = await q(sb.from('fidc_propostas').insert(row).select().single());
-    const itens = S.itens.map(x => ({ proposta_id: p.id, empresa_id: e, lancamento_id: x.t.id, documento: x.t.documento, sacado: sacadoDe(x.t), cnpj: cnpjDe(x.t) || null,
+    const docNF = await cnpjDasNotas(S.itens.map(x => x.t.id));
+    const itens = S.itens.map(x => ({ proposta_id: p.id, empresa_id: e, lancamento_id: x.t.id, documento: x.t.documento, sacado: sacadoDe(x.t), cnpj: docNF[x.t.id] || cnpjDe(x.t) || null,
       emissao: x.t.emissao, vencimento: x.t.data, valor: x.t.valor, prazo: x.prazo, custo_estimado: +x.custo.toFixed(2), ...(x.t.venc_orig ? { vencimento_original: x.t.venc_orig } : {}) }));
     for (let i = 0; i < itens.length; i += 500) await q(sb.from('fidc_proposta_itens').insert(itens.slice(i, i + 500)));
     return p;
   }
+}
+
+// CNPJ do sacado de cada título vem do destinatário da NF (o favorecido pode reunir filiais com CNPJs diferentes)
+async function cnpjDasNotas(lancIds) {
+  const ids = lancIds.filter(Boolean); const r = {};
+  for (let i = 0; i < ids.length; i += 200) {
+    const vs = await q(sb.from('nfe_vinculos').select('lancamento_id,p:nfe_parcelas(n:nfe_notas(dest_doc))').in('lancamento_id', ids.slice(i, i + 200)));
+    for (const v of vs) { const d = String(v.p?.n?.dest_doc || '').replace(/\D/g, ''); if (d) r[v.lancamento_id] = d; }
+  }
+  return r;
 }
 
 // ======================================================================
@@ -408,17 +419,19 @@ async function detalhe(p, root) {
   if (ed && !base && ['Rascunho', 'Rejeitada'].includes(p.status)) acoes.push('<button class="btn" id="edit">Editar</button>', '<button class="btn danger" id="del">Excluir</button>');
   if (ed && p.status === 'Rascunho') acoes.push('<button class="btn primary" id="env">Enviar para aprovação</button>');
   if (ed && !base && p.status === 'Pendente') acoes.push('<button class="btn" id="canc">Cancelar envio</button>');
+  if (ed && !base && ['Rascunho', 'Pendente'].includes(p.status)) acoes.unshift('<button class="btn" id="espelho" title="Troca os valores simulados pelos do borderô do fundo, para a aprovação lançar exatamente a operação">Ajustar ao borderô</button>');
   const semLanc = base ? itens.filter(i => !i.lancamento_id).length : 0;
   const m = modal({
     title: `Proposta nº ${p.numero} — ${fu.nome || ''}`, wide: true,
     body: `<p style="margin:0 0 10px"><span class="badge ${STATUS_CLS[p.status]}">${p.status}</span>
         <span class="muted small">criada em ${dateBR(p.criado_em.slice(0, 10))}${p.enviado_em ? ' · enviada em ' + dateBR(p.enviado_em.slice(0, 10)) : ''}${p.aprovado_em ? ` · ${p.status === 'Aprovada' ? 'aprovada' : 'decidida'} em ${dateBR(p.aprovado_em.slice(0, 10))}` : ''}</span></p>
       ${base ? `<p class="small" style="margin-top:0">Borderô <strong>${esc(p.comparativo?.bordero || '')}</strong> do ${esc(fu.nome || '')} registrado na base FIDC — valores reais do borderô.${p.status === 'Pendente' ? (semLanc ? ` <span class="neg">${semLanc} título(s) ainda não estão lançados em aberto: importe os XML das NFs antes de aprovar (a aprovação liga os títulos sozinha).</span>` : ' Títulos ligados aos lançamentos em aberto.') : ''}</p>` : ''}
+      ${an.espelho ? `<p class="small" style="margin-top:0"><span class="badge pago">espelho do borderô ${esc(an.espelho.bordero || '')}</span> <span class="muted">valores ajustados ao borderô do fundo em ${dateBR(an.espelho.em.slice(0, 10))} (${an.espelho.origem === 'arquivo' ? 'lido do arquivo ' + esc(an.espelho.arquivo || '') : 'digitados'}). Antes: data ${dateBR(an.espelho.antes.data_operacao)}, deságio ${money(an.espelho.antes.desagio)}, tarifas/IOF ${money(+an.espelho.antes.tarifas + +an.espelho.antes.iof + +an.espelho.antes.ad_valorem)}, líquido ${money(an.espelho.antes.liquido)}.</span></p>` : ''}
       ${p.motivo ? `<p class="small"><strong>Motivo / comentário do diretor:</strong> ${esc(p.motivo)}</p>` : ''}
       <div class="kpis">
         <div class="kpi"><div class="k-label">Valor de face</div><div class="k-value">${money0(p.valor_face)}</div><div class="k-sub">${p.qtd_titulos} títulos · operação ${dateBR(p.data_operacao)}</div></div>
-        <div class="kpi"><div class="k-label">${base ? 'Custo do borderô' : 'Custo estimado'}</div><div class="k-value">${money0(p.custo_total)}</div><div class="k-sub">deságio ${money0(p.desagio)} · tarifas/IOF ${money0(+p.tarifas + +p.iof + +p.ad_valorem)}</div></div>
-        <div class="kpi"><div class="k-label">${base ? 'Líquido' : 'Líquido estimado'}</div><div class="k-value">${money0(p.liquido)}</div><div class="k-sub">${p.recompras > 0 ? `recompras ${money0(p.recompras)} · ` : ''}crédito em ${esc(state.cad.contaById[p.conta_credito_id]?.nome || '—')}</div></div>
+        <div class="kpi"><div class="k-label">${base || an.espelho ? 'Custo do borderô' : 'Custo estimado'}</div><div class="k-value">${money0(p.custo_total)}</div><div class="k-sub">deságio ${money0(p.desagio)} · tarifas/IOF ${money0(+p.tarifas + +p.iof + +p.ad_valorem)}</div></div>
+        <div class="kpi"><div class="k-label">${base || an.espelho ? 'Líquido' : 'Líquido estimado'}</div><div class="k-value">${money0(p.liquido)}</div><div class="k-sub">${p.recompras > 0 ? `recompras ${money0(p.recompras)} · ` : ''}crédito em ${esc(state.cad.contaById[p.conta_credito_id]?.nome || '—')}</div></div>
         <div class="kpi"><div class="k-label">Taxa a.m.</div><div class="k-value">${pct(p.taxa_am / 100, 2)}</div><div class="k-sub">prazo ${num1(p.prazo_medio)} d · cobrado ${num1(p.prazo_cobrado)} d</div></div>
       </div>
       ${an.custos ? `<p class="small" style="margin-top:10px"><strong>Custos da operação:</strong> ${descCustos(an.custos, an.condicoes, p.qtd_titulos)}${+p.ad_valorem ? ` · ad valorem ${money(p.ad_valorem)}` : ''}${+p.iof ? ` · IOF ${money(p.iof)}` : ''}.</p>` : ''}
@@ -457,6 +470,109 @@ async function detalhe(p, root) {
   });
   $('#dupl', m.el) && ($('#dupl', m.el).onclick = () => { m.close(); state.duplicataProp = p.id; location.hash = '#/duplicatas'; });
   $('#cmpb', m.el) && ($('#cmpb', m.el).onclick = () => { m.close(); compararBordero(p, fu, itens, root); });
+  $('#espelho', m.el) && ($('#espelho', m.el).onclick = () => { m.close(); ajustarAoBordero(p, fu, itens, root); });
+}
+
+// ======================================================================
+// Ajustar ao borderô: a proposta (rascunho ou pendente) vira o espelho da operação real,
+// para que a aprovação lance deságio, tarifas, recompras e líquido exatamente como o fundo fez
+// ======================================================================
+const CAMPOS_ESP = [['data_operacao', 'Data da operação', 'date'], ['bordero', 'Nº do borderô / termo', 'text'], ['prazo_cobrado', 'Prazo cobrado (dias)', 'num'],
+  ['desagio', 'Deságio / juros (R$)', 'num'], ['ad_valorem', 'Ad valorem (R$)', 'num'], ['tarifas', 'Tarifas e despesas (R$)', 'num'], ['iof', 'IOF (R$)', 'num'],
+  ['recompras', 'Recompras descontadas (R$)', 'num'], ['liquido', 'Líquido creditado (R$)', 'num']];
+const normTit = (s) => String(s || '').split(/[-\/.\s]+/).map(x => x.replace(/\D/g, '')).filter(Boolean).map(x => String(+x)).join('-');
+const difDias = (a, b) => Math.round((new Date(a + 'T12:00:00') - new Date(b + 'T12:00:00')) / 864e5);
+
+function casarTitulos(itens, tits) {
+  const usados = new Set(); const sit = {}; let aceitos = 0, divergentes = 0;
+  for (const i of itens) {
+    let k = tits.findIndex((t, ix) => !usados.has(ix) && normTit(t.titulo) && normTit(t.titulo) === normTit(i.documento));
+    if (k < 0) k = tits.findIndex((t, ix) => !usados.has(ix) && t.vencimento === i.vencimento && Math.abs(+t.valor - +i.valor) < 0.02);
+    if (k >= 0) { usados.add(k); aceitos++; const dv = Math.abs(+tits[k].valor - +i.valor) > 0.02; if (dv) divergentes++; sit[i.id] = dv ? `valor ${money(tits[k].valor)}` : 'aceito'; }
+    else sit[i.id] = 'fora do borderô';
+  }
+  return { sit, aceitos, divergentes, recusados: itens.length - aceitos, extras: tits.length - usados.size, sobra: tits.filter((_, ix) => !usados.has(ix)) };
+}
+
+async function ajustarAoBordero(p, fu, itens, root) {
+  const v0 = { data_operacao: p.data_operacao, bordero: p.comparativo?.bordero || p.analise?.espelho?.bordero || '', prazo_cobrado: p.prazo_cobrado, desagio: p.desagio, ad_valorem: p.ad_valorem, tarifas: p.tarifas, iof: p.iof, recompras: p.recompras, liquido: p.liquido };
+  const fmtV = (k, v) => CAMPOS_ESP.find(c => c[0] === k)[2] === 'num' ? (+v || 0).toFixed(2).replace('.', ',') : (v || '');
+  const m = modal({
+    title: `Ajustar a proposta nº ${p.numero} ao borderô do ${fu.nome || 'fundo'}`, wide: true,
+    body: `<p class="small muted" style="margin-top:0">Leia o arquivo do borderô enviado pelo fundo (.pdf ou .htm) para preencher os valores, ou digite-os. A proposta passa a ser o espelho da operação: ao aprovar, os lançamentos saem com estes valores. Os títulos não mudam aqui — se o fundo recusou ou incluiu títulos, cancele o envio e edite a proposta.</p>
+      <div class="toolbar"><label>Arquivo do borderô<input type="file" id="esp-arq" accept=".htm,.html,.pdf"></label></div>
+      <div id="esp-lido" class="small" style="margin:6px 0 10px"></div>
+      <form id="esp-f" class="grid-form">${CAMPOS_ESP.map(([k, n, t]) => `<label>${n}<input name="${k}" ${t === 'date' ? 'type="date"' : t === 'num' ? 'inputmode="decimal"' : ''} value="${esc(fmtV(k, v0[k]))}"></label>`).join('')}</form>
+      <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th class="num">Proposta hoje</th><th class="num">Ajustada</th><th class="num">Diferença</th></tr></thead><tbody id="esp-cmp"></tbody></table></div>
+      <div id="esp-chk" class="alert-list" style="margin-top:10px"></div>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="esp-ok">Gravar ajuste</button>',
+  });
+  let lido = null, arquivo = null, casa = null;
+  const F = $('#esp-f', m.el);
+  const val = () => { const d = formData(F); const o = {}; for (const [k, , t] of CAMPOS_ESP) o[k] = t === 'num' ? +(parseNum(d[k]) || 0).toFixed(2) : (d[k] || '').trim(); return o; };
+  const atualizar = () => {
+    const v = val(); const face = +p.valor_face;
+    const custo = v.desagio + v.ad_valorem + v.tarifas + v.iof; const calc = +(face - custo - v.recompras).toFixed(2); const dif = +(v.liquido - calc).toFixed(2);
+    const L = (n, a, b, f = money) => { const d = +(b - a).toFixed(2); return `<tr><td>${n}</td><td class="num">${f(a)}</td><td class="num">${f(b)}</td><td class="num ${Math.abs(d) >= 0.01 ? 'neg' : ''}">${Math.abs(d) >= 0.01 ? (d > 0 ? '+' : '') + f(d) : '✓'}</td></tr>`; };
+    $('#esp-cmp', m.el).innerHTML = `<tr><td>Data da operação</td><td class="num">${dateBR(p.data_operacao)}</td><td class="num">${dateBR(v.data_operacao)}</td><td class="num ${v.data_operacao !== p.data_operacao ? 'neg' : ''}">${v.data_operacao !== p.data_operacao ? 'muda' : '✓'}</td></tr>
+      ${L('Prazo cobrado', +p.prazo_cobrado, v.prazo_cobrado, x => num1(x) + ' d')}${L('Deságio / juros', +p.desagio, v.desagio)}${L('Tarifas, IOF e ad valorem', +p.tarifas + +p.iof + +p.ad_valorem, v.tarifas + v.iof + v.ad_valorem)}
+      ${L('Recompras', +p.recompras, v.recompras)}${L('Líquido', +p.liquido, v.liquido)}`;
+    const chk = [];
+    chk.push(Math.abs(dif) < 0.01 ? ['ok', 'Conta fecha', `Face ${money(face)} − custos ${money(custo)} − recompras ${money(v.recompras)} = ${money(calc)} = líquido.`]
+      : ['atencao', 'Conta não fecha', `Face ${money(face)} − custos ${money(custo)} − recompras ${money(v.recompras)} = ${money(calc)}, mas o líquido informado é ${money(v.liquido)} (diferença ${money(dif)}). Confira os valores do borderô.`]);
+    if (!v.data_operacao) chk.push(['atencao', 'Informe a data da operação', '']);
+    if (lido) {
+      chk.push(Math.abs(+lido.valor_face - face) < 0.01 ? ['ok', 'Valor de face igual ao do borderô', money(face)] : ['atencao', 'Valor de face diferente', `Proposta ${money(face)} × borderô ${money(lido.valor_face)}. Os títulos não batem: cancele o envio e edite a proposta.`]);
+      chk.push(casa.recusados || casa.extras || casa.divergentes ? ['atencao', 'Títulos diferentes do borderô', `${casa.aceitos} iguais · ${casa.recusados} da proposta fora do borderô · ${casa.extras} no borderô sem estar na proposta${casa.divergentes ? ` · ${casa.divergentes} com valor diferente` : ''}${casa.sobra.length ? ' (' + casa.sobra.slice(0, 6).map(t => esc(t.titulo)).join(', ') + ')' : ''}.`]
+        : ['ok', 'Títulos iguais aos do borderô', `${casa.aceitos} de ${itens.length}.`]);
+      if (lido.fundo && fu.nome && lido.fundo.toLowerCase() !== fu.nome.toLowerCase()) chk.push(['atencao', 'Arquivo de outro fundo', `O arquivo é do ${lido.fundo}; a proposta é do ${fu.nome}.`]);
+    }
+    $('#esp-chk', m.el).innerHTML = chk.map(([st, t, d]) => `<div class="alert-row ${st}"><span class="alert-tag">${st === 'ok' ? '✓ OK' : '⚠ Atenção'}</span><div><strong>${esc(t)}</strong>${d ? `<div class="small muted">${d}</div>` : ''}</div></div>`).join('');
+    return { v, ok: Math.abs(dif) < 0.01 && !!v.data_operacao && (!lido || (Math.abs(+lido.valor_face - face) < 0.01 && !casa.recusados && !casa.extras && !casa.divergentes)) };
+  };
+  F.oninput = atualizar; atualizar();
+  $('#esp-arq', m.el).onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    $('#esp-lido', m.el).textContent = 'Lendo o arquivo…';
+    try {
+      const { lerBordero } = await import('../lib/bordero.js');
+      lido = await lerBordero(f, fu.nome); arquivo = f.name; casa = casarTitulos(itens, lido.titulos || []);
+      const set = (k, v) => { if (v != null && v !== '') F.elements[k].value = fmtV(k, v); };
+      set('data_operacao', lido.data); set('bordero', lido.bordero); set('prazo_cobrado', lido.prazo_cobrado ?? lido.prazo_medio);
+      set('desagio', (+lido.desagio || 0) + (+lido.encargos || 0)); set('ad_valorem', lido.ad_valorem || 0); set('tarifas', lido.tarifas || 0); set('iof', lido.iof || 0); set('recompras', lido.recompra || 0); set('liquido', lido.liquido);
+      $('#esp-lido', m.el).innerHTML = `Lido: <strong>${esc(lido.fundo || fu.nome)} borderô ${esc(lido.bordero || '?')}</strong> de ${dateBR(lido.data || '')} — ${lido.titulos.length} títulos, face ${money(lido.valor_face)}, líquido ${money(lido.liquido)}.`;
+    } catch (err) { lido = null; casa = null; $('#esp-lido', m.el).innerHTML = `<span class="neg">Não consegui ler este arquivo: ${esc(err.message || err)}. Digite os valores do borderô.</span>`; }
+    atualizar();
+  };
+  $('#esp-ok', m.el).onclick = async () => {
+    const { v, ok } = atualizar();
+    if (!ok) return toast('Corrija os pontos de atenção antes de gravar');
+    try {
+      const face = +p.valor_face; const custo = v.desagio + v.ad_valorem + v.tarifas + v.iof;
+      const prazoIt = itens.map(i => Math.max(0, difDias(i.vencimento, v.data_operacao)));
+      const pm = face && itens.length ? itens.reduce((s, i, k) => s + +i.valor * prazoIt[k], 0) / face : +p.prazo_medio;
+      const pc = v.prazo_cobrado || pm;
+      // taxa efetiva da operação, como na simulação e na comparação: custo total sobre o valor antecipado, ao mês
+      const taxa = face && pc && face - custo ? custo / (face - custo) / pc * 30 : +p.taxa_am / 100;
+      const pesos = itens.map((i, k) => +i.valor * (prazoIt[k] + (pc - pm)));
+      const sp = pesos.reduce((s, x) => s + x, 0) || 1;
+      const docNF = await cnpjDasNotas(itens.map(i => i.lancamento_id));
+      const antes = Object.fromEntries(['data_operacao', 'prazo_medio', 'prazo_cobrado', 'taxa_am', 'desagio', 'ad_valorem', 'tarifas', 'iof', 'recompras', 'liquido'].map(k => [k, p[k]]));
+      const cp = { fundo: fu.nome, bordero: v.bordero, data: v.data_operacao, aceitos: casa ? casa.aceitos : itens.length, divergentes: casa ? casa.divergentes : 0, recusados: casa ? casa.recusados : 0, extras: casa ? casa.extras : 0,
+        prop: { n: itens.length, face, desagio: v.desagio, outros: v.ad_valorem + v.tarifas + v.iof, custo, recompra: v.recompras, liquido: v.liquido, taxa },
+        real: { n: casa ? (lido.titulos || []).length : itens.length, face: lido ? +lido.valor_face : face, desagio: v.desagio, outros: v.ad_valorem + v.tarifas + v.iof, custo, recompra: v.recompras, liquido: v.liquido, taxa } };
+      const analise = { ...(p.analise || {}), espelho: { bordero: v.bordero, origem: lido ? 'arquivo' : 'manual', arquivo, em: new Date().toISOString(), por: state.user?.id || null, antes } };
+      await q(sb.from('fidc_propostas').update({ data_operacao: v.data_operacao, prazo_medio: +pm.toFixed(2), prazo_cobrado: +(+pc).toFixed(2), taxa_am: +(taxa * 100).toFixed(4),
+        desagio: v.desagio, ad_valorem: v.ad_valorem, tarifas: v.tarifas, iof: v.iof, recompras: v.recompras, liquido: v.liquido, comparativo: cp, analise }).eq('id', p.id));
+      let acum = 0;
+      for (const [k, i] of itens.entries()) {
+        const c = k === itens.length - 1 ? +(custo - acum).toFixed(2) : +(custo * pesos[k] / sp).toFixed(2); acum += c;
+        await q(sb.from('fidc_proposta_itens').update({ prazo: prazoIt[k], custo_estimado: c, situacao_bordero: casa ? casa.sit[i.id] : 'aceito', ...(docNF[i.lancamento_id] ? { cnpj: docNF[i.lancamento_id] } : {}) }).eq('id', i.id));
+      }
+      toast(`Proposta nº ${p.numero} ajustada ao borderô ${v.bordero || ''}`); m.close(); await carregar();
+      detalhe(propostas.find(x => x.id === p.id), root);
+    } catch (e) { fail(e); }
+  };
 }
 
 // ======================================================================
