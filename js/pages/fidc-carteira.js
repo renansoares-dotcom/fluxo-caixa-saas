@@ -13,11 +13,15 @@ const SIT_CLS = { a_vencer: '', aguardando: 'aberto', atrasado: 'vencido', sem_r
 
 async function carregar() {
   const e = state.empresa.id;
-  const [tit, liq] = await Promise.all([
+  const [tit, liq, exe] = await Promise.all([
     fetchAll(() => sb.from('fidc_titulos').select('id,fundo,bordero,data_operacao,titulo,vencimento,valor,sacado,cnpj_sacado').eq('empresa_id', e).order('id')),
     fetchAll(() => sb.from('fidc_liquidacoes').select('*').eq('empresa_id', e).order('id')).catch(() => null),
+    // robô FIDC (SQL 083, pasta Sistema › robo-fidc): última execução de cada fundo
+    q(sb.from('robo_execucoes').select('fonte,inicio,fim,status,novos,atualizados,sem_titulo,valor_pago,mensagem').eq('empresa_id', e).eq('robo', 'fidc-liquidacoes').order('inicio', { ascending: false }).limit(200)).catch(() => []),
   ]);
-  B = { tit, liq: liq || [], semTabela: liq === null, hoje: today() };
+  const robo = {}; for (const r of exe || []) if (!robo[r.fonte]) robo[r.fonte] = { ...r, ultimoOk: null };
+  for (const r of exe || []) if (r.status === 'ok' && robo[r.fonte] && !robo[r.fonte].ultimoOk) robo[r.fonte].ultimoOk = r;
+  B = { tit, liq: liq || [], semTabela: liq === null, hoje: today(), robo };
   B.cart = carteira(B.tit, B.liq, B.hoje);
   return B;
 }
@@ -35,9 +39,22 @@ export async function render(root) {
   pintar(root);
 }
 
+const horaBR = (iso) => iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+const HORAS_SEM_ROBO = 26;   // o robô roda 07h e 13h: mais de 26 h sem execução = parado
+function roboAtrasado(r) { return r && (Date.now() - new Date(r.inicio).getTime()) / 36e5 > HORAS_SEM_ROBO; }
+function seloRobo(fundo) {
+  const r = B.robo[fundo]; if (!r) return '';
+  if (r.status === 'erro') return `<div class="small"><span class="badge vencido" title="${esc(r.mensagem || '')}">robô com erro ${horaBR(r.inicio)}</span></div>`;
+  const ok = r.status === 'ok' ? r : r.ultimoOk;
+  return ok ? `<div class="small ${roboAtrasado(ok) ? '' : 'muted'}">${roboAtrasado(ok) ? '<span class="badge aberto">robô parado</span> ' : ''}robô ${horaBR(ok.inicio)} · ${ok.novos} nova(s)</div>` : '';
+}
+
 function pintar(root) {
   const C = B.cart, T = C.total, fundos = [...new Set(B.tit.map(t => t.fundo))].sort();
   root.innerHTML = `
+    ${Object.values(B.robo).filter(r => r.status === 'erro' || roboAtrasado(r.status === 'ok' ? r : r.ultimoOk || r)).map(r => `<div class="card"><span class="badge ${r.status === 'erro' ? 'vencido' : 'aberto'}">Robô ${esc(r.fonte)}</span> ${r.status === 'erro'
+      ? `A última sincronização automática (${horaBR(r.inicio)}) falhou: ${esc(r.mensagem || 'sem mensagem')}. As liquidações deste fundo podem estar desatualizadas; confira o computador do robô ou importe o relatório em PDF.`
+      : `Sem sincronização automática desde ${horaBR((r.status === 'ok' ? r : r.ultimoOk || r).inicio)}. Confira se o computador do robô está ligado.`}</div>`).join('')}
     ${B.semTabela ? '<div class="card"><span class="badge vencido">SQL 073 pendente</span> A tabela de liquidações ainda não foi criada no banco: a tela mostra os títulos, mas nenhum aparece como liquidado.</div>' : ''}
     <div class="kpis">
       <div class="kpi"><div class="k-label">Coobrigação (ainda pode voltar)</div><div class="k-value">${money0(T.coobrigacao)}</div><div class="k-sub">a vencer + vencidos sem liquidação informada</div></div>
@@ -48,7 +65,7 @@ function pintar(root) {
     </div>
     <div class="card flush"><div class="table-wrap"><table><thead><tr><th>Fundo</th><th class="num">A vencer</th><th class="num">Vencidos aguardando o fundo</th><th class="num">Vencidos sem liquidação</th><th class="num">Coobrigação</th><th class="num">Liquidados</th><th class="num">Recomprados</th><th>Último relatório</th></tr></thead><tbody>
       ${C.fundos.map(f => { const u = f.cobertura;
-        return `<tr class="clickable" data-f="${esc(f.fundo)}"><td><strong>${esc(f.fundo)}</strong></td><td class="num">${money(f.a_vencer)}</td><td class="num">${money(f.aguardando + f.sem_relatorio)}</td><td class="num ${f.atrasado ? 'neg' : ''}">${money(f.atrasado)}${f.n_atrasado ? `<div class="small muted">${f.n_atrasado} título(s)</div>` : ''}</td><td class="num"><strong>${money(f.coobrigacao)}</strong></td><td class="num">${money(f.liquidado)}</td><td class="num">${money(f.recomprado)}</td><td class="small">${u ? 'pagos até ' + dateBR(u) : '<span class="badge vencido">nenhum importado</span>'}</td></tr>`; }).join('')}
+        return `<tr class="clickable" data-f="${esc(f.fundo)}"><td><strong>${esc(f.fundo)}</strong></td><td class="num">${money(f.a_vencer)}</td><td class="num">${money(f.aguardando + f.sem_relatorio)}</td><td class="num ${f.atrasado ? 'neg' : ''}">${money(f.atrasado)}${f.n_atrasado ? `<div class="small muted">${f.n_atrasado} título(s)</div>` : ''}</td><td class="num"><strong>${money(f.coobrigacao)}</strong></td><td class="num">${money(f.liquidado)}</td><td class="num">${money(f.recomprado)}</td><td class="small">${u ? 'pagos até ' + dateBR(u) : '<span class="badge vencido">nenhum importado</span>'}${seloRobo(f.fundo)}</td></tr>`; }).join('')}
     </tbody></table></div></div>
     <div class="card"><div class="toolbar" style="margin-bottom:0">
       <div class="chips" id="cc-abas">${[['titulos', 'Títulos'], ['fora', 'Pagos fora da base']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div>
