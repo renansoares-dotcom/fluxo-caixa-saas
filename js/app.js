@@ -11,6 +11,8 @@ import { alternarMini, fecharMini } from './lib/mini-chat.js';
 import { carregarIdentidade } from './lib/identidade.js';
 import { esquecerRegimes } from './lib/regime.js';
 import { abrirLancamento } from './lib/lanc-form.js';
+import { montarMenu, marcarTela } from './lib/menu.js';
+import { codigoDa } from './lib/telas.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -264,8 +266,10 @@ async function entrarEmpresa(emp, papel, areas) {
 }
 
 $('#ano-global').onchange = (e) => { state.ano = +e.target.value; render(); };
+// menu: ícones, códigos de tela, busca, favoritos, recentes e modo recolhido (js/lib/menu.js)
+montarMenu();
 // menu em cascata: um grupo aberto por vez
-$$('#nav details').forEach(d => d.addEventListener('toggle', () => { if (d.open) $$('#nav details').forEach(o => { if (o !== d) o.open = false; }); }));
+$$('#nav details').forEach(d => d.addEventListener('toggle', () => { if (d.open && !$('#nav').classList.contains('nav-filtrando')) $$('#nav details').forEach(o => { if (o !== d) o.open = false; }); }));
 // menu em acordeão também nas áreas: uma área aberta por vez (a da tela atual abre sozinha; a última aberta fica guardada)
 function abrirArea(area, guardar = true) {
   $$('#nav .nav-area').forEach(a => a.classList.toggle('aberta', a === area));
@@ -315,13 +319,15 @@ async function render() {
     const mod = await loader();
     if (seq !== renderSeq) return;
     $('#page-title').textContent = mod.title;
+    // código da tela (js/lib/telas.js), como no Iniflex
+    { const cod = codigoDa(route), pc = $('#page-cod'); if (pc) { pc.textContent = cod; pc.hidden = !cod; } marcarTela(route); }
     // botão "?": manual de uso desta tela (Ajuda › Tutoriais)
     { const man = manualDaRota(route), b = $('#ajuda-btn'); if (b) { b.hidden = !man || (man.rh && !temRH()); if (man) b.href = `#/tutoriais?m=${man.id}`; } }
     // trilha: Área › Seção (de onde a página fica no menu)
     { const a = $(`#nav a[data-route="${route}"]`); const area = a?.closest('.nav-area'); const sec = a?.closest('details')?.querySelector('summary')?.textContent;
-      const tit = area?.querySelector('.nav-area-tit')?.firstChild?.textContent?.trim(); const tr = $('#page-trilha');
+      const tit = area?.querySelector('.nav-area-tit')?.dataset.nome; const tr = $('#page-trilha');
       tr.textContent = [tit, sec].filter(Boolean).join(' › '); tr.dataset.area = area?.dataset.area || ''; }
-    document.title = `${mod.title} · ${state.empresa.nome}`;
+    document.title = `${codigoDa(route) ? codigoDa(route) + ' · ' : ''}${mod.title} · ${state.empresa.nome}`;
     // os cadastros podem ter sido descartados no meio do caminho (sessão renovada, troca de empresa): recarrega antes de desenhar
     if (!state.cad) await loadCadastros();
     if (seq !== renderSeq) return;

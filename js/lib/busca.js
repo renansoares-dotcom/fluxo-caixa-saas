@@ -5,6 +5,7 @@
 import { sb, state, q, temArea } from './data.js';
 import { $, $$, esc, money, dateBR, parseNum, debounce, fail } from './ui.js';
 import { abrirLancamento } from './lanc-form.js';
+import { codigoDa, rotaDoCodigo } from './telas.js';
 
 const MAX = 8;
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -24,9 +25,14 @@ const rotaLiberada = (route) => {
 };
 const ir = (route, abrir) => { if (abrir) state.abrir = abrir; if (location.hash === '#/' + route) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + route; };
 
+// telas: pelo nome ou pelo código (FIN019, fin19, CAD-003); o código exato vem primeiro
 function telas(t) {
-  return $$('#nav a[data-route]').filter(a => rotaLiberada(a.dataset.route) && norm(a.textContent).includes(t))
-    .slice(0, 6).map(a => ({ texto: a.textContent.trim(), sub: a.closest('.nav-sec')?.querySelector('summary')?.textContent || '', go: () => ir(a.dataset.route) }));
+  const exata = rotaDoCodigo(t), tc = t.replace(/[\s-]/g, '');
+  const nome = (a) => a.dataset.nome || a.textContent.trim();
+  return $$('#nav a[data-route]').filter(a => rotaLiberada(a.dataset.route) && (norm(nome(a)).includes(t) || norm(codigoDa(a.dataset.route)).includes(tc) || a.dataset.route === exata))
+    .sort((a, b) => (b.dataset.route === exata) - (a.dataset.route === exata))
+    .slice(0, 6).map(a => { const cod = codigoDa(a.dataset.route), sec = a.closest('.nav-sec')?.querySelector('summary')?.textContent || a.closest('.nav-area')?.querySelector('.nav-area-tit')?.dataset.nome || '';
+      return { texto: cod ? `${cod} · ${nome(a)}` : nome(a), sub: sec, go: () => ir(a.dataset.route) }; });
 }
 
 function locais(t, dig) {
@@ -108,8 +114,8 @@ export function abrirBusca(inicial = '') {
   const back = document.createElement('div');
   back.className = 'modal-back busca-back';
   back.innerHTML = `<div class="busca-box" role="dialog" aria-label="Busca">
-    <input id="bg-input" autocomplete="off" placeholder="Buscar beneficiário, lançamento (descrição, NF ou valor), nota, proposta, PA nº, tela…" value="${esc(inicial)}">
-    <div id="bg-res" class="busca-res"><div class="muted small busca-dica">Dicas: valor "41.000" · data "08/09" · nº da NF ou da proposta · "PA 12" · CNPJ · nome da tela</div></div></div>`;
+    <input id="bg-input" autocomplete="off" placeholder="Buscar beneficiário, lançamento (descrição, NF ou valor), nota, proposta, PA nº, tela ou código da tela…" value="${esc(inicial)}">
+    <div id="bg-res" class="busca-res"><div class="muted small busca-dica">Dicas: valor "41.000" · data "08/09" · nº da NF ou da proposta · "PA 12" · CNPJ · nome ou código da tela (ex.: FIN019)</div></div></div>`;
   document.body.appendChild(back); aberto = back;
   const inp = $('#bg-input', back), res = $('#bg-res', back);
   let itens = [], sel = 0, seq = 0;

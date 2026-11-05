@@ -115,19 +115,19 @@ function editar(f, root) {
       <fieldset><legend>Identificação</legend><div class="grid-form">
         <label>Tipo<select name="tipo">${tipos.map(t => `<option ${t === f.tipo ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         <label>Pessoa<select name="tipo_pessoa"><option value="PJ" ${f.tipo_pessoa !== 'PF' ? 'selected' : ''}>Jurídica (CNPJ)</option><option value="PF" ${f.tipo_pessoa === 'PF' ? 'selected' : ''}>Física (CPF)</option></select></label>
-        <label>CNPJ / CPF<input name="documento" value="${esc(analisaDocumento(f.documento).formatado || '')}" placeholder="só números ou formatado"><span class="small" id="doc-msg"></span></label>
+        <label class="c4">CNPJ / CPF<input name="documento" value="${esc(analisaDocumento(f.documento).formatado || '')}" placeholder="só números ou formatado"><span class="small" id="doc-msg"></span></label>
+        <label class="xs" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="ativo" ${f.ativo !== false ? 'checked' : ''}> Ativo</label>
         <label class="span2">Nome / razão social *<input name="nome" required value="${v('nome')}"></label>
-        <label>Nome fantasia<input name="nome_fantasia" value="${v('nome_fantasia')}"></label>
+        <label class="span2">Nome fantasia<input name="nome_fantasia" value="${v('nome_fantasia')}"></label>
         <label>Inscrição estadual<input name="ie" value="${v('ie')}"></label>
         <label>Inscrição municipal<input name="im" value="${v('im')}"></label>
-        <label>Segmento<input name="segmento" value="${v('segmento')}"></label>
-        <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="ativo" ${f.ativo !== false ? 'checked' : ''}> Ativo</label>
+        <label class="span2">Segmento<input name="segmento" value="${v('segmento')}"></label>
       </div></fieldset>
       <fieldset><legend>Endereço e contato</legend><div class="grid-form">
         <label class="span2">Logradouro<input name="logradouro" value="${v('logradouro')}"></label><label>Número<input name="numero" value="${v('numero')}"></label>
-        <label>Complemento<input name="complemento" value="${v('complemento')}"></label><label>Bairro<input name="bairro" value="${v('bairro')}"></label>
-        <label>Município<input name="municipio" value="${v('municipio')}"></label><label>UF<input name="uf" maxlength="2" value="${v('uf')}"></label><label>CEP<input name="cep" value="${v('cep')}"></label>
-        <label>E-mail<input name="email" type="email" value="${v('email')}"></label><label>Telefone<input name="telefone" value="${v('telefone')}"></label>
+        <label class="c4">Complemento<input name="complemento" value="${v('complemento')}"></label><label class="c4">Bairro<input name="bairro" value="${v('bairro')}"></label>
+        <label class="c4">Município<input name="municipio" value="${v('municipio')}"></label><label>UF<input name="uf" maxlength="2" value="${v('uf')}"></label><label>CEP<input name="cep" value="${v('cep')}"></label>
+        <label class="c8">E-mail<input name="email" type="email" value="${v('email')}"></label><label class="c4">Telefone<input name="telefone" value="${v('telefone')}"></label>
       </div></fieldset>
       <fieldset class="so-pj-cf"><legend>Fiscal</legend><div class="grid-form">
         <label>Regime tributário<select name="regime_tributario"><option value="">—</option>${REGIMES.map(r => `<option ${r === f.regime_tributario ? 'selected' : ''}>${r}</option>`).join('')}</select></label>

@@ -5,6 +5,7 @@ import { $, esc, money, money0, dateBR, toast, fail, modal, today, exportXLSX, e
 import { carregarPdfjs } from '../lib/pdfjs.js';
 import { textoPdfDoc, textoHtm } from '../lib/bordero.js';
 import { LEITORES, casar, carteira, SITUACOES, TIPOS, TOLERANCIA_DU } from '../lib/fidc-liquidacoes.js';
+import { abrirRelatorio } from '../lib/relatorio.js';
 
 export const title = 'Carteira cedida';
 const ui = { fundo: '', sit: 'risco', busca: '', aba: 'titulos' };
@@ -73,7 +74,7 @@ function pintar(root) {
       <label>Fundo<select id="cc-fundo"><option value="">Todos</option>${fundos.map(f => `<option ${ui.fundo === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select></label>
       ${ui.aba === 'titulos' ? `<label>Situação<select id="cc-sit">${[['risco', 'Vencidos sem liquidação + aguardando'], ['coob', 'Toda a coobrigação'], ...Object.entries(SITUACOES), ['', 'Todas']].map(([k, t]) => `<option value="${k}" ${ui.sit === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
       <label class="grow">Buscar<input id="cc-busca" value="${esc(ui.busca)}" placeholder="título, cliente, borderô"></label>
-      <span class="spacer"></span><button class="btn" id="cc-xls">Excel</button>${podeEditar() && !B.semTabela ? '<button class="btn primary" id="cc-imp">Importar relatório de pagos</button>' : ''}
+      <span class="spacer"></span><button class="btn" id="cc-xls">Excel</button><button class="btn" id="cc-rel">Gerar relatório</button>${podeEditar() && !B.semTabela ? '<button class="btn primary" id="cc-imp">Importar relatório de pagos</button>' : ''}
     </div></div>
     <div id="cc-lista"></div>`;
   root.querySelector('tbody').onclick = (e) => { const f = e.target.closest('tr[data-f]')?.dataset.f; if (f) { ui.fundo = f; ui.sit = 'risco'; pintar(root); } };
@@ -83,7 +84,64 @@ function pintar(root) {
   let tm; $('#cc-busca', root).oninput = (e) => { clearTimeout(tm); tm = setTimeout(() => { ui.busca = e.target.value; lista(root); }, 250); };
   $('#cc-xls', root).onclick = () => { const t = $('#cc-lista table', root); if (t) exportXLSX(t, `carteira_cedida_${ui.aba}_${B.hoje}`); };
   $('#cc-imp', root) && ($('#cc-imp', root).onclick = () => importar(root));
+  $('#cc-rel', root).onclick = () => pedirRelatorio();
   lista(root);
+}
+
+// ---------------------------------------------------------------- Relatório (padrão Fretes e CIOT, js/lib/relatorio.js)
+function pedirRelatorio() {
+  const fundos = [...new Set(B.tit.map(t => t.fundo))].sort();
+  const h = B.hoje, ini = h.slice(0, 8) + '01';
+  const m = modal({ title: 'Relatório da carteira cedida', body: `<div class="grid-form">
+      <label>Fundo<select id="cr-f"><option value="">Todos</option>${fundos.map(f => `<option ${ui.fundo === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select></label>
+      <label>Liquidações de<input type="date" id="cr-de" value="${ini}"></label>
+      <label>até<input type="date" id="cr-ate" value="${h}"></label></div>
+    <p class="small muted" style="margin:12px 0 0">O resumo e os títulos em risco são a posição de hoje. As liquidações e as recompras são as do período escolhido.</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="cr-ok">Gerar relatório</button>' });
+  $('#cr-ok', m.el).onclick = () => {
+    const f = $('#cr-f', m.el).value, de = $('#cr-de', m.el).value, ate = $('#cr-ate', m.el).value;
+    if (!de || !ate || de > ate) return toast('Período inválido', true);
+    m.close(); relatorio(f, de, ate);
+  };
+}
+
+async function relatorio(fundo, de, ate) {
+  const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
+  const C = B.cart, F = C.fundos.filter(x => !fundo || x.fundo === fundo);
+  const soma = (xs, k) => xs.reduce((s, x) => s + (+x[k] || 0), 0);
+  const T = Object.fromEntries(['a_vencer', 'aguardando', 'sem_relatorio', 'atrasado', 'coobrigacao', 'liquidado', 'recomprado'].map(k => [k, soma(F, k)]));
+  const sync = (f) => { const r = B.robo[f]; const ok = r && (r.status === 'ok' ? r : r.ultimoOk); return [C.cobertura[f] ? `pagos até ${dateBR(C.cobertura[f])}` : 'nenhum relatório importado', ok ? `robô ${horaBR(ok.inicio)}` : ''].filter(Boolean).join(' · '); };
+  const risco = C.itens.filter(i => i.sit === 'atrasado' && (!fundo || i.fundo === fundo)).sort((a, b) => b.atraso - a.atraso || b.valor - a.valor);
+  const aguard = C.itens.filter(i => ['aguardando', 'sem_relatorio'].includes(i.sit) && (!fundo || i.fundo === fundo));
+  const noPer = B.liq.filter(l => (!fundo || l.fundo === fundo) && l.quitacao >= de && l.quitacao <= ate);
+  const liq = noPer.filter(l => l.tipo !== 'recompra').sort((a, b) => a.fundo.localeCompare(b.fundo) || a.quitacao.localeCompare(b.quitacao) || String(a.titulo).localeCompare(String(b.titulo)));
+  const rec = noPer.filter(l => l.tipo === 'recompra').sort((a, b) => a.quitacao.localeCompare(b.quitacao));
+  const porFundo = {}; for (const l of liq) { const p = porFundo[l.fundo] || (porFundo[l.fundo] = { n: 0, face: 0, pago: 0 }); p.n++; p.face += +l.valor_face; p.pago += +l.valor_pago; }
+  const tr = (cells) => `<tr>${cells.join('')}</tr>`, td = (v, n) => `<td${n ? ' class="n"' : ''}>${v}</td>`;
+  const vazio = (n, txt = 'Nenhum.') => `<tr><td colspan="${n}">${txt}</td></tr>`;
+  await abrirRelatorio({ janela: w, nome: 'Carteira cedida', titulo: 'Relatório da carteira cedida aos fundos', paisagem: true,
+    subtitulo: `${fundo ? 'Fundo ' + esc(fundo) : 'Todos os fundos'} · posição em ${dateBR(B.hoje)} · liquidações de ${dateBR(de)} a ${dateBR(ate)}`,
+    corpo: `<h2>1. Resumo por fundo</h2>
+    <table><thead><tr><th>Fundo</th><th class="n">A vencer</th><th class="n">Vencidos aguardando o fundo</th><th class="n">Vencidos sem liquidação</th><th class="n">Coobrigação</th><th class="n">Liquidados</th><th class="n">Recomprados</th><th>Atualização</th></tr></thead><tbody>
+    ${F.map(f => tr([td(`<b>${esc(f.fundo)}</b>`), td(money(f.a_vencer), 1), td(money(f.aguardando + f.sem_relatorio), 1), td(money(f.atrasado) + (f.n_atrasado ? ` (${f.n_atrasado})` : ''), 1), td(`<b>${money(f.coobrigacao)}</b>`, 1), td(money(f.liquidado), 1), td(money(f.recomprado), 1), td(sync(f.fundo))])).join('') || vazio(8)}
+    ${F.length > 1 ? tr([td('<b>Total</b>'), td(`<b>${money(T.a_vencer)}</b>`, 1), td(`<b>${money(T.aguardando + T.sem_relatorio)}</b>`, 1), td(`<b>${money(T.atrasado)}</b>`, 1), td(`<b>${money(T.coobrigacao)}</b>`, 1), td(`<b>${money(T.liquidado)}</b>`, 1), td(`<b>${money(T.recomprado)}</b>`, 1), td('')]) : ''}
+    </tbody></table>
+    <p class="m">Coobrigação = a vencer + vencidos ainda sem liquidação informada pelo fundo: o que ainda pode voltar como recompra. ${aguard.length} título(s) vencido(s) aguardando o relatório do fundo (${money(soma(aguard, 'valor'))}).</p>
+    <h2>2. Títulos em risco: vencidos sem liquidação (${risco.length} · ${money(soma(risco, 'valor'))})</h2>
+    <table><thead><tr><th>Fundo</th><th>Borderô</th><th>Título</th><th>Cliente</th><th>Cedido em</th><th>Vencimento</th><th class="n">Dias úteis de atraso</th><th class="n">Valor</th></tr></thead><tbody>
+    ${risco.map(i => tr([td(esc(i.fundo)), td(esc(i.bordero)), td(esc(i.titulo)), td(esc(i.sacado || '')), td(dateBR(i.data_operacao)), td(dateBR(i.vencimento)), td(i.atraso, 1), td(money(i.valor), 1)])).join('') || vazio(8, 'Nenhum título vencido sem liquidação.')}
+    </tbody></table>
+    <p class="m">O relatório do fundo já cobre ${TOLERANCIA_DU} dias úteis além do vencimento e não trouxe o pagamento: confira com o fundo e com o cliente antes que vire recompra.</p>
+    <h2>3. Liquidações no período (${liq.length} · pago ${money(soma(liq, 'valor_pago'))})</h2>
+    ${Object.keys(porFundo).length > 1 ? `<table><thead><tr><th>Fundo</th><th class="n">Títulos</th><th class="n">Face</th><th class="n">Pago</th></tr></thead><tbody>${Object.entries(porFundo).map(([f, p]) => tr([td(esc(f)), td(p.n, 1), td(money(p.face), 1), td(money(p.pago), 1)])).join('')}</tbody></table>` : ''}
+    <table><thead><tr><th>Fundo</th><th>Quitação</th><th>Título</th><th>Borderô</th><th>Cliente</th><th>Vencimento</th><th class="n">Face</th><th class="n">Desconto</th><th class="n">Mora</th><th class="n">Pago</th><th>Tipo</th></tr></thead><tbody>
+    ${liq.map(l => tr([td(esc(l.fundo)), td(dateBR(l.quitacao)), td(esc(l.titulo)), td(esc(l.bordero)), td(esc(l.sacado || '')), td(dateBR(l.vencimento)), td(money(l.valor_face), 1), td(+l.desconto ? money(l.desconto) : '–', 1), td(+l.mora ? money(l.mora) : '–', 1), td(money(l.valor_pago), 1), td(TIPOS[l.tipo] || l.tipo)])).join('') || vazio(11, 'Nenhuma liquidação no período.')}
+    </tbody></table>
+    <h2>4. Recompras no período (${rec.length} · ${money(soma(rec, 'valor_pago'))})</h2>
+    <table><thead><tr><th>Fundo</th><th>Quitação</th><th>Título</th><th>Borderô</th><th>Cliente</th><th>Vencimento</th><th class="n">Face</th><th class="n">Pago</th><th>Texto do fundo</th></tr></thead><tbody>
+    ${rec.map(l => tr([td(esc(l.fundo)), td(dateBR(l.quitacao)), td(esc(l.titulo)), td(esc(l.bordero)), td(esc(l.sacado || '')), td(dateBR(l.vencimento)), td(money(l.valor_face), 1), td(money(l.valor_pago), 1), td(esc(l.tipo_fundo || ''))])).join('') || vazio(9, 'Nenhuma recompra no período.')}
+    </tbody></table>`,
+    rodape: 'Base: títulos cedidos (base FIDC da plataforma) e liquidações informadas pelos fundos (relatórios de títulos pagos importados e robô de captura dos portais). A cessão baixa o título na aprovação do borderô; a liquidação registra o pagamento do cliente ao fundo.' });
 }
 
 function lista(root) {
