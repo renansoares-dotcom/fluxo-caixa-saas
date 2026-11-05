@@ -20,12 +20,13 @@ export async function render(root) {
   $('#niv', root).onchange = (e) => { ui.nivel = +e.target.value; carregar(root); };
   $('#sel', root).onchange = (e) => { ui.sel = e.target.value; carregar(root); };
   $('#exp', root).onclick = () => {
-    const t = (id) => [...$(id, root).querySelectorAll('tr')].map(tr => [...tr.cells].map(c => c.textContent.trim()));
+    const t = (id) => [...($(id, root)?.querySelectorAll('tr') || [])].map(tr => [...tr.cells].map(c => c.textContent.trim()));
     exportXLSX([...t('#at'), [], ...t('#pa')], 'balanco_patrimonial');
   };
   try {
     const f = await fontes(true); const op = opcoes(f);
-    if (!op.length) { $('#at', root).innerHTML = '<div class="empty">Importe o balancete da contabilidade em Contabilidade › Balancete.</div>'; return; }
+    // sem balancete: só o aviso, em largura inteira (sem o cartão vazio do passivo ao lado)
+    if (!op.length) { $('.bp-grid', root).outerHTML = '<div class="card"><div class="empty">Importe o balancete da contabilidade em <a href="#/contab/balancete">Contabilidade › Balancete</a>.</div></div>'; return; }
     if (!op.some(o => o[0] === ui.sel)) ui.sel = op[0][0];
     $('#sel', root).innerHTML = op.map(([v, t]) => `<option value="${v}" ${v === ui.sel ? 'selected' : ''}>${esc(t)}</option>`).join('');
     await carregar(root);

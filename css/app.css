@@ -1067,3 +1067,39 @@ th .small{font-weight:400;font-size:11px}
   .mm-topo{flex-wrap:wrap;align-items:flex-start}
   .mm-topo>:first-child{flex:1 1 100%;min-width:0}
 }
+/* Seletor "Colunas" (js/lib/colunas.js, docs/design-system.md › 5) */
+.col-sel{position:relative;display:inline-flex}
+.col-sel .col-n{color:var(--muted);font-weight:400}
+.col-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:40;min-width:230px;max-width:min(320px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:10px 12px;text-align:left}
+.col-pop[hidden]{display:none}
+.col-pop-tit{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.col-lista{display:grid;gap:2px;max-height:50vh;overflow:auto}
+.col-pop label.chk{flex-direction:row;align-items:center;gap:8px;font-size:13px;font-weight:400;color:var(--text);padding:5px 2px;min-width:0;cursor:pointer;white-space:nowrap}
+.col-pop label.chk input{width:auto;min-height:0;margin:0}
+.col-atalhos{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.col-pop-pe{border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:flex-end}
+/* 2ª linha da célula (colunas secundárias): mesma regra das Propostas de Borderô */
+td .small.muted,th .small{font-weight:400}
+th .small{font-size:11px;margin-top:1px}
+td.wrap-m{white-space:normal;min-width:150px}
+/* modal pequeno: cadastro de um ou dois campos (modal({ narrow: true })) */
+.modal.estreito{max-width:480px}
+/* celular e tablet: tabela que rola para o lado esmaece na borda onde há mais colunas (classes postas por js/app.js) */
+@media (max-width:900px){
+  .table-wrap.rola-dir{-webkit-mask-image:linear-gradient(to left,transparent 0,#000 36px);mask-image:linear-gradient(to left,transparent 0,#000 36px)}
+  .table-wrap.rola-esq{-webkit-mask-image:linear-gradient(to right,transparent 0,#000 36px);mask-image:linear-gradient(to right,transparent 0,#000 36px)}
+  .table-wrap.rola-esq.rola-dir{-webkit-mask-image:linear-gradient(to right,transparent 0,#000 36px,#000 calc(100% - 36px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 36px,#000 calc(100% - 36px),transparent 100%)}
+}
+@media (max-width:600px){ .col-pop{position:fixed;left:12px;right:12px;top:auto;bottom:12px;max-width:none} }
+.col-pop label.chk.sub{padding-left:22px}
+/* Representantes e Metas: grade de metas com campos que ocupam a coluna (o seletor "Meses" mostra um semestre por vez) */
+table.metas-grade td{padding:4px 6px}
+table.metas-grade td input.rv-m{width:100%;min-width:92px;text-align:right;font-variant-numeric:tabular-nums}
+table.metas-grade td.sticky{min-width:150px;white-space:normal}
+.col-lista.duas{grid-template-columns:1fr 1fr;column-gap:12px}
+.modal.estreito .grid-form{grid-template-columns:1fr}.modal.estreito .grid-form>*{grid-column:1/-1}
+/* ficha só de leitura (ex.: ficha do cliente): 5 dados por linha no modal largo, para 9 ou 5 itens não sobrar um sozinho */
+@container (min-width:820px){.grid-form.dados5{grid-template-columns:repeat(5,minmax(0,1fr))}.grid-form.dados5>*{grid-column:auto}}
+/* caixa de seleção com texto longo: .span2 / .full valem também para ela (a regra automática a deixa em xs) */
+@container (min-width:520px){.grid-form>label.chk.span2:has(>input[type="checkbox"]){grid-column:span 8}.grid-form>label.chk.full:has(>input[type="checkbox"]){grid-column:1/-1}}
+@container (min-width:820px){.grid-form>label.chk.span2:has(>input[type="checkbox"]){grid-column:span 6}}

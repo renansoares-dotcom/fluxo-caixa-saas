@@ -1,7 +1,7 @@
 import { sb, state, q, podeEditar, loadCadastros } from '../lib/data.js';
 import { $, esc, options, modal, formData, toast, fail } from '../lib/ui.js';
 
-export const title = 'Plano de contas';
+export const title = 'Plano de Contas';
 const SECOES = [['', '(fora da DRE)'], ['receita_bruta', 'Receita operacional bruta'], ['custos_diretos', 'Custos diretos'], ['despesas_operacionais', 'Despesas operacionais'],
   ['receitas_financeiras', 'Receitas financeiras'], ['despesas_financeiras', 'Despesas financeiras'], ['tributos', 'Tributos'],
   ['nao_operacionais', 'Movimentos não operacionais'], ['capital_giro', 'Capital de giro (adiantamentos)']];
@@ -81,16 +81,18 @@ function pintar(root) {
 
 function editar(p, root) {
   const l1 = p.nivel === 1;
+  // classificação: 3 linhas cheias (código + nome · tipo + natureza + ativa · bloco da DRE + prioridade); conta (3 campos): modal pequeno
+  const ativa = `<label class="chk"><input type="checkbox" name="ativo" ${p.ativo ? 'checked' : ''}> Ativa</label>`;
   const m = modal({
-    title: p.id ? `Editar ${p.codigo}` : (l1 ? 'Nova classificação' : 'Nova conta'),
+    title: p.id ? `Editar ${p.codigo}` : (l1 ? 'Nova classificação' : 'Nova conta'), narrow: !l1,
     body: `<form id="pf" class="grid-form">
-      <label>Código<input name="codigo" value="${esc(p.codigo || '')}" required placeholder="${l1 ? '2.15' : '2.05.30'}"></label>
-      <label class="span2">Nome<input name="nome" value="${esc(p.nome || '')}" required></label>
+      <label class="${l1 ? 'xs' : ''}">Código *<input name="codigo" value="${esc(p.codigo || '')}" required placeholder="${l1 ? '2.15' : '2.05.30'}"></label>
+      <label class="span2">Nome *<input name="nome" value="${esc(p.nome || '')}" required></label>
       ${l1 ? `<label>Tipo<select name="tipo" ${p.id ? 'disabled' : ''}>${options(Object.entries(TIPOS).map(([id, nome]) => ({ id, nome })), { selected: p.tipo })}</select></label>
       <label>Natureza (transferências)<select name="natureza" ${p.id ? 'disabled' : ''}><option value="">Automática</option><option value="C" ${p.natureza === 'C' ? 'selected' : ''}>Crédito (+)</option><option value="D" ${p.natureza === 'D' ? 'selected' : ''}>Débito (−)</option></select></label>
-      <label>Bloco da DRE<select name="dre_secao">${options(SECOES.map(([id, nome]) => ({ id, nome })), { selected: p.dre_secao || '' })}</select></label>
-      <label>Prioridade (saídas)<select name="prioridade"><option value="">Negociável (padrão)</option>${options([{ id: 'Obrigatório' }, { id: 'Negociável' }], { label: 'id', selected: p.prioridade })}</select></label>` : ''}
-      <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="ativo" ${p.ativo ? 'checked' : ''}> Ativa</label>
+      ${ativa}
+      <label class="span2">Bloco da DRE<select name="dre_secao">${options(SECOES.map(([id, nome]) => ({ id, nome })), { selected: p.dre_secao || '' })}</select></label>
+      <label>Prioridade (saídas)<select name="prioridade"><option value="">Negociável (padrão)</option>${options([{ id: 'Obrigatório' }, { id: 'Negociável' }], { label: 'id', selected: p.prioridade })}</select></label>` : ativa}
     </form>`,
     foot: `${p.id ? '<button class="btn danger" id="pdel" style="margin-right:auto">Excluir</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="psave">Salvar</button>`,
   });

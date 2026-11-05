@@ -6,14 +6,14 @@ import { kpiGrid, drawer, tabela } from '../lib/componentes.js';
 import { TIPOS, carregarProdutos } from '../lib/produtos.js';
 import { qtd, unit, num } from '../lib/compras.js';
 
-export const title = 'Posição de estoque';
+export const title = 'Posição de Estoque';
 const ui = { esp: null, filtro: 'todos', busca: '', tipo: '' };
 const compras = () => state.papel === 'compras';
 const podeImportar = () => ['admin', 'financeiro', 'diretor'].includes(state.papel);
 const addDias = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Posição de estoque</h2><div class="muted small">Espelho do Iniflex: o saldo é o do relatório importado na data indicada.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Posição de Estoque</h2><div class="muted small">Espelho do Iniflex: o saldo é o do relatório importado na data indicada.</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">${podeImportar() ? '<button class="btn ghost" id="es-par">Parâmetros de custo</button><button class="btn" id="es-hist">Espelhos</button><button class="btn primary" id="es-imp">Importar espelho do Iniflex</button>' : ''}</div></div>
     <div id="es-corpo"><div class="loading">Carregando…</div></div>`;
   $('#es-imp', root) && ($('#es-imp', root).onclick = () => importar(root));

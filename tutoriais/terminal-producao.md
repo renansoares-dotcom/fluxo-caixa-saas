@@ -1,12 +1,12 @@
 ---
 titulo: Terminal de produção
-tela: Produção › Terminal do setor
-versao: 1.1
-atualizado: 2026-10-29
+tela: Produção › Terminal do Setor (PRD001)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
-O **Terminal do setor** é a tela do chão de fábrica, com botões grandes para usar no computador ou no tablet do setor. Nele o operador registra:
+O **Terminal do Setor** é a tela do chão de fábrica, com botões grandes para usar no computador ou no tablet do setor. Nele o operador registra:
 
 - o **início da produção** de uma etapa da OP numa máquina;
 - cada **bobina** produzida, com etiqueta e QR code;
@@ -79,3 +79,4 @@ O usuário do operador é ligado ao cadastro dele e aos setores dele em **Produ�
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: início, bobina com etiqueta, parada, retomada e encerramento do apontamento. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

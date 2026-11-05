@@ -6,7 +6,7 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, esc, toast, fail, loading, modal, debounce } from '../lib/ui.js';
 
-export const title = 'De-para contábil';
+export const title = 'De-para Contábil';
 
 const TRAT = [['resultado', 'Direto no resultado'], ['fornecedor', 'Baixa de fornecedor'], ['cliente', 'Baixa de cliente'], ['obrigacao', 'Baixa de obrigação'],
   ['ativo', 'Ativo'], ['financiamento', 'Financiamento / FIDC'], ['transferencia', 'Transferência']];

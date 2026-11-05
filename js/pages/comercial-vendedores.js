@@ -3,13 +3,20 @@ import { sb, state, q } from '../lib/data.js';
 import { $, $$, esc, money0, fail, toast, modal, MESES_CURTO } from '../lib/ui.js';
 import { baseComercial, limparBaseComercial, podeConfigCom } from '../lib/comercial.js';
 import { inp, num } from '../lib/compras.js';
+import { seletorColunas } from '../lib/colunas.js';
 
-export const title = 'Representantes e metas';
+export const title = 'Representantes e Metas';
 const ui = { ano: new Date().getFullYear() };
+// metas: os 12 meses não cabem em 1366 com valores de milhões; o seletor "Colunas" mostra um semestre por vez
+// (padrão: o semestre atual; "Ano todo" rola para o lado com o nome fixo). Meses ocultos continuam no total e no salvar.
+const MESES_COL = MESES_CURTO.map((m, i) => ({ id: 'm' + (i + 1), nome: m }));
+const SEM1 = MESES_COL.slice(0, 6).map(c => c.id), SEM2 = MESES_COL.slice(6).map(c => c.id);
+const colunasMetas = () => seletorColunas({ tela: 'comercial-metas', rotulo: 'Meses', titulo: 'Mostrar meses', colunas: MESES_COL.map(c => ({ ...c, padrao: (new Date().getMonth() < 6 ? SEM1 : SEM2).includes(c.id) })),
+  atalhos: [{ nome: '1º semestre', colunas: SEM1 }, { nome: '2º semestre', colunas: SEM2 }, { nome: 'Ano todo', colunas: [...SEM1, ...SEM2] }] });
 
 export async function render(root) {
   if (!podeConfigCom()) { root.innerHTML = '<div class="card"><p>Só admin ou diretor configura representantes e metas.</p></div>'; return; }
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Representantes e metas</h2><div class="muted small">O representante do cliente vem do cadastro de beneficiários (campo Representante). Ligue-o ao usuário com perfil Vendas para ele ver a própria carteira.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Representantes e Metas</h2><div class="muted small">O representante do cliente vem do cadastro de beneficiários (campo Representante). Ligue-o ao usuário com perfil Vendas para ele ver a própria carteira.</div></div>
       <button class="btn primary" id="rv-novo">Novo representante</button></div><div id="rv-corpo"><div class="loading">Carregando…</div></div>`;
   $('#rv-novo', root).onclick = () => editar(null, root);
   await pintar(root);
@@ -30,17 +37,18 @@ async function pintar(root) {
   const nCli = (rid) => B.clientes.filter(c => c.representante_id === rid).length;
   const linhasMeta = [{ id: '', nome: 'Empresa (total)' }, ...B.vendedores.filter(v => v.ativo)];
   const val = (vid, m) => metas.find(x => (x.vendedor_id || '') === vid && x.mes === m)?.valor;
-  corpo.innerHTML = `<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Representante</th><th>No cadastro</th><th class="num">Clientes</th><th>Usuário</th><th>Situação</th></tr></thead><tbody>
-    ${B.vendedores.map(v => `<tr class="clickable" data-id="${v.id}"><td>${esc(v.nome)}</td><td>${esc(reps.find(r => r[0] === v.representante_id)?.[1] || '— não ligado')}</td><td class="num">${v.representante_id ? nCli(v.representante_id) : ''}</td>
-      <td>${esc(email[v.user_id] || (v.user_id ? 'usuário' : '— sem acesso'))}</td><td>${v.ativo ? '' : '<span class="badge">inativo</span>'}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum representante configurado.</td></tr>'}</tbody></table></div></div>
+  corpo.innerHTML = `<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Representante</th><th>No cadastro</th><th class="num">Clientes</th><th>Usuário</th></tr></thead><tbody>
+    ${B.vendedores.map(v => `<tr class="clickable" data-id="${v.id}"><td>${esc(v.nome)}${v.ativo ? '' : ' <span class="badge">inativo</span>'}</td><td>${esc(reps.find(r => r[0] === v.representante_id)?.[1] || '— não ligado')}</td><td class="num">${v.representante_id ? nCli(v.representante_id) : ''}</td>
+      <td>${esc(email[v.user_id] || (v.user_id ? 'usuário' : '— sem acesso'))}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Nenhum representante configurado.</td></tr>'}</tbody></table></div></div>
     ${semVinc.length ? `<p class="small">Representantes do cadastro ainda não configurados: ${semVinc.map(([id, n]) => `<a href="#" data-add="${id}">${esc(n)} (${nCli(id)} clientes)</a>`).join(' · ')}</p>` : ''}
-    <div class="card" style="margin-top:16px"><div class="card-head"><h2 style="margin:0">Metas de faturamento</h2><label>Ano<input id="rv-ano" type="number" value="${ui.ano}" style="width:90px"></label></div>
+    <div class="card" style="margin-top:16px"><div class="card-head"><h2 style="margin:0">Metas de faturamento</h2><div class="toolbar" id="rv-tb"><label class="xs" style="min-width:0">Ano<input id="rv-ano" type="number" value="${ui.ano}" style="width:90px"></label></div></div>
       <p class="small muted" style="margin-top:0">Se a meta da empresa ficar em branco, o painel usa a soma das metas dos representantes.</p>
-      <div class="table-wrap"><table id="rv-metas"><thead><tr><th>Meta</th>${MESES_CURTO.map(m => `<th class="num">${m}</th>`).join('')}<th class="num">Ano</th></tr></thead><tbody>
-      ${linhasMeta.map(v => `<tr data-v="${v.id}"><td>${esc(v.nome)}</td>${MESES_CURTO.map((_, i) => `<td><input class="rv-m" data-m="${i + 1}" value="${inp(val(v.id, i + 1))}" style="width:86px"></td>`).join('')}<td class="num rv-t"></td></tr>`).join('')}</tbody></table></div>
+      <div class="table-wrap" data-colunas="comercial-metas"><table id="rv-metas" class="metas-grade"><thead><tr><th class="sticky">Meta</th>${MESES_CURTO.map((m, i) => `<th class="num" data-col="m${i + 1}">${m}</th>`).join('')}<th class="num">Ano</th></tr></thead><tbody>
+      ${linhasMeta.map(v => `<tr data-v="${v.id}"><td class="sticky">${esc(v.nome)}</td>${MESES_CURTO.map((m, i) => `<td data-col="m${i + 1}"><input class="rv-m" data-m="${i + 1}" value="${inp(val(v.id, i + 1))}" inputmode="decimal" aria-label="Meta de ${m} — ${esc(v.nome)}"></td>`).join('')}<td class="num rv-t"></td></tr>`).join('')}</tbody></table></div>
       <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn primary" id="rv-salvar">Salvar metas de ${ui.ano}</button></div></div>`;
   const tot = () => $$('#rv-metas tbody tr', corpo).forEach(tr => { $('.rv-t', tr).textContent = money0($$('.rv-m', tr).reduce((t, i) => t + num(i.value), 0)); });
   corpo.addEventListener('input', tot); tot();
+  $('#rv-tb', corpo).append(colunasMetas().botao);
   $('#rv-ano', corpo).onchange = (e) => { ui.ano = +e.target.value || ui.ano; pintar(root); };
   $$('tr[data-id]', corpo).forEach(tr => tr.onclick = () => editar(B.vendedores.find(v => v.id === tr.dataset.id), root));
   $$('[data-add]', corpo).forEach(a => a.onclick = (e) => { e.preventDefault(); editar({ representante_id: a.dataset.add, nome: reps.find(r => r[0] === a.dataset.add)[1], ativo: true }, root); });

@@ -1,17 +1,17 @@
 ---
 titulo: Logística — cargas, entregas e frota
-tela: Logística › Cargas e entregas e Frota e parâmetros
-versao: 1.2
-atualizado: 2026-11-04
+tela: Logística › Cargas e Entregas (LOG001) e Frota e Parâmetros (LOG005)
+versao: 1.3
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
-- **Cargas e entregas**: lista as **notas de venda que a frota da IPLAMM entrega**. Com elas, a tela:
+- **Cargas e Entregas**: lista as **notas de venda que a frota da IPLAMM entrega**. Com elas, a tela:
   - **monta as cargas** sozinha, pelo peso, pelo volume, pela região e pela jornada do motorista;
   - deixa ajustar arrastando as entregas entre os caminhões;
   - gera o **romaneio** e mostra o **mapa**;
   - registra se cada entrega foi feita.
-- **Frota e parâmetros**: os veículos (capacidade, baú, custo), os parâmetros da montagem e os clientes com restrição de entrega.
+- **Frota e Parâmetros**: os veículos (capacidade, baú, custo), os parâmetros da montagem e os clientes com restrição de entrega.
 
 Os fretes contratados de terceiros (CIOT, MDF-e, piso) ficam em **Logística › Fretes e CIOT**, que tem manual próprio.
 
@@ -22,9 +22,9 @@ Os fretes contratados de terceiros (CIOT, MDF-e, piso) ficam em **Logística ›
 | Administrador, financeiro e diretor | Montam e salvam cargas, dão baixa nas entregas, cadastram veículos e parâmetros. |
 | Demais perfis com a área Logística | Consultam. |
 
-## 3. Frota e parâmetros (comece por aqui)
+## 3. Frota e Parâmetros (comece por aqui)
 
-![Figura 1 — Frota e parâmetros (dados fictícios)](img/logistica-1.jpg)
+![Figura 1 — Frota e Parâmetros (dados fictícios)](img/logistica-1.jpg)
 
 ### 3.1 Veículos
 
@@ -62,13 +62,13 @@ Clique em **Incluir cliente** e informe o CNPJ/CPF, se ele **só recebe veículo
 
 A aba **e-frete (CIOT)** guarda os parâmetros do CIOT e do pagamento do frete pelo e-frete: ambiente (homologação ou produção), forma de pagamento, adiantamento, quitação, documentos que o posto retém, embalagem, quebra de carga, endereço da empresa e o tipo de carga × código da ANTT. Só o administrador altera. O passo a passo da emissão está no manual **Fretes e CIOT**.
 
-## 4. Cargas e entregas
+## 4. Cargas e Entregas
 
-![Figura 2 — Cargas e entregas (dados fictícios)](img/logistica-2.jpg)
+![Figura 2 — Cargas e Entregas (dados fictícios)](img/logistica-2.jpg)
 
 ### 4.1 Montar as cargas do dia
 
-1. Escolha o **dia das cargas** e o período das notas (**Notas de / até**).
+1. Na barra de filtros, logo abaixo do título, escolha o **dia das cargas** e o período das notas (**Notas de / até**). O botão **Frota e Parâmetros**, à direita do título, leva aos cadastros dos veículos.
 2. Em **Pendentes de carga** estão as notas ainda não entregues.
 3. Clique em **Montar cargas automaticamente**. A plataforma distribui as entregas pelos veículos livres, respeitando o peso, o volume, a região, a jornada e as restrições dos clientes. A linha tracejada no mapa indica que a sugestão ainda não foi salva.
 4. Ajuste arrastando as entregas entre os caminhões, ou use **+ carga** na entrega pendente. **Nova carga** cria uma carga vazia.
@@ -114,3 +114,4 @@ Para as notas que foram entregues **antes** de usar a plataforma, use **Baixa in
 | 1.0 | 28/10/2026 | Primeira versão do manual: frota, parâmetros, clientes com restrição, montagem automática de cargas, romaneio, mapa, baixa das entregas e baixa inicial. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 04/11/2026 | Aba **e-frete (CIOT)** em Frota e parâmetros. |
+| 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Filtros de Cargas e Entregas numa barra abaixo do título. Figuras refeitas. |

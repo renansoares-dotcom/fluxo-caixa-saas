@@ -6,7 +6,7 @@ import { podeLogistica, TIPOS_VEICULO } from '../lib/logistica.js';
 import * as F from '../lib/frota.js';
 import { valorMensal } from '../lib/contratos.js';
 
-export const title = 'Logística — gestão da frota';
+export const title = 'Gestão da Frota';
 const BUCKET = 'frota';
 const ui = { aba: 'painel', mes: today().slice(0, 7), veic: '' };
 let D = null;
@@ -36,7 +36,7 @@ const kpi = (r, v, s = '', c = '') => `<div class="kpi"><div class="k-label">${r
 
 export async function render(root) {
   if (!podeLogistica()) { root.innerHTML = '<div class="card"><div class="empty">Gestão da frota: acesso de administrador, financeiro ou diretor.</div></div>'; return; }
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Gestão da frota</h2><div class="muted small">Documentos, manutenção, abastecimento, multas, motoristas e custo por quilômetro.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Gestão da Frota</h2><div class="muted small">Documentos, manutenção, abastecimento, multas, motoristas e custo por quilômetro.</div></div>
       <a class="btn ghost" href="#/logistica/frota">Frota e parâmetros (cargas)</a></div>
     <div class="card toolbar"><div class="chips" id="gf-abas">${[['painel', 'Painel'], ['veic', 'Veículos'], ['manut', 'Manutenção'], ['abast', 'Abastecimento'], ['multas', 'Multas'], ['mot', 'Motoristas']]
       .map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>

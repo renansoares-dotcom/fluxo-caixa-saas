@@ -7,7 +7,7 @@ import { temRH, podeRH, carregarBase, avisoMigracao, kpi } from '../lib/rh-dados
 import { inp, num } from '../lib/compras.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 
-export const title = 'RH — colaboradores';
+export const title = 'Colaboradores';
 const ui = { busca: '', sit: 'ativos', setor: '', vinc: '' };
 const soDig = (s) => String(s || '').replace(/\D/g, '');
 const limpa = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
@@ -61,17 +61,19 @@ export async function render(root) {
 
 async function editar(c, B, root) {
   const pode = podeRH(), dis = pode ? '' : 'disabled';
-  const f = (id, lab, val, extra = '') => `<label>${lab}<input id="${id}" value="${val ?? ''}" ${extra} ${dis}></label>`;
-  const sel = (id, lab, obj, v) => `<label>${lab}<select id="${id}" data-nobusca ${dis}>${Object.entries(obj).map(([k, t]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+  // cls: tamanho do campo na grade (docs/design-system.md › 4)
+  const f = (id, lab, val, extra = '', cls = '') => `<label class="${cls}">${lab}<input id="${id}" value="${val ?? ''}" ${extra} ${dis}></label>`;
+  const sel = (id, lab, obj, v, cls = '') => `<label class="${cls}">${lab}<select id="${id}" data-nobusca ${dis}>${Object.entries(obj).map(([k, t]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
   const md = modal({ title: c ? c.nome : 'Incluir colaborador', wide: true, body: `<div class="grid-form">
-      ${f('fc-n', 'Nome', esc(c?.nome || ''), 'class="span2"')}${f('fc-m', 'Matrícula', esc(c?.matricula || ''))}${f('fc-cpf', 'CPF', esc(c?.cpf || ''))}
+      ${f('fc-n', 'Nome', esc(c?.nome || ''), '', 'span2')}${f('fc-m', 'Matrícula', esc(c?.matricula || ''), '', 'xs')}${f('fc-cpf', 'CPF', esc(c?.cpf || ''), '', 'xs')}
+      ${sel('fc-st', 'Situação', SITUACOES, c?.situacao || 'ativo', 'xs')}
       ${f('fc-c', 'Cargo', esc(c?.cargo || ''))}${f('fc-s', 'Setor', esc(c?.setor || ''), 'list="fc-setores"')}
       <datalist id="fc-setores">${[...new Set(B.colabs.map(x => x.setor).filter(Boolean))].map(s => `<option value="${esc(s)}">`).join('')}</datalist>
       <label>Centro de custo<select id="fc-cc" data-nobusca ${dis}><option value="">—</option>${state.cad.cc.map(x => `<option value="${x.id}" ${x.id === c?.centro_custo_id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>
-      ${sel('fc-v', 'Vínculo', VINCULOS, c?.vinculo || 'clt')}${sel('fc-st', 'Situação', SITUACOES, c?.situacao || 'ativo')}
-      ${f('fc-a', 'Admissão', c?.admissao || '', 'type="date"')}${f('fc-d', 'Desligamento', c?.demissao || '', 'type="date"')}
-      ${f('fc-sal', 'Salário base (R$)', inp(c?.salario))}${f('fc-pix', 'PIX / conta para pagamento', esc(c?.pix || ''))}
-      ${f('fc-o', 'Observação', esc(c?.observacao || ''), 'class="span2"')}</div>
+      ${sel('fc-v', 'Vínculo', VINCULOS, c?.vinculo || 'clt')}
+      ${f('fc-a', 'Admissão', c?.admissao || '', 'type="date"', 'xs')}${f('fc-d', 'Desligamento', c?.demissao || '', 'type="date"', 'xs')}
+      ${f('fc-sal', 'Salário base (R$)', inp(c?.salario), '', 'xs')}${f('fc-pix', 'PIX / conta para pagamento', esc(c?.pix || ''), '', 'span2')}
+      ${f('fc-o', 'Observação', esc(c?.observacao || ''), '', 'full')}</div>
       ${c ? '<h3 style="margin:16px 0 6px">Histórico de salário e cargo</h3><div id="fc-hist" class="small muted">Carregando…</div>' : ''}`,
     foot: pode ? `${c ? '<button class="btn danger" id="fc-del" style="margin-right:auto">Excluir</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="fc-ok">Salvar</button>` : '<button class="btn" data-close>Fechar</button>' });
   if (c) q(sb.from('rh_salarios').select('*').eq('colaborador_id', c.id).order('vigencia', { ascending: false }).order('id', { ascending: false })).then(h => {

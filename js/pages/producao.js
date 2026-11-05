@@ -5,13 +5,13 @@ import { kpiGrid, drawer, barList, tabela } from '../lib/componentes.js';
 import { cadProducao, ST_OP, horas, addDias } from '../lib/producao.js';
 import { badge, qtd } from '../lib/compras.js';
 
-export const title = 'Painel de produção';
+export const title = 'Painel de Produção';
 const ui = { dias: 7 };
 const pctTxt = (v) => (v == null || !isFinite(v) ? '–' : (v * 100).toFixed(1).replace('.', ',') + '%');
 
 export async function render(root) {
   const h = today(), de = addDias(h, -(ui.dias - 1));
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Painel de produção</h2><div class="muted small">Apontamentos com início no período (importados do Iniflex ou feitos no terminal).</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Painel de Produção</h2><div class="muted small">Apontamentos com início no período (importados do Iniflex ou feitos no terminal).</div></div>
       <label>Período<select id="pd-d">${[[1, 'Hoje'], [7, '7 dias'], [30, '30 dias'], [90, '90 dias']].map(([d, t]) => `<option value="${d}" ${ui.dias === d ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
     <div id="pd-corpo"><div class="loading">Carregando…</div></div>`;
   $('#pd-d', root).onchange = (e) => { ui.dias = +e.target.value; render(root); };
@@ -54,7 +54,7 @@ export async function render(root) {
   };
   const corpo = $('#pd-corpo', root);
   corpo.innerHTML = `<div id="pd-kpis"></div>
-    <div class="card" style="margin-top:16px"><h2>Produção por dia (kg bons)</h2><div class="chart-box"><canvas id="pd-c1"></canvas></div></div>
+    <div class="card" style="margin-top:16px"><h2>Produção por dia (kg bons)</h2>${ap.length ? '<div class="chart-box"><canvas id="pd-c1"></canvas></div>' : '<div class="empty" style="padding:14px">Nenhum apontamento no período. Os apontamentos vêm do Terminal do Setor ou da importação do Iniflex.</div>'}</div>
     <div class="card flush" style="margin-top:16px"><div style="padding:14px 16px 0"><h2>OEE por máquina</h2></div><div class="table-wrap"><table><thead><tr><th>Máquina</th><th>Setor</th><th class="num">Horas apontadas</th><th class="num">Paradas (não plan.)</th><th class="num">Bom</th><th class="num">Refugo</th><th class="num">Disponib.</th><th class="num">Perform.</th><th class="num">Qualid.</th><th class="num">OEE</th></tr></thead><tbody>
       ${maqs.map(x => `<tr><td>${esc(x.m.codigo)} — ${esc(x.m.nome)}</td><td>${esc(C.setorById[x.m.setor_id]?.nome || '')}</td><td class="num">${x.run.toFixed(1).replace('.', ',')}</td><td class="num">${x.naoPl.toFixed(1).replace('.', ',')}</td>
         <td class="num">${qtd(Math.round(x.b))}</td><td class="num">${qtd(Math.round(x.r))}</td><td class="num">${pctTxt(x.D)}</td><td class="num">${pctTxt(x.Pf)}</td><td class="num">${pctTxt(x.Q)}</td>
@@ -65,7 +65,7 @@ export async function render(root) {
   kpiGrid($('#pd-kpis', corpo), Object.entries(KP).map(([id, k]) => ({ id, ...k, clicavel: ['oee', 'op', 'at'].includes(id) })), (id) => KP[id].abrir());
   const dias = Array.from({ length: ui.dias }, (_, i) => addDias(de, i));
   const setores = C.setores.filter(s => ap.some(a => a.setor_id === s.id));
-  chart($('#pd-c1', corpo), { type: 'bar', data: { labels: dias.map(d => d.slice(8) + '/' + d.slice(5, 7)), datasets: (setores.length ? setores : [{ id: null, nome: 'Total' }]).map((s, i) => ({
+  if ($('#pd-c1', corpo)) chart($('#pd-c1', corpo), { type: 'bar', data: { labels: dias.map(d => d.slice(8) + '/' + d.slice(5, 7)), datasets: (setores.length ? setores : [{ id: null, nome: 'Total' }]).map((s, i) => ({
     label: s.nome, data: dias.map(d => ap.filter(a => (s.id == null || a.setor_id === s.id) && new Date(a.inicio).toLocaleDateString('sv-SE', { timeZone: 'America/Recife' }) === d).reduce((t, a) => t + +a.qtd_boa, 0)),
     backgroundColor: [COR.entrada, COR.saida, COR.saldo, '#1baf7a', '#eda100'][i % 5] })) },
     options: { maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });

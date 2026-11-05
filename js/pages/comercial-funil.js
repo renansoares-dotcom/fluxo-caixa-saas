@@ -7,13 +7,13 @@ import { MATERIAIS, pesoTeorico, carregarProdutos, datalistProdutos, acharProdut
 import { qtd, inp, unit, num } from '../lib/compras.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 
-export const title = 'Funil e propostas';
+export const title = 'Funil e Propostas';
 const ui = { vend: '', mostrar: 'abertas' };
 let B = null, OPS = [], PRODS = [];
 const nomeCli = (o) => (o.favorecido_id ? B.clientes.find(c => c.id === o.favorecido_id)?.nome : null) || o.prospect || '–';
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Funil e propostas</h2><div class="muted small">Vai até a proposta; ganhou, registre o número do pedido no Iniflex.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Funil e Propostas</h2><div class="muted small">Vai até a proposta; ganhou, registre o número do pedido no Iniflex.</div></div>
       ${podeEditarCom() ? '<button class="btn primary" id="fu-nova">Nova oportunidade</button>' : ''}</div>
     <div class="card toolbar"><div class="chips" id="fu-m"><span class="chip ${ui.mostrar === 'abertas' ? 'on' : ''}" data-m="abertas">Em andamento</span><span class="chip ${ui.mostrar === 'todas' ? 'on' : ''}" data-m="todas">Com ganhas e perdidas (180 dias)</span></div>
       ${interno() ? '<label>Representante<select id="fu-v"><option value="">Todos</option></select></label>' : ''}</div>
@@ -50,18 +50,20 @@ function pintar(root) {
 function editar(o, root) {
   const v = o || {};
   const m = modal({ title: v.id ? `Oportunidade #${v.numero}` : 'Nova oportunidade', body: `
-    <div class="grid-form">
+    <fieldset><legend>Cliente</legend><div class="grid-form">
       <label class="span2">Cliente da carteira<input id="op-c" list="op-cl" value="${esc(v.favorecido_id ? B.clientes.find(c => c.id === v.favorecido_id)?.nome || '' : '')}" placeholder="escolha da lista">
         <datalist id="op-cl">${B.clientes.map(c => `<option value="${esc(c.nome)}"></option>`).join('')}</datalist></label>
-      <label class="span2">ou prospect (ainda sem cadastro)<input id="op-p" value="${esc(v.prospect || '')}"></label>
-      <label>Contato<input id="op-ct" value="${esc(v.contato || '')}"></label>
-      <label class="span2">O que é *<input id="op-t" value="${esc(v.titulo || '')}" placeholder="ex.: sacola 50x60 impressa 2 cores"></label>
-      <label>Valor estimado<input id="op-v" value="${inp(v.valor_estimado)}"></label>
-      <label>Probabilidade %<input id="op-pr" value="${v.probabilidade ?? ''}"></label>
-      <label>Previsão de fechamento<input type="date" id="op-f" value="${v.previsao_fechamento || ''}"></label>
-      ${interno() ? `<label>Representante<select id="op-vd"><option value="">—</option>${B.vendedores.filter(x => x.ativo).map(x => `<option value="${x.id}" ${v.vendedor_id === x.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>` : ''}
-      <label class="span2">Observação<input id="op-o" value="${esc(v.observacao || '')}"></label>
-    </div>`, foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="op-ok">Salvar</button>` });
+      <label class="c4">Contato<input id="op-ct" value="${esc(v.contato || '')}"></label>
+      <label class="${interno() ? 'span2' : 'full'}">ou prospect (ainda sem cadastro)<input id="op-p" value="${esc(v.prospect || '')}"></label>
+      ${interno() ? `<label class="c4">Representante<select id="op-vd"><option value="">—</option>${B.vendedores.filter(x => x.ativo).map(x => `<option value="${x.id}" ${v.vendedor_id === x.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>` : ''}
+    </div></fieldset>
+    <fieldset><legend>Oportunidade</legend><div class="grid-form">
+      <label class="full">O que é *<input id="op-t" required value="${esc(v.titulo || '')}" placeholder="ex.: sacola 50x60 impressa 2 cores"></label>
+      <label class="c4">Valor estimado<input id="op-v" inputmode="decimal" value="${inp(v.valor_estimado)}"></label>
+      <label class="c4">Probabilidade %<input id="op-pr" inputmode="numeric" value="${v.probabilidade ?? ''}"></label>
+      <label class="c4">Previsão de fechamento<input type="date" id="op-f" value="${v.previsao_fechamento || ''}"></label>
+      <label class="full">Observação<input id="op-o" value="${esc(v.observacao || '')}"></label>
+    </div></fieldset>`, foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="op-ok">Salvar</button>` });
   $('#op-ok', m.el).onclick = async (ev) => {
     const cn = $('#op-c', m.el).value.trim(), cli = B.clientes.find(c => c.nome === cn);
     if (cn && !cli) return toast('Escolha o cliente da lista (ou use o campo de prospect)', true);

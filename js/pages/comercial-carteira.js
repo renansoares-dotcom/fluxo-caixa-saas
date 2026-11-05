@@ -5,7 +5,7 @@ import { $, $$, esc, money, money0, dateBR, today, fail, toast, modal, exportXLS
 import { baseComercial, limparBaseComercial, ST_CLI, TIPOS_INT, podeEditarCom, interno, addDias } from '../lib/comercial.js';
 import { badge, qtd, unit } from '../lib/compras.js';
 
-export const title = 'Carteira de clientes';
+export const title = 'Carteira e Agenda';
 const ui = { aba: 'carteira', st: '', busca: '', rep: '' };
 let B = null, AG = [];
 
@@ -78,7 +78,7 @@ async function ficha(id, root) {
   const ab = fin.abertos || [], h = today(), venc = ab.filter(t => t.data < h), totAb = ab.reduce((t, x) => t + +x.valor, 0);
   const at = fin.atraso || {};
   const m = modal({ title: c.nome, wide: true, body: `
-    <div class="grid-form small">
+    <div class="grid-form small dados5">
       <div><span class="muted">Situação</span><div>${badge(ST_CLI, i.st)}</div></div><div><span class="muted">CNPJ/CPF</span><div>${esc(c.documento || '–')}</div></div>
       <div><span class="muted">Representante</span><div>${esc(c.representante || '–')}</div></div><div><span class="muted">Segmento</span><div>${esc(c.segmento || '–')}</div></div>
       <div><span class="muted">Contato</span><div>${esc([c.telefone, c.email].filter(Boolean).join(' · ') || '–')}</div></div>
@@ -88,7 +88,7 @@ async function ficha(id, root) {
       <div><span class="muted">Ticket médio</span><div>${i.ticket ? money0(i.ticket) : '–'}</div></div>
     </div>
     <h3 style="margin:14px 0 6px">Financeiro</h3>
-    <div class="grid-form small">
+    <div class="grid-form small dados5">
       <div><span class="muted">Em aberto</span><div>${money(totAb)} (${ab.length} título(s))</div></div>
       <div><span class="muted">Vencido</span><div class="${venc.length ? 'neg' : ''}">${money(venc.reduce((t, x) => t + +x.valor, 0))} (${venc.length})</div></div>
       <div><span class="muted">Limite de crédito</span><div>${c.limite_credito != null ? `${money(c.limite_credito)} · uso ${pct(totAb / c.limite_credito, 0)}` : '–'}</div></div>
@@ -107,8 +107,8 @@ async function ficha(id, root) {
     <h3 style="margin:14px 0 6px">Contatos</h3>
     ${podeEditarCom() ? `<div class="grid-form" id="ci-novo">
       <label>Tipo<select id="ci-t">${Object.entries(TIPOS_INT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
-      <label class="span2">O que foi tratado *<input id="ci-r"></label>
-      <label>Próximo contato<input type="date" id="ci-p"></label><label class="span2">Assunto do próximo<input id="ci-pa"></label>
+      <label class="span2">O que foi tratado *<input id="ci-r" required></label>
+      <label>Próximo contato<input type="date" id="ci-p"></label><label class="c8">Assunto do próximo<input id="ci-pa"></label>
       <div style="align-self:end"><button class="btn primary small" id="ci-ok">Registrar</button></div></div>` : ''}
     <div class="small" style="margin-top:8px">${ints.map(x => `<div style="padding:6px 0;border-bottom:1px solid var(--border)"><b>${esc(TIPOS_INT[x.tipo])}</b> · ${dateBR(x.data)} — ${esc(x.resumo)}${x.proximo_contato ? ` <span class="${x.concluido ? 'muted' : 'warn'}">→ ${dateBR(x.proximo_contato)} ${esc(x.proximo_assunto || '')}${x.concluido ? ' (feito)' : ''}</span>` : ''}</div>`).join('') || '<span class="muted">Nenhum contato registrado.</span>'}</div>`,
     foot: `${podeEditarCom() ? '<button class="btn" id="ci-op">Nova oportunidade</button>' : ''}<button class="btn" data-close>Fechar</button>` });

@@ -3,7 +3,8 @@ import { sb, state, q, podeEditar, loadCadastros } from './data.js';
 import { $, esc, options, modal, formData, toast, fail, money, parseNum, exportXLSX, debounce } from './ui.js';
 
 /**
- * cfg = { table, titulo, rows: () => array, cols: [{k, t, fmt?, num?}], fields: [{k, t, type?, opts?, req?, span?}], busca?: fn }
+ * cfg = { table, titulo, rows: () => array, cols: [{k, t, fmt?, num?}], fields: [{k, t, type?, opts?, req?, span?, cls?}], busca?: fn, largo?: bool }
+ * cls: classe de tamanho do campo na grade (xs, c4, full…); largo: modal de 1100 px (4 campos por linha)
  */
 export function crudPage(root, cfg) {
   const ed = podeEditar();
@@ -28,14 +29,15 @@ export function crudPage(root, cfg) {
   $('#cx', wrap).onclick = () => exportXLSX($('#ct table', wrap), cfg.table);
   if (!ed) return;
   const abrir = (r = {}) => {
+    // cadastro de até dois campos: modal pequeno (docs/design-system.md › 4); obrigatório leva * no rótulo e required
     const m = modal({
-      title: r.id ? 'Editar' : 'Novo',
+      title: r.id ? 'Editar' : 'Novo', narrow: cfg.fields.length <= 2, wide: !!cfg.largo,
       body: `<form id="cf" class="grid-form">${cfg.fields.map(f => {
-        const v = r[f.k] ?? f.def ?? '';
-        if (f.type === 'select') return `<label class="${f.span ? 'span2' : ''}">${f.t}<select name="${f.k}">${options(f.opts(), { selected: v, empty: f.req ? null : '—', value: f.value || 'id', label: f.label || 'nome' })}</select></label>`;
-        if (f.type === 'check') return `<label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${f.k}" ${v === true || v === '' && f.def !== false ? 'checked' : ''}> ${f.t}</label>`;
-        if (f.type === 'money') return `<label>${f.t}<input name="${f.k}" inputmode="decimal" value="${v !== '' ? money(v) : ''}"></label>`;
-        return `<label class="${f.span ? 'span2' : ''}">${f.t}<input name="${f.k}" value="${esc(v)}" ${f.req ? 'required' : ''} ${f.list ? `list="dl-${f.k}"` : ''}>${f.list ? `<datalist id="dl-${f.k}">${f.list().map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}</label>`;
+        const v = r[f.k] ?? f.def ?? ''; const t = f.req ? `${f.t} *` : f.t; const c = [f.span ? 'span2' : '', f.cls || ''].join(' ').trim();
+        if (f.type === 'select') return `<label class="${c}">${t}<select name="${f.k}" ${f.req ? 'required' : ''}>${options(f.opts(), { selected: v, empty: f.req ? null : '—', value: f.value || 'id', label: f.label || 'nome' })}</select></label>`;
+        if (f.type === 'check') return `<label class="chk" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${f.k}" ${v === true || v === '' && f.def !== false ? 'checked' : ''}> ${f.t}</label>`;
+        if (f.type === 'money') return `<label class="${c}">${t}<input name="${f.k}" inputmode="decimal" value="${v !== '' ? money(v) : ''}"></label>`;
+        return `<label class="${c}">${t}<input name="${f.k}" value="${esc(v)}" ${f.req ? 'required' : ''} ${f.list ? `list="dl-${f.k}"` : ''}>${f.list ? `<datalist id="dl-${f.k}">${f.list().map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}</label>`;
       }).join('')}</form>`,
       foot: `${r.id ? '<button class="btn danger" id="cd" style="margin-right:auto">Excluir</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="cs">Salvar</button>`,
     });

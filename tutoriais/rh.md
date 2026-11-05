@@ -1,22 +1,22 @@
 ---
 titulo: RH — colaboradores, folha do mês e 13º
-tela: RH / Trabalhista › Colaboradores, Folha do mês e 13º salário
-versao: 1.1
-atualizado: 2026-10-29
+tela: RH / Trabalhista › Colaboradores (RHT001), Folha do Mês (RHT002) e 13º Salário (RHT003)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
 O módulo **RH / Trabalhista** tem três telas:
 
 - **Colaboradores**: o cadastro de quem trabalha na IPLAMM (cargo, setor, vínculo, admissão e salário).
-- **Folha do mês**: a **previsão de caixa** da folha (adiantamento, saldo e guias de INSS, FGTS e IRRF), lançada no fluxo de caixa.
+- **Folha do Mês**: a **previsão de caixa** da folha (adiantamento, saldo e guias de INSS, FGTS e IRRF), lançada no fluxo de caixa.
 - **13º salário**: a provisão do 13º por pessoa e as datas de pagamento das duas parcelas e dos encargos.
 
 > **Importante:** a folha oficial continua sendo feita no **Iniflex** e pela **contabilidade**. A plataforma calcula uma **estimativa** para o fluxo de caixa saber quanto vai sair e quando.
 
 ## 2. Quem tem acesso
 
-Salário é informação **sigilosa**. As telas de RH só abrem para o **administrador** e para quem tem a área **RH (salários)** marcada em **Cadastros › Empresa e usuários**.
+Salário é informação **sigilosa**. As telas de RH só abrem para o **administrador** e para quem tem a área **RH (salários)** marcada em **Cadastros › Empresa e Usuários**.
 
 Sem essa marcação, a pessoa não vê o menu de RH, mesmo tendo acesso às outras áreas. Quem tem a área RH com perfil de leitura consulta, mas não altera.
 
@@ -69,9 +69,9 @@ Os filtros ficam no topo da lista: busca, **Ativos / Desligados / Todos**, setor
 
 > **Cuidado:** o relatório com salário é **confidencial**. Imprima só quando necessário e não deixe cópias soltas.
 
-## 4. Folha do mês
+## 4. Folha do Mês
 
-![Figura 2 — Folha do mês (previsão de caixa) (dados fictícios)](img/rh-2.jpg)
+![Figura 2 — Folha do Mês (previsão de caixa) (dados fictícios)](img/rh-2.jpg)
 
 ### 4.1 Montar a folha da competência
 
@@ -166,3 +166,4 @@ Pessoa sem data de admissão entra com 12 avos. Preencha a admissão de quem ent
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: cadastro e importação, setor por cargo, relatório, folha do mês com previsão no fluxo, parâmetros e 13º salário. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

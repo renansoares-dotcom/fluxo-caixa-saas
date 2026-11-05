@@ -1,18 +1,18 @@
 ---
 titulo: Contabilidade — DRE, balancete, balanço e DFC
-tela: Contabilidade › DRE gerencial, Balancete, Balanço Patrimonial, DRE Contábil, DFC e De-para contábil
-versao: 1.1
-atualizado: 2026-10-29
+tela: Contabilidade › DRE Gerencial (CTB001), Balancete (CTB002), Balanço Patrimonial (CTB003), DRE Contábil (CTB004), DFC (Método Direto) (CTB005) e De-para Contábil (CTB006)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
 A área **Contabilidade** junta os demonstrativos:
 
-- **DRE gerencial**: o resultado pelo **regime de caixa** (lançamentos pagos), em blocos configuráveis pelo plano de contas.
+- **DRE Gerencial**: o resultado pelo **regime de caixa** (lançamentos pagos), em blocos configuráveis pelo plano de contas.
 - **Balancete**: os balancetes oficiais da contabilidade, importados do PDF. Também o **balancete feito pela plataforma**: saldo de abertura + lançamentos contábeis gerados a partir dos lançamentos pagos.
 - **Balanço Patrimonial** e **DRE Contábil** (competência), no formato da contabilidade, a partir de um dos dois balancetes.
 - **DFC — Fluxo de caixa pelo método direto**, a partir dos lançamentos contábeis da plataforma.
-- **De-para contábil**: liga a plataforma ao plano de contas da contabilidade.
+- **De-para Contábil**: liga a plataforma ao plano de contas da contabilidade.
 
 > A contabilidade da IPLAMM usa o sistema **Domínio**. Os arquivos gerados aqui são, por enquanto, para **conferência**, não para importação.
 
@@ -20,15 +20,15 @@ A área **Contabilidade** junta os demonstrativos:
 
 O administrador e o financeiro importam balancetes, geram os lançamentos contábeis e gravam o de-para. Quem tem a área Contabilidade consulta e exporta.
 
-## 3. DRE gerencial
+## 3. DRE Gerencial
 
-![Figura 1 — DRE gerencial (dados fictícios)](img/contabilidade-1.jpg)
+![Figura 1 — DRE Gerencial (dados fictícios)](img/contabilidade-1.jpg)
 
 1. Use os filtros de sempre (visão, grupo, conta, centro de custo, favorecido e disponibilidade) e escolha a **exibição**: **Mensal** ou **Acumulado no ano**.
 2. Os indicadores mostram a **receita bruta**, o **EBITDA gerencial** e o **resultado gerencial**. O gráfico compara a receita com o resultado.
 3. A tabela tem os meses, o **ANO** e a **AV%** (análise vertical sobre a receita).
 
-Os blocos da DRE são configurados em **Cadastros › Plano de contas**. **Exportar Excel** baixa a tabela.
+Os blocos da DRE são configurados em **Cadastros › Plano de Contas**. **Exportar Excel** baixa a tabela.
 
 ## 4. Balancete
 
@@ -51,18 +51,18 @@ Escolha a **fonte**: um balancete importado da contabilidade ou o balancete da p
 - **Balanço**: escolha o **detalhe** (grupos, subgrupos, contas ou analítico). O indicador **Ativo − (Passivo + PL)** precisa dar zero.
 - **DRE Contábil**: sai no mesmo formato da DRE da contabilidade, com o % da receita bruta. Cada linha abre as contas que a compõem.
 
-## 6. DFC (método direto)
+## 6. DFC (Método Direto)
 
 Escolha o **mês**. Cada lançamento que mexe numa conta do **Disponível** (1.1.1) é classificado pela conta da contrapartida em atividades **operacionais**, de **investimento**, de **financiamento** ou **outros**. As transferências entre contas do Disponível se anulam e não aparecem.
 
 O indicador **Início + variação = fim** confere o fechamento.
 
-## 7. De-para contábil
+## 7. De-para Contábil
 
 Use as abas para ligar cada item ao plano de contas da contabilidade:
 
 - **Classificações**: a conta contábil da contrapartida de cada classificação do plano da plataforma, e o **tratamento**: direto no resultado, baixa de fornecedor, baixa de cliente, baixa de obrigação, ativo, financiamento / FIDC ou transferência. Marque **Usa conta do beneficiário** quando a contabilidade tem conta própria por cliente ou fornecedor.
-- **Contas bancárias**: a conta contábil de cada conta e a conta usada **se negativo** (por exemplo, cheque especial).
+- **Contas Bancárias**: a conta contábil de cada conta e a conta usada **se negativo** (por exemplo, cheque especial).
 - **Beneficiários**: a conta própria do cliente, do fornecedor ou do adiantamento.
 
 Preencha à mão (escolha a conta da lista) e clique em **Gravar de-para**. Ou use **Importar planilha revisada** (depara_contabil_sugestao.xlsx):
@@ -93,3 +93,4 @@ Use o filtro **Sem conta contábil** para ver o que falta.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: DRE gerencial, balancete importado e da plataforma, balanço, DRE contábil, DFC e de-para contábil. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

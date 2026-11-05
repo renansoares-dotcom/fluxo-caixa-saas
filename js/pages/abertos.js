@@ -1,9 +1,14 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, $$, esc, money, cls, dateBR, today, options, exportXLSX, fail, toast, modal, MESES_CURTO } from '../lib/ui.js';
 import { abrirLancamento } from '../lib/lanc-form.js';
+import { seletorColunas } from '../lib/colunas.js';
 
-export const title = 'Contas a pagar / receber';
+export const title = 'Contas a Pagar / Receber';
 const f = { aba: 'S', de: '', ate: '', conta: '', busca: '' };
+// colunas que o seletor "Colunas" mostra ou oculta (docs/design-system.md › 5); Dias e Conta ficam na 2ª linha da célula
+const COLUNAS = [{ id: 'dias', nome: 'Dias de atraso ou a vencer' }, { id: 'fav', nome: 'Favorecido' }, { id: 'desc', nome: 'Descrição' },
+  { id: 'plano', nome: 'Plano de contas' }, { id: 'conta', nome: 'Conta', sub: true }, { id: 'prio', nome: 'Prioridade (a pagar)' }];
+let LISTA = [];
 const ABAS = [['S', 'A pagar'], ['E', 'A receber'], ['INAD', 'Inadimplentes'], ['T', 'Transferências'], ['MES', 'Resumo mensal']];
 
 export async function render(root) {
@@ -17,15 +22,16 @@ export async function render(root) {
       <label class="grow">Buscar<input name="busca" value="${esc(f.busca)}" placeholder="Favorecido, descrição…"></label>
     </div></div>
     <div class="kpis" id="kp"></div>
-    <div class="card flush">${podeEditar() ? `<div class="toolbar" style="padding:10px 12px"><span class="muted small" id="si">Nenhum selecionado</span>
+    <div class="card flush"><div class="toolbar" style="padding:10px 12px" id="tb-tab">${podeEditar() ? `<span class="muted small" id="si">Nenhum selecionado</span>
       <label style="flex-direction:row;align-items:center;gap:6px">Data do pagamento <input type="date" id="dt-baixa" value="${today()}"></label>
       <button class="btn small" id="baixar" disabled>Baixar selecionados</button>
-      ${f.aba === 'E' ? '<span class="spacer"></span><button class="btn small primary" id="bordero" disabled title="Simular o borderô FIDC com os títulos marcados e gerar a proposta para aprovação">Montar borderô FIDC</button>' : ''}</div>` : ''}
-      <div class="table-wrap" id="tbl"></div></div>`;
+      ${f.aba === 'E' ? '<span class="spacer"></span><button class="btn small primary" id="bordero" disabled title="Simular o borderô FIDC com os títulos marcados e gerar a proposta para aprovação">Montar borderô FIDC</button>' : ''}` : ''}${podeEditar() && f.aba === 'E' ? '' : '<span class="spacer"></span>'}</div>
+      <div class="table-wrap" id="tbl" data-colunas="abertos"></div></div>`;
+  if (f.aba !== 'MES') $('#tb-tab', root).append(seletorColunas({ tela: 'abertos', colunas: COLUNAS }).botao);
   $('#abas', root).onclick = (e) => { if (e.target.dataset.k) { f.aba = e.target.dataset.k; render(root); } };
   $('#flt', root).addEventListener('change', (e) => { f[e.target.name] = e.target.value; load(root); });
   $('#novo', root) && ($('#novo', root).onclick = () => abrirLancamento({ status: 'Em aberto' }, () => load(root)));
-  $('#exp', root).onclick = () => exportXLSX($('#tbl table', root), `em_aberto_${f.aba}`);
+  $('#exp', root).onclick = () => exportar();
   if (podeEditar()) $('#baixar', root).onclick = async () => {
     const ids = $$('.sel:checked', root).map(c => c.value);
     try { const n = await q(sb.rpc('baixar_lancamentos', { p_ids: ids, p_data: $('#dt-baixa', root).value || null })); toast(`${n} título(s) baixado(s)`); load(root); } catch (e) { fail(e); }
@@ -78,6 +84,7 @@ async function load(root) {
       <div class="kpi"><div class="k-label">Inadimplência</div><div class="k-value neg">${money(sum(rec.filter(r => r.data < hoje)))}</div></div>
       <div class="kpi"><div class="k-label">Saldo projetado</div><div class="k-value ${cls(sum(rec) - sum(pag))}">${money(sum(rec) - sum(pag))}</div></div>`;
 
+    LISTA = null;
     if (f.aba === 'MES') {
       const ano = {}; for (const r of rows) { const k = r.data.slice(0, 7); (ano[k] ||= { E: 0, S: 0 }); if (r.tipo !== 'T') ano[k][r.tipo] += Math.abs(+r.valor_sinal); }
       const ks = Object.keys(ano).sort();
@@ -87,15 +94,21 @@ async function load(root) {
       return;
     }
     const lista = f.aba === 'INAD' ? rec.filter(r => r.data < hoje) : rows.filter(r => r.tipo === f.aba);
-    if (!lista.length) { tbl.innerHTML = '<div class="empty">Nada em aberto aqui.</div>'; return; }
-    tbl.innerHTML = `<table><thead><tr>${podeEditar() ? '<th><input type="checkbox" id="all"></th>' : ''}<th>Vencimento</th><th>Dias</th><th>Favorecido</th><th>Descrição</th><th>Plano de contas</th><th>Conta</th><th>Prioridade</th><th class="num">Valor</th></tr></thead><tbody>
+    if (!lista.length) { LISTA = []; tbl.innerHTML = '<div class="empty">Nada em aberto aqui.</div>'; return; }
+    LISTA = lista;
+    // Prioridade só existe no a pagar: nas outras abas a coluna sai (regra dos 80 % vazios)
+    const comPrio = lista.some(r => r.tipo === 'S');
+    tbl.innerHTML = `<table><thead><tr>${podeEditar() ? '<th><input type="checkbox" id="all" aria-label="Marcar todos"></th>' : ''}<th>Vencimento<div class="small" data-col="dias">Dias</div></th>
+      <th data-col="fav">Favorecido</th><th data-col="desc">Descrição</th><th data-col="plano">Plano de contas<div class="small" data-col="conta">Conta</div></th>
+      ${comPrio ? '<th data-col="prio">Prioridade</th>' : ''}<th class="num">Valor</th></tr></thead><tbody>
       ${lista.map(r => { const dias = Math.floor((new Date(hoje) - new Date(r.data)) / 864e5);
         return `<tr class="clickable" data-id="${r.id}">${podeEditar() ? `<td><input type="checkbox" class="sel" value="${r.id}" data-v="${r.valor}"></td>` : ''}
-        <td>${dateBR(r.data)}</td><td>${dias > 0 ? `<span class="badge vencido">${dias} d atraso</span>` : `<span class="muted small">em ${-dias} d</span>`}</td>
-        <td class="wrap">${esc(r.favorecido_nome || '')}</td><td class="wrap">${esc(r.descricao || '')}${r.documento && !(r.descricao || '').includes(r.documento) ? `<div class="muted small">NF ${esc(r.documento)}</div>` : ''}${emProp[r.id] ? `<div class="small"><span class="badge ${emProp[r.id].status === 'Pendente' ? 'aberto' : 'negoc'}">borderô proposta nº ${emProp[r.id].numero} · ${emProp[r.id].status.toLowerCase()}</span></div>` : ''}</td><td>${esc(r.plano_codigo + ' - ' + r.plano_nome)}</td>
-        <td>${esc(r.conta_nome || '—')}</td><td>${r.tipo === 'S' ? `<span class="badge ${r.prioridade_efetiva === 'Obrigatório' ? 'obrig' : 'negoc'}">${r.prioridade_efetiva}</span>` : ''}</td>
+        <td>${dateBR(r.data)}<div data-col="dias">${dias > 0 ? `<span class="badge vencido">${dias} d atraso</span>` : `<span class="muted small">em ${-dias} d</span>`}</div></td>
+        <td class="wrap-m" data-col="fav">${esc(r.favorecido_nome || '')}</td><td class="wrap" data-col="desc">${esc(r.descricao || '')}${r.documento && !(r.descricao || '').includes(r.documento) ? `<div class="muted small">NF ${esc(r.documento)}</div>` : ''}${emProp[r.id] ? `<div class="small"><span class="badge ${emProp[r.id].status === 'Pendente' ? 'aberto' : 'negoc'}">borderô proposta nº ${emProp[r.id].numero} · ${emProp[r.id].status.toLowerCase()}</span></div>` : ''}</td>
+        <td class="wrap-m" data-col="plano">${esc(r.plano_codigo + ' - ' + r.plano_nome)}<div class="small muted" data-col="conta">${esc(r.conta_nome || 'sem conta')}</div></td>
+        ${comPrio ? `<td data-col="prio">${r.tipo === 'S' ? `<span class="badge ${r.prioridade_efetiva === 'Obrigatório' ? 'obrig' : 'negoc'}">${r.prioridade_efetiva}</span>` : ''}</td>` : ''}
         <td class="num ${cls(r.valor_sinal)}">${money(r.valor_sinal)}</td></tr>`; }).join('')}
-      <tr class="row-total">${podeEditar() ? '<td></td>' : ''}<td colspan="7">Total</td><td class="num">${money(lista.reduce((s, r) => s + +r.valor_sinal, 0))}</td></tr></tbody></table>`;
+      <tr class="row-total">${podeEditar() ? '<td></td>' : ''}<td>Total</td><td data-col="fav"></td><td data-col="desc"></td><td data-col="plano"></td>${comPrio ? '<td data-col="prio"></td>' : ''}<td class="num">${money(lista.reduce((s, r) => s + +r.valor_sinal, 0))}</td></tr></tbody></table>`;
     tbl.onclick = (e) => {
       if (e.target.matches('input')) return atualizarSel(root);
       const tr = e.target.closest('tr[data-id]'); if (tr) abrirLancamento(lista.find(x => x.id === tr.dataset.id), () => load(root));
@@ -103,4 +116,15 @@ async function load(root) {
     const all = $('#all', root); if (all) all.onchange = () => { $$('.sel', root).forEach(c => c.checked = all.checked); atualizarSel(root); };
     atualizarSel(root);
   } catch (e) { fail(e); }
+}
+
+// Excel com todas as colunas, mesmo as ocultas na tela (seletor "Colunas")
+function exportar() {
+  const tbl = $('#tbl table');
+  if (LISTA === null) return tbl ? exportXLSX(tbl, `em_aberto_${f.aba}`) : toast('Nada para exportar', true);
+  if (!LISTA.length) return toast('Nada para exportar', true);
+  const hoje = today();
+  exportXLSX([['Vencimento', 'Dias de atraso (negativo = a vencer)', 'Favorecido', 'Descrição', 'NF / documento', 'Plano de contas', 'Conta', 'Prioridade', 'Valor'],
+    ...LISTA.map(r => [dateBR(r.data), Math.floor((new Date(hoje) - new Date(r.data)) / 864e5), r.favorecido_nome || '', r.descricao || '', r.documento || '',
+      `${r.plano_codigo} - ${r.plano_nome}`, r.conta_nome || '', r.tipo === 'S' ? r.prioridade_efetiva || '' : '', +r.valor_sinal])], `em_aberto_${f.aba}`);
 }

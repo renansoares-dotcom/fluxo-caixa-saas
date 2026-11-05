@@ -5,7 +5,7 @@ import { sb, state, q, fetchAll, podeEditar, loadCadastros } from '../lib/data.j
 import { $, esc, money, money0, pct, dateBR, fail, toast, modal, exportXLSX, loading, chart, COR, MESES, MESES_CURTO, moneyTick, logoPNG, parseNum } from '../lib/ui.js';
 import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 
-export const title = 'Controle orçamentário';
+export const title = 'Controle Orçamentário';
 
 const ui = { ref: 0, comp: 'budget', visao: 'conta', tipo: 'S', tolPct: 10, tolVal: 5000, filtro: '', busca: '', abertos: new Set() };
 let D = null;

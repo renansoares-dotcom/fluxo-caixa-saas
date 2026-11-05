@@ -5,7 +5,7 @@ import { sb, state, q, fetchAll } from '../lib/data.js';
 import { $, esc, money, dateBR, fail, loading, exportXLSX } from '../lib/ui.js';
 import { fontes, periodo, arvore, dentro, MESN } from '../lib/contab.js';
 
-export const title = 'DFC — Fluxo de Caixa (método direto)';
+export const title = 'DFC (Método Direto)';
 const ui = { sel: null, acum: false, abertas: new Set() };
 
 // contrapartida → linha da DFC (a regra mais específica vence: é testada a cadeia de contas-mãe)

@@ -185,7 +185,7 @@ function editar(p, root, soVer = false, pre = null) {
   const m = modal({ title: novo ? 'Novo pagamento antecipado' : `Pagamento antecipado — PA nº ${p.numero}${soVer ? '' : ' — editar'}`, wide: true, body: `
     ${p?.motivo && p.status === 'rejeitado' ? `<p class="neg small" style="margin-top:0">Rejeitado: ${esc(p.motivo)}. Corrija e salve para reenviar à aprovação.</p>` : ''}
     <fieldset><legend>Quem recebe</legend><div class="grid-form">
-      <label class="span2">Razão social / nome *<input id="rs" ${dis} list="pq-favs" value="${esc(v.razao_social || '')}" placeholder="como está no CNPJ">${favs.length ? `<datalist id="pq-favs">${favs.map(f => `<option value="${esc(f.nome)}"></option>`).join('')}</datalist>` : ''}</label>
+      <label class="span2">Razão social / nome *<input required id="rs" ${dis} list="pq-favs" value="${esc(v.razao_social || '')}" placeholder="como está no CNPJ">${favs.length ? `<datalist id="pq-favs">${favs.map(f => `<option value="${esc(f.nome)}"></option>`).join('')}</datalist>` : ''}</label>
       <label>CNPJ / CPF<input id="doc" ${dis} value="${esc(fmtDoc(v.cnpj))}" placeholder="00.000.000/0000-00"></label>
       <label>Pix — tipo<select id="pxt" ${dis}><option value="">—</option>${Object.entries(PIX).map(([k, t]) => `<option value="${k}" ${v.pix_tipo === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label class="c4">Pix — chave<input id="pxc" ${dis} value="${esc(v.pix_chave || '')}"></label>
@@ -194,13 +194,13 @@ function editar(p, root, soVer = false, pre = null) {
       <label class="xs">Conta<input id="cc" ${dis} value="${esc(v.conta_bancaria || '')}"></label>
     </div></fieldset>
     <fieldset><legend>O pagamento</legend><div class="grid-form">
-      <label class="xs">Valor *<input id="vl" ${dis} value="${v.valor ? (+v.valor).toFixed(2).replace('.', ',') : ''}" placeholder="0,00"></label>
-      <label class="xs">Pagar em *<input type="date" id="dt" ${dis} value="${v.data_pagamento || ''}"></label>
+      <label class="xs">Valor *<input required id="vl" ${dis} value="${v.valor ? (+v.valor).toFixed(2).replace('.', ',') : ''}" placeholder="0,00"></label>
+      <label class="xs">Pagar em *<input required type="date" id="dt" ${dis} value="${v.data_pagamento || ''}"></label>
       <label class="xs">Prioridade<select id="pri" ${dis}><option value="normal">Normal</option><option value="urgente" ${v.prioridade === 'urgente' ? 'selected' : ''}>Urgente</option></select></label>
-      <label class="xs">Terá nota fiscal? *<select id="nf" ${dis}><option value="sim">Sim</option><option value="nao" ${v.tera_nota === false ? 'selected' : ''}>Não</option></select></label>
+      <label class="xs">Terá nota fiscal? *<select required id="nf" ${dis}><option value="sim">Sim</option><option value="nao" ${v.tera_nota === false ? 'selected' : ''}>Não</option></select></label>
       <label class="xs">Previsão da nota<input type="date" id="pnf" ${dis} value="${v.previsao_nota || ''}"></label>
       <label class="xs">Pedido / proforma<input id="ped" ${dis} value="${esc(v.pedido || '')}"></label>
-      <label class="span2">Descrição / motivo *<input id="ds" ${dis} value="${esc(v.descricao || '')}" placeholder="ex.: adiantamento resina importação 3; frete Manaus"></label>
+      <label class="span2">Descrição / motivo *<input required id="ds" ${dis} value="${esc(v.descricao || '')}" placeholder="ex.: adiantamento resina importação 3; frete Manaus"></label>
       <label class="c4">Anexo (link do pedido, proforma, boleto)<input id="anx" ${dis} value="${esc(v.anexo_url || '')}" placeholder="https://…"></label>
       <label class="xs">Solicitante<input id="sol" ${dis} value="${esc(v.solicitante || '')}"></label>
     </div></fieldset>
@@ -251,7 +251,7 @@ function decidir(sel, status, root) {
   const m = modal({ title: apr ? 'Autorizar pagamentos antecipados' : 'Recusar pagamentos antecipados', body: `
     <p style="margin-top:0">${sel.length} PA · <strong>${money(tot)}</strong>${sel.some(p => !p.tera_nota) ? `<br><span class="neg small">${sel.filter(p => !p.tera_nota).length} sem nota fiscal (${money(sel.filter(p => !p.tera_nota).reduce((s, p) => s + +p.valor, 0))})</span>` : ''}</p>
     <ul class="small" style="max-height:220px;overflow:auto">${sel.map(p => `<li>nº ${p.numero} · ${esc(p.razao_social)} · ${money(p.valor)} · ${dateBR(p.data_pagamento)}</li>`).join('')}</ul>
-    ${apr ? '' : '<label>Motivo da rejeição *<input id="mot" placeholder="volta para quem pediu corrigir"></label>'}`,
+    ${apr ? '' : '<label>Motivo da rejeição *<input required id="mot" placeholder="volta para quem pediu corrigir"></label>'}`,
     foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">${apr ? 'Aprovar' : 'Rejeitar'}</button>` });
   $('#ok', m.el).onclick = async () => {
     const motivo = apr ? null : $('#mot', m.el).value.trim(); if (!apr && !motivo) return toast('Informe o motivo', true);
@@ -272,7 +272,7 @@ function programar(p, root) {
     <p class="small muted" style="margin-top:0">Cria o lançamento <strong>Em aberto</strong> em ${dateBR(p.data_pagamento)} — ele entra no fluxo diário, em Contas a pagar e na Autorização de pagamentos. A baixa é feita como em qualquer título.</p>
     <p><strong>${esc(p.razao_social)}</strong> ${esc(fmtDoc(p.cnpj))} · ${money(p.valor)} · ${esc(p.descricao)}</p>
     <div class="grid2">
-      <label class="grow">Plano de contas *<select id="pl">${options(cad.contasPlano.filter(x => x.natureza !== 'C'), { label: 'label', selected: p.plano_id, empty: '— escolha —' })}</select></label>
+      <label class="grow">Plano de contas *<select required id="pl">${options(cad.contasPlano.filter(x => x.natureza !== 'C'), { label: 'label', selected: p.plano_id, empty: '— escolha —' })}</select></label>
       <label>Centro de custo<select id="ccu">${options(cad.cc, { selected: p.centro_custo_id, empty: '—' })}</select></label>
       <label>Conta de saída<select id="cta">${options(cad.contas, { selected: p.conta_id, empty: '—' })}</select></label>
       <label>Data<input type="date" id="dt" value="${p.data_pagamento < today() ? today() : p.data_pagamento}"></label>
@@ -435,9 +435,9 @@ function registrarPagamento(p, root) {
   const m = modal({ title: `${pago > 0 ? 'Complemento' : 'Pagamento'} — PA nº ${p.numero}`, body: `
     <p class="small muted" style="margin-top:0">${esc(p.razao_social)} · valor do PA ${money(p.valor)}${pago > 0 ? ` · já pago ${money(pago)}` : ''} · <strong>falta ${money(falta)}</strong></p>
     <div class="grid2">
-      <label>Valor pago *<input id="pv" value="${falta.toFixed(2).replace('.', ',')}"></label>
-      <label>Data do pagamento *<input type="date" id="pd" value="${today()}"></label>
-      <label class="grow">Conta de saída *<select id="pc">${options(cad.contas, { selected: p.conta_id, empty: '— escolha —' })}</select></label>
+      <label>Valor pago *<input required id="pv" value="${falta.toFixed(2).replace('.', ',')}"></label>
+      <label>Data do pagamento *<input required type="date" id="pd" value="${today()}"></label>
+      <label class="grow">Conta de saída *<select required id="pc">${options(cad.contas, { selected: p.conta_id, empty: '— escolha —' })}</select></label>
       <label class="grow">Observação<input id="po" placeholder="ex.: complemento — pago a menor no dia 27/10"></label>
       <label class="grow">Comprovante(s) deste pagamento<br>${inputArquivos('pf')}</label>
     </div>
@@ -504,7 +504,7 @@ function pagamentosEAnexos(p, root) {
       const x = L2.find(y => y.id === t.dataset.cor);
       const md = modal({ title: `Corrigir pagamento ${L2.indexOf(x) + 1} — PA nº ${p.numero}`, body: `
         <p class="small muted" style="margin-top:0">Registrado ${money(x.valor)} em ${dateBR(x.data)}. Informe o valor que saiu de verdade do banco: o lançamento${x.credito_id ? ' e o adiantamento ao fornecedor' : ''} mudam juntos. Lançamento já conciliado não pode mudar.</p>
-        <div class="grid2"><label>Valor correto *<input id="cv" value="${(+x.valor).toFixed(2).replace('.', ',')}"></label><label>Data<input type="date" id="cd" value="${x.data}"></label></div>`,
+        <div class="grid2"><label>Valor correto *<input required id="cv" value="${(+x.valor).toFixed(2).replace('.', ',')}"></label><label>Data<input type="date" id="cd" value="${x.data}"></label></div>`,
         foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="cok">Corrigir</button>' });
       $('#cok', md.el).onclick = async () => {
         const v = +parseNum($('#cv', md.el).value).toFixed(2); if (!(v > 0)) return toast('Informe o valor', true);

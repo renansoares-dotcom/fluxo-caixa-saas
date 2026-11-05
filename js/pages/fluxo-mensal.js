@@ -1,7 +1,7 @@
 import { sb, state, q, filtrosHTML, bindFiltros, rpcFiltros, matrizMensal, descricaoFiltros, soma, z, mesesHeader } from '../lib/data.js';
 import { $, $$, esc, money, cls, exportXLSX, fail, loading, MESES } from '../lib/ui.js';
 
-export const title = 'Fluxo de caixa mensal';
+export const title = 'Fluxo de Caixa Mensal';
 const abertos = new Set();
 
 export async function render(root) {

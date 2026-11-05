@@ -6,7 +6,7 @@ import { badge } from '../lib/compras.js';
 import { carregarBase, municipios, paradas, ordenar, metricas, montarCargas, capacidade, veiculoPequeno, imprimirRomaneio, mapaSVG, podeLogistica,
   TIPOS_VEICULO, ST_CARGA, PROX_ST } from '../lib/logistica.js';
 
-export const title = 'Logística — cargas';
+export const title = 'Cargas e Entregas';
 const ui = { data: null, de: null, ate: null };
 let B, M, origem, PEND = [], SALVAS = [], PROP = null, BAIXAS = [];
 const kg = (v) => Math.round(+v || 0).toLocaleString('pt-BR');
@@ -22,10 +22,10 @@ export async function render(root) {
   try {
     [B, M] = await Promise.all([carregarBase(), municipios()]);
   } catch (err) { fail(err); root.innerHTML = erroTela(); return; }
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Cargas e entregas</h2><div class="muted small">Notas de saída com frete por conta da empresa (modFrete ${esc(B.P.mod_fretes.join(', '))}). Peso e volumes vêm da nota; volume em m³ estimado por tonelada quando não há medida.</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Dia das cargas<input type="date" id="lg-d" value="${ui.data}"></label>
-      <label>Notas de<input type="date" id="lg-de" value="${ui.de}"></label><label>até<input type="date" id="lg-ate" value="${ui.ate}"></label>
-      <a class="btn ghost" href="#/logistica/frota">Frota e parâmetros</a></div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Cargas e Entregas</h2><div class="muted small">Notas de saída com frete por conta da empresa (modFrete ${esc(B.P.mod_fretes.join(', '))}). Peso e volumes vêm da nota; volume em m³ estimado por tonelada quando não há medida.</div></div>
+      <a class="btn ghost" href="#/logistica/frota">Frota e Parâmetros</a></div>
+    <div class="card toolbar"><label>Dia das cargas<input type="date" id="lg-d" value="${ui.data}"></label>
+      <label>Notas de<input type="date" id="lg-de" value="${ui.de}"></label><label>até<input type="date" id="lg-ate" value="${ui.ate}"></label></div>
     <div id="lg-corpo"><div class="loading">Carregando notas…</div></div>`;
   $('#lg-d', root).onchange = (e) => { ui.data = e.target.value; PROP = null; render(root); };
   $('#lg-de', root).onchange = (e) => { ui.de = e.target.value; PROP = null; render(root); };
@@ -70,8 +70,8 @@ function pintar(root) {
   const ocup = todas.filter(x => x.m.pctKg != null), ocMed = ocup.length ? ocup.reduce((t, x) => t + x.m.pctKg, 0) / ocup.length : null;
   const frete = todas.reduce((t, x) => t + (x.m.frete || 0), 0);
   corpo.innerHTML = `
-    ${!B.veiculos.length ? `<div class="card" style="border-left:4px solid var(--warn,#f59e0b)"><b>Cadastre a frota primeiro.</b> <span class="muted">Placa, carga máxima e medidas do baú de cada caminhão.</span> <a href="#/logistica/frota">Ir para Frota e parâmetros</a></div>` : ''}
-    ${!origem ? '<div class="card" style="border-left:4px solid var(--warn,#f59e0b)"><b>Ponto de saída desconhecido.</b> Informe o código IBGE do município da fábrica em Frota e parâmetros › Parâmetros.</div>' : ''}
+    ${!B.veiculos.length ? `<div class="card" style="border-left:4px solid var(--warn,#f59e0b)"><b>Cadastre a frota primeiro.</b> <span class="muted">Placa, carga máxima e medidas do baú de cada caminhão.</span> <a href="#/logistica/frota">Ir para Frota e Parâmetros</a></div>` : ''}
+    ${!origem ? '<div class="card" style="border-left:4px solid var(--warn,#f59e0b)"><b>Ponto de saída desconhecido.</b> Informe o código IBGE do município da fábrica em Frota e Parâmetros › Parâmetros.</div>' : ''}
     <div class="pl-kpis">${[['Entregas pendentes', `${PEND.length} · ${t1(PEND.reduce((t, s) => t + s.kg, 0) / 1000)} t`, ''], ['Atrasadas', String(atras.length), atras.length ? 'neg' : ''],
       ['Cargas do dia', String(todas.length), ''], ['Ocupação média', ocMed == null ? '–' : Math.round(ocMed * 100) + '%', ''], ['Frete previsto', frete ? money(frete) : '–', ''],
       ['Para transportadora', String(longe.length), longe.length ? 'warn' : '']].map(([t, v, c]) => `<div class="pl-k"><span>${t}</span><b class="${c}">${v}</b></div>`).join('')}</div>
@@ -179,7 +179,7 @@ function ligar(root) {
     $('#nc-ok', md.el).onclick = async () => { try { await salvarNova(B.veiculos.find(x => x.id === $('#nc-v', md.el).value), [], $('#nc-m', md.el).value.trim()); md.close(); await recarregar(root); } catch (err) { fail(err); } };
   });
   $('#lg-mapa', corpo).onclick = () => {
-    if (!origem) return toast('Defina o ponto de saída em Frota e parâmetros', true);
+    if (!origem) return toast('Defina o ponto de saída em Frota e Parâmetros', true);
     const rotas = [...(PROP?.cargas || []).map(x => ({ stops: x.stops, salva: false })), ...SALVAS.filter(x => x.c.data === ui.data || ATIVAS.includes(x.c.status)).map(x => ({ stops: x.stops, salva: true }))];
     const legenda = [...(PROP?.cargas || []).map((x, i) => `${x.veiculo.codigo} (sugestão)`), ...SALVAS.filter(x => x.c.data === ui.data || ATIVAS.includes(x.c.status)).map(x => `${x.v?.codigo || ''} · carga ${x.c.numero}`)];
     const cores = ['#2563eb', '#7c3aed', '#16a34a', '#ea580c', '#0891b2', '#db2777'];

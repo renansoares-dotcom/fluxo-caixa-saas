@@ -1,8 +1,8 @@
 ---
 titulo: Portal do Cliente
-tela: Financeiro › Portal do Cliente
-versao: 1.1
-atualizado: 2026-10-29
+tela: Financeiro › Portal do Cliente (FIN006)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
@@ -74,3 +74,4 @@ Na aba **Acessos**:
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: convites, pedidos de prorrogação e acessos. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

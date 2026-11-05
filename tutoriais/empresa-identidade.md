@@ -1,8 +1,8 @@
 ---
 titulo: Empresa — identidade visual, regime tributário e crachás
-tela: Cadastros › Empresa: identidade, regime tributário e crachás
-versao: 1.2
-atualizado: 2026-11-04
+tela: Cadastros › Empresa: Identidade e Crachás (CAD005)
+versao: 1.4
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -34,7 +34,7 @@ As cores valem no tema claro. No tema escuro a plataforma mantém as cores próp
 
 ## 4. Regime tributário
 
-![Figura 2 — Regime tributário vigente e histórico de vigências (dados fictícios)](img/empresa-identidade-4.jpg)
+![Figura 2 — Crachás dos colaboradores (dados fictícios)](img/empresa-identidade-2.jpg)
 
 Na aba **Regime tributário** fica o regime de cada período, com a data de início. O quadro de cima mostra o regime de hoje; a tabela abaixo, o histórico com o início e o fim de cada vigência.
 
@@ -50,7 +50,7 @@ Na aba **Regime tributário** fica o regime de cada período, com a data de iní
 Cada mudança é uma **vigência nova**, e a anterior fica no histórico: troca de regime, entrada ou saída do sublimite e a opção do IBS/CBS, que vale por semestre (janeiro a junho, julho a dezembro). As telas usam a vigência da data de cada operação: uma nota de dezembro segue a regra de dezembro, mesmo que o regime mude em janeiro.
 
 **Onde o regime é usado hoje:**
-- **Apuração de impostos › Regras e parâmetros**: mostra o regime do mês e o que a apuração precisa naquele regime.
+- **Apuração de Impostos › Regras e parâmetros**: mostra o regime do mês e o que a apuração precisa naquele regime.
 - **Conferência IBS/CBS**: na empresa do Simples com IBS/CBS no DAS, nota sem o grupo IBS/CBS aparece como informação, e não como erro.
 - **Simulador da reforma**: avisa quando o regime não é o Lucro Real, porque a comparação é com o PIS/COFINS não cumulativo.
 - **Relatórios**: sem razão social na identidade, o cabeçalho usa o nome da empresa cadastrada.
@@ -63,11 +63,9 @@ A criação de empresas fica bloqueada para os usuários. Só o administrador da
 2. No Simples, informe também o CNAE principal e o anexo. Informe a UF e o início do uso na plataforma.
 3. Clique em **Criar empresa**. Quem cria entra como administrador.
 
-A empresa nasce com o plano de contas modelo. No Simples e no MEI, o grupo **2.08 Tributos** já vem com as contas do Simples: DAS, ICMS-ST/DIFAL, ISS retido, INSS patronal do Anexo IV, IBS/CBS pelo regime regular e parcelamentos. PIS/COFINS e IRPJ/CSLL separados não entram. Os demais dados do regime são completados nesta aba. Os outros usuários entram por convite, em **Empresa e usuários**.
+A empresa nasce com o plano de contas modelo. No Simples e no MEI, o grupo **2.08 Tributos** já vem com as contas do Simples: DAS, ICMS-ST/DIFAL, ISS retido, INSS patronal do Anexo IV, IBS/CBS pelo regime regular e parcelamentos. PIS/COFINS e IRPJ/CSLL separados não entram. Os demais dados do regime são completados nesta aba. Os outros usuários entram por convite, em **Empresa e Usuários**.
 
 ## 5. Crachás dos colaboradores
-
-![Figura 3 — Crachás dos colaboradores (dados fictícios)](img/empresa-identidade-2.jpg)
 
 A lista vem de **RH › Colaboradores**. Os filtros mostram os ativos, quem está sem crachá, sem foto ou desligado com crachá a recolher.
 
@@ -84,8 +82,6 @@ Rosto de frente, fundo claro, sem boné ou óculos escuros.
 A foto é dado pessoal (LGPD). Antes de imprimir, colha a assinatura do colaborador na autorização de uso de imagem e registre a data em **Autorização**. Guarde o documento assinado com o RH.
 
 ### 5.3 Emitir e imprimir
-
-![Figura 4 — Folha A4: frente e verso lado a lado, com a linha de dobra (dados fictícios)](img/empresa-identidade-3.jpg)
 
 1. Marque as pessoas e clique em **Emitir e imprimir selecionados**. Quem já tem crachá ativo não ganha outro: o atual é impresso de novo.
 2. A janela de impressão abre com **5 crachás por folha A4**.
@@ -145,3 +141,5 @@ Todos os crachás emitidos, com via, validade, situação e baixa. Use **Devolvi
 | 1.0 | 30/10/2026 | Primeira versão: identidade visual (logos, cores, unidades) aplicada na plataforma e nos relatórios; crachás com foto, QR Code de verificação, 2ª via, terceiros e visitantes, impressão em A4. |
 | 1.1 | 30/10/2026 | Correção: logo em SVG não aparecia na faixa do crachá (prévia e impressão). |
 | 1.2 | 04/11/2026 | Nova aba **Regime tributário** (Simples Nacional, MEI, Lucro Presumido e Lucro Real, por vigência, com atividades e anexos do Simples, sublimite e opção do IBS/CBS pelo regime regular) e criação de empresa já com o regime. No Simples, o plano de contas vem com as contas do DAS. |
+| 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.4 | 29/10/2026 | Imagens das telas, com dados fictícios. |

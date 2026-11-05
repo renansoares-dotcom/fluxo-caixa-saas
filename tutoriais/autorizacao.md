@@ -1,12 +1,12 @@
 ---
 titulo: Autorização de pagamentos
-tela: Financeiro › Autorização de pagamentos
-versao: 1.1
-atualizado: 2026-10-29
+tela: Financeiro › Autorização de Pagamentos (FIN007)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
-A **Autorização de pagamentos** monta a lista do que será pago e gera o **PDF para o diretor assinar**.
+A **Autorização de Pagamentos** monta a lista do que será pago e gera o **PDF para o diretor assinar**.
 
 A lista mostra os títulos a pagar em aberto com a prioridade, o banco e o orçamento de cada um. Junto vêm o saldo em bancos e quanto sobra depois de pagar. Cada autorização recebe um número e fica no histórico, onde o diretor aprova ou rejeita.
 
@@ -20,7 +20,7 @@ A lista mostra os títulos a pagar em aberto com a prioridade, o banco e o orça
 
 ## 3. Passo a passo
 
-![Figura 1 — Autorização de pagamentos (dados fictícios)](img/autorizacao-1.jpg)
+![Figura 1 — Autorização de Pagamentos (dados fictícios)](img/autorizacao-1.jpg)
 
 ### 3.1 Filtrar os títulos
 
@@ -42,7 +42,7 @@ Os indicadores mostram:
 - Para pagar só parte de um título, ajuste o **Valor autorizado**.
 - Escreva uma **observação** quando precisar.
 
-A **prioridade** (Obrigatório ou Negociável) vem da classificação do plano de contas (**Cadastros › Plano de contas**) ou do próprio lançamento.
+A **prioridade** (Obrigatório ou Negociável) vem da classificação do plano de contas (**Cadastros › Plano de Contas**) ou do próprio lançamento.
 
 ### 3.3 Gerar a autorização
 
@@ -73,7 +73,7 @@ Em **Autorizações emitidas**, o diretor ou o administrador clica em **Aprovar*
 
 **A mensagem diz "Escreva a justificativa de cada conta".** Há título marcado em conta acima do orçado. Preencha o motivo de cada conta da lista.
 
-**O saldo em bancos parece baixo.** Só entram as contas marcadas como "Conta com recursos disponíveis" em **Cadastros › Contas bancárias**. Com filtro de banco, entra só o saldo dele.
+**O saldo em bancos parece baixo.** Só entram as contas marcadas como "Conta com recursos disponíveis" em **Cadastros › Contas Bancárias**. Com filtro de banco, entra só o saldo dele.
 
 ## 6. Histórico de alterações
 
@@ -81,3 +81,4 @@ Em **Autorizações emitidas**, o diretor ou o administrador clica em **Aprovar*
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: filtros, marcação, valor parcial, justificativa de orçamento, PDF para assinatura e aprovação. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

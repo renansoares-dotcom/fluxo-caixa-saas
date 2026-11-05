@@ -1,18 +1,18 @@
 ---
 titulo: Produção — PCP, ordens, programação e planta
-tela: Produção › Painel, Planta da fábrica, Ordens de produção, Programação, Cadastros e Importar do Iniflex
-versao: 1.2
-atualizado: 2026-10-29
+tela: Produção › Painel de Produção (PRD002), Ordens de Produção (PRD004), Programação (PRD005), Cadastros de Produção (PRD006), Importar do Iniflex (PRD007) e Planta da Fábrica (PRD003)
+versao: 1.3
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
 O módulo **Produção** faz o PCP (planejamento e controle da produção) da IPLAMM na plataforma, enquanto o trabalho oficial continua no **Iniflex**. Os dados do Iniflex entram por importação.
 
-- **Painel de produção**: produção por dia, apara e refugo, OEE por máquina, paradas, OPs abertas e atrasadas.
-- **Planta da fábrica**: a fábrica ao vivo, em 3D no computador e na TV e em planta baixa no celular, e o editor para montar a planta.
-- **Ordens de produção (OP)**: etapas, necessidade de material contra estoque, apontamentos, bobinas e consumo real contra teórico.
+- **Painel de Produção**: produção por dia, apara e refugo, OEE por máquina, paradas, OPs abertas e atrasadas.
+- **Planta da Fábrica**: a fábrica ao vivo, em 3D no computador e na TV e em planta baixa no celular, e o editor para montar a planta.
+- **Ordens de Produção (OP)**: etapas, necessidade de material contra estoque, apontamentos, bobinas e consumo real contra teórico.
 - **Programação**: quadro máquina × dia, com a carga em horas contra a capacidade.
-- **Cadastros de produção**: setores, máquinas, motivos, operadores, ferramentas e roteiros.
+- **Cadastros de Produção**: setores, máquinas, motivos, operadores, ferramentas e roteiros.
 - **Importar do Iniflex**: OPs e apontamentos por planilha.
 
 ## 2. Quem tem acesso
@@ -22,20 +22,20 @@ O módulo **Produção** faz o PCP (planejamento e controle da produção) da IP
 | Administrador, diretor e financeiro | Fazem tudo: cadastros, OPs, programação, importação e planta. |
 | Produção (operador) | Usa o Terminal do setor e consulta as Ordens de produção (veja o manual do Terminal). |
 
-## 3. Cadastros de produção (comece por aqui)
+## 3. Cadastros de Produção (comece por aqui)
 
 Nas abas, cadastre na ordem:
 
 1. **Setores**: nome, ordem no fluxo e horas produtivas por dia.
 2. **Máquinas**: código, setor, **capacidade (kg/h)** e o desenho na planta. Sem capacidade, a máquina fica sem OEE.
 3. **Motivos** de parada e de refugo. **Criar motivos padrão** cria a lista comum (setup, troca de bobina, manutenção, falta de matéria-prima, furo, solda…). Marque como **parada planejada** as que não contam contra a disponibilidade.
-4. **Operadores**: nome, matrícula, o **usuário (perfil Produção)** e os setores. O operador entra por convite em **Cadastros › Empresa e usuários**.
+4. **Operadores**: nome, matrícula, o **usuário (perfil Produção)** e os setores. O operador entra por convite em **Cadastros › Empresa e Usuários**.
 5. **Ferramentas**: clichês, cilindros e facas, com as cores, a vida útil, os metros usados, a localização e a situação.
 6. **Roteiros**: para cada produto, as etapas (setor, máquina padrão, velocidade em kg/h e setup em minutos). A OP nasce com as etapas do roteiro.
 
 Prefira **desativar** a excluir o que já foi usado em OPs ou apontamentos.
 
-## 4. Ordens de produção
+## 4. Ordens de Produção
 
 ![Figura 1 — Ordens de produção em aberto (dados fictícios)](img/producao-1.jpg)
 
@@ -67,7 +67,7 @@ Os filtros da lista são **Em aberto**, **Atrasadas**, **Concluídas** e **Todas
 2. Em **A programar**, clique em **Programar** na etapa e informe a máquina, o início previsto, as horas previstas e a quantidade desta etapa.
 3. O quadro **máquina × dia** mostra as etapas programadas e a carga em horas contra a capacidade do setor. **Tirar da programação** devolve a etapa para a lista.
 
-## 6. Painel de produção
+## 6. Painel de Produção
 
 Escolha o **período**. O painel mostra:
 
@@ -81,7 +81,7 @@ Escolha o **período**. O painel mostra:
 - **Qualidade** = bom ÷ (bom + refugo).
 - **OEE** = disponibilidade × performance × qualidade.
 
-## 7. Planta da fábrica
+## 7. Planta da Fábrica
 
 - **Acompanhar**: a planta mostra cada máquina com a situação ao vivo (produzindo, parada, livre). Entre os setores, as setas mostram as bobinas paradas esperando a etapa seguinte. **Modo TV** é para o telão da fábrica; no celular, a planta aparece vista de cima. Clique numa máquina para abrir a OP.
 - **Editar**: clique em **Editar planta** (administrador, financeiro ou diretor).
@@ -125,3 +125,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.0 | 28/10/2026 | Primeira versão do manual: cadastros, OPs com necessidade de material e rastreabilidade, programação, painel com OEE, planta da fábrica e importação do Iniflex. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** da ordem de produção (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

@@ -7,7 +7,7 @@ import { carregarAliquotas } from '../lib/reforma-ui.js';
 import { pctBR } from '../lib/reforma.js';
 import { STATUS, ORIGEM, PLANO_JUROS, PRAZO_ALERTA, dadosND, diasDesde, nivel } from '../lib/notas-debito.js';
 
-export const title = 'Notas de débito (juros e multa)';
+export const title = 'Notas de Débito';
 const ui = { status: 'abertas', busca: '' };
 let D = null;
 const BADGE = { pendente: 'aberto', a_decidir: '', emitida: 'pago', dispensada: '' };

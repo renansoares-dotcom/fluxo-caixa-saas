@@ -1,18 +1,18 @@
 ---
 titulo: Créditos, adiantamentos e conta-corrente
-tela: Financeiro › Créditos e adiantamentos e Conta-corrente fornecedor / cliente
-versao: 1.1
-atualizado: 2026-10-29
+tela: Financeiro › Créditos e Adiantamentos (FIN004) e Conta-Corrente Fornecedor / Cliente (FIN005)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
-- **Créditos e adiantamentos** guarda o dinheiro que fica "a abater":
+- **Créditos e Adiantamentos** guarda o dinheiro que fica "a abater":
   - adiantamentos pagos a fornecedores antes da nota;
   - adiantamentos recebidos de clientes;
   - créditos de clientes: devolução, desconto, pagamento a maior, acordo.
 
   O saldo de cada um é usado depois nas parcelas das notas.
-- **Conta-corrente fornecedor / cliente** cruza o **dinheiro** com as **notas fiscais** de um fornecedor ou cliente, com o extrato, o saldo, as notas em aberto e o relatório em PDF.
+- **Conta-Corrente Fornecedor / Cliente** cruza o **dinheiro** com as **notas fiscais** de um fornecedor ou cliente, com o extrato, o saldo, as notas em aberto e o relatório em PDF.
   - **Fornecedor**: pagamentos contra as notas que ele emite. **Saldo positivo** = a IPLAMM pagou adiantado e tem produto ou serviço a receber.
   - **Cliente**: notas de venda contra os recebimentos, os créditos usados e o antecipado no FIDC. **Saldo positivo** = a receber do cliente.
 
@@ -23,11 +23,11 @@ atualizado: 2026-10-29
 | Administrador e financeiro | Cadastram, devolvem e cancelam créditos; registram adiantamentos e abatem notas. |
 | Diretor e leitura | Consultam e geram o relatório. |
 
-## 3. Créditos e adiantamentos
+## 3. Créditos e Adiantamentos
 
 ### 3.1 A tela
 
-![Figura 1 — Créditos e adiantamentos (dados fictícios)](img/creditos-conta-corrente-1.jpg)
+![Figura 1 — Créditos e Adiantamentos (dados fictícios)](img/creditos-conta-corrente-1.jpg)
 
 Escolha **De** (clientes ou fornecedores) e use a busca. Os indicadores mostram o **saldo de créditos**, os **adiantamentos em aberto** e o que **já foi usado em notas**.
 
@@ -63,7 +63,7 @@ Informe o valor devolvido e ligue o lançamento que já existe ou lance agora (d
 
 Crédito que ainda não foi usado pode ser cancelado. Ele deixa de aparecer para uso nas notas.
 
-## 4. Conta-corrente fornecedor / cliente
+## 4. Conta-Corrente Fornecedor / Cliente
 
 ![Figura 2 — Conta-corrente de um cliente (dados fictícios)](img/creditos-conta-corrente-2.jpg)
 
@@ -112,3 +112,4 @@ Nada muda no caixa: a nota passa a constar como paga pelo adiantamento. Cada aba
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: créditos e adiantamentos, devolução, conta-corrente de fornecedor e cliente, adiantamentos × notas e relatório. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

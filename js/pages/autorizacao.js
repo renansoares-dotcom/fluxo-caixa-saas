@@ -2,7 +2,7 @@ import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, $$, esc, money, cls, dateBR, today, options, fail, toast, parseNum, loading, logoPNG, modal, MESES_CURTO } from '../lib/ui.js';
 import { padronizarPDF, pdfCabecalho, pdfTitulo, pdfRodapes } from '../lib/relatorio.js';
 
-export const title = 'Autorização de pagamentos';
+export const title = 'Autorização de Pagamentos';
 const f = { de: '', ate: '', conta: '', grupo: '', cc: '', favorecido: '', situacao: '', prioridade: '' };
 let itens = [];      // títulos listados
 let marc = {};       // id -> {autoriza, valor, obs}

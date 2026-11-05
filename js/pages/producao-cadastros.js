@@ -6,7 +6,7 @@ import { carregarProdutos, datalistProdutos, acharProduto } from '../lib/produto
 import { qtd, inp, num } from '../lib/compras.js';
 import { TIPOS_VISUAIS } from '../lib/planta.js';
 
-export const title = 'Cadastros de produção';
+export const title = 'Cadastros de Produção';
 const ui = { aba: 'setores', prod: '' };
 let C = null, PRODS = [], MEMB = [];
 
@@ -21,7 +21,7 @@ const ABAS = {
 };
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Cadastros de produção</h2><div class="muted small">Base para OP, terminal, programação e OEE. ${podePCP() ? '' : 'Só admin, financeiro ou diretor alteram.'}</div></div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Cadastros de Produção</h2><div class="muted small">Base para OP, terminal, programação e OEE. ${podePCP() ? '' : 'Só admin, financeiro ou diretor alteram.'}</div></div></div>
     <div class="card toolbar"><div class="chips" id="pc-abas">${Object.entries(ABAS).map(([k, a]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${a.t}</span>`).join('')}</div></div>
     <div id="pc-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#pc-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
@@ -78,7 +78,7 @@ function campo(c, v) {
     case 'produto': { const p = PRODS.find(x => x.id === v); return `<label class="span2">${c[1]}<input id="${id}" list="dl-pr" value="${p ? esc(`${p.codigo} — ${p.descricao}`) : ''}">${datalistProdutos('dl-pr', PRODS)}</label>`; }
     case 'usuario': return `<label>${c[1]}<select id="${id}"><option value="">—</option>${MEMB.filter(x => x.papel === 'producao' || x.user_id === v).map(x => `<option value="${x.user_id}" ${v === x.user_id ? 'selected' : ''}>${esc(x.email)}</option>`).join('')}</select></label>`;
     case 'setores': return `<div class="span2"><div class="small muted">${c[1]} (nenhum marcado = todos)</div><div class="areas-chk">${C.setores.map(s => `<label class="chk"><input type="checkbox" class="f-setores" value="${s.id}" ${(v || []).includes(s.id) ? 'checked' : ''}> ${esc(s.nome)}</label>`).join('')}</div></div>`;
-    default: return `<label>${c[1]}<input id="${id}" value="${esc(v ?? '')}"></label>`;
+    default: return `<label class="${c[0] === 'observacao' ? 'span2' : ''}">${c[1]}<input id="${id}" value="${esc(v ?? '')}"></label>`;
   }
 }
 function ler(c, el) {
@@ -93,7 +93,8 @@ function ler(c, el) {
   }
 }
 function editar(A, r, root) {
-  const m = modal({ title: `${r ? 'Editar' : 'Incluir'} — ${A.t}`, body: `<div class="grid-form">${A.cols.map(c => campo(c, r?.[c[0]])).join('')}</div>`,
+  // até 4 campos: modal pequeno; 7 ou mais: modal largo (4 por linha), para nenhuma linha sobrar com um campo só
+  const m = modal({ title: `${r ? 'Editar' : 'Incluir'} — ${A.t}`, narrow: A.cols.length <= 4, wide: A.cols.length >= 7, body: `<div class="grid-form">${A.cols.map(c => campo(c, r?.[c[0]])).join('')}</div>`,
     foot: `${r ? '<button class="btn danger" id="ce-del" style="margin-right:auto">Excluir</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ce-ok">Salvar</button>` });
   $('#ce-ok', m.el).onclick = async (ev) => {
     const row = Object.fromEntries(A.cols.map(c => [c[0], ler(c, m.el)]));

@@ -5,7 +5,7 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, $$, esc, money, money0, dateBR, fail, loading, modal, chart, moneyTick, COR, exportXLSX, parseNum, today, toast, confirmDialog } from '../lib/ui.js';
 
-export const title = 'Necessidade de caixa';
+export const title = 'Necessidade de Caixa';
 
 const SEMANAS = 13;
 const ls = { get: (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },

@@ -134,7 +134,7 @@ export async function render(root) {
   const h = today(), [ay, am] = [+h.slice(0, 4), +h.slice(5, 7)];
   if (!ui.ref) { const [a, m] = ant(ay, am); ui.ref = `${a}-${String(m).padStart(2, '0')}`; }
   const opcoes = []; for (let k = 0, a = ay, m = am; k < 18; k++) { opcoes.push(`${a}-${String(m).padStart(2, '0')}`); [a, m] = ant(a, m); }
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Dashboard executivo</h2><div class="muted small">Movimento pago com conta bancária. Saldos e em aberto são de hoje. Clique nos indicadores para ver a composição.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Dashboard Executivo</h2><div class="muted small">Movimento pago com conta bancária. Saldos e em aberto são de hoje. Clique nos indicadores para ver a composição.</div></div>
       <div class="toolbar" style="margin:0"><label>Mês de referência<select id="ex-ref">${opcoes.map(o => `<option value="${o}" ${o === ui.ref ? 'selected' : ''}>${MESES[+o.slice(5) - 1]} ${o.slice(0, 4)}${o === `${ay}-${String(am).padStart(2, '0')}` ? ' (até hoje)' : ''}</option>`).join('')}</select></label>
         <button class="btn ghost" id="ex-xls">Excel</button></div></div>
     <div id="ex-corpo"><div class="loading">Carregando…</div></div>`;

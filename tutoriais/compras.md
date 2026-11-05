@@ -1,8 +1,8 @@
 ---
 titulo: Compras — requisições, pedidos e recebimentos
-tela: Compras › Painel, Requisições e cotações, Pedidos de compra e Recebimentos
-versao: 1.2
-atualizado: 2026-10-29
+tela: Compras › Painel de Compras (CMP001), Requisições e Cotações (CMP002), Pedidos de Compra (CMP003) e Recebimentos (CMP004)
+versao: 1.3
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
@@ -44,7 +44,7 @@ Embaixo ficam as entregas atrasadas e da semana e os **maiores fornecedores** do
 
 ### 4.1 Fazer uma requisição
 
-1. Em **Requisições e cotações**, clique em **Nova requisição**.
+1. Em **Requisições e Cotações**, clique em **Nova requisição**.
 2. Informe o **solicitante**, o **setor** (centro de custo), a data em **Precisa até**, a **prioridade** e uma justificativa.
 3. Em **Itens**, escolha o produto do cadastro na lista ou escreva livre. Informe a unidade, a **quantidade** e, se souber, o valor unitário estimado e o NCM. Use **+ Item** para mais linhas.
 4. Clique em **Enviar para aprovação**.
@@ -63,17 +63,24 @@ A requisição mostra o **mapa comparativo de cotações**: o menor preço de ca
 
 ### 4.4 Gerar o pedido de compra
 
+![Figura 2 — Novo pedido de compra: Pedido e Itens (dados fictícios)](img/compras-3.jpg)
+
 1. No mapa, clique em **Gerar pedido** na cotação escolhida. Se não houver cotação, use **Pedido sem cotação**: os preços estimados entram no pedido e podem ser ajustados no rascunho.
 2. Confirme o **fornecedor do cadastro**. Se o fornecedor da cotação não estiver cadastrado, escolha o cadastro correspondente ou peça ao Financeiro para cadastrar.
 3. O pedido nasce em **rascunho** e a requisição passa para **Virou pedido**.
 
-Também dá para criar um pedido avulso, sem requisição, em **Pedidos de compra › Novo pedido**.
+Também dá para criar um pedido avulso, sem requisição, em **Pedidos de Compra › Novo pedido**. O formulário tem duas seções:
+
+- **Pedido**: fornecedor (obrigatório), data do pedido, entrega prevista, nº do pedido no Iniflex, parcelas (dias após a entrega), condição em texto, classificação (plano de contas, obrigatória para aprovar), centro de custo, frete, desconto e observação.
+- **Itens**: descrição, unidade, quantidade, valor unitário e NCM de cada item. Escolha o produto do cadastro na lista ou escreva livre.
 
 ### 4.5 Completar e aprovar o pedido
 
-![Figura 2 — Pedidos de compra (dados fictícios)](img/compras-2.jpg)
+![Figura 3 — Pedidos de Compra (dados fictícios)](img/compras-2.jpg)
 
-1. Em **Pedidos de compra**, abra o pedido e clique em **Editar**.
+A lista mostra o **Nº** (com a data do pedido e o nº do Iniflex na 2ª linha), o **Fornecedor** (com a condição de pagamento na 2ª linha), a **Situação**, os **Itens**, a **Entrega prevista** (em vermelho se já passou) e o **Total** (com o quanto já foi recebido na 2ª linha). O botão **Colunas**, ao lado do Excel, mostra ou oculta cada uma dessas informações, e a escolha fica guardada para você. O **Excel** sai com todas as colunas.
+
+1. Em **Pedidos de Compra**, abra o pedido e clique em **Editar**.
 2. Confira o fornecedor, a entrega prevista, as **parcelas (dias após a entrega)**, o frete, o desconto e os itens. Preencha a **classificação (plano de contas)**, obrigatória para aprovar, o centro de custo e o **nº do pedido no Iniflex**.
 3. Salve e clique em:
    - **Aprovar**, se o valor estiver dentro da sua alçada (ou se você for diretor ou administrador);
@@ -115,7 +122,7 @@ Os recebimentos ficam em **Últimos recebimentos**, com as divergências encontr
 
 **A nota não aparece no recebimento.** Ela ainda não foi importada, ou foi emitida antes dos 30 dias anteriores ao pedido. Importe o XML em Notas Fiscais › Entradas.
 
-**A nota veio em outra unidade (por exemplo, caixa em vez de unidade).** Cadastre o **de-para do fornecedor** em **Estoque › De-para de fornecedores**, com o fator de conversão. Os próximos recebimentos já convertem sozinhos.
+**A nota veio em outra unidade (por exemplo, caixa em vez de unidade).** Cadastre o **de-para do fornecedor** em **Estoque › De-para de Fornecedores**, com o fator de conversão. Os próximos recebimentos já convertem sozinhos.
 
 **Errei o fornecedor de um pedido aprovado.** Use **Voltar para rascunho**, corrija e aprove de novo. Se já houver recebimento, cancele e faça outro pedido.
 
@@ -135,3 +142,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.0 | 28/10/2026 | Primeira versão do manual: painel, requisição, cotação e mapa comparativo, pedido com alçada e impressão, recebimento conferido com a nota. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do pedido de compra (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Lista de Pedidos de Compra com as informações secundárias na 2ª linha e seletor **Colunas**; formulário do novo pedido em seções. Figuras refeitas. |

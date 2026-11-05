@@ -6,13 +6,13 @@ import { kpiGrid, drawer, barList, score, faixa, tabela, trend, variacao } from 
 import { baseComercial, ST_CLI, ABERTAS, interno, addDias } from '../lib/comercial.js';
 import { qtd, unit } from '../lib/compras.js';
 
-export const title = 'Painel comercial';
+export const title = 'Painel Comercial';
 const ui = { ref: null };
 
 export async function render(root) {
   const h = today(); ui.ref ||= h.slice(0, 7);
   const opcoes = []; for (let k = 0, d = new Date(h.slice(0, 7) + '-15'); k < 18; k++, d.setMonth(d.getMonth() - 1)) opcoes.push(d.toISOString().slice(0, 7));
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Painel comercial</h2><div class="muted small">Faturamento = NF-e de venda autorizadas (o pedido de venda continua no Iniflex)${interno() ? '' : ' · só a sua carteira'}.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Painel Comercial</h2><div class="muted small">Faturamento = NF-e de venda autorizadas (o pedido de venda continua no Iniflex)${interno() ? '' : ' · só a sua carteira'}.</div></div>
       <label>Mês<select id="cm-ref">${opcoes.map(o => `<option value="${o}" ${o === ui.ref ? 'selected' : ''}>${MESES[+o.slice(5) - 1]} ${o.slice(0, 4)}${o === h.slice(0, 7) ? ' (até hoje)' : ''}</option>`).join('')}</select></label></div>
     <div id="cm-corpo"><div class="loading">Carregando…</div></div>`;
   $('#cm-ref', root).onchange = (e) => { ui.ref = e.target.value; render(root); };

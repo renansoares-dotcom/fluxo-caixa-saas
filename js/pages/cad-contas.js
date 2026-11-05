@@ -2,7 +2,7 @@ import { state } from '../lib/data.js';
 import { esc, money } from '../lib/ui.js';
 import { crudPage } from '../lib/crud.js';
 
-export const title = 'Contas bancárias';
+export const title = 'Contas Bancárias';
 const TIPOS = ['Conta Corrente', 'Caixa', 'Conta Poupança', 'Investimento', 'Conta Escrow', 'FIDC', 'Cheques', 'Cartão de Crédito', 'Vale Combústivel', 'Digital'];
 
 export async function render(root) {
@@ -20,19 +20,21 @@ export async function render(root) {
       { k: 'saldo_inicial', t: 'Saldo inicial', num: true, fmt: r => money(r.saldo_inicial) },
       { k: 'ativo', t: '', fmt: r => r.ativo ? '' : '<span class="badge vencido">inativa</span>' },
     ],
+    // modal largo (4 por linha): Ativa fica na linha da Disponibilidade e os 4 saldos numa linha só (auditoria 11/2026)
+    largo: true,
     fields: [
-      { k: 'codigo', t: 'Id / código' }, { k: 'nome', t: 'Nome de identificação', req: true, span: true },
+      { k: 'codigo', t: 'Id / código', cls: 'xs' }, { k: 'nome', t: 'Nome de identificação', req: true, span: true },
       { k: 'tipo', t: 'Tipo', list: () => TIPOS },
       { k: 'grupo_id', t: 'Grupo empresarial', type: 'select', opts: () => state.cad.grupos },
       { k: 'disponibilidade', t: 'Disponibilidade', type: 'select', req: true, value: 'id', label: 'id', def: 'Conta com recursos disponíveis',
         opts: () => [{ id: 'Conta com recursos disponíveis' }, { id: 'Conta com recursos bloqueados' }] },
-      { k: 'instituicao', t: 'Instituição' }, { k: 'agencia', t: 'Agência' }, { k: 'numero', t: 'Número da conta' },
+      { k: 'ativo', t: 'Ativa', type: 'check', def: true },
+      { k: 'instituicao', t: 'Instituição' }, { k: 'agencia', t: 'Agência', cls: 'xs' }, { k: 'numero', t: 'Número da conta' },
       { k: 'ofx_banco', t: 'Banco no OFX (BANKID)' }, { k: 'ofx_conta', t: 'Conta no OFX (ACCTID)' },
       { k: 'saldo_inicial', t: 'Saldo inicial real', type: 'money', def: 0 },
       { k: 'saldo_inicial_aberto', t: 'Saldo inicial em aberto', type: 'money', def: 0 },
       { k: 'saldo_budget', t: 'Saldo inicial budget', type: 'money', def: 0 },
       { k: 'saldo_forecast', t: 'Saldo inicial forecast', type: 'money', def: 0 },
-      { k: 'ativo', t: 'Ativa', type: 'check', def: true },
     ],
   });
 }

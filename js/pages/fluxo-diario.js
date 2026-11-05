@@ -1,7 +1,7 @@
 import { sb, state, q, filtrosHTML, bindFiltros, rpcFiltros, descricaoFiltros, soma } from '../lib/data.js';
 import { $, esc, money, cls, exportXLSX, fail, loading, MESES, options, chart, moneyTick, CORES, COR } from '../lib/ui.js';
 
-export const title = 'Fluxo de caixa diário';
+export const title = 'Fluxo de Caixa Diário';
 let mes = new Date().getMonth() + 1;
 
 export async function render(root) {

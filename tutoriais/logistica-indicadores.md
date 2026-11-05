@@ -1,8 +1,8 @@
 ---
 titulo: Indicadores de logística
-tela: Logística › Indicadores
-versao: 1.1
-atualizado: 2026-10-31
+tela: Logística › Indicadores (LOG004)
+versao: 1.3
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -63,3 +63,5 @@ Metas iniciais: entregas no prazo ≥ 95%, ocupação ≥ 80%, custo logístico 
 |---|---|---|
 | 1.0 | 30/10/2026 | Primeira versão: nível de serviço, eficiência das cargas, custo logístico e frota, com metas e tendência de 6 meses. |
 | 1.1 | 31/10/2026 | Nova figura: metas dos indicadores. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.3 | 29/10/2026 | Imagens das telas, com dados fictícios. |

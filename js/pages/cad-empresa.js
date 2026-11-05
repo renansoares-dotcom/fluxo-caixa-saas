@@ -7,7 +7,7 @@ import { BUCKET, urlArquivo, esquecerArquivo, aplicarIdentidade } from '../lib/i
 import * as CR from '../lib/crachas.js';
 import { pintarTributacao } from '../lib/regime-ui.js';
 
-export const title = 'Empresa — identidade, regime tributário e crachás';
+export const title = 'Empresa: Identidade e Crachás';
 const ui = { aba: 'id', filtro: 'ativos', busca: '' };
 let D = null;
 

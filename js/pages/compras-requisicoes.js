@@ -4,7 +4,7 @@ import { $, $$, esc, money, dateBR, today, fail, toast, modal, confirmDialog } f
 import { cadCompras, ST_REQ, badge, qtd, inp, unit, num, diasTxt, lerDias, podeAprovar } from '../lib/compras.js';
 import { carregarProdutos, datalistProdutos, ligarItensProduto, produtoDoItem } from '../lib/produtos.js';
 
-export const title = 'Requisições e cotações';
+export const title = 'Requisições e Cotações';
 const ui = { filtro: 'abertas', busca: '' };
 let R = [], C = null, PRODS = [];
 
@@ -12,7 +12,7 @@ const FILTROS = [['abertas', 'Em andamento', ['pendente', 'aprovada']], ['penden
   ['atendida', 'Viraram pedido', ['atendida']], ['rejeitada', 'Rejeitadas', ['rejeitada']], ['cancelada', 'Canceladas', ['cancelada']], ['todas', 'Todas', null]];
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Requisições e cotações</h2><div class="muted small">Quem precisa pede; a direção aprova; Compras cota e gera o pedido.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Requisições e Cotações</h2><div class="muted small">Quem precisa pede; a direção aprova; Compras cota e gera o pedido.</div></div>
       <button class="btn primary" id="rq-novo">Nova requisição</button></div>
     <div class="card toolbar"><div class="chips" id="rq-f">${FILTROS.map(([k, t]) => `<span class="chip ${ui.filtro === k ? 'on' : ''}" data-f="${k}">${t}</span>`).join('')}</div>
       <input id="rq-busca" placeholder="Procurar item, solicitante ou nº" value="${esc(ui.busca)}" style="min-width:240px"></div>

@@ -6,7 +6,7 @@ import { $, $$, esc, money, money0, pct, dateBR, fail, toast, modal, parseNum, M
 import { revisarSemConta } from '../lib/sem-conta.js';
 import { usosPorNota } from '../lib/creditos.js';
 
-export const title = 'Fechamento do mês';
+export const title = 'Fechamento do Mês';
 
 const mesAnt = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const ui = { mes: mesAnt() };
@@ -16,7 +16,7 @@ const TOL_PCT = 10, TOL_VAL = 5000; // mesma tolerância padrão do Controle or�
 export async function render(root) {
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
-      <div><h2 style="margin:0">Fechamento do mês</h2><p class="muted small" style="margin:4px 0 0">Cada etapa é conferida automaticamente com os dados do sistema. Verde = pronto; vermelho = falta resolver (o link leva à tela certa).</p></div>
+      <div><h2 style="margin:0">Fechamento do Mês</h2><p class="muted small" style="margin:4px 0 0">Cada etapa é conferida automaticamente com os dados do sistema. Verde = pronto; vermelho = falta resolver (o link leva à tela certa).</p></div>
       <div class="toolbar" style="margin:0"><label>Mês<input type="month" id="mes" value="${ui.mes}"></label><button class="btn" id="imp">Imprimir / PDF</button></div>
     </div></div>
     <div id="corpo"><div class="loading">Conferindo o mês…</div></div>`;

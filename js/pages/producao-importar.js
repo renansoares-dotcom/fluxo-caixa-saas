@@ -4,7 +4,7 @@ import { $, esc, fail, toast } from '../lib/ui.js';
 import { lerPlanilha, mapearColunas } from '../lib/importador.js';
 import { podePCP } from '../lib/producao.js';
 
-export const title = 'Importar produção do Iniflex';
+export const title = 'Importar do Iniflex';
 const OPS = [
   { k: 'numero_iniflex', t: 'Nº da OP', re: /^(op|n[º°o.]?\s*op|ordem|n[úu]mero)/i, obrig: true },
   { k: 'codigo_produto', t: 'Código do produto', re: /(c[óo]d.*prod|^produto$|^c[óo]digo$|^item$)/i, obrig: true },

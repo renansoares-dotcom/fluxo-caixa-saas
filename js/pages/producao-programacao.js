@@ -4,7 +4,7 @@ import { $, $$, esc, dateBR, today, fail, toast, modal } from '../lib/ui.js';
 import { cadProducao, podePCP, addDias } from '../lib/producao.js';
 import { qtd, inp, num } from '../lib/compras.js';
 
-export const title = 'Programação da produção';
+export const title = 'Programação';
 const ui = { ini: null, setor: '' };
 const segunda = (s) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
 

@@ -1,8 +1,8 @@
 ---
 titulo: Fretes e CIOT
-tela: Logística › Fretes e CIOT
-versao: 1.7
-atualizado: 2026-11-04
+tela: Logística › Fretes e CIOT (LOG002)
+versao: 1.8
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
@@ -56,6 +56,10 @@ O registro de cada frete é a **ficha do frete**. A tela também guarda o cadast
 
 ### 4.2 Criar a ficha de um frete
 
+![Figura 2 — Ficha do novo frete, em seções (dados fictícios)](img/fretes-ciot-2.jpg)
+
+A ficha é dividida em seções: **Viagem e piso mínimo**, **Veículo, CIOT e MDF-e**, **Pedágio e observação**, **Pagamento** e **Anexos**. Os campos com * são obrigatórios.
+
 1. Na aba **Fretes**, clique em **Novo frete**.
 2. Escolha o **transportador**. Se ele não existir, use **+ cadastrar transportador**.
 3. Informe a **data da viagem**, a **carga da logística** (se houver), as **NF-e transportadas**, a origem e o destino.
@@ -63,7 +67,7 @@ O registro de cada frete é a **ficha do frete**. A tela também guarda o cadast
 5. Informe o **valor do frete**. Logo abaixo, a ficha mostra o **piso mínimo** e se o frete está acima ou abaixo dele.
 6. Preencha a placa, o motorista, o **CIOT** (e quem o gerou: a IPLAMM pela IPEF ou a transportadora), a **chave do MDF-e** (44 dígitos), a **chave do CT-e** e o **vale-pedágio**, ou marque **Rota sem pedágio**.
 7. Clique em **Salvar**.
-8. Abra a ficha de novo e anexe os documentos: CIOT, MDF-e, CT-e, vale-pedágio, contrato e comprovantes.
+8. Abra a ficha de novo e, na seção **Anexos**, escolha os arquivos e o tipo e clique em **Anexar**: CIOT, MDF-e, CT-e, vale-pedágio, contrato e comprovantes.
 
 A ficha mostra na hora o que falta. Para autônomo aparece **Pagamento travado (autônomo): falta ...**; para transportadora, **Avisos: falta ...**.
 
@@ -76,8 +80,6 @@ Quando a empresa é a **transportadora** e o cliente também usa a plataforma (p
 3. Escolha o período (a plataforma sugere 7 dias antes da viagem até o dia seguinte) e, se quiser, o número ou o nome do destinatário. Clique em **Buscar**.
 4. As notas que já trazem a transportadora no campo **Transportadora** da NF-e vêm primeiro e já marcadas. As outras mostram "não informada" ou "sem frete": confira pelo destino e pela data.
 5. Clique em **Usar as marcadas**. Os números entram em **NF-e transportadas** e, se o destino estiver vazio, ele é preenchido.
-
-![Figura — Escolher as NF-e do cliente na ficha do frete (dados fictícios)](img/fretes-ciot-nfe-cliente.jpg)
 
 No **MDF-e**, o botão **Buscar NF-e** também acha essas notas pelo número, com a chave, o destino, o peso e o valor.
 
@@ -126,7 +128,7 @@ Inclua sempre uma linha nova com a nova vigência, sem apagar a antiga. Cada fre
 
 ### 4.6 Preparar o MDF-e da viagem
 
-![Figura 2 — Painel MDF-e · 23/11 (dados fictícios)](img/fretes-ciot-2.jpg)
+![Figura 3 — Painel MDF-e · 23/11 (dados fictícios)](img/fretes-ciot-3.jpg)
 
 O MDF-e (manifesto da carga) é emitido por quem faz o transporte:
 
@@ -162,11 +164,9 @@ Para deixar o MDF-e da IPLAMM pronto:
 
 Quando a empresa usa o e-frete, o CIOT sai da própria ficha do frete. Antes da primeira emissão:
 
-1. Em **Logística › Frota e parâmetros › e-frete (CIOT)**, o administrador confere os parâmetros: ambiente, forma de pagamento ao transportador, % de adiantamento, prazo da quitação, documentos que o posto retém, embalagem, quebra de carga, endereço da empresa e o **tipo de carga × código da ANTT**. Nada disso fica fixo no sistema: tudo se ajusta nessa tela.
+1. Em **Logística › Frota e Parâmetros › e-frete (CIOT)**, o administrador confere os parâmetros: ambiente, forma de pagamento ao transportador, % de adiantamento, prazo da quitação, documentos que o posto retém, embalagem, quebra de carga, endereço da empresa e o **tipo de carga × código da ANTT**. Nada disso fica fixo no sistema: tudo se ajusta nessa tela.
 2. O quadro do topo mostra se as **credenciais** do e-frete estão cadastradas no servidor (homologação e produção). Os valores nunca aparecem na tela.
 3. No **cadastro do transportador**, preencha o endereço, os **motoristas** (CPF;nome;CNH;nascimento;celular, um por linha) e, em cada veículo, o **RENAVAM** e o **chassi** (placa;eixos;tipo;renavam;chassi).
-
-![Figura — Parâmetros do e-frete (dados fictícios)](img/fretes-ciot-efrete-parametros.jpg)
 
 Para emitir:
 
@@ -174,8 +174,6 @@ Para emitir:
 2. Clique em **Emitir CIOT pelo e-frete**. A plataforma confere tudo e mostra o que falta, separado por onde corrigir: cadastro do transportador, ficha do frete ou parâmetros.
 3. Confira o resumo (contratado, motorista, veículos, rota, NF-e, tipo de carga, valor, adiantamento e quitação) e ajuste o **início** e o **fim previstos** da viagem. O início não pode ser antes de agora.
 4. Clique em **Emitir CIOT**. A plataforma cadastra o proprietário, o veículo e o motorista no e-frete, emite o CIOT, grava o número no frete e guarda o **PDF** nos anexos.
-
-![Figura — Conferência antes de emitir o CIOT (dados fictícios)](img/fretes-ciot-efrete-ciot.jpg)
 
 Depois de emitido, o mesmo botão abre o **PDF do CIOT** e o **Cancelar CIOT** (com motivo). Na carga lotação o CIOT não pode ser corrigido: cancele (e o MDF-e, se já emitido) e emita de novo.
 
@@ -210,7 +208,7 @@ Depois de emitido, o mesmo botão abre o **PDF do CIOT** e o **Cancelar CIOT** (
 
 **Cancelei um frete e o lançamento continua no fluxo.** O cancelamento não apaga o lançamento programado. Exclua o lançamento em Lançamentos, se for o caso.
 
-**O Buscar NF-e diz que não encontrou as notas.** As notas precisam estar importadas (com XML) em CPD › Notas fiscais. Confira os números na ficha do frete, ou cole a chave de 44 dígitos no município de descarga.
+**O Buscar NF-e diz que não encontrou as notas.** As notas precisam estar importadas (com XML) em CPD › Notas Fiscais. Confira os números na ficha do frete, ou cole a chave de 44 dígitos no município de descarga.
 
 **O painel diz que falta a IPEF contratada.** Depois de contratar a IPEF, grave o CNPJ dela em **Padrões do MDF-e**.
 
@@ -235,3 +233,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.5 | 04/11/2026 | Tabela completa da ANTT (Portaria SUROC nº 22/2026: Tabelas A a D, 12 tipos de carga) carregada no piso mínimo, com filtros por tabela, tipo de carga e só vigentes. |
 | 1.6 | 04/11/2026 | **NF-e do cliente**: a transportadora do grupo escolhe as NF-e do cliente na ficha do frete e no MDF-e, sem importar de novo (autorização IPLAMM → KRATOS). |
 | 1.7 | 04/11/2026 | **CIOT pelo e-frete** na ficha do frete (conferência, emissão, PDF e cancelamento) e **parâmetros do e-frete** em Frota e parâmetros; motoristas, endereço, RENAVAM e chassi no cadastro do transportador. |
+| 1.8 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Ficha do frete em seções, com Pagamento e Anexos. Figuras refeitas. |

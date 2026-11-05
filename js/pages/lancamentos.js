@@ -3,9 +3,13 @@ import { $, $$, esc, money, cls, dateBR, options, MESES_CURTO, debounce, exportX
 import { abrirLancamento } from '../lib/lanc-form.js';
 import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
 import { importarLancamentosERP } from '../lib/erp-lancamentos.js';
+import { seletorColunas } from '../lib/colunas.js';
 
 export const title = 'Lançamentos';
 const PAGE = 100;
+// colunas que o seletor "Colunas" mostra ou oculta (docs/design-system.md › 5); C. Custo e Conta ficam na 2ª linha da célula
+const COLUNAS = [{ id: 'plano', nome: 'Plano de contas' }, { id: 'cc', nome: 'C. Custo', sub: true }, { id: 'desc', nome: 'Descrição' },
+  { id: 'fav', nome: 'Favorecido' }, { id: 'conta', nome: 'Conta', sub: true }, { id: 'status', nome: 'Status' }];
 let conciliados = new Set();
 const f = { mes: new Date().getMonth() + 1, de: '', ate: '', status: '', classe: '', conta: '', cc: '', busca: '', page: 0 };
 
@@ -34,12 +38,13 @@ export async function render(root) {
     </div>
     <div class="kpis" id="tot"></div>
     <div class="card flush">
-      ${podeEditar() ? `<div class="toolbar" style="padding:10px 12px" id="bulk"><span class="muted small" id="sel-info">Nenhum selecionado</span>
+      <div class="toolbar" style="padding:10px 12px" id="bulk">${podeEditar() ? `<span class="muted small" id="sel-info">Nenhum selecionado</span>
         <button class="btn small" id="baixar" disabled>Marcar como pago</button>
-        <button class="btn small danger" id="excluir" disabled>Excluir selecionados</button></div>` : ''}
-      <div class="table-wrap" id="tbl"></div>
+        <button class="btn small danger" id="excluir" disabled>Excluir selecionados</button>` : ''}<span class="spacer"></span></div>
+      <div class="table-wrap" id="tbl" data-colunas="lancamentos"></div>
       <div class="pager" id="pager"></div>
     </div>`;
+  $('#bulk', root).append(seletorColunas({ tela: 'lancamentos', colunas: COLUNAS }).botao);
 
   $('#meses', root).onclick = (e) => { const m = e.target.dataset.m; if (m == null) return; f.mes = +m; f.de = f.ate = ''; f.page = 0; render(root); };
   $('#lp', root) && ($('#lp', root).onclick = () => { f.de = f.ate = ''; f.page = 0; render(root); });
@@ -124,15 +129,15 @@ async function load(root) {
     const nfs = new Map();
     try { for (const v of await q(sb.from('nfe_vinculos').select('lancamento_id,tipo,n:nfe_notas(numero),p:nfe_parcelas(numero)').in('lancamento_id', data.map(l => l.id)))) nfs.set(v.lancamento_id, v); } catch { /* sem a estrutura de NF-e: segue sem o selo */ }
     const seloNF = (l) => { const v = nfs.get(l.id); if (!v?.n) return ''; return ` <span class="badge pago" title="Ligado à NF-e ${v.n.numero} importada (Notas Fiscais)${v.tipo === 'titulo' ? ' — título gerado da nota' : ''}">NF ${v.n.numero}${v.p?.numero ? '/' + v.p.numero : ''} ✓</span>`; };
-    tbl.innerHTML = `<table><thead><tr>${podeEditar() ? '<th><input type="checkbox" id="all"></th>' : ''}
-      <th>Data</th><th>Plano de contas</th><th>Descrição</th><th>Favorecido</th><th>C. Custo</th><th>Conta</th><th>Status</th><th class="num">Valor</th></tr></thead>
+    tbl.innerHTML = `<table><thead><tr>${podeEditar() ? '<th><input type="checkbox" id="all" aria-label="Marcar todos"></th>' : ''}
+      <th>Data</th><th data-col="plano">Plano de contas<div class="small" data-col="cc">C. Custo</div></th><th data-col="desc">Descrição</th>
+      <th data-col="fav">Favorecido<div class="small" data-col="conta">Conta</div></th><th data-col="status">Status</th><th class="num">Valor</th></tr></thead>
       <tbody>${data.map(l => `<tr class="clickable" data-id="${l.id}">
         ${podeEditar() ? `<td><input type="checkbox" class="sel" value="${l.id}"></td>` : ''}
-        <td>${dateBR(l.data)}</td><td>${esc(l.plano_codigo + ' - ' + l.plano_nome)}</td>
-        <td class="wrap">${esc(l.descricao || '')}${seloNF(l)}${l.documento ? `<div class="muted small">NF ${esc(l.documento)}${l.emissao ? ` · emissão ${dateBR(l.emissao)}` : ''}${l.fidc_proposta_id ? ' · FIDC' : ''}</div>` : ''}${l.opc1 ? `<div class="muted small">${esc(l.opc1)}</div>` : ''}</td>
-        <td class="wrap">${esc(l.favorecido_nome || '')}</td><td>${esc(l.centro_custo_nome || '')}</td>
-        <td class="${l.conta_destino_id ? 'wrap' : ''}">${esc(contaTxt(l))}</td>
-        <td><span class="badge ${l.status === 'Pago' ? 'pago' : 'aberto'}">${l.status}</span>${conc.has(l.id) ? ' <span class="badge conc" title="Conciliado com o extrato bancário">✓ conciliado</span>' : ''}</td>
+        <td>${dateBR(l.data)}</td><td class="wrap-m" data-col="plano">${esc(l.plano_codigo + ' - ' + l.plano_nome)}${l.centro_custo_nome ? `<div class="small muted" data-col="cc">${esc(l.centro_custo_nome)}</div>` : ''}</td>
+        <td class="wrap" data-col="desc">${esc(l.descricao || '')}${seloNF(l)}${l.documento ? `<div class="muted small">NF ${esc(l.documento)}${l.emissao ? ` · emissão ${dateBR(l.emissao)}` : ''}${l.fidc_proposta_id ? ' · FIDC' : ''}</div>` : ''}${l.opc1 ? `<div class="muted small">${esc(l.opc1)}</div>` : ''}</td>
+        <td class="wrap-m" data-col="fav">${esc(l.favorecido_nome || '')}<div class="small muted" data-col="conta">${esc(contaTxt(l))}</div></td>
+        <td data-col="status"><span class="badge ${l.status === 'Pago' ? 'pago' : 'aberto'}">${l.status}</span>${conc.has(l.id) ? ' <span class="badge conc" title="Conciliado com o extrato bancário">✓ conciliado</span>' : ''}</td>
         <td class="num ${cls(vS(l))}">${l.conta_destino_id && !f.conta ? `<span class="muted" title="Transferência: sai de ${esc(l.conta_nome || '')} e entra em ${esc(l.conta_destino_nome || '')}">⇄ ${money(l.valor)}</span>` : money(vS(l))}</td></tr>`).join('')}</tbody></table>`;
     const pages = Math.ceil(count / PAGE);
     $('#pager', root).innerHTML = `<span class="muted small">Página ${f.page + 1} de ${pages}</span>

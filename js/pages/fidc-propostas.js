@@ -8,7 +8,7 @@ import { condicaoDe, condicaoDoFundo, prazos, desagioTitulo } from '../lib/fidc-
 import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 import { conversaNoModal } from '../lib/mini-chat.js';
 
-export const title = 'Propostas de borderô';
+export const title = 'Propostas de Borderô';
 
 const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', campoData: 'emissao', propostaEdit: null, vencAj: {}, pf: { status: '', fundo: '', mes: '', busca: '' } };
 let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [], condicoes = [];

@@ -14,6 +14,8 @@ for (const [m, figs] of Object.entries(porManual)) {
     L.splice(i + 1, 0, '', `![Figura ${f.n} — ${f.leg} (dados fictícios)](${f.arq})`);
     s = L.join('\n');
   }
+  // numera as figuras na ordem de leitura (a ordem de figuras.mjs pode não ser a do texto)
+  { let k = 0; s = s.replace(/^!\[Figura \d+ — /gm, () => `![Figura ${++k} — `); }
   // versão e histórico
   const v = s.match(/^versao: (\d+)\.(\d+)$/m), nova = `${v[1]}.${+v[2] + 1}`;
   if (!s.includes('| Imagens das telas, com dados fictícios. |')) {

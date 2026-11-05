@@ -1,18 +1,18 @@
 ---
 titulo: Estoque e produtos
-tela: Estoque › Posição de estoque, Produtos e De-para de fornecedores
-versao: 1.3
-atualizado: 2026-10-31
+tela: Estoque › Posição de Estoque (EST001), Produtos (EST003) e De-para de Fornecedores (EST004)
+versao: 1.4
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
-- **Posição de estoque**: o **espelho do estoque do Iniflex**, importado por arquivo. Mostra o valor a custo de reposição, a curva ABC e o que está abaixo do ponto de pedido, e gera a requisição de compra automática.
+- **Posição de Estoque**: o **espelho do estoque do Iniflex**, importado por arquivo. Mostra o valor a custo de reposição, a curva ABC e o que está abaixo do ponto de pedido, e gera a requisição de compra automática.
 - **Produtos**: o cadastro dos produtos e insumos, com:
   - os atributos de plástico flexível e os parâmetros de estoque;
   - os códigos dos fornecedores;
   - a estrutura do produto, com o custo teórico;
   - as compras pelas NF-e e a posição no Iniflex.
-- **De-para de fornecedores**: liga cada código de item que aparece nas notas de entrada (CNPJ do fornecedor + código dele) a um produto do cadastro. Com o de-para, a plataforma calcula o custo de compra e casa o recebimento sozinha.
+- **De-para de Fornecedores**: liga cada código de item que aparece nas notas de entrada (CNPJ do fornecedor + código dele) a um produto do cadastro. Com o de-para, a plataforma calcula o custo de compra e casa o recebimento sozinha.
 
 > O estoque oficial passa a ser o da plataforma: o **Kardex**, com saldo por local e lote e custo médio (veja o manual **Kardex e parâmetros do estoque**). O espelho do Iniflex serve para a implantação e a conferência.
 
@@ -23,9 +23,9 @@ atualizado: 2026-10-31
 | Administrador, diretor e financeiro | Importam e excluem espelhos, definem os parâmetros de custo, cadastram produtos e fazem o de-para. |
 | Compras | Consulta a posição, gera a requisição automática e cadastra e edita produtos. |
 
-## 3. Posição de estoque
+## 3. Posição de Estoque
 
-![Figura 1 — Posição de estoque com o ponto de pedido (dados fictícios)](img/estoque-2.jpg)
+![Figura 1 — Posição de Estoque com o ponto de pedido (dados fictícios)](img/estoque-2.jpg)
 
 ### 3.1 Importar o espelho do Iniflex
 
@@ -65,11 +65,13 @@ Confirme com a contabilidade quais impostos marcar.
 
 ### 4.1 Cadastrar
 
+![Figura 3 — Novo produto, em quatro seções, com o Fator de compra (dados fictícios)](img/estoque-3.jpg)
+
 1. Clique em **Novo produto**.
-2. Preencha o **tipo**, o **código (Iniflex)**, a **descrição**, a unidade, o NCM, o grupo e o subgrupo.
+2. O formulário tem quatro seções. Em **Identificação**, preencha o **tipo**, o **código (Iniflex)** e a **descrição** (obrigatórios), a unidade, o NCM, o grupo e o subgrupo.
 3. Em **Plástico flexível**, informe o material, a largura, a espessura, as faces, a cor e a solda.
 4. Em **Classificação no estoque**, confira a **família**, o **tipo do item no SPED**, o **local padrão** e se o item **controla lote**. Deixados em branco, vêm da família, e a família vem do tipo do produto.
-5. Em **Estoque e compra**, informe o ponto de pedido, o lote econômico, o estoque máximo, a localização e a unidade de compra.
+5. Em **Estoque e compra**, informe o estoque mínimo e o máximo, o ponto de pedido, o lote econômico, a **unidade de compra**, o **Fator de compra** (quantas unidades de estoque vêm em 1 unidade de compra; ex.: 1 SC = 25 KG), a localização e a observação.
 6. Clique em **Salvar**.
 
 **Importar das notas de saída** cadastra de uma vez os códigos vendidos nas NF-e de saída que ainda não estão no cadastro. Eles entram como produto acabado (família Produto acabado, tipo 04 no SPED e local Produto acabado), com a descrição, a unidade e o NCM da nota mais recente. Desmarque o que não for produto (sucata, serviço) e clique em **Cadastrar marcados**.
@@ -83,7 +85,7 @@ Clique no produto para ver:
 - a **estrutura**: os componentes que o produto consome, com a quantidade e a perda %, e o custo teórico. Use **+ Componente** para incluir;
 - as **compras nos últimos 12 meses**, pelas NF-e de entrada.
 
-## 5. De-para de fornecedores
+## 5. De-para de Fornecedores
 
 1. Escolha **Notas desde** e, se quiser, o **fornecedor**.
 2. A lista mostra os itens das notas de entrada **sem de-para**: o fornecedor, o código e a descrição no fornecedor, a unidade, o NCM, as notas, o total comprado, a última compra e a **sugestão** de produto.
@@ -116,3 +118,4 @@ Clique no produto para ver:
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 31/10/2026 | Nova figura: posição de estoque com o ponto de pedido. |
 | 1.3 | 31/10/2026 | Estoque oficial na plataforma (Kardex). Produto com família, tipo do item no SPED, local padrão e controle de lote; o cadastro pelas notas de saída já entra classificado. |
+| 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Novo produto em quatro seções; o rótulo "Fator (1 un. de compra = ? un.)" passou a **Fator de compra**. Figuras refeitas. |

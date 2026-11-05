@@ -11,7 +11,7 @@ import { creditosComSaldo, mesmoGrupo, desfazerUso } from '../lib/creditos.js';
 import { semPagamento } from '../lib/nfe-pag.js';
 import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 
-export const title = 'Conta-corrente de fornecedor / cliente';
+export const title = 'Conta-Corrente Fornecedor / Cliente';
 const LS = 'contaForn.fav';
 const ui = { aba: 'extrato', aberta: null, de: `${new Date().getFullYear()}-01-01`, ate: today(), visao: null };
 let D = null;   // dados carregados

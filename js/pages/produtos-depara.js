@@ -5,7 +5,7 @@ import { $, $$, esc, money, dateBR, fail, toast, modal, confirmDialog } from '..
 import { TIPOS, tipoPorNcm, carregarProdutos, limparCacheProdutos, datalistProdutos, acharProduto } from '../lib/produtos.js';
 import { num } from '../lib/compras.js';
 
-export const title = 'De-para de fornecedores';
+export const title = 'De-para de Fornecedores';
 const ui = { desde: '2026-01-01', busca: '', forn: '' };
 let PEND = [], PROD = [];
 const norm = (s) => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 1);
@@ -23,7 +23,7 @@ function sugerir(x) {
 }
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">De-para de fornecedores</h2><div class="muted small">Itens das NF-e de entrada ainda sem produto. Ligue a um produto existente ou crie o produto (insumo) a partir do item.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">De-para de Fornecedores</h2><div class="muted small">Itens das NF-e de entrada ainda sem produto. Ligue a um produto existente ou crie o produto (insumo) a partir do item.</div></div>
       <button class="btn primary" id="dp-criar">Criar produtos dos marcados</button></div>
     <div class="card toolbar"><label>Notas desde<input type="date" id="dp-de" value="${ui.desde}"></label>
       <label>Fornecedor<select id="dp-f"><option value="">Todos</option></select></label>

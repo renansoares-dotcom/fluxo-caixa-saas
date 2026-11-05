@@ -5,7 +5,7 @@ import { $, $$, esc, dateBR, fail, toast, modal } from '../lib/ui.js';
 import { cadProducao, imprimirEtiquetas } from '../lib/producao.js';
 import { qtd, num } from '../lib/compras.js';
 
-export const title = 'Terminal de produção';
+export const title = 'Terminal do Setor';
 let C = null, timer = null;
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };

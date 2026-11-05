@@ -6,7 +6,7 @@ import { $, esc, money, money0, dateBR, fail, toast, modal, formData, logoPNG } 
 import { valorExtenso, dataExtenso } from '../lib/extenso.js';
 import { padronizarPDF, PRETO } from '../lib/relatorio.js';
 
-export const title = 'Duplicatas para endosso';
+export const title = 'Duplicatas para Endosso';
 
 const ui = { modalidade: '', referencia: '', sel: new Set(), benefId: '', dataEndosso: '', praca: '', busca: '', venDe: '', venAte: '', soSel: false, origem: '', vista: 0 };
 let historico = [], titulos = [], benefs = [], emitidas = {}, propostas = [], itensProp = {}, fundos = [];

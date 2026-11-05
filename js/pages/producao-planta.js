@@ -9,7 +9,7 @@ import { TIPOS_VEICULO } from '../lib/logistica.js';
 import { criarPlanta3D } from '../lib/planta3d.js';
 let V3 = null, falhou3d = false;
 
-export const title = 'Planta da fábrica';
+export const title = 'Planta da Fábrica';
 const ui = { sel: null, editando: false };
 let timer = null;
 const celular = () => matchMedia('(max-width: 900px)').matches;
@@ -25,7 +25,7 @@ export async function render(root) {
   if (ui.editando) return editor(root, C, planta);
   const temPlanta = (planta.elementos || []).length || C.maquinas.some(m => m.pos_x != null);
   root.innerHTML = `<div class="pl-pagina">
-    <div class="mm-topo"><div><h2 style="margin:0">Planta da fábrica</h2><div class="muted small" id="pl-at">Carregando situação…</div></div>
+    <div class="mm-topo"><div><h2 style="margin:0">Planta da Fábrica</h2><div class="muted small" id="pl-at">Carregando situação…</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">${temPlanta ? '<button class="btn ghost" id="pl-tv">Modo TV</button>' : ''}${podePCP() ? '<button class="btn" id="pl-ed">Editar planta</button>' : ''}</div></div>
     <div class="pl-leg">${Object.entries(ROTULO_ST).map(([k, t]) => `<span><i style="background:${COR[k]}"></i>${t}</span>`).join('')}</div>
     <div id="pl-kpis" class="pl-kpis"></div>

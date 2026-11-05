@@ -318,7 +318,9 @@ async function render() {
   try {
     const mod = await loader();
     if (seq !== renderSeq) return;
-    $('#page-title').textContent = mod.title;
+    // nome oficial da tela = nome do menu (js/lib/menu.js preenche data-nome); fora do menu, o título do módulo
+    const nomeTela = $(`#nav a[data-route="${CSS.escape(route)}"]`)?.dataset.nome || mod.title;
+    $('#page-title').textContent = nomeTela;
     // código da tela (js/lib/telas.js), como no Iniflex
     { const cod = codigoDa(route), pc = $('#page-cod'); if (pc) { pc.textContent = cod; pc.hidden = !cod; } marcarTela(route); }
     // botão "?": manual de uso desta tela (Ajuda › Tutoriais)
@@ -327,7 +329,7 @@ async function render() {
     { const a = $(`#nav a[data-route="${route}"]`); const area = a?.closest('.nav-area'); const sec = a?.closest('details')?.querySelector('summary')?.textContent;
       const tit = area?.querySelector('.nav-area-tit')?.dataset.nome; const tr = $('#page-trilha');
       tr.textContent = [tit, sec].filter(Boolean).join(' › '); tr.dataset.area = area?.dataset.area || ''; }
-    document.title = `${codigoDa(route) ? codigoDa(route) + ' · ' : ''}${mod.title} · ${state.empresa.nome}`;
+    document.title = `${codigoDa(route) ? codigoDa(route) + ' · ' : ''}${nomeTela} · ${state.empresa.nome}`;
     // os cadastros podem ter sido descartados no meio do caminho (sessão renovada, troca de empresa): recarrega antes de desenhar
     if (!state.cad) await loadCadastros();
     if (seq !== renderSeq) return;
@@ -343,6 +345,16 @@ async function abrirLancamentoPorId(id) {
     abrirLancamento(l, () => render());
   } catch (e) { fail(e); }
 }
+// tabela que rola para o lado: marca a borda onde há mais colunas (.rola-esq / .rola-dir; o CSS esmaece a borda no celular)
+function marcarRolagem(w) {
+  const max = w.scrollWidth - w.clientWidth;
+  w.classList.toggle('rola-esq', max > 2 && w.scrollLeft > 2);
+  w.classList.toggle('rola-dir', max > 2 && w.scrollLeft < max - 2);
+}
+{ let t = null; const todas = () => { clearTimeout(t); t = setTimeout(() => $$('.table-wrap').forEach(marcarRolagem), 120); };
+  new MutationObserver(todas).observe(document.body, { childList: true, subtree: true });
+  window.addEventListener('resize', todas);
+  document.addEventListener('scroll', (e) => { if (e.target?.classList?.contains('table-wrap')) marcarRolagem(e.target); }, true); }
 window.addEventListener('hashchange', render);
 export const rerender = render;
 

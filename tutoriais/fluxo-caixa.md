@@ -1,24 +1,24 @@
 ---
 titulo: Fluxo de caixa e necessidade de caixa
-tela: Financeiro › Fluxo de caixa mensal, Fluxo de caixa diário e Necessidade de caixa
-versao: 1.1
-atualizado: 2026-10-29
+tela: Financeiro › Fluxo de Caixa Mensal (FIN011), Fluxo de Caixa Diário (FIN012) e Necessidade de Caixa (FIN013)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
 Três telas mostram o dinheiro da empresa no tempo:
 
-- **Fluxo de caixa mensal**: entradas, saídas e transferências por mês do ano, por classificação e por conta do plano.
-- **Fluxo de caixa diário**: o mesmo, dia a dia, num mês, com o saldo de cada dia.
-- **Necessidade de caixa**: a projeção das **próximas 13 semanas** a partir do saldo de hoje. Ela mostra em que semana o caixa fica abaixo do mínimo e quanto falta.
+- **Fluxo de Caixa Mensal**: entradas, saídas e transferências por mês do ano, por classificação e por conta do plano.
+- **Fluxo de Caixa Diário**: o mesmo, dia a dia, num mês, com o saldo de cada dia.
+- **Necessidade de Caixa**: a projeção das **próximas 13 semanas** a partir do saldo de hoje. Ela mostra em que semana o caixa fica abaixo do mínimo e quanto falta.
 
 ## 2. Quem tem acesso
 
 Quem tem a área Financeiro consulta e exporta. Só o administrador e o financeiro cadastram **compromissos programados**.
 
-## 3. Fluxo de caixa mensal e diário
+## 3. Fluxo de Caixa Mensal e Diário
 
-![Figura 1 — Fluxo de caixa mensal (dados fictícios)](img/fluxo-caixa-1.jpg)
+![Figura 1 — Fluxo de Caixa Mensal (dados fictícios)](img/fluxo-caixa-1.jpg)
 
 ### 3.1 Filtros
 
@@ -41,9 +41,9 @@ No mensal, as colunas são os meses, o **TOTAL** e a **Part.** (participação d
 
 **Exportar Excel** baixa a tabela como está na tela.
 
-## 4. Necessidade de caixa
+## 4. Necessidade de Caixa
 
-![Figura 2 — Necessidade de caixa por semana (dados fictícios)](img/fluxo-caixa-2.jpg)
+![Figura 2 — Necessidade de Caixa por semana (dados fictícios)](img/fluxo-caixa-2.jpg)
 
 ### 4.1 Como a projeção é feita
 
@@ -80,7 +80,7 @@ O compromisso entra na projeção no dia informado de cada mês, entre o início
 
 ### 4.5 Quando falta caixa
 
-A plataforma sugere títulos a receber para antecipar. **Montar borderô com esses títulos** leva para **Propostas de borderô** com eles já marcados.
+A plataforma sugere títulos a receber para antecipar. **Montar borderô com esses títulos** leva para **Propostas de Borderô** com eles já marcados.
 
 ## 5. Regras e travas
 
@@ -102,3 +102,4 @@ A plataforma sugere títulos a receber para antecipar. **Montar borderô com ess
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: fluxo mensal e diário, necessidade de caixa de 13 semanas, caixa mínimo, forecast, contas consideradas e compromissos programados. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

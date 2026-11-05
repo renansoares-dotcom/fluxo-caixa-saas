@@ -13,7 +13,7 @@ import { pedidoCIOT, faltasCIOT, empresaGeraCIOT } from '../lib/ipef.js';
 import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, coefDe, pendencias, pendenciasTransp, tipoPeloDoc, lerVeiculos, veiculosTxt, lerMotoristas, motoristasTxt } from '../lib/fretes.js';
 import { janelaCiot, situacaoCiot, camposEndereco, lerEndereco } from '../lib/efrete-ui.js';
 
-export const title = 'Logística — fretes e CIOT';
+export const title = 'Fretes e CIOT';
 const ui = { aba: 'fretes', mes: today().slice(0, 7), busca: '' };
 const PLANO_FRETE = '2.06.01';
 // nome curto da empresa nos rótulos (o valor gravado continua 'iplamm' = a própria empresa emite)
@@ -59,7 +59,7 @@ function situacao(f) {
 
 export async function render(root) {
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Fretes e CIOT</h2><div class="muted small">Conformidade ANTT dos fretes contratados: CIOT, MDF-e, piso mínimo, vale-pedágio e pagamento ao autônomo pela IPEF.</div></div>
-      <a class="btn ghost" href="#/logistica">Cargas e entregas</a></div>
+      <a class="btn ghost" href="#/logistica">Cargas e Entregas</a></div>
     <div class="card toolbar"><div class="chips" id="lf-abas">${[['fretes', 'Fretes'], ['mdfe', 'MDF-e · 23/11'], ['transp', 'Transportadores'], ['conf', 'Conformidade do mês'], ['piso', 'Piso mínimo']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div id="lf-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#lf-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
@@ -90,7 +90,7 @@ function fretes(corpo, root) {
   corpo.innerHTML = `<div class="kpis">${kpi('Fretes no mês', ativos.length, money(ativos.reduce((s, f) => s + (+f.valor || 0), 0)))}${kpi('Com autônomo', aut.length, 'CIOT gerado pela IPLAMM')}
       ${kpi('Autônomo com pendência', bloq.length, bloq.length ? 'pagamento travado' : 'nenhum', bloq.length ? 'neg' : '')}${kpi('Abaixo do piso', abaixo.length, abaixo.length ? 'risco de multa ao contratante' : 'nenhum', abaixo.length ? 'neg' : '')}</div>
     <div class="card toolbar" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <label class="small" style="display:flex;gap:6px;align-items:center">Mês <input type="month" id="ff-mes" value="${ui.mes}"></label>
+      <label class="small" style="display:flex;flex-direction:row;gap:6px;align-items:center;min-width:0">Mês <input type="month" id="ff-mes" value="${ui.mes}"></label>
       <input id="ff-busca" placeholder="Buscar nº, transportador, rota, CIOT, NF…" value="${esc(ui.busca)}" style="min-width:240px">
       ${pode ? '<button class="btn primary" id="ff-novo" style="margin-left:auto">Novo frete</button>' : ''}</div>
     <div class="card flush" style="margin-top:12px"><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Transportador</th><th>Rota</th><th class="num">Valor</th><th class="num">Piso</th><th>CIOT</th><th>MDF-e</th><th>Pagamento</th><th>Situação</th></tr></thead><tbody>
@@ -133,20 +133,20 @@ function ficha(f0, root, pre = {}) {
   const l = B.L.get(f.lancamento_id);
   const md = modal({ title: f0 ? `Frete nº ${f0.numero}` : 'Novo frete contratado', wide: true, body: `
     <fieldset><legend>Viagem e piso mínimo</legend><div class="grid-form">
-      <label class="span2">Transportador *<select id="fr-t" ${dis} data-nobusca><option value="">— escolha —</option>${B.T.filter(t => t.ativo || t.id === f.transportador_id).map(t => `<option value="${t.id}" ${t.id === f.transportador_id ? 'selected' : ''}>${esc(t.nome)} · ${TIPO_CURTO[t.tipo]}</option>`).join('')}</select>
+      <label class="span2">Transportador *<select required id="fr-t" ${dis} data-nobusca><option value="">— escolha —</option>${B.T.filter(t => t.ativo || t.id === f.transportador_id).map(t => `<option value="${t.id}" ${t.id === f.transportador_id ? 'selected' : ''}>${esc(t.nome)} · ${TIPO_CURTO[t.tipo]}</option>`).join('')}</select>
         ${pode ? '<a href="#" id="fr-novo-t" class="small">+ cadastrar transportador</a>' : ''}</label>
-      <label class="xs">Data da viagem *<input type="date" id="fr-d" value="${f.data}" ${dis}></label>
+      <label class="xs">Data da viagem *<input required type="date" id="fr-d" value="${f.data}" ${dis}></label>
       <label class="c4">Carga da logística<select id="fr-k" ${dis} data-nobusca><option value="">—</option>${cargas.map(k => `<option value="${k.id}" ${k.id === f.carga_id ? 'selected' : ''}>Carga ${k.numero} · ${dateBR(k.data)}</option>`).join('')}</select></label>
       <label class="c4">NF-e transportadas<input id="fr-n" value="${esc(f.notas || '')}" placeholder="36435, 36440" ${dis}>${pode && B.NC?.length ? '<a href="#" id="fr-nc" class="small">+ escolher NF-e do cliente</a>' : ''}</label>
       <label>Origem<input id="fr-o" value="${esc(f.origem || 'Caruaru/PE')}" ${dis}></label>
       <label>Destino<input id="fr-de" value="${esc(f.destino || '')}" placeholder="cidade/UF" ${dis}></label>
-      <label class="xs">Distância (km, ida) *<input id="fr-km" value="${inp(f.km)}" ${dis}></label>
-      <label class="xs">Eixos carregados *<select id="fr-e" ${dis} data-nobusca><option value="">—</option>${[2, 3, 4, 5, 6, 7, 9].map(e => `<option ${+f.eixos === e ? 'selected' : ''}>${e}</option>`).join('')}</select></label>
+      <label class="xs">Distância (km, ida) *<input required id="fr-km" value="${inp(f.km)}" ${dis}></label>
+      <label class="xs">Eixos carregados *<select required id="fr-e" ${dis} data-nobusca><option value="">—</option>${[2, 3, 4, 5, 6, 7, 9].map(e => `<option ${+f.eixos === e ? 'selected' : ''}>${e}</option>`).join('')}</select></label>
       <label class="c4">Tabela / tipo de carga<select id="fr-tc" ${dis} data-nobusca>${tipos.map(x => { const [tb, tc] = x.split('|'); return `<option value="${x}" ${f.tabela === tb && f.tipo_carga === tc ? 'selected' : ''}>Tabela ${tb} · ${esc(tc)}</option>`; }).join('') || '<option value="A|geral">Tabela A · geral</option>'}</select></label>
       <label class="chk"><input type="checkbox" id="fr-lot" ${f.lotacao ? 'checked' : ''} ${dis}> Carga lotação (o piso se aplica)</label>
       <label class="chk"><input type="checkbox" id="fr-rv" ${f.retorno_vazio ? 'checked' : ''} ${dis}> Retorno vazio obrigatório</label>
       <label class="xs">Km de retorno<input id="fr-kr" value="${inp(f.km_retorno)}" ${dis}></label>
-      <label>Valor do frete (R$) *<input id="fr-v" value="${inp(f.valor)}" ${dis}></label>
+      <label>Valor do frete (R$) *<input required id="fr-v" value="${inp(f.valor)}" ${dis}></label>
       <div class="c8 small" id="fr-piso" style="align-self:end"></div>
     </div></fieldset>
     <fieldset><legend>Veículo, CIOT e MDF-e</legend><div class="grid-form">
@@ -157,10 +157,10 @@ function ficha(f0, root, pre = {}) {
       ${f0 && f0.status !== 'cancelado' && f0.ciot_por !== 'transportadora' ? `<div class="full small" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button type="button" class="btn small ${situacaoCiot(f0).emitido ? '' : 'primary'}" id="fr-efrete">${situacaoCiot(f0).emitido ? 'CIOT pelo e-frete (PDF / cancelar)' : 'Emitir CIOT pelo e-frete'}</button>
         <span class="muted">${esc(situacaoCiot(f0).txt || 'Salve a ficha antes: o CIOT usa os dados salvos do frete, do MDF-e e do transportador.')}</span></div>` : ''}
-      <label class="span2">Chave do MDF-e<input id="fr-mdf" value="${esc(f.mdfe_chave || '')}" placeholder="44 dígitos" ${dis}></label>
-      <label class="span2">Chave do CT-e (transportadora)<input id="fr-cte" value="${esc(f.cte_chave || '')}" ${dis}></label>
+      <label class="${B.semMdfe ? 'span2' : 'c4'}">Chave do MDF-e<input id="fr-mdf" value="${esc(f.mdfe_chave || '')}" placeholder="44 dígitos" ${dis}></label>
+      <label class="${B.semMdfe ? 'span2' : 'c4'}">Chave do CT-e (transportadora)<input id="fr-cte" value="${esc(f.cte_chave || '')}" ${dis}></label>
       ${B.semMdfe ? '' : `<label>Quem emite o MDF-e<select id="fr-em" ${dis} data-nobusca><option value="">—</option><option value="iplamm" ${f.mdfe_emissor === 'iplamm' ? 'selected' : ''}>${esc(nomeCurto())} (carga própria)</option><option value="transportadora" ${f.mdfe_emissor === 'transportadora' ? 'selected' : ''}>Transportadora (com CT-e)</option></select></label>
-      <div class="c8 small" id="fr-mdfe-st" style="align-self:end"></div>`}
+      <div class="full small" id="fr-mdfe-st"></div>`}
     </div></fieldset>
     <fieldset><legend>Pedágio e observação</legend><div class="grid-form">
       <label class="xs">Vale-pedágio (R$)<input id="fr-pv" value="${inp(f.pedagio_valor)}" ${dis}></label>
@@ -169,11 +169,11 @@ function ficha(f0, root, pre = {}) {
       <label class="c4">Observação<input id="fr-obs" value="${esc(f.observacao || '')}" ${dis}></label>
     </div></fieldset>
     <div id="fr-pend" style="margin-top:10px"></div>
-    <h3 style="margin:14px 0 6px">Pagamento</h3>
-    <div id="fr-pag" class="small">${l ? `Lançamento ${l.status === 'Pago' ? '<b>pago</b>' : 'programado'} em ${dateBR(l.data)} · ${money(l.valor)} · ${esc(state.cad.contaById[l.conta_id]?.nome || '')}` : 'Sem lançamento ligado.'}</div>
-    ${f0 ? `<h3 style="margin:14px 0 6px">Anexos</h3><div id="fr-anx">${listaAnexos(anexosDe(f0), pode)}</div>
-      ${pode ? `<div class="grid2" style="margin-top:6px;align-items:end"><label class="grow">Arquivos<br><input type="file" id="fr-arq" multiple accept="application/pdf,image/*,.xml"></label>
-        <label>Tipo<select id="fr-at" data-nobusca>${Object.entries(TIPOS_ANEXO).filter(([k]) => k !== 'contrato' || true).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label><button type="button" class="btn" id="fr-env">Anexar</button></div>` : ''}` : '<p class="small muted">Salve a ficha para anexar CIOT, MDF-e, CT-e, contrato e comprovantes.</p>'}`,
+    <fieldset><legend>Pagamento</legend>
+    <div id="fr-pag" class="small">${l ? `Lançamento ${l.status === 'Pago' ? '<b>pago</b>' : 'programado'} em ${dateBR(l.data)} · ${money(l.valor)} · ${esc(state.cad.contaById[l.conta_id]?.nome || '')}` : 'Sem lançamento ligado.'}</div></fieldset>
+    <fieldset><legend>Anexos</legend>${f0 ? `<div id="fr-anx">${listaAnexos(anexosDe(f0), pode)}</div>
+      ${pode ? `<div class="grid-form" style="margin-top:6px"><label class="span2">Arquivos<input type="file" id="fr-arq" multiple accept="application/pdf,image/*,.xml"></label>
+        <label>Tipo<select id="fr-at" data-nobusca>${Object.entries(TIPOS_ANEXO).filter(([k]) => k !== 'contrato' || true).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label><div class="xs" style="align-self:end"><button type="button" class="btn" id="fr-env" style="width:100%">Anexar</button></div></div>` : ''}` : '<p class="small muted" style="margin:0">Salve a ficha para anexar CIOT, MDF-e, CT-e, contrato e comprovantes.</p>'}</fieldset>`,
     foot: pode ? `${f0 && f0.status !== 'cancelado' && !(l?.status === 'Pago') ? '<button class="btn danger" id="fr-canc" style="margin-right:auto">Cancelar frete</button>' : ''}
       ${f0 && !f0.lancamento_id && f0.status !== 'cancelado' ? '<button class="btn" id="fr-prog">Programar pagamento</button><button class="btn" id="fr-lig">Ligar a lançamento</button>' : ''}
       <button class="btn" data-close>Fechar</button><button class="btn primary" id="fr-ok">Salvar</button>` : '<button class="btn" data-close>Fechar</button>' });
@@ -297,9 +297,9 @@ function editarTransp(t, root, depois = null) {
   const pode = podeLogistica(), dis = pode ? '' : 'disabled';
   const favs = state.cad.favorecidos.filter(f => f.tipo !== 'CLIENTES');
   const md = modal({ title: t ? t.nome : 'Cadastrar transportador', wide: true, body: `<div class="grid2">
-      <label class="grow">Nome / razão social *<input id="ct-n" value="${esc(t?.nome || '')}" ${dis}></label>
+      <label class="grow">Nome / razão social *<input required id="ct-n" value="${esc(t?.nome || '')}" ${dis}></label>
       <label>CPF / CNPJ<input id="ct-d" value="${esc(fmtDoc(t?.documento))}" ${dis}></label>
-      <label>Tipo *<select id="ct-t" ${dis} data-nobusca>${Object.entries(TIPOS_TRANSP).map(([k, v]) => `<option value="${k}" ${(t?.tipo || 'etc') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label>Tipo *<select required id="ct-t" ${dis} data-nobusca>${Object.entries(TIPOS_TRANSP).map(([k, v]) => `<option value="${k}" ${(t?.tipo || 'etc') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       <label class="grow">Favorecido no cadastro (pagamentos)<select id="ct-f" ${dis}><option value="">—</option>${favs.map(f => `<option value="${f.id}" ${f.id === t?.favorecido_id ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
       <label>RNTRC<input id="ct-r" value="${esc(t?.rntrc || '')}" ${dis}></label><label>RNTRC válido até<input type="date" id="ct-rv" value="${t?.rntrc_validade || ''}" ${dis}></label>
       <label class="span2">Veículos (uma linha por veículo: placa;eixos;tipo;renavam;chassi)<textarea id="ct-vs" rows="3" ${dis} placeholder="ABC1D23;5;carreta;12345678901;9BM384078KB123456">${esc(veiculosTxt(t?.veiculos))}</textarea>
@@ -386,7 +386,7 @@ async function conformidade(corpo, root) {
   const porTipo = (k) => F.filter(f => B.tById[f.transportador_id]?.tipo === k);
   const linha = (rot, xs) => { const sem = xs.filter(f => !String(f.ciot || '').trim()).length, ab = xs.filter(f => pendDe(f).includes('abaixo do piso mínimo')).length, mdf = xs.filter(f => !f.mdfe_chave).length, pend = xs.filter(f => pendDe(f).length).length;
     return `<tr><td>${rot}</td><td class="num">${xs.length}</td><td class="num">${money(xs.reduce((s, f) => s + (+f.valor || 0), 0))}</td><td class="num ${sem ? 'neg' : ''}">${sem}</td><td class="num ${mdf ? 'warn' : ''}">${mdf}</td><td class="num ${ab ? 'neg' : ''}">${ab}</td><td class="num ${pend ? 'warn' : ''}">${pend}</td></tr>`; };
-  corpo.innerHTML = `<div class="card toolbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="small" style="display:flex;gap:6px;align-items:center">Mês <input type="month" id="cf-mes" value="${ui.mes}"></label>
+  corpo.innerHTML = `<div class="card toolbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="small" style="display:flex;flex-direction:row;gap:6px;align-items:center;min-width:0">Mês <input type="month" id="cf-mes" value="${ui.mes}"></label>
       <button class="btn" id="cf-rel" style="margin-left:auto">Relatório (imprimir)</button></div>
     <div class="card flush" style="margin-top:12px"><div class="card-head" style="padding:14px 16px 0"><h2 style="margin:0">Fretes com ficha</h2></div><div class="table-wrap"><table>
       <thead><tr><th>Tipo de transportador</th><th class="num">Fretes</th><th class="num">Valor</th><th class="num">Sem CIOT</th><th class="num">Sem MDF-e</th><th class="num">Abaixo do piso</th><th class="num">Com pendência</th></tr></thead>
@@ -408,7 +408,7 @@ async function conformidade(corpo, root) {
   $$('[data-dsp]', corpo).forEach(b => b.onclick = () => { const l = semFicha.find(x => x.id === b.dataset.dsp);
     const md = modal({ title: 'Dispensar da conformidade', body: `<p class="small muted" style="margin-top:0">${dateBR(l.data)} · ${money(l.valor)} · ${esc(state.cad.favById[l.favorecido_id]?.nome || l.descricao || '')}<br>O lançamento não muda; sai dos alertas com o motivo registrado (quem e quando). Dá para desfazer.</p>
       <label>Motivo<select id="ds-m" data-nobusca>${Object.entries(MOTIVOS).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label>
-      <label>Justificativa *<input id="ds-j" placeholder="ex.: frete Manaus contratado pelo fornecedor; CT-e em nome da empresa"></label>`,
+      <label>Justificativa *<input required id="ds-j" placeholder="ex.: frete Manaus contratado pelo fornecedor; CT-e em nome da empresa"></label>`,
       foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ds-ok">Dispensar</button>' });
     $('#ds-ok', md.el).onclick = async () => { const j = $('#ds-j', md.el).value.trim(); if (!j) return toast('Escreva a justificativa', true);
       try { await q(sb.from('log_frete_dispensas').insert({ empresa_id: state.empresa.id, lancamento_id: l.id, motivo: $('#ds-m', md.el).value, justificativa: j })); md.close(); conformidade(corpo, root); } catch (err) { fail(err); } }; });

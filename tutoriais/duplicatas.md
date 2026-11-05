@@ -1,12 +1,12 @@
 ---
 titulo: Duplicatas para endosso
-tela: Financeiro › Duplicatas para endosso
-versao: 1.1
-atualizado: 2026-10-29
+tela: Financeiro › Duplicatas para Endosso (FIN020)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
-A tela **Duplicatas para endosso** monta as **duplicatas mercantis** dos títulos a receber e o **endosso** delas para um beneficiário, por exemplo um fornecedor de resina, em garantia do pagamento de uma compra. Os títulos ficam à esquerda e a duplicata é montada em tempo real à direita.
+A tela **Duplicatas para Endosso** monta as **duplicatas mercantis** dos títulos a receber e o **endosso** delas para um beneficiário, por exemplo um fornecedor de resina, em garantia do pagamento de uma compra. Os títulos ficam à esquerda e a duplicata é montada em tempo real à direita.
 
 O PDF sai com **uma duplicata por página** (frente e endosso no verso), pronto para assinatura com **certificado digital ICP-Brasil**. A plataforma registra quais títulos foram endossados, para quem e quando.
 
@@ -18,12 +18,12 @@ O administrador e o financeiro geram e cancelam endossos e cadastram beneficiár
 
 ## 3. Passo a passo
 
-![Figura 1 — Duplicatas para endosso (dados fictícios)](img/duplicatas-1.jpg)
+![Figura 1 — Duplicatas para Endosso (dados fictícios)](img/duplicatas-1.jpg)
 
 ### 3.1 Escolher os títulos
 
 1. À esquerda ficam as duplicatas a receber em aberto e os títulos das propostas de borderô. Use **Buscar cliente / NF**, **Vencimento de / até** ou escolha uma **Proposta de borderô**.
-2. Marque os títulos que vão ser endossados, ou use **Marcar filtrados**.
+2. Marque os títulos que vão ser endossados, ou use **Marcar filtrados**. A **NF / parcela** e a **situação** aparecem na 2ª linha do cliente, para a lista caber inteira ao lado do endosso.
 
 ### 3.2 Escolher o beneficiário
 
@@ -79,3 +79,4 @@ Clique em **Gerar PDF**. A plataforma registra o lote e baixa o arquivo para ass
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: escolha dos títulos, beneficiário, dados do endosso, PDF para assinatura digital, lotes emitidos, cancelamento e termo. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nome da tela igual ao do menu, com o código. Títulos com a NF / parcela e a situação na 2ª linha. Figuras refeitas. |

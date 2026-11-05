@@ -8,7 +8,7 @@ import { $, esc, money, dateBR, fail, loading, exportXLSX, MESES_CURTO } from '.
 import { pintarAliquotas, pintarSimulador, pintarConferencia } from '../lib/reforma-ui.js';
 import { regimeEm, descricao, ehSimples } from '../lib/regime.js';
 
-export const title = 'Apuração de impostos';
+export const title = 'Apuração de Impostos';
 
 const hoje = new Date(); const ant = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
 const ui = { mes: `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`, aba: 'livro', lado: 'saidas', agrupar: 'cfop', abertas: new Set() };

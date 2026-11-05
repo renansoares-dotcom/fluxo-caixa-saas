@@ -1,12 +1,12 @@
 ---
 titulo: Conciliação bancária
-tela: Financeiro › Conciliação bancária
-versao: 1.3
-atualizado: 2026-10-31
+tela: Financeiro › Conciliação Bancária (FIN002)
+versao: 1.4
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
-A **Conciliação bancária** confere, movimento a movimento, o **extrato do banco** contra os **lançamentos da plataforma**. Cada movimento do extrato é ligado ao lançamento (ou aos lançamentos) que ele representa. O que sobra de um lado ou do outro mostra o que falta lançar ou o que foi lançado errado.
+A **Conciliação Bancária** confere, movimento a movimento, o **extrato do banco** contra os **lançamentos da plataforma**. Cada movimento do extrato é ligado ao lançamento (ou aos lançamentos) que ele representa. O que sobra de um lado ou do outro mostra o que falta lançar ou o que foi lançado errado.
 
 A tela tem dois lados:
 
@@ -35,7 +35,7 @@ Escolha a **conta** e o **mês** no topo. Depois:
 
 ## 4. Conciliar
 
-![Figura 1 — Conciliação bancária: extrato à esquerda, lançamentos sem extrato à direita (dados fictícios)](img/conciliacao-1.jpg)
+![Figura 1 — Conciliação Bancária: extrato à esquerda, lançamentos sem extrato à direita (dados fictícios)](img/conciliacao-1.jpg)
 
 ### 4.1 Pelas sugestões
 
@@ -59,7 +59,7 @@ Para juntar **vários movimentos com um ou vários lançamentos** (por exemplo, 
 
 Se as datas estiverem a mais de 2 dias uma da outra, a plataforma pede confirmação.
 
-**Recebimento com juros:** quando o extrato é maior que o título selecionado (um título a receber), aparece **Conciliar com R$ X de juros/multa**. O título é baixado pelo valor de face, a diferença vira lançamento em **1.02.17 JUROS E MULTAS RECEBIDOS** e a **nota de débito** entra na fila de **Fiscal › Notas de débito** (reforma tributária).
+**Recebimento com juros:** quando o extrato é maior que o título selecionado (um título a receber), aparece **Conciliar com R$ X de juros/multa**. O título é baixado pelo valor de face, a diferença vira lançamento em **1.02.17 JUROS E MULTAS RECEBIDOS** e a **nota de débito** entra na fila de **Fiscal › Notas de Débito** (reforma tributária).
 
 ### 4.3 Quando não há lançamento
 
@@ -96,7 +96,7 @@ Use os filtros **Pendentes / Conciliados / Ignorados / Todos** na lista do extra
 
 **Criei o lançamento, mas ele não conciliou.** O valor, a natureza ou a conta não bateram com o movimento. Concilie à mão (item 4.2).
 
-**Há diferença de saldo, mas tudo está conciliado.** Confira se o extrato foi importado até o fim do mês, ou se há lançamento pago nesta conta com data errada. A **Conferência do dia** mostra em que dia a diferença começa.
+**Há diferença de saldo, mas tudo está conciliado.** Confira se o extrato foi importado até o fim do mês, ou se há lançamento pago nesta conta com data errada. A **Conferência do Dia** mostra em que dia a diferença começa.
 
 ## 8. Histórico de alterações
 
@@ -106,3 +106,4 @@ Use os filtros **Pendentes / Conciliados / Ignorados / Todos** na lista do extra
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 31/10/2026 | Conciliar recebimento com juros/multa: baixa pela face, lança a diferença em 1.02.17 e gera a nota de débito a emitir. |
 | 1.3 | 31/10/2026 | Nova figura: movimento do extrato com os lançamentos candidatos. |
+| 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

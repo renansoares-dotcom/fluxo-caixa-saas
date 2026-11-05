@@ -5,13 +5,13 @@ import { carregarBase, podeLogistica, TIPOS_VEICULO, PARAM_PADRAO, municipios } 
 import { qtd, inp, num } from '../lib/compras.js';
 import { parametrosEfrete } from '../lib/efrete-ui.js';
 
-export const title = 'Logística — frota e parâmetros';
+export const title = 'Frota e Parâmetros';
 const ui = { aba: 'frota' };
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const soDig = (s) => String(s || '').replace(/\D/g, '');
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Frota e parâmetros</h2><div class="muted small">Base da montagem automática das cargas. ${podeLogistica() ? '' : 'Só admin, financeiro ou diretor alteram.'}</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Frota e Parâmetros</h2><div class="muted small">Base da montagem automática das cargas. ${podeLogistica() ? '' : 'Só admin, financeiro ou diretor alteram.'}</div></div>
       <a class="btn ghost" href="#/logistica">Voltar às cargas</a></div>
     <div class="card toolbar"><div class="chips" id="lf-abas">${[['frota', 'Veículos'], ['param', 'Parâmetros'], ['cli', 'Clientes com restrição'], ['efrete', 'e-frete (CIOT)']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div id="lf-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
@@ -47,8 +47,8 @@ function editarVeiculo(v, root) {
       ${f('fv-ck', 'Consumo (km/l)', inp(v?.consumo_km_l))}${f('fv-cu', 'Custo por km (R$)', inp(v?.custo_km), 'placeholder="ou consumo × diesel"')}
       ${f('fv-mo', 'Motorista habitual', esc(v?.motorista || ''))}
       <label>Situação<select id="fv-s">${[['disponivel', 'Disponível'], ['manutencao', 'Em manutenção'], ['inativo', 'Inativo']].map(([k, t]) => `<option value="${k}" ${(v?.situacao || 'disponivel') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label class="chk"><input type="checkbox" id="fv-pq" ${v?.pequeno ? 'checked' : ''}> Atende cliente que só recebe veículo pequeno</label>
-      <label class="span2">Observação<input id="fv-o" value="${esc(v?.observacao || '')}"></label></div>`,
+      <label class="chk span2"><input type="checkbox" id="fv-pq" ${v?.pequeno ? 'checked' : ''}> Atende cliente que só recebe veículo pequeno</label>
+      <label class="full">Observação<input id="fv-o" value="${esc(v?.observacao || '')}"></label></div>`,
     foot: `${v ? '<button class="btn danger" id="fv-del" style="margin-right:auto">Excluir</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="fv-ok">Salvar</button>` });
   const n = (id) => { const s = $('#' + id, md.el).value.trim(); return s ? num(s) : null; };
   $('#fv-ok', md.el).onclick = async (ev) => {

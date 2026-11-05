@@ -1,8 +1,8 @@
 ---
 titulo: Conversas
-tela: Comunicação › Conversas
-versao: 2.3
-atualizado: 2026-10-29
+tela: Comunicação › Conversas (AJU002)
+versao: 2.4
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
@@ -191,7 +191,7 @@ Os avisos usam a mesma liberação do sino de notificações. Clique no **sino**
 
 ## 13. Perguntas frequentes e erros comuns
 
-**Não acho a pessoa na nova conversa.** Ela precisa ser usuária da empresa. Peça ao administrador para convidá-la em **Cadastros › Empresa e usuários**.
+**Não acho a pessoa na nova conversa.** Ela precisa ser usuária da empresa. Peça ao administrador para convidá-la em **Cadastros › Empresa e Usuários**.
 
 **A mensagem ficou com 🕓.** Ela está esperando a internet e sai sozinha quando a conexão voltar.
 
@@ -222,3 +222,4 @@ Os avisos usam a mesma liberação do sino de notificações. Clique no **sino**
 | 2.1 | 29/10/2026 | Microfone recusado: a plataforma explica o motivo e como liberar no computador, iPad/iPhone e Android. |
 | 2.2 | 29/10/2026 | O online e o "digitando…" passam por canais privados: só os recebe quem é da empresa ou da conversa. |
 | 2.3 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 2.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

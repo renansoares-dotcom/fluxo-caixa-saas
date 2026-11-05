@@ -65,8 +65,8 @@ async function editar(p, root) {
   const n = (id, val, ph = '') => `<input id="${id}" value="${val != null ? inp(val) : ''}" placeholder="${ph}">`;
   const m = modal({ title: p ? `${p.codigo} — editar` : 'Novo produto', wide: true, body: `
     <fieldset><legend>Identificação</legend><div class="grid-form">
-      <label>Código (Iniflex) *<input id="pf-cod" value="${esc(v.codigo || '')}"></label>
-      <label class="span2">Descrição *<input id="pf-des" value="${esc(v.descricao || '')}"></label>
+      <label>Código (Iniflex) *<input required id="pf-cod" value="${esc(v.codigo || '')}"></label>
+      <label class="span2">Descrição *<input required id="pf-des" value="${esc(v.descricao || '')}"></label>
       <label>Tipo${sel('pf-tipo', TIPOS, v.tipo, false)}</label>
       <label class="xs">Unidade<input id="pf-un" value="${esc(v.unidade || 'KG')}"></label>
       <label class="xs">NCM<input id="pf-ncm" value="${esc(v.ncm || '')}"></label>
@@ -182,9 +182,9 @@ async function abrir(p, root) {
       ${linhasEstr.map(l => `<tr><td>${esc(l.c ? `${l.c.codigo} — ${l.c.descricao}` : '?')}</td><td class="num">${qtd(l.e.quantidade)} ${esc(l.c?.unidade || '')} por ${qtd(l.e.base)} ${esc(p.unidade)}</td><td class="num">${qtd(l.e.perda_pct)}%</td>
         <td class="num">${qtd(Math.round(l.qtdUn * 10000) / 10000)}</td><td class="num">${l.custo != null ? unit(l.custo) : '<span class="muted">sem custo</span>'}</td>${ed ? `<td><button class="btn ghost icon" data-ex="${l.e.id}">✕</button></td>` : ''}</tr>`).join('')
       || `<tr><td colspan="${ed ? 6 : 5}" class="empty">Sem estrutura.</td></tr>`}</tbody></table></div>
-    ${ed ? `<div class="grid-form" style="margin-top:8px" id="es-add"><label class="span2">Componente<input id="es-c" list="es-dl" placeholder="código ou descrição">${datalistProdutos('es-dl', L.filter(x => x.id !== p.id))}</label>
-      <label>Quantidade<input id="es-q"></label><label>Por (base em ${esc(p.unidade)})<input id="es-b" value="1"></label><label>Perda %<input id="es-p" value="0"></label>
-      <div style="align-self:end"><button class="btn small" id="es-ok">+ Componente</button></div></div>` : ''}
+    ${ed ? `<div class="grid-form" style="margin-top:8px" id="es-add"><label class="c4">Componente<input id="es-c" list="es-dl" placeholder="código ou descrição">${datalistProdutos('es-dl', L.filter(x => x.id !== p.id))}</label>
+      <label class="xs">Quantidade<input id="es-q" inputmode="decimal"></label><label class="xs">Por (base em ${esc(p.unidade)})<input id="es-b" value="1" inputmode="decimal"></label><label class="xs">Perda %<input id="es-p" value="0" inputmode="decimal"></label>
+      <div class="xs" style="align-self:end"><button class="btn small" id="es-ok" style="min-height:38px">+ Componente</button></div></div>` : ''}
     ${comprasNf.length ? `<h3 style="margin:14px 0 6px">Compras nos últimos 12 meses (NF-e de entrada)</h3><div class="table-wrap" style="max-height:260px"><table><thead><tr><th>Emissão</th><th>NF</th><th>Fornecedor</th><th class="num">Quantidade</th><th class="num">Custo líquido</th><th class="num">Unitário</th></tr></thead><tbody>
       ${comprasNf.sort((a, b) => b.emissao.localeCompare(a.emissao)).map(c => `<tr><td>${dateBR(c.emissao)}</td><td>${c.numero}</td><td>${esc(c.emit_nome || '')}</td><td class="num">${qtd(c.quantidade)}</td><td class="num">${money(c.custo_total)}</td><td class="num">${c.custo_unitario != null ? unit(c.custo_unitario) : '–'}</td></tr>`).join('')}</tbody></table></div>
       <p class="small muted">Custo líquido = produtos + frete + outras − desconto + ST, sem os impostos marcados como recuperáveis em Posição de estoque › Parâmetros de custo.</p>` : ''}`,

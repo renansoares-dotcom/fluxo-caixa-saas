@@ -1,8 +1,8 @@
 ---
 titulo: Contratos
-tela: Cadastros › Contratos
-versao: 1.1
-atualizado: 2026-10-30
+tela: Cadastros › Contratos (CAD006)
+versao: 1.3
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -72,7 +72,7 @@ Os mesmos alertas aparecem no **Decision Center** para os administradores.
 4. Clique em **Gerar minuta (PDF)**. A plataforma monta o documento no padrão do papel timbrado (logo, razão social, CNPJ e endereço da empresa), com a qualificação das partes, as cláusulas, o valor por extenso, o reajuste, o foro e os campos de assinatura.
 5. Na janela de impressão, escolha **Salvar como PDF**.
 
-Os dados da empresa vêm de **Empresa e Usuários** (CNPJ, endereço e representante legal) e de **Cadastros › Empresa: identidade e crachás** (razão social dos documentos, logo e unidades). Os da outra parte vêm do cadastro do beneficiário (nome, CPF/CNPJ e endereço).
+Os dados da empresa vêm de **Empresa e Usuários** (CNPJ, endereço e representante legal) e de **Cadastros › Empresa: Identidade e Crachás** (razão social dos documentos, logo e unidades). Os da outra parte vêm do cadastro do beneficiário (nome, CPF/CNPJ e endereço).
 
 > Os modelos são **minutas-base**. Peça ao jurídico para revisar cada modelo antes do primeiro uso e ajuste as cláusulas ao caso concreto.
 
@@ -124,3 +124,5 @@ Os dados da empresa vêm de **Empresa e Usuários** (CNPJ, endereço e represent
 |---|---|---|
 | 1.0 | 30/10/2026 | Primeira versão: cadastro de contratos, PDF assinado com conferência de assinatura digital, alertas de vencimento, aviso prévio e reajuste, parcelas no fluxo e reajuste proposto e aprovado. |
 | 1.1 | 30/10/2026 | Modelos de contrato: minuta preenchida com os cadastros (9 modelos), no padrão do papel timbrado, para salvar em PDF e assinar no gov.br. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.3 | 29/10/2026 | Imagens das telas, com dados fictícios. |

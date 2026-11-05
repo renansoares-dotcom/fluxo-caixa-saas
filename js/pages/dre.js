@@ -1,7 +1,7 @@
 import { state, filtrosHTML, bindFiltros, matrizMensal, montarDRE, descricaoFiltros, soma, mesesHeader } from '../lib/data.js';
 import { $, esc, money, pct, cls, exportXLSX, fail, loading, chart, CORES, COR, MESES_CURTO, moneyTick } from '../lib/ui.js';
 
-export const title = 'DRE gerencial';
+export const title = 'DRE Gerencial';
 let modo = 'mensal';
 
 export async function render(root) {

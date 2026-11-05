@@ -5,21 +5,29 @@ import { cadCompras, ST_PED, badge, ABERTOS, qtd, inp, unit, num, diasTxt, lerDi
 import { carregarProdutos, datalistProdutos, ligarItensProduto, produtoDoItem } from '../lib/produtos.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 import { conversaNoModal } from '../lib/mini-chat.js';
+import { seletorColunas } from '../lib/colunas.js';
 
-export const title = 'Pedidos de compra';
+export const title = 'Pedidos de Compra';
 const ui = { filtro: 'andamento', busca: '' };
-let P = [], C = null, PRODS = [];
+let P = [], C = null, PRODS = [], VIS = [];
+// colunas que o seletor "Colunas" mostra ou oculta (docs/design-system.md › 5); Data, Iniflex, Pagamento e Recebido ficam na 2ª linha
+const COLUNAS = [{ id: 'data', nome: 'Data do pedido', sub: true }, { id: 'ini', nome: 'Nº no Iniflex', sub: true }, { id: 'forn', nome: 'Fornecedor' },
+  { id: 'pag', nome: 'Pagamento', sub: true }, { id: 'sit', nome: 'Situação' }, { id: 'itens', nome: 'Itens' }, { id: 'ent', nome: 'Entrega prevista' }, { id: 'rec', nome: 'Recebido (%)', sub: true }];
 const FILTROS = [['andamento', 'Em andamento', ['rascunho', 'aguardando', 'aprovado', 'enviado', 'recebido_parcial']], ['aguardando', 'Aguardando aprovação', ['aguardando']],
   ['receber', 'A receber', ABERTOS], ['recebido', 'Recebidos', ['recebido']], ['cancelado', 'Cancelados', ['cancelado']], ['todos', 'Todos', null]];
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Pedidos de compra</h2><div class="muted small">Pedido aprovado vira previsão no contas a pagar; o recebimento com a nota troca a previsão pelos títulos reais.</div></div>
-      <div style="display:flex;gap:8px"><button class="btn ghost" id="pc-xls">Excel</button><button class="btn primary" id="pc-novo">Novo pedido</button></div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Pedidos de Compra</h2><div class="muted small">Pedido aprovado vira previsão no contas a pagar; o recebimento com a nota troca a previsão pelos títulos reais.</div></div>
+      <div style="display:flex;gap:8px" id="pc-acoes"><button class="btn ghost" id="pc-xls">Excel</button><button class="btn primary" id="pc-novo">Novo pedido</button></div></div>
     <div class="card toolbar"><div class="chips" id="pc-f">${FILTROS.map(([k, t]) => `<span class="chip ${ui.filtro === k ? 'on' : ''}" data-f="${k}">${t}</span>`).join('')}</div>
       <input id="pc-busca" placeholder="Procurar fornecedor, item, nº ou Iniflex" value="${esc(ui.busca)}" style="min-width:260px"></div>
-    <div id="pc-lista" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
+    <div id="pc-lista" style="margin-top:12px" data-colunas="compras-pedidos"><div class="loading">Carregando…</div></div>`;
+  $('#pc-acoes', root).prepend(seletorColunas({ tela: 'compras-pedidos', colunas: COLUNAS, classe: 'btn ghost' }).botao);
   $('#pc-novo', root).onclick = () => editar(null, root);
-  $('#pc-xls', root).onclick = () => exportXLSX($('#pc-lista table', root), 'pedidos_de_compra');
+  // Excel com todas as colunas, mesmo as ocultas na tela
+  $('#pc-xls', root).onclick = () => exportXLSX([['Nº', 'Data', 'Fornecedor', 'Itens', 'Entrega prevista', 'Pagamento', 'Total', 'Recebido (%)', 'Iniflex', 'Situação'],
+    ...VIS.map(p => [`PC ${p.numero}`, dateBR(p.data_pedido), C.forById[p.favorecido_id]?.nome || '', p.itens.map(i => i.descricao).join(' · '), dateBR(p.entrega_prevista),
+      p.condicao_pagamento || diasTxt(p.parcelas_dias), +p.total, p.pctRec ? Math.round(p.pctRec * 100) : '', p.pedido_iniflex || '', ST_PED[p.status]?.[0] || p.status])], 'pedidos_de_compra');
   $('#pc-f', root).onclick = (e) => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { ui.filtro = f; $$('#pc-f .chip', root).forEach(c => c.classList.toggle('on', c.dataset.f === f)); pintar(root); } };
   $('#pc-busca', root).oninput = (e) => { ui.busca = e.target.value; pintar(root); };
   const ab = state.abrir?.tipo === 'pedido' ? state.abrir : null; if (ab) delete state.abrir;
@@ -44,12 +52,17 @@ function pintar(root) {
   const sts = FILTROS.find(f => f[0] === ui.filtro)[2], b = ui.busca.trim().toLowerCase(), h = today();
   const vis = P.filter(p => (!sts || sts.includes(p.status)) && (!b || String(p.numero) === b.replace(/\D/g, '') || (p.pedido_iniflex || '').toLowerCase().includes(b)
     || (C.forById[p.favorecido_id]?.nome || '').toLowerCase().includes(b) || p.itens.some(i => i.descricao.toLowerCase().includes(b))));
-  $('#pc-lista', root).innerHTML = `<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Fornecedor</th><th>Itens</th><th>Entrega prevista</th><th>Pagamento</th><th class="num">Total</th><th class="num">Recebido</th><th>Iniflex</th><th>Situação</th></tr></thead><tbody>
-    ${vis.map(p => `<tr class="clickable" data-id="${p.id}"><td>PC ${p.numero}</td><td>${dateBR(p.data_pedido)}</td><td>${esc(C.forById[p.favorecido_id]?.nome || '–')}</td>
-      <td class="wrap">${esc(p.itens.slice(0, 2).map(i => i.descricao).join(' · '))}${p.itens.length > 2 ? ` <span class="muted">+${p.itens.length - 2}</span>` : ''}</td>
-      <td class="${p.entrega_prevista && p.entrega_prevista < h && ABERTOS.includes(p.status) ? 'neg' : ''}">${dateBR(p.entrega_prevista)}</td><td>${esc(p.condicao_pagamento || diasTxt(p.parcelas_dias))}</td>
-      <td class="num">${money(p.total)}</td><td class="num">${p.pctRec ? Math.round(p.pctRec * 100) + '%' : ''}</td><td>${esc(p.pedido_iniflex || '')}</td><td>${badge(ST_PED, p.status)}</td></tr>`).join('')
-    || '<tr><td colspan="10" class="empty">Nenhum pedido neste filtro.</td></tr>'}</tbody></table></div></div>`;
+  VIS = vis;
+  $('#pc-lista', root).innerHTML = `<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Nº<div class="small" data-col="data">Data</div></th>
+      <th data-col="forn">Fornecedor<div class="small" data-col="pag">Pagamento</div></th><th data-col="sit">Situação</th><th data-col="itens">Itens</th><th data-col="ent">Entrega prevista</th>
+      <th class="num">Total<div class="small" data-col="rec">Recebido</div></th></tr></thead><tbody>
+    ${vis.map(p => `<tr class="clickable" data-id="${p.id}"><td>PC ${p.numero}<div class="small muted" data-col="data">${dateBR(p.data_pedido)}</div>${p.pedido_iniflex ? `<div class="small muted" data-col="ini">Iniflex ${esc(p.pedido_iniflex)}</div>` : ''}</td>
+      <td class="wrap-m" data-col="forn">${esc(C.forById[p.favorecido_id]?.nome || '–')}<div class="small muted" data-col="pag">${esc(p.condicao_pagamento || diasTxt(p.parcelas_dias))}</div></td>
+      <td data-col="sit">${badge(ST_PED, p.status)}</td>
+      <td class="wrap" data-col="itens">${esc(p.itens.slice(0, 2).map(i => i.descricao).join(' · '))}${p.itens.length > 2 ? ` <span class="muted">+${p.itens.length - 2}</span>` : ''}</td>
+      <td data-col="ent" class="${p.entrega_prevista && p.entrega_prevista < h && ABERTOS.includes(p.status) ? 'neg' : ''}">${dateBR(p.entrega_prevista)}</td>
+      <td class="num">${money(p.total)}${p.pctRec ? `<div class="small muted" data-col="rec">recebido ${Math.round(p.pctRec * 100)}%</div>` : ''}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="empty">Nenhum pedido neste filtro.</td></tr>'}</tbody></table></div></div>`;
   $$('#pc-lista tr[data-id]', root).forEach(tr => tr.onclick = () => abrir(P.find(p => p.id === tr.dataset.id), root));
 }
 
@@ -61,10 +74,10 @@ function linhaItem(i = {}) {
 }
 function editar(p, root) {
   const v = p || { data_pedido: today(), parcelas_dias: [28], frete: 0, desconto: 0, itens: [{}] };
-  const so = (id, lista, sel, rot) => `<select id="${id}"><option value="">—</option>${lista.map(x => `<option value="${x.id}" ${sel === x.id ? 'selected' : ''}>${esc(rot(x))}</option>`).join('')}</select>`;
+  const so = (id, lista, sel, rot, req = false) => `<select id="${id}"${req ? ' required' : ''}><option value="">—</option>${lista.map(x => `<option value="${x.id}" ${sel === x.id ? 'selected' : ''}>${esc(rot(x))}</option>`).join('')}</select>`;
   const m = modal({ title: p ? `PC ${p.numero} — editar` : 'Novo pedido de compra (avulso)', wide: true, body: `
     <fieldset><legend>Pedido</legend><div class="grid-form">
-      <label class="span2">Fornecedor *${so('pe-f', C.fornecedores, v.favorecido_id, f => f.nome + (f.documento ? ' · ' + f.documento : ''))}</label>
+      <label class="span2">Fornecedor *${so('pe-f', C.fornecedores, v.favorecido_id, f => f.nome + (f.documento ? ' · ' + f.documento : ''), true)}</label>
       <label class="xs">Data do pedido<input type="date" id="pe-dt" value="${v.data_pedido || today()}"></label>
       <label class="xs">Entrega prevista<input type="date" id="pe-ent" value="${v.entrega_prevista || ''}"></label>
       <label class="xs">Nº do pedido no Iniflex<input id="pe-ini" value="${esc(v.pedido_iniflex || '')}"></label>
@@ -129,15 +142,14 @@ async function abrir(p, root) {
   const alc = +(C.parametros?.alcada_valor ?? 5000), f = C.forById[p.favorecido_id];
   const m = modal({ title: `Pedido de compra PC ${p.numero}`, wide: true, body: `
     <div class="grid-form small">
-      <div><span class="muted">Situação</span><div>${badge(ST_PED, p.status)}</div></div>
+      <div class="xs"><span class="muted">Situação</span><div>${badge(ST_PED, p.status)}</div>${p.aprovado_em ? `<div class="muted">aprovado em ${dateBR(p.aprovado_em)}</div>` : ''}</div>
       <div class="span2"><span class="muted">Fornecedor</span><div>${esc(f?.nome || '–')}${f?.documento ? ` <span class="muted">${esc(f.documento)}</span>` : ''}</div></div>
-      <div><span class="muted">Data</span><div>${dateBR(p.data_pedido)}</div></div>
-      <div><span class="muted">Entrega prevista</span><div>${dateBR(p.entrega_prevista) || '–'}</div></div>
-      <div><span class="muted">Pagamento</span><div>${esc(p.condicao_pagamento || '')} ${diasTxt(p.parcelas_dias)}</div></div>
+      <div class="xs"><span class="muted">Data</span><div>${dateBR(p.data_pedido)}</div></div>
+      <div class="xs"><span class="muted">Entrega prevista</span><div>${dateBR(p.entrega_prevista) || '–'}</div></div>
+      <div class="xs"><span class="muted">Pagamento</span><div>${esc(p.condicao_pagamento || '')} ${diasTxt(p.parcelas_dias)}</div></div>
       <div class="span2"><span class="muted">Classificação</span><div>${esc(C.planoById[p.plano_id] ? `${C.planoById[p.plano_id].codigo} - ${C.planoById[p.plano_id].nome}` : '— falta definir')}</div></div>
-      <div><span class="muted">Centro de custo</span><div>${esc(C.ccById[p.centro_custo_id]?.nome || '–')}</div></div>
-      <div><span class="muted">Iniflex</span><div>${esc(p.pedido_iniflex || '–')}</div></div>
-      ${p.aprovado_em ? `<div><span class="muted">Aprovado em</span><div>${dateBR(p.aprovado_em)}</div></div>` : ''}
+      <div class="xs"><span class="muted">Centro de custo</span><div>${esc(C.ccById[p.centro_custo_id]?.nome || '–')}</div></div>
+      <div class="xs"><span class="muted">Iniflex</span><div>${esc(p.pedido_iniflex || '–')}</div></div>
     </div>
     ${p.observacao ? `<p class="small" style="margin:8px 0 0"><span class="muted">Observação:</span> ${esc(p.observacao)}</p>` : ''}
     ${p.motivo ? `<p class="small neg" style="margin:6px 0 0">Motivo: ${esc(p.motivo)}</p>` : ''}

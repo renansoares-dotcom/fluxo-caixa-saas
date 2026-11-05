@@ -1,8 +1,8 @@
 ---
 titulo: Pagamentos Antecipados
-tela: Financeiro › Pagamentos Antecipados
-versao: 1.2
-atualizado: 2026-10-29
+tela: Financeiro › Pagamentos Antecipados (FIN008)
+versao: 1.3
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
@@ -44,6 +44,8 @@ As abas separam os pedidos pela situação: **Aguardando aprovação**, **Aprova
 ## 4. Passo a passo
 
 ### 4.1 Pedir um pagamento antecipado
+
+![Figura 2 — Novo pagamento antecipado: Quem recebe, O pagamento e Classificação (dados fictícios)](img/pagamentos-antecipados-2.jpg)
 
 1. Clique em **+ Novo pagamento antecipado**.
 2. Em **Quem recebe**, preencha a **razão social** (ao escolher um fornecedor do cadastro, o CNPJ entra sozinho), o **CNPJ / CPF** e a **chave Pix** (com o tipo) ou o **banco, agência e conta**.
@@ -158,3 +160,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.0 | 28/10/2026 | Primeira versão do manual: pedido, aprovação, programação, vários pagamentos e comprovantes, ligar a nota e relatório no padrão IPLAMM. |
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do pagamento antecipado (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.3 | 05/11/2026 | Nome da tela com o código. Formulário do novo pagamento em três seções (Quem recebe, O pagamento, Classificação). Figuras refeitas. |

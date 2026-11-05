@@ -3,7 +3,7 @@ import { sb, state, q, loadCadastros, podeEditar } from '../lib/data.js';
 import { erroTela, $, esc, money, dateBR, fail, toast, exportXLSX } from '../lib/ui.js';
 import { TIPOS, creditosComSaldo, novoCredito, devolverCredito } from '../lib/creditos.js';
 
-export const title = 'Créditos e adiantamentos';
+export const title = 'Créditos e Adiantamentos';
 const ui = { nat: 'cliente', saldo: true, busca: '' };
 let L = [];
 
@@ -11,7 +11,7 @@ export async function render(root) {
   await loadCadastros();
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
-      <div><h2 style="margin:0">Créditos e adiantamentos</h2><p class="muted small" style="margin:4px 0 0">Adiantamentos recebidos de clientes (ou pagos a fornecedores) antes da nota, e créditos de clientes (devolução, desconto, acordo). O saldo é usado nas parcelas das notas em <em>Notas Fiscais › nota › Usar crédito</em>.</p></div>
+      <div><h2 style="margin:0">Créditos e Adiantamentos</h2><p class="muted small" style="margin:4px 0 0">Adiantamentos recebidos de clientes (ou pagos a fornecedores) antes da nota, e créditos de clientes (devolução, desconto, acordo). O saldo é usado nas parcelas das notas em <em>Notas Fiscais › nota › Usar crédito</em>.</p></div>
       <div style="display:flex;gap:8px">${podeEditar() ? '<button class="btn primary" id="novo">+ Novo crédito / adiantamento</button>' : ''}<button class="btn" id="exp">Exportar Excel</button></div></div>
       <div class="toolbar" id="flt" style="margin-top:10px">
         <label>De<select name="nat"><option value="cliente">Clientes</option><option value="fornecedor">Fornecedores</option></select></label>

@@ -1,7 +1,7 @@
 import { state } from '../lib/data.js';
 import { crudPage } from '../lib/crud.js';
 
-export const title = 'Centros de custo e grupos';
+export const title = 'Centros de Custo e Grupos';
 
 export async function render(root) {
   crudPage(root, {

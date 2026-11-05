@@ -1,15 +1,15 @@
 ---
 titulo: Conferência do dia e Fechamento do mês
-tela: Financeiro › Conferência do dia e Fechamento do mês
-versao: 1.1
-atualizado: 2026-10-29
+tela: Financeiro › Conferência do Dia (FIN009) e Fechamento do Mês (FIN010)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
 As duas telas ajudam a deixar o caixa certo todos os dias e a fechar o mês com segurança:
 
-- **Conferência do dia**: um mapa do mês com **uma linha por conta e uma coluna por dia**. Cada quadradinho diz se o dia bate com o extrato do banco. Clicando, você confere o dia e dá o **visto**.
-- **Fechamento do mês**: um checklist que confere sozinho cada etapa do fechamento, o resumo do mês para a direção e a **trava** de cada conta.
+- **Conferência do Dia**: um mapa do mês com **uma linha por conta e uma coluna por dia**. Cada quadradinho diz se o dia bate com o extrato do banco. Clicando, você confere o dia e dá o **visto**.
+- **Fechamento do Mês**: um checklist que confere sozinho cada etapa do fechamento, o resumo do mês para a direção e a **trava** de cada conta.
 
 Nenhuma das duas altera lançamentos. As correções são feitas nas telas de sempre (Lançamentos e Conciliação).
 
@@ -21,7 +21,7 @@ Nenhuma das duas altera lançamentos. As correções são feitas nas telas de se
 | Administrador | Fecha e destrava as contas no Fechamento do mês. |
 | Diretor e leitura | Consultam e imprimem. |
 
-## 3. Conferência do dia
+## 3. Conferência do Dia
 
 ![Figura 1 — Mapa da conferência do mês (dados fictícios)](img/conferencia-fechamento-1.jpg)
 
@@ -63,7 +63,7 @@ A aba **Saldos da conta** mostra uma linha por dia de uma conta: saldo inicial, 
 
 **Imprimir / PDF** gera a tela no padrão IPLAMM.
 
-## 4. Fechamento do mês
+## 4. Fechamento do Mês
 
 ![Figura 2 — Checklist do fechamento do mês (dados fictícios)](img/conferencia-fechamento-2.jpg)
 
@@ -117,3 +117,4 @@ Cada conta pode ser fechada numa data diferente.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: mapa do mês, visto por dia e em lote, saldos da conta, checklist do fechamento, resumo para a direção e trava por conta. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

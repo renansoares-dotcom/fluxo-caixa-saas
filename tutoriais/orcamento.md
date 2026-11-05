@@ -1,8 +1,8 @@
 ---
 titulo: Orçamento — budget, forecast e controle orçamentário
-tela: Financeiro › Budget / Forecast, Orçado x Realizado e Controle orçamentário
-versao: 1.1
-atualizado: 2026-10-29
+tela: Financeiro › Budget / Forecast (FIN014), Orçado x Realizado (FIN015) e Controle Orçamentário (FIN016)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
@@ -10,7 +10,7 @@ atualizado: 2026-10-29
   - **Budget** é o planejamento inicial.
   - **Forecast** é a revisão ao longo do ano.
 - **Orçado x Realizado**: compara o orçamento com o que aconteceu, mês a mês.
-- **Controle orçamentário**: acompanha cada conta do plano e cada centro de custo:
+- **Controle Orçamentário**: acompanha cada conta do plano e cada centro de custo:
   - orçado, comprometido (em aberto) e realizado;
   - semáforo e projeção do ano;
   - justificativa dos desvios, com relatório em PDF.
@@ -56,9 +56,9 @@ No forecast, escolha para cada mês o que vale nas comparações:
 
 O budget e o forecast são lançados por conta do plano, sem banco nem favorecido. Os filtros da tela afetam só o realizado.
 
-## 5. Controle orçamentário
+## 5. Controle Orçamentário
 
-![Figura 2 — Controle orçamentário (dados fictícios)](img/orcamento-2.jpg)
+![Figura 2 — Controle Orçamentário (dados fictícios)](img/orcamento-2.jpg)
 
 ### 5.1 Os parâmetros
 
@@ -124,3 +124,4 @@ O rateio não muda o budget nem o forecast: só distribui o valor na visão por 
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: budget, forecast e status do mês, orçado x realizado, controle orçamentário com semáforo, justificativas, rateio por centro de custo e relatório. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

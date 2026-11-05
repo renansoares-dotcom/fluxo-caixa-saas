@@ -17,6 +17,7 @@ Regras de tela da plataforma. Valem para toda tela nova ou alterada, e o agente 
 Toda tela tem um código fixo, como no Iniflex, registrado em `js/lib/telas.js`: **3 letras da área + 3 dígitos**. Exemplos: `FIN014` Carteira Cedida, `CAD003` Beneficiários.
 - O código aparece ao lado do título da tela e no menu, e a busca (Ctrl K) encontra a tela pelo código.
 - O código **nunca muda** e não é reaproveitado. Uma tela nova pega o próximo número livre da área.
+- **Nome oficial da tela = nome do menu.** O título do topo e o da aba do navegador vêm do item do menu (`js/app.js` lê o `data-nome`); `export const title` de cada tela fica igual a ele (teste em `tests/telas.test.js`). Nos manuais, a tela aparece com o nome do menu e, no cabeçalho, com o código: "Carteira Cedida (FIN019)".
 
 | Prefixo | Área |
 |---|---|
@@ -55,13 +56,39 @@ Use `<fieldset><legend>Seção</legend><div class="grid-form">…</div></fieldse
 - Obrigatório: `*` no rótulo e `required` no campo.
 - Nenhuma linha deve ficar com mais de um terço vazio. Reordene os campos ou ajuste o tamanho. Texto livre que sobra sozinho na última linha (Observação) usa `full`.
 - Ações no rodapé do modal: destrutiva à esquerda (`danger`), Cancelar e principal (`primary`) à direita.
+- Tamanho do modal pelo número de campos: até 2 a 4 campos simples, `modal({ narrow: true })` (480 px, uma coluna); o padrão (760 px, 3 por linha) para formulários médios; `wide: true` (1100 px, 4 por linha) a partir de 7 ou 8 campos. `crud.js` já escolhe sozinho o pequeno (até 2 campos) e aceita `largo: true` e `cls` por campo.
+- Caixa de seleção com texto longo (ex.: "Atende cliente que só recebe veículo pequeno") usa `class="chk span2"` (ou `full`); sem isso a grade a deixa do tamanho `xs`.
+- Ficha só de leitura em modal largo (rótulo + valor, como a ficha do cliente): `grid-form dados5`, 5 dados por linha, para 9 ou 5 itens não sobrar um sozinho. Dado curto (data, situação, código) usa `xs`.
+- Linha de inclusão dentro do modal (componente, consumo, contato): campo principal `c4`, números `xs` e o botão num `div.xs` alinhado embaixo, tudo na mesma linha.
 
 ## 5. Tabelas e listas
 - Números à direita com `class="num"`, moeda com `money()` e datas com `dateBR()`.
-- Coluna vazia em mais de 80 % das linhas: esconda ou mostre só ao filtrar.
+- Coluna vazia em mais de 80 % das linhas: esconda ou mostre só ao filtrar (ex.: Prioridade só na aba A pagar).
 - Lista longa: `.table-wrap` com cabeçalho fixo. Linha clicável: `class="clickable"`.
-- Tabela em painel lado a lado (lista + painel, como em Propostas de Borderô): a coluna de valor tem de caber sem rolagem em 1366. Colunas secundárias (emissão, NF / parcela, situação) vão para a 2ª linha da célula principal com `<div class="small muted">`, e o rótulo para a 2ª linha do cabeçalho com `<div class="small">`.
+- **Nada rola para o lado em 1366.** Colunas secundárias (dias, conta, centro de custo, data, pagamento, recebido, emissão, NF / parcela, situação) vão para a 2ª linha da célula principal com `<div class="small muted">`, e o rótulo para a 2ª linha do cabeçalho com `<th>Plano de contas<div class="small">Conta</div></th>`. Texto que pode quebrar: `td.wrap` (descrição, 220 px) ou `td.wrap-m` (nome, plano de contas, 150 px). Vale para listas e para tabela em painel lado a lado (Propostas de Borderô).
 - Toolbar: filtros à esquerda, ações à direita (Excel, Gerar relatório, ação principal por último).
+
+### Seletor "Colunas" (`js/lib/colunas.js`)
+Botão **Colunas** que abre uma lista de caixas para mostrar ou ocultar colunas, com **Restaurar padrão**. A escolha fica guardada por usuário e por tela no `localStorage` (com `try/catch`). Usado em Contas a Pagar / Receber, Lançamentos, Pedidos de Compra e Representantes e Metas (meses da meta, com atalhos 1º semestre, 2º semestre e Ano todo).
+
+```js
+import { seletorColunas } from '../lib/colunas.js';
+const COLUNAS = [{ id: 'plano', nome: 'Plano de contas' }, { id: 'cc', nome: 'C. Custo', sub: true }, { id: 'obs', nome: 'Observação', padrao: false }];
+// no HTML: um contêiner com data-colunas="<tela>"; cada célula ou 2ª linha que pode sumir leva data-col="<id>"
+root.innerHTML = `…<div class="toolbar" id="tb">…<span class="spacer"></span></div><div class="table-wrap" data-colunas="lancamentos">
+  <table><tr><th data-col="plano">Plano de contas<div class="small" data-col="cc">C. Custo</div></th>…`;
+$('#tb', root).append(seletorColunas({ tela: 'lancamentos', colunas: COLUNAS }).botao);
+```
+
+- `id`: o mesmo do `data-col`. `padrao: false` deixa a coluna oculta até o usuário marcar. `sub: true` aparece recuada na lista (é a 2ª linha da coluna anterior).
+- Opções: `rotulo` e `titulo` (ex.: "Meses" / "Mostrar meses"), `classe` do botão (padrão `btn small`, o da toolbar da tabela), `atalhos: [{ nome, colunas: [ids] }]`.
+- A regra de ocultar vai num `<style>` da tela, então a tabela pode ser redesenhada (filtro, página, aba) sem chamar nada.
+- Lugar do botão: na toolbar da tabela, à direita (ou ao lado do Excel no cabeçalho da tela, quando a tela não tem toolbar própria).
+- **O Excel exporta todas as colunas**, mesmo as ocultas: monte a planilha pelos dados (`exportXLSX([[cabeçalho], ...linhas])`), não pela tabela da tela.
+- Coluna só oculta cabe na regra dos 80 %; não use o seletor para esconder um problema de largura: primeiro a 2ª linha da célula.
+
+### Celular
+Tabela mais larga que a tela rola para o lado e **esmaece a borda** onde há mais colunas (`.table-wrap.rola-dir` / `.rola-esq`, marcadas por `js/app.js`; CSS só até 900 px). Não precisa fazer nada na tela.
 
 ## 6. Relatórios
 Sempre por `abrirRelatorio()` de `js/lib/relatorio.js`. O padrão é o de Fretes e CIOT: Times, logo, título em maiúsculas, seções numeradas, filetes pretos e rodapé com a base dos dados.

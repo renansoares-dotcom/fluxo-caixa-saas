@@ -1,25 +1,25 @@
 ---
 titulo: Cadastros — plano de contas, contas, beneficiários e centros de custo
-tela: Cadastros › Plano de contas, Contas bancárias, Beneficiários e Centros de custo e grupos
-versao: 1.1
-atualizado: 2026-10-29
+tela: Cadastros › Plano de Contas (CAD001), Contas Bancárias (CAD002), Beneficiários (CAD003) e Centros de Custo e Grupos (CAD004)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
 Os cadastros são a base de toda a plataforma:
 
-- **Plano de contas**: as classificações e as contas que dão o sinal (entrada ou saída) e o lugar de cada lançamento na DRE.
-- **Contas bancárias**: bancos, caixas, FIDC, cartões e demais contas onde o dinheiro está.
+- **Plano de Contas**: as classificações e as contas que dão o sinal (entrada ou saída) e o lugar de cada lançamento na DRE.
+- **Contas Bancárias**: bancos, caixas, FIDC, cartões e demais contas onde o dinheiro está.
 - **Beneficiários**: clientes, fornecedores, fundos (FIDC), representantes, funcionários e sócios.
-- **Centros de custo e grupos**: os setores para análise de custo e os grupos empresariais.
+- **Centros de Custo e Grupos**: os setores para análise de custo e os grupos empresariais.
 
 ## 2. Quem tem acesso
 
 Os cadastros aparecem para todos. O administrador e o financeiro incluem e alteram; os demais perfis consultam.
 
-## 3. Plano de contas
+## 3. Plano de Contas
 
-![Figura 1 — Plano de contas (dados fictícios)](img/cadastros-1.jpg)
+![Figura 1 — Plano de Contas (dados fictícios)](img/cadastros-1.jpg)
 
 ### 3.1 Estrutura
 
@@ -43,9 +43,9 @@ Na **classificação** você define:
 
 Conta usada em lançamentos **não pode ser excluída**: inative-a.
 
-## 4. Contas bancárias
+## 4. Contas Bancárias
 
-![Figura 2 — Contas bancárias (dados fictícios)](img/cadastros-2.jpg)
+![Figura 2 — Contas Bancárias (dados fictícios)](img/cadastros-2.jpg)
 
 Para cada conta, informe:
 
@@ -102,7 +102,7 @@ Na aba **Fundos (FIDC)** ficam juntos:
 - os **dados cadastrais** usados no endosso: razão social, CNPJ, endereço e praça de pagamento;
 - as **condições da operação** usadas na simulação das propostas de borderô: conta do fundo, conta de crédito do líquido, cálculo do deságio, taxa a.m., ad valorem, tarifas, IOF, dias de compensação, prazos e limites.
 
-## 6. Centros de custo e grupos
+## 6. Centros de Custo e Grupos
 
 - **Centros de custo**: os setores para análise (o nome é gravado em maiúsculas).
 - **Grupos empresariais**: matriz, filiais e empresas do grupo.
@@ -129,3 +129,4 @@ Inative o que não estiver mais em uso.
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: plano de contas, contas bancárias, beneficiários por aba (inclusive pelas NF-e e fundos FIDC) e centros de custo e grupos. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

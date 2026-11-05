@@ -8,13 +8,13 @@ import { badge, qtd, num } from '../lib/compras.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 import { conversaNoModal } from '../lib/mini-chat.js';
 
-export const title = 'Ordens de produção';
+export const title = 'Ordens de Produção';
 const ui = { filtro: 'abertas', busca: '' };
 let C = null, OPS = [], ETS = [], PRODS = [];
 const FILTROS = [['abertas', 'Em aberto', ['planejada', 'liberada', 'em_producao']], ['atrasadas', 'Atrasadas', null], ['concluida', 'Concluídas', ['concluida']], ['todas', 'Todas', []]];
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Ordens de produção</h2><div class="muted small">Enquanto o Iniflex for o sistema principal, as OPs entram por Produção › Importar do Iniflex; OPs novas também podem ser abertas aqui.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Ordens de Produção</h2><div class="muted small">Enquanto o Iniflex for o sistema principal, as OPs entram por Produção › Importar do Iniflex; OPs novas também podem ser abertas aqui.</div></div>
       <div style="display:flex;gap:8px"><button class="btn ghost" id="op-xls">Excel</button>${podePCP() ? '<button class="btn primary" id="op-nova">Nova OP</button>' : ''}</div></div>
     <div class="card toolbar"><div class="chips" id="op-f">${FILTROS.map(([k, t]) => `<span class="chip ${ui.filtro === k ? 'on' : ''}" data-f="${k}">${t}</span>`).join('')}</div>
       <input id="op-b" placeholder="Procurar OP, produto, cliente ou pedido" value="${esc(ui.busca)}" style="min-width:260px"></div>
@@ -141,8 +141,8 @@ async function abrir(o, root) {
         <td style="font-family:monospace">${esc(bob.find(x => x.id === b.mae_id)?.codigo || (b.mae_id ? '(outra OP)' : ''))}</td><td>${esc(b.lote_materia || '')}</td><td>${esc(b.situacao)}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhuma bobina registrada.</td></tr>'}</tbody></table></div>
     ${podeApontar() ? `<h3 style="margin:14px 0 6px">Consumo de matéria-prima</h3>
       <div class="small">${cons.map(c => `${qtd(c.quantidade)} — ${esc(PRODS.find(p => p.id === c.produto_id)?.descricao || c.codigo || '')}${c.lote ? ` · lote ${esc(c.lote)}` : ''}`).join('<br>') || '<span class="muted">Nenhum consumo apontado.</span>'}</div>
-      <div class="grid-form" style="margin-top:6px"><label class="span2">Material<input id="oc-p" list="oc-dl">${datalistProdutos('oc-dl', PRODS.filter(p => p.tipo !== 'produto_acabado'))}</label>
-        <label>Quantidade<input id="oc-q"></label><label>Lote / NF<input id="oc-l"></label><div style="align-self:end"><button class="btn small" id="oc-ok">+ Consumo</button></div></div>` : ''}`,
+      <div class="grid-form" style="margin-top:6px"><label class="c4">Material<input id="oc-p" list="oc-dl">${datalistProdutos('oc-dl', PRODS.filter(p => p.tipo !== 'produto_acabado'))}</label>
+        <label class="xs">Quantidade<input id="oc-q" inputmode="decimal"></label><label>Lote / NF<input id="oc-l"></label><div class="xs" style="align-self:end"><button class="btn small" id="oc-ok" style="min-height:38px">+ Consumo</button></div></div>` : ''}`,
     foot: '<div id="op-ac" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%"></div>' });
   conversaNoModal(m, 'prod_ordem', o.id);
   const ac = $('#op-ac', m.el), btn = (t, cls, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = t; b.onclick = fn; ac.appendChild(b); };

@@ -31,3 +31,12 @@ test('menu sem conectivo em maiúscula', () => {
   const ruins = nomes.filter(n => grafia(n) !== n);
   assert.deepEqual(ruins, []);
 });
+test('nome oficial da tela: o título do módulo é o nome do menu', () => {
+  const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const menu = Object.fromEntries([...html.matchAll(/data-route="([^"]+)"[^>]*>([^<]+)</g)].map(m => [m[1], m[2].trim()]));
+  const dif = [...app.matchAll(/'([^']+)': \(\) => import\(`\.\/pages\/([a-z0-9-]+)\.js/g)].flatMap(([, rota, pag]) => {
+    const t = readFileSync(new URL(`../js/pages/${pag}.js`, import.meta.url), 'utf8').match(/export const title = '([^']*)'/)?.[1];
+    return menu[rota] && t !== menu[rota] ? [`${rota}: "${t}" ≠ "${menu[rota]}"`] : [];
+  });
+  assert.deepEqual(dif, []);
+});

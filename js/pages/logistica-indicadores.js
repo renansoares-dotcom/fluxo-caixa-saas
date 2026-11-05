@@ -5,7 +5,7 @@ import { podeLogistica } from '../lib/logistica.js';
 import { indicadores, frenteMeta, mesesAte, METAS_PADRAO } from '../lib/logistica-indicadores.js';
 import { valorMensal } from '../lib/contratos.js';
 
-export const title = 'Logística — indicadores';
+export const title = 'Indicadores';
 const ui = { mes: today().slice(0, 7) };
 let B = null;
 const nf = (v, c = 1) => v == null ? '–' : (+v).toLocaleString('pt-BR', { minimumFractionDigits: c, maximumFractionDigits: c });
@@ -68,7 +68,7 @@ export async function render(root) {
           .map(([v, u, m, sd]) => { const st = m != null ? frenteMeta(v, m, sd) : null; return `<td class="num ${st === 'neg' ? 'neg' : st === 'warn' ? 'warn' : ''}">${v == null ? '–' : u === 'R$' ? money(v) : nf(v) + u}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div></div>
       <div class="card"><h3 style="margin:0 0 8px">Clientes com mais atraso no mês</h3>
         ${k.atrasos.map(a => `<div class="small" style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)"><span>${esc(a.nome)}</span><span>${a.qtd} entrega(s) · média ${nf(a.media)} dias</span></div>`).join('') || '<div class="muted small">Nenhuma entrega fora do prazo no mês.</div>'}</div></div>
-    <p class="small muted">Prazo: dias entre a emissão da nota e a baixa da entrega (limite em Frota e parâmetros). Ocupação: peso e volume da carga sobre a capacidade do veículo, nas cargas que saíram. Custo: frota (combustível, manutenção, multas e locação) mais fretes de terceiros, sobre o valor das notas entregues.</p>`;
+    <p class="small muted">Prazo: dias entre a emissão da nota e a baixa da entrega (limite em Frota e Parâmetros). Ocupação: peso e volume da carga sobre a capacidade do veículo, nas cargas que saíram. Custo: frota (combustível, manutenção, multas e locação) mais fretes de terceiros, sobre o valor das notas entregues.</p>`;
   const rot = B.meses.map(MES);
   chart($('#li-c1', root), { type: 'line', data: { labels: rot, datasets: [{ label: 'No prazo (%)', data: serie.map(s => s.prazo_pct), tension: .3 }, { label: 'Ocupação (%)', data: serie.map(s => s.ocupacao_pct), tension: .3 }] },
     options: { maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } } } });

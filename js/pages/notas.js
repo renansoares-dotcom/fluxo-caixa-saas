@@ -10,7 +10,7 @@ import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
 import { usosPorNota, usarCredito, desfazerUso } from '../lib/creditos.js';
 import { pintarRelatorios, limparCacheRelatorios } from '../lib/notas-relatorio-ui.js';
 
-export const title = 'Notas fiscais';
+export const title = 'Notas Fiscais';
 
 const hoje = new Date();
 const ant = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);

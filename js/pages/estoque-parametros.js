@@ -4,7 +4,7 @@ import { sb, state, q, podeEditar, isAdmin, loadCadastros } from '../lib/data.js
 import { $, $$, esc, dateBR, toast, fail, modal, confirmDialog, exportXLSX, erroTela } from '../lib/ui.js';
 import { FINALIDADES, POSSE, TIPOS_SPED, SENTIDOS, DOCUMENTOS, PAPEIS, periodoAberto } from '../lib/estoque-kardex.js';
 
-export const title = 'Parâmetros do estoque';
+export const title = 'Parâmetros do Estoque';
 const ABAS = [['locais', 'Locais'], ['familias', 'Famílias de item'], ['tipos', 'Tipos de movimento'], ['regras', 'Regras por CFOP'], ['fechamento', 'Fechamento']];
 const ui = { aba: 'locais', sentido: 'entrada', busca: '' };
 let D = null;
@@ -36,7 +36,7 @@ export async function render(root) {
 
 function pintar(root) {
   const ed = podeEditar(), per = periodoAberto(D.fech);
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Parâmetros do estoque</h2><div class="muted small">Como cada item entra, onde fica, quem movimenta e como o custo se forma. Custo médio ponderado móvel por produto, sem os impostos recuperáveis.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Parâmetros do Estoque</h2><div class="muted small">Como cada item entra, onde fica, quem movimenta e como o custo se forma. Custo médio ponderado móvel por produto, sem os impostos recuperáveis.</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="ep-xls">Excel</button>${ed ? '<button class="btn" id="ep-padrao" title="Cria o que faltar da configuração inicial; não altera o que já foi ajustado">Completar com o padrão</button>' : ''}</div></div>
     <div class="kpis">
       <div class="kpi"><div class="k-label">Locais ativos</div><div class="k-value">${D.locais.filter(l => l.ativo).length}</div><div class="k-sub">${D.locais.filter(l => l.finalidade === 'processo' && l.ativo).length} em processo</div></div>
@@ -59,16 +59,18 @@ const corpo = (root, html) => { $('#ep-corpo', root).innerHTML = html; };
 const novoBtn = (ed, id, txt) => ed ? `<div class="toolbar" style="margin:0 0 8px"><span class="spacer"></span><button class="btn primary" id="${id}">${txt}</button></div>` : '';
 const clicar = (root, lista, fn) => $$('#ep-corpo tr[data-id]', root).forEach(tr => tr.onclick = () => fn(lista.find(x => x.id === tr.dataset.id)));
 
-/** formulário genérico: campos [{ k, t, tipo: 'text'|'num'|'chk'|'sel'|'multi', op, span }] */
+/** formulário genérico: campos [{ k, t, tipo: 'text'|'num'|'chk'|'sel'|'multi', op, span, cls }]
+ *  multi (várias caixas) vai num fieldset próprio abaixo da grade, com as caixas em linha; obrigatório leva * e required */
 function form({ titulo, campos, v, tabela, root, excluir }) {
   const campo = (c) => {
     const val = v[c.k];
+    const cl = [c.span ? 'span2' : '', c.cls || ''].join(' ').trim(), t = c.obrig ? `${c.t} *` : c.t, rq = c.obrig ? ' required' : '';
     if (c.tipo === 'chk') return `<label class="chk"><input type="checkbox" data-k="${c.k}" ${val ? 'checked' : ''}> ${c.t}</label>`;
-    if (c.tipo === 'sel') return `<label class="${c.span ? 'span2' : ''}">${c.t}<select data-k="${c.k}">${c.vazio !== false ? `<option value="">${c.vazio || '—'}</option>` : ''}${Object.entries(c.op).map(([k, t]) => `<option value="${esc(k)}" ${String(val ?? '') === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
-    if (c.tipo === 'multi') return `<div class="span2"><div class="small muted">${c.t}</div>${Object.entries(c.op).map(([k, t]) => `<label class="chk" style="display:inline-flex;margin-right:12px"><input type="checkbox" data-m="${c.k}" value="${k}" ${(val || []).includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}<div class="small muted">${c.dica || ''}</div></div>`;
-    return `<label class="${c.span ? 'span2' : ''}">${c.t}<input data-k="${c.k}" ${c.tipo === 'num' ? 'type="number"' : ''} value="${esc(val ?? '')}" ${c.ph ? `placeholder="${esc(c.ph)}"` : ''}></label>`;
+    if (c.tipo === 'sel') return `<label class="${cl}">${t}<select data-k="${c.k}"${rq}>${c.vazio !== false ? `<option value="">${c.vazio || '—'}</option>` : ''}${Object.entries(c.op).map(([k, t]) => `<option value="${esc(k)}" ${String(val ?? '') === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+    if (c.tipo === 'multi') return `<fieldset><legend>${c.t}</legend><div class="areas-chk">${Object.entries(c.op).map(([k, t]) => `<label class="chk"><input type="checkbox" data-m="${c.k}" value="${k}" ${(val || []).includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div>${c.dica ? `<div class="small muted">${c.dica}</div>` : ''}</fieldset>`;
+    return `<label class="${cl}">${t}<input data-k="${c.k}"${rq} ${c.tipo === 'num' ? 'type="number"' : ''} value="${esc(val ?? '')}" ${c.ph ? `placeholder="${esc(c.ph)}"` : ''}></label>`;
   };
-  const m = modal({ title: titulo, wide: true, body: `<div class="grid-form">${campos.map(campo).join('')}</div>`,
+  const m = modal({ title: titulo, wide: true, body: `<div class="grid-form">${campos.filter(c => c.tipo !== 'multi').map(campo).join('')}</div>${campos.filter(c => c.tipo === 'multi').map(campo).join('')}`,
     foot: `${excluir && v.id ? '<button class="btn danger" id="pf-del">Excluir</button>' : ''}<span class="spacer"></span><button class="btn" data-close>Cancelar</button><button class="btn primary" id="pf-ok">Salvar</button>` });
   $('#pf-ok', m.el).onclick = async (ev) => {
     const row = {};
@@ -101,9 +103,9 @@ function locais(root, ed) {
   </tbody></table></div></div>
   <p class="small muted">"Compõe custo" desligado = não entra no valor do estoque nem no custo médio (ex.: material de terceiros em nosso poder). "Quem movimenta" vazio = todos os perfis que movimentam estoque (administrador, financeiro, diretor, compras e produção); o administrador sempre pode.</p>`);
   const abrir = (l) => ed && form({ titulo: l?.id ? `Local ${l.codigo}` : 'Novo local', tabela: 'est_locais', root, excluir: true, v: l || { finalidade: 'materia_prima', posse: 'propria', controla_saldo: true, compoe_custo: true, ativo: true, ordem: 200 },
-    campos: [{ k: 'codigo', t: 'Código', obrig: true }, { k: 'nome', t: 'Nome', obrig: true, span: true }, { k: 'finalidade', t: 'Finalidade', tipo: 'sel', op: FINALIDADES, vazio: false },
+    campos: [{ k: 'codigo', t: 'Código', obrig: true, cls: 'xs' }, { k: 'nome', t: 'Nome', obrig: true, span: true }, { k: 'finalidade', t: 'Finalidade', tipo: 'sel', op: FINALIDADES, vazio: false },
       { k: 'posse', t: 'Posse', tipo: 'sel', op: POSSE, vazio: false }, { k: 'setor_id', t: 'Setor da produção (em processo)', tipo: 'sel', op: Object.fromEntries(D.setores.map(s => [s.id, s.nome])) },
-      { k: 'conta_contabil', t: 'Conta contábil', ph: 'ex.: 1.1.4.01' }, { k: 'ordem', t: 'Ordem', tipo: 'num' },
+      { k: 'conta_contabil', t: 'Conta contábil', ph: 'ex.: 1.1.4.01' }, { k: 'ordem', t: 'Ordem', tipo: 'num', cls: 'xs' },
       { k: 'controla_saldo', t: 'Controla saldo', tipo: 'chk' }, { k: 'compoe_custo', t: 'Compõe custo', tipo: 'chk' }, { k: 'permite_negativo', t: 'Permite saldo negativo', tipo: 'chk' }, { k: 'ativo', t: 'Ativo', tipo: 'chk' },
       { k: 'papeis', t: 'Quem movimenta (nenhum marcado = todos)', tipo: 'multi', op: { financeiro: 'Financeiro', diretor: 'Diretor', compras: 'Compras', producao: 'Produção' } }] });
   $('#ep-novo', root) && ($('#ep-novo', root).onclick = () => abrir(null));

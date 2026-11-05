@@ -42,8 +42,9 @@ export function toast(msg, err = false) {
 export const erroTela = (oQue = 'esta tela') => `<div class="card"><div class="empty">Não foi possível carregar ${oQue}. Recarregue a página; se continuar, avise o administrador da plataforma.</div></div>`;
 export function fail(e) { console.error(e); toast(e?.message || String(e), true); }
 
-export function modal({ title, body, foot = '', wide = false, onMount, fixo = false }) {
-  const back = h(`<div class="modal-back"><div class="modal" style="${wide ? 'max-width:1100px' : ''}">
+export function modal({ title, body, foot = '', wide = false, narrow = false, onMount, fixo = false }) {
+  // narrow: modal pequeno (480 px) para cadastro de um ou dois campos (docs/design-system.md › 4)
+  const back = h(`<div class="modal-back"><div class="modal${narrow && !wide ? ' estreito' : ''}" style="${wide ? 'max-width:1100px' : ''}">
     <div class="modal-head"><h2 style="margin:0">${esc(title)}</h2>${fixo ? '' : '<button class="btn ghost icon" data-close>✕</button>'}</div>
     <div class="modal-body"></div><div class="modal-foot"></div></div></div>`);
   const b = $('.modal-body', back); typeof body === 'string' ? b.innerHTML = body : b.appendChild(body);

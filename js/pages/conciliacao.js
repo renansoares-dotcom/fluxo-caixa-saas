@@ -10,7 +10,7 @@ import { lerVExpenses } from '../lib/vexpenses.js';
 import { normTxt } from '../lib/nf-titulos.js';
 import { PLANO_JUROS } from '../lib/notas-debito.js';
 
-export const title = 'Conciliação bancária';
+export const title = 'Conciliação Bancária';
 
 const hoje = new Date();
 const mesAnt = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);

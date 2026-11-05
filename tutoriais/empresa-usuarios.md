@@ -1,12 +1,12 @@
 ---
 titulo: Empresa, usuários e auditoria
-tela: Cadastros › Empresa e usuários e Auditoria
-versao: 1.2
-atualizado: 2026-10-29
+tela: Cadastros › Empresa e Usuários (CAD007) e Auditoria (CAD008)
+versao: 1.3
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
-- **Empresa e usuários**: os dados da empresa, os usuários com o **papel** e as **áreas** de cada um, os convites e a importação de lançamentos por planilha.
+- **Empresa e Usuários**: os dados da empresa, os usuários com o **papel** e as **áreas** de cada um, os convites e a importação de lançamentos por planilha.
 - **Auditoria**: o registro de **quem incluiu, alterou ou excluiu**, quando, e o que mudou (antes e depois), com a opção de desfazer.
 
 ## 2. Quem tem acesso
@@ -91,7 +91,7 @@ Em **Dados da empresa › Segurança**, marque **Exigir verificação em duas et
 1. Clique em **Baixar modelo** para ter o layout.
 2. Preencha as colunas (cabeçalho na 1ª linha):
    - **Data**;
-   - **Plano de contas**: o código (por exemplo, 2.05.09) ou "2.05.09 - NOME";
+   - **Plano de Contas**: o código (por exemplo, 2.05.09) ou "2.05.09 - NOME";
    - **Valor**;
    - Descrição, Favorecido, Centro de Custo, Status (Pago ou Em aberto), Conta e Opcional 1 a 4.
 3. Escolha o arquivo (Excel ou CSV). A plataforma mostra as linhas válidas, as com erro e os beneficiários novos.
@@ -136,3 +136,4 @@ Dentro do lançamento, o botão **Histórico** mostra a auditoria só daquele la
 | 1.0 | 28/10/2026 | Primeira versão do manual: dados da empresa, convites, papéis, áreas, importação por planilha e auditoria. |
 | 1.1 | 28/10/2026 | Verificação em duas etapas: ativar a sua e exigir para administrador, financeiro e diretor. |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

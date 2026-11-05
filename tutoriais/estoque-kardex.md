@@ -1,15 +1,15 @@
 ---
 titulo: Kardex e parâmetros do estoque
-tela: Estoque › Kardex e Parâmetros do estoque
-versao: 1.0
-atualizado: 2026-10-31
+tela: Estoque › Kardex (EST002) e Parâmetros do Estoque (EST005)
+versao: 1.2
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
 A plataforma passa a ser o **estoque oficial** da empresa. Duas telas:
 
 - **Kardex**: o saldo de cada produto **por local e por lote**, o **custo médio ponderado móvel** e todos os movimentos (entradas, saídas, transferências, ajustes e estornos).
-- **Parâmetros do estoque**: as regras que decidem onde cada item fica e como o custo se forma:
+- **Parâmetros do Estoque**: as regras que decidem onde cada item fica e como o custo se forma:
   - **locais** (as partições do estoque);
   - **famílias de item**;
   - **tipos de movimento**;
@@ -79,9 +79,9 @@ O estorno lança o movimento inverso ao mesmo custo; o original fica no históri
 
 **Recalcular** (administrador e financeiro) refaz o custo médio e os saldos do produto em ordem de data. Use depois de lançar um movimento com data anterior a outros já lançados.
 
-## 4. Parâmetros do estoque
+## 4. Parâmetros do Estoque
 
-![Figura 2 — Parâmetros do estoque: os locais (dados fictícios)](img/estoque-kardex-2.jpg)
+![Figura 2 — Parâmetros do Estoque: os locais (dados fictícios)](img/estoque-kardex-2.jpg)
 
 A empresa já nasce com uma configuração padrão. **Completar com o padrão** cria o que estiver faltando dela e não muda o que já foi ajustado.
 
@@ -134,7 +134,7 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 
 > Os movimentos automáticos pelas notas de entrada e de saída entram na próxima etapa. Revise as regras antes.
 
-### 4.5 Fechamento do mês
+### 4.5 Fechamento do Mês
 
 **Fechar o mês** trava o estoque: nenhum movimento com data até o fim do mês fechado é aceito. Fechar um mês fecha também os anteriores. As correções entram por estorno, com data do mês aberto. Só o administrador reabre.
 
@@ -163,3 +163,5 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 31/10/2026 | Primeira versão: kardex por local e lote com custo médio ponderado móvel, movimento manual, transferência, estorno, recálculo, locais, famílias, tipos de movimento, regras por CFOP e fechamento do mês. |
+| 1.1 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |

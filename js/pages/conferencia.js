@@ -8,7 +8,7 @@ import { $, $$, esc, money, money0, cls, dateBR, fail, toast, modal, parseNum, M
 import { abrirLancamento } from '../lib/lanc-form.js';
 import { normTxt } from '../lib/nf-titulos.js';
 
-export const title = 'Conferência do dia';
+export const title = 'Conferência do Dia';
 
 const LS = 'fc-conf-mes';
 const mesAnt = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
@@ -38,7 +38,7 @@ export async function render(root) {
   rootEl = root;
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
-      <div><h2 style="margin:0">Conferência do dia</h2>
+      <div><h2 style="margin:0">Conferência do Dia</h2>
         <p class="muted small" style="margin:4px 0 0">Cada quadradinho é uma conta num dia. Verde = saldo e movimento batem com o extrato; vermelho = diverge (mostra a diferença; “…” = diferença que vem de um dia anterior); amarelo = algo para olhar; amarelo tracejado = falta extrato. Clique para abrir o dia, conferir e dar o visto.</p></div>
       <div class="toolbar noprint" style="margin:0" id="cflt">
         <label>Mês<input type="month" name="mes" value="${ui.mes}"></label>

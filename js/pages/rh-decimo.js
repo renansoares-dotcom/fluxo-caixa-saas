@@ -6,12 +6,12 @@ import { itensDecimo, eventosDecimo, calcDecimo, EVENTOS, VINCULOS } from '../li
 import { temRH, podeRH, carregarBase, carregarFolha, gravarFolha, salvarEventos, blocoEventos, avisoMigracao, kpi } from '../lib/rh-dados.js';
 import { inp, num } from '../lib/compras.js';
 
-export const title = 'RH — 13º salário';
+export const title = '13º Salário';
 const ui = { ano: new Date().getFullYear() };
 
 export async function render(root) {
   if (!temRH()) { root.innerHTML = '<div class="card"><div class="empty">Acesso ao RH só para administrador ou quem tem a área RH liberada.</div></div>'; return; }
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">13º salário</h2><div class="muted small">Provisão e caixa: 1ª parcela até 30/11, 2ª até 20/12, encargos em dezembro e janeiro.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">13º Salário</h2><div class="muted small">Provisão e caixa: 1ª parcela até 30/11, 2ª até 20/12, encargos em dezembro e janeiro.</div></div>
       <label class="small" style="display:flex;gap:6px;align-items:center">Ano <select id="rd-ano" data-nobusca>${[ui.ano - 1, ui.ano, ui.ano + 1].map(a => `<option ${a === ui.ano ? 'selected' : ''}>${a}</option>`).join('')}</select></label></div>
     <div id="rd-corpo"><div class="loading">Carregando…</div></div>`;
   $('#rd-ano', root).onchange = (e) => { ui.ano = +e.target.value; render(root); };

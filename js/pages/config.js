@@ -1,7 +1,7 @@
 import { sb, state, q, fetchAll, isAdmin, podeEditar, loadCadastros, AREAS } from '../lib/data.js';
 import { $, esc, options, formData, toast, fail, parseNum, dateBR, money, exportXLSX } from '../lib/ui.js';
 
-export const title = 'Empresa e usuários';
+export const title = 'Empresa e Usuários';
 const PAPEIS = [['admin', 'Administrador — tudo, inclusive usuários'], ['financeiro', 'Financeiro — lança e edita'], ['diretor', 'Diretor — consulta e aprova autorizações'], ['leitura', 'Leitura — só consulta'], ['compras', 'Compras — módulo Compras, estoque e pagamentos antecipados (os próprios)'], ['vendas', 'Vendas — representante: só a área Comercial e a própria carteira'], ['producao', 'Produção — operador: terminal do setor e ordens de produção']];
 
 export async function render(root) {

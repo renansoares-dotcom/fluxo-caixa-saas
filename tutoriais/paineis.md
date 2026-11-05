@@ -1,8 +1,8 @@
 ---
 titulo: Painéis — Minha Manhã, Decisão do Dia, Decision Center e dashboards
-tela: Painéis › Minha Manhã, Decisão do Dia, Decision Center, Dashboard Executivo e Dashboard
-versao: 1.1
-atualizado: 2026-10-29
+tela: Painéis › Minha Manhã (PAI001), Decisão do Dia (PAI002), Decision Center (PAI003), Dashboard Executivo (PAI004) e Dashboard (PAI005)
+versao: 1.2
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
@@ -140,3 +140,4 @@ O resumo do ano mostra:
 |---|---|---|
 | 1.0 | 28/10/2026 | Primeira versão do manual: Minha Manhã, Decisão do Dia com registro e aprovação, Decision Center, Dashboard Executivo e Dashboard. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

@@ -1,8 +1,8 @@
 ---
 titulo: Carteira cedida — liquidação dos títulos nos fundos
-tela: Financeiro › Crédito / FIDC › Carteira cedida
-versao: 1.3
-atualizado: 2026-11-04
+tela: Financeiro › Crédito / FIDC › Carteira Cedida (FIN019)
+versao: 1.5
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -11,7 +11,7 @@ Um título vendido ao fundo tem dois momentos:
 1. **A cessão.** Quando a proposta de borderô é aprovada, o título fica **Pago** na conta do fundo. Entram o deságio, as tarifas, a recompra descontada e o líquido que vai para o banco. É o dinheiro que a empresa recebe.
 2. **A liquidação.** No vencimento, o cliente paga o **fundo**. Só então o título deixa de ser risco da empresa. A cessão é com coobrigação: se o cliente não paga, a empresa recompra.
 
-A **Carteira cedida** controla esse segundo momento. Ela lê o relatório de títulos pagos que cada fundo envia e mostra, título a título, o que já foi liquidado, o que foi recomprado e o que venceu sem pagamento informado.
+A **Carteira Cedida** controla esse segundo momento. Ela lê o relatório de títulos pagos que cada fundo envia e mostra, título a título, o que já foi liquidado, o que foi recomprado e o que venceu sem pagamento informado.
 
 A liquidação **não gera lançamento**: o dinheiro foi para o fundo, e a receita já entrou na cessão.
 
@@ -21,9 +21,9 @@ Todos os usuários da empresa consultam. O administrador e o financeiro importam
 
 ## 3. O painel
 
-![Figura 1 — Carteira cedida por fundo, com os títulos vencidos sem liquidação (dados fictícios)](img/fidc-carteira-1.jpg)
+![Figura 1 — Carteira Cedida por fundo, com os títulos vencidos sem liquidação (dados fictícios)](img/fidc-carteira-1.jpg)
 
-1. Abra **Financeiro › Crédito / FIDC › Carteira cedida**.
+1. Abra **Financeiro › Crédito / FIDC › Carteira Cedida**.
 2. Os indicadores mostram:
    - **Coobrigação**: tudo o que ainda pode voltar como recompra (a vencer + vencidos sem liquidação informada);
    - **A vencer**;
@@ -100,3 +100,5 @@ O relatório da FS também não traz o borderô. O título é ligado pela nota e
 | 1.1 | 30/10/2026 | Leitor do relatório de títulos liquidados da Contato; tabela dos tipos de baixa de cada fundo. |
 | 1.2 | 04/11/2026 | Leitor do extrato de títulos liquidados da FS, ligado pela data da operação. |
 | 1.3 | 04/11/2026 | Leitor do relatório de títulos liquidados da Vector. |
+| 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.5 | 29/10/2026 | Imagens das telas, com dados fictícios. |

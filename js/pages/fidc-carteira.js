@@ -7,7 +7,7 @@ import { textoPdfDoc, textoHtm } from '../lib/bordero.js';
 import { LEITORES, casar, carteira, SITUACOES, TIPOS, TOLERANCIA_DU } from '../lib/fidc-liquidacoes.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 
-export const title = 'Carteira cedida';
+export const title = 'Carteira Cedida';
 const ui = { fundo: '', sit: 'risco', busca: '', aba: 'titulos' };
 let B = null;
 const SIT_CLS = { a_vencer: '', aguardando: 'aberto', atrasado: 'vencido', sem_relatorio: '', liquidado: 'pago', recomprado: 'aberto' };

@@ -1,8 +1,8 @@
 ---
 titulo: Gestão da frota e motoristas
-tela: Logística › Gestão da frota
-versao: 1.0
-atualizado: 2026-10-30
+tela: Logística › Gestão da Frota (LOG003)
+versao: 1.2
+atualizado: 2026-10-29
 ---
 ## 1. Para que serve
 
@@ -23,7 +23,7 @@ Quem edita a logística: **administrador, financeiro e diretor**. Os demais perf
 
 ![Figura 1 — Painel da frota: custo por veículo e alertas (dados fictícios)](img/frota-1.jpg)
 
-1. Abra **Logística › Gestão da frota**.
+1. Abra **Logística › Gestão da Frota**.
 2. Escolha o **mês**. Para cada veículo: km rodados (pelo hodômetro dos abastecimentos), combustível, manutenção, multas, locação (do contrato), total, custo por km e consumo médio.
 3. A coluna **Custo/km usado nas cargas** mostra o valor que a montagem de cargas usa hoje. Clique em **usar** para trocar pelo custo real do mês.
 4. Em **Alertas**: documentos vencendo em até 60 dias, preventivas no limite, CNH, toxicológico e MOPP vencendo, consumo fora da média e multas com prazo de indicação perto. Os mesmos alertas aparecem no **Decision Center**.
@@ -34,7 +34,7 @@ Quem edita a logística: **administrador, financeiro e diretor**. Os demais perf
 2. Complete a identificação: marca e modelo, anos, RENAVAM, chassi e **propriedade** (próprio, locado ou agregado). Para locado e agregado, escolha o **contrato**: o valor mensal entra no custo do veículo.
 3. Em **Documentos**, inclua cada documento com número, seguradora ou órgão, validade, valor e o arquivo (PDF ou foto).
 4. Em **Manutenção preventiva**, cadastre os serviços com intervalo em **km**, em **meses** ou nos dois (vale o que vencer primeiro), com a última execução.
-5. Capacidade, baú e parâmetros da montagem de cargas continuam em **Frota e parâmetros**.
+5. Capacidade, baú e parâmetros da montagem de cargas continuam em **Frota e Parâmetros**.
 
 ## 5. Abastecimento
 
@@ -82,3 +82,5 @@ Quem edita a logística: **administrador, financeiro e diretor**. Os demais perf
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 30/10/2026 | Primeira versão: painel de custos, documentos dos veículos, preventivas, manutenção e multas com conta a pagar, abastecimento com km/l e motoristas com CNH, toxicológico e MOPP. |
+| 1.1 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |

@@ -7,14 +7,14 @@ import { itensMensal, eventosMensal, liquidoItem, datasFolha, PARAM_PADRAO, PLAN
 import { temRH, podeRH, carregarBase, carregarFolha, gravarFolha, salvarEventos, blocoEventos, historicoPago, avisoMigracao, kpi } from '../lib/rh-dados.js';
 import { inp, num } from '../lib/compras.js';
 
-export const title = 'RH — folha do mês';
+export const title = 'Folha do Mês';
 const ui = { aba: 'folha', comp: new Date().toISOString().slice(0, 7) };
 const nomeComp = (c) => `${MESES[+c.slice(5) - 1].toLowerCase()}/${c.slice(0, 4)}`;
 const pctTxt = (v) => (v == null ? '–' : (+v).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%');
 
 export async function render(root) {
   if (!temRH()) { root.innerHTML = '<div class="card"><div class="empty">Acesso ao RH só para administrador ou quem tem a área RH liberada.</div></div>'; return; }
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Folha do mês</h2><div class="muted small">Previsão de caixa da folha a partir do cadastro. A folha oficial é feita no Iniflex/contabilidade.</div></div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Folha do Mês</h2><div class="muted small">Previsão de caixa da folha a partir do cadastro. A folha oficial é feita no Iniflex/contabilidade.</div></div></div>
     <div class="card toolbar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <div class="chips" id="rf-abas">${[['folha', 'Folha'], ['param', 'Parâmetros']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div>
       ${ui.aba === 'folha' ? `<label class="small" style="display:flex;gap:6px;align-items:center">Competência <input type="month" id="rf-comp" value="${ui.comp}"></label>` : ''}</div>

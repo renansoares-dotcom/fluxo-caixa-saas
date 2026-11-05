@@ -1,8 +1,8 @@
 ---
 titulo: Notas fiscais e apuração de impostos
-tela: CPD › Notas Fiscais e Apuração de impostos
-versao: 1.4
-atualizado: 2026-10-31
+tela: CPD › Notas Fiscais (FIS001) e Apuração de Impostos (FIS002)
+versao: 1.5
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
@@ -12,7 +12,7 @@ atualizado: 2026-10-31
   - liga as parcelas das notas aos recebimentos e pagamentos que já existem nos lançamentos;
   - liga os títulos dos borderôs FIDC às notas;
   - tira os **relatórios de faturamento e de compras** (tela, PDF e Excel).
-- **Apuração de impostos**: a memória de cálculo a partir dos itens das notas, com o livro por CFOP/CST e o resumo dos impostos destacados. Por enquanto é **só leitura e só prévia**. Também traz a **reforma tributária**: a conferência da CBS e do IBS destacados nas notas, o simulador de 2027, a tabela de alíquotas por ano e a fila das **notas de débito** de juros e multa.
+- **Apuração de Impostos**: a memória de cálculo a partir dos itens das notas, com o livro por CFOP/CST e o resumo dos impostos destacados. Por enquanto é **só leitura e só prévia**. Também traz a **reforma tributária**: a conferência da CBS e do IBS destacados nas notas, o simulador de 2027, a tabela de alíquotas por ano e a fila das **notas de débito** de juros e multa.
 
 ## 2. Quem tem acesso
 
@@ -93,7 +93,7 @@ Como os valores são montados:
 - **Curva ABC**: A até 80% do acumulado, B até 95%, C o restante.
 - Em **Origem** (compras), a UF do fornecedor sai do CFOP: mesmo estado, outros estados ou exterior.
 
-## 6. Apuração de impostos
+## 6. Apuração de Impostos
 
 1. Escolha o **mês** e a aba **Saídas** (notas emitidas) ou **Entradas** (compras e devoluções).
 2. Escolha como **agrupar**: livro por CFOP / CST, resumo dos impostos, ou regras e parâmetros.
@@ -150,7 +150,7 @@ A tabela de CBS e IBS por ano usada no simulador e na conferência. O padrão da
 
 Quando sair a alíquota definitiva, o **administrador** clica no ano, ajusta os percentuais, a situação e a **fonte** (lei ou resolução e a data) e salva. **Voltar ao padrão** apaga o ajuste da empresa para aquele ano.
 
-### 6.4 Notas de débito de juros e multa
+### 6.4 Notas de Débito (juros e multa)
 
 ![Figura 5 — Notas de débito de juros e multa a emitir (dados fictícios)](img/notas-fiscais-5.jpg)
 
@@ -161,7 +161,7 @@ Juros, multa e acréscimos recebidos por atraso entram na base da CBS e do IBS (
 
 Não confunda com a **nota de crédito** de multa e juros (finalidade 5, tipo 01): é a que o **cliente** emite quando o fornecedor não emitiu a nota de débito.
 
-Como a fila se forma (**CPD › Fiscal › Notas de débito**):
+Como a fila se forma (**CPD › Fiscal › Notas de Débito**):
 
 1. Todo recebimento de juros vira um lançamento em **1.02.17 JUROS E MULTAS RECEBIDOS**, ligado ao título; o título continua com o valor de face. Isso acontece:
    - na **Conciliação**, ao clicar em **Conciliar com R$ X de juros/multa** quando o extrato é maior que o título;
@@ -205,3 +205,4 @@ Como a fila se forma (**CPD › Fiscal › Notas de débito**):
 | 1.2 | 30/10/2026 | Importação aceita XML com o número do item gravado fora do padrão (como o de alguns emissores); antes a nota entrava sem os itens. |
 | 1.3 | 30/10/2026 | Relatórios de faturamento e de compras (tela, PDF e Excel) por mês, cliente/fornecedor, produto, UF e CFOP, com devoluções, comparativo do ano anterior, ticket médio e curva ABC. Reforma tributária na Apuração: conferência da CBS/IBS das notas, simulador de 2027 e alíquotas por vigência com a proposta do TCU de 11,3% (SQL 072). |
 | 1.4 | 31/10/2026 | Notas de débito de juros e multa (finalidade 6, tipo 04): fila gerada pelos recebimentos com juros, rateio pelos itens da nota de origem, registro da emissão e juros recebidos pelo fundo como "a decidir" (SQL 074). |
+| 1.5 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |

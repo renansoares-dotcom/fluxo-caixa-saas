@@ -1,14 +1,14 @@
 ---
 titulo: FIDC — propostas de borderô e análise
-tela: Financeiro › Propostas de borderô e Análise FIDC
-versao: 1.3
-atualizado: 2026-10-31
+tela: Financeiro › Análise FIDC (FIN017) e Propostas de Borderô (FIN018)
+versao: 1.4
+atualizado: 2026-11-05
 ---
 ## 1. Para que serve
 
 As duas telas cobrem a antecipação de recebíveis com os fundos (FIDC):
 
-- **Propostas de borderô**: a IPLAMM monta e simula o borderô **na plataforma**. Ela escolhe os títulos a receber e o fundo, compara o custo entre os fundos, confere as verificações e envia ao **diretor**, que aprova ou rejeita. A proposta aprovada é o **registro oficial** da operação. O borderô enviado pelo fundo entra depois **só para comparação**.
+- **Propostas de Borderô**: a IPLAMM monta e simula o borderô **na plataforma**. Ela escolhe os títulos a receber e o fundo, compara o custo entre os fundos, confere as verificações e envia ao **diretor**, que aprova ou rejeita. A proposta aprovada é o **registro oficial** da operação. O borderô enviado pelo fundo entra depois **só para comparação**.
 - **Análise FIDC**: o resumo das operações com os fundos. Mostra o custo, a taxa a.m. contra o CDI, a coobrigação a vencer, as recompras, a concentração de sacados e os alertas, com o PDF da análise.
 
 ## 2. Quem tem acesso
@@ -19,17 +19,17 @@ As duas telas cobrem a antecipação de recebíveis com os fundos (FIDC):
 | Diretor (e administrador) | Aprova ou rejeita as propostas enviadas. |
 | Leitura | Consulta. |
 
-## 3. Propostas de borderô
+## 3. Propostas de Borderô
 
-![Figura 1 — Títulos disponíveis para a proposta de borderô (dados fictícios)](img/fidc-1.jpg)
+![Figura 1 — Propostas de Borderô: títulos disponíveis (dados fictícios)](img/fidc-1.jpg)
 
 ### 3.1 Escolher os títulos
 
 1. Na aba **Títulos em aberto**, estão as duplicatas em aberto (receita 1.01). Use **Buscar cliente / NF** e os filtros de vencimento.
-2. Marque os títulos que vão para o borderô, ou use **Marcar filtrados**.
+2. Marque os títulos que vão para o borderô, ou use **Marcar filtrados**. Para a lista caber ao lado do painel da proposta, a **emissão** aparece na 2ª linha do vencimento e a **NF / parcela** na 2ª linha do cliente.
 3. Se a nota ainda não estiver nos títulos, use **+ Lançar NFs** ou **Importar XML das NFs**.
 
-Também dá para chegar aqui marcando os títulos em **Contas a pagar / receber › A receber › Montar borderô FIDC**.
+Também dá para chegar aqui marcando os títulos em **Contas a Pagar / Receber › A receber › Montar borderô FIDC**.
 
 ### 3.2 Simular e escolher o fundo
 
@@ -48,7 +48,7 @@ Na aba **Propostas**, filtre por status, fundo e mês. Ao abrir uma proposta:
 - **Rascunho**: **Editar**, **Excluir** e **Enviar para aprovação**.
 - **Pendente**: **Cancelar envio** (volta a rascunho). O diretor vê **Aprovar operação** e **Rejeitar** (com motivo).
 - **PDF para aprovação**: gera a proposta no padrão IPLAMM, com a comparação, as verificações, os títulos e os campos de assinatura.
-- **Duplicatas para endosso**: abre a tela de endosso com os títulos da proposta.
+- **Duplicatas para Endosso**: abre a tela de endosso com os títulos da proposta.
 
 ### 3.4 Aprovação
 
@@ -125,3 +125,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** da proposta (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 31/10/2026 | Nova figura: análise fidc: custo e prazo por fundo. |
+| 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Títulos disponíveis com a emissão e a NF / parcela na 2ª linha. Figuras refeitas. |
