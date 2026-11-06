@@ -1,6 +1,8 @@
 // Menu lateral (05/11/2026, padrão em docs/design-system.md › 3): ícone por área, código de cada tela,
 // busca no menu (nome ou código), Favoritos (estrela), Recentes (últimas 5) e modo recolhido (só ícones,
 // abre por cima ao passar o mouse). O acordeão de áreas e grupos continua em app.js.
+// 06/11/2026: no computador (> 900 px) as áreas ficam paradas e cada uma abre num painel ao lado, por cima da tela,
+// sem empurrar os itens de baixo (decisão do Renan, opção B). No celular continua o acordeão.
 // Favoritos e Recentes ficam fora do #nav (data-r, não data-route) para não confundir as rotinas que leem o menu.
 import { state } from './data.js';
 import { $, $$, esc } from './ui.js';
@@ -89,6 +91,86 @@ export function montarMenu() {
     }
   });
   $('#nav-atalhos').addEventListener('click', (e) => { const b = e.target.closest('.nav-fav'); if (b) { e.preventDefault(); alternarFavorito(b.dataset.r); } });
+  montarPainel(nav);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Painel lateral das áreas (computador)
+// ---------------------------------------------------------------------------------------------
+const MQ = typeof matchMedia === 'function' ? matchMedia('(min-width:901px)') : { matches: false, addEventListener() {} };
+export const modoPainel = () => document.body.classList.contains('nav-modo-painel');
+let aberta = null;
+
+function montarPainel(nav) {
+  // o conteúdo de cada área vai para um "corpo", que no computador vira o painel flutuante
+  $$('.nav-area', nav).forEach(ar => {
+    const tit = $('.nav-area-tit', ar); if (!tit) return;
+    const corpo = document.createElement('div'); corpo.className = 'nav-corpo'; corpo.setAttribute('role', 'menu');
+    corpo.innerHTML = `<div class="nav-corpo-tit">${esc(tit.dataset.nome || '')}</div>`;
+    [...ar.children].filter(c => c !== tit).forEach(c => corpo.appendChild(c));
+    ar.appendChild(corpo);
+    tit.setAttribute('aria-haspopup', 'menu'); tit.setAttribute('aria-expanded', 'false');
+    // com um painel aberto, passar o mouse em outra área troca o painel (como numa barra de menus)
+    tit.addEventListener('mouseenter', () => { if (aberta && aberta !== ar && modoPainel() && !nav.classList.contains('nav-filtrando')) abrirPainel(ar); });
+  });
+  // no painel os grupos ficam todos abertos e o título do grupo é só um rótulo
+  nav.addEventListener('click', (e) => { const s = e.target.closest('summary'); if (s && modoPainel() && !nav.classList.contains('nav-filtrando')) e.preventDefault(); }, true);
+  document.addEventListener('mousedown', (e) => { if (aberta && !aberta.contains(e.target)) fecharPainel(); });
+  document.addEventListener('keydown', (e) => {
+    if (!aberta) return;
+    const corpo = $('.nav-corpo', aberta);
+    if (e.key === 'Escape') { e.preventDefault(); const t = $('.nav-area-tit', aberta); fecharPainel(); t?.focus(); return; }
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) && corpo.contains(document.activeElement)) {
+      e.preventDefault();
+      const ls = $$('a[data-route]', corpo).filter(a => a.offsetParent); const i = ls.indexOf(document.activeElement);
+      const j = e.key === 'Home' ? 0 : e.key === 'End' ? ls.length - 1 : e.key === 'ArrowDown' ? Math.min(ls.length - 1, i + 1) : Math.max(0, i - 1);
+      ls[j]?.focus();
+    }
+    if (e.key === 'ArrowLeft' && corpo.contains(document.activeElement)) { e.preventDefault(); const t = $('.nav-area-tit', aberta); fecharPainel(); t?.focus(); }
+  });
+  $('#sidebar')?.addEventListener('scroll', () => { if (aberta) posicionar(aberta); }, { passive: true });
+  addEventListener('resize', () => { if (aberta) posicionar(aberta); });
+  const aplicar = () => {
+    fecharPainel();
+    document.body.classList.toggle('nav-modo-painel', MQ.matches);
+    if (MQ.matches) { $$('.nav-area', nav).forEach(a => a.classList.remove('aberta')); $$('details', nav).forEach(d => { d.open = true; }); }
+    else { const at = $('a.active', nav)?.closest('details'); $$('details', nav).forEach(d => { d.open = d === at; }); }
+  };
+  MQ.addEventListener('change', aplicar); aplicar();
+}
+
+/** clique (ou Enter) no título de uma área; devolve true quando o painel tratou */
+export function cliqueArea(ar, peloTeclado = false) {
+  if (!modoPainel() || $('#nav').classList.contains('nav-filtrando')) return false;
+  if (aberta === ar) fecharPainel(); else abrirPainel(ar, peloTeclado);
+  return true;
+}
+
+function abrirPainel(ar, focar = false) {
+  if (aberta && aberta !== ar) fecharPainel();
+  aberta = ar; ar.classList.add('painel');
+  $('.nav-area-tit', ar)?.setAttribute('aria-expanded', 'true');
+  document.body.classList.add('nav-painel-aberto');
+  const corpo = $('.nav-corpo', ar);
+  const n = $$('a[data-route]', corpo).filter(a => !a.hidden && getComputedStyle(a).display !== 'none').length;
+  corpo.classList.toggle('duas-col', n > 9);
+  posicionar(ar);
+  if (focar) ($('a[data-route].active', corpo) || $$('a[data-route]', corpo).find(a => a.offsetParent))?.focus();
+}
+
+function posicionar(ar) {
+  const corpo = $('.nav-corpo', ar), tit = $('.nav-area-tit', ar), sb = $('#sidebar');
+  const rt = tit.getBoundingClientRect(), rs = sb.getBoundingClientRect();
+  corpo.style.left = Math.round(rs.right + 6) + 'px';
+  corpo.style.maxHeight = (innerHeight - 16) + 'px';
+  const h = corpo.offsetHeight;
+  corpo.style.top = Math.round(Math.max(8, Math.min(rt.top - 10, innerHeight - h - 8))) + 'px';
+}
+
+export function fecharPainel() {
+  if (!aberta) return;
+  aberta.classList.remove('painel'); $('.nav-area-tit', aberta)?.setAttribute('aria-expanded', 'false');
+  aberta = null; document.body.classList.remove('nav-painel-aberto');
 }
 
 function recolher(on) {
@@ -107,7 +189,8 @@ function filtrar(txt) {
   });
   $$('.nav-area', nav).forEach(ar => ar.classList.toggle('tem-achado', !!$('a.achou', ar)));
   $$('details', nav).forEach(d => { const tem = !!$('a.achou', d); d.classList.toggle('tem-achado', tem); if (t && tem) d.open = true; });
-  if (!t) { const at = $('a.active', nav)?.closest('details'); $$('details', nav).forEach(d => { d.open = d === at; }); }
+  if (t) fecharPainel();
+  if (!t) { const at = $('a.active', nav)?.closest('details'); $$('details', nav).forEach(d => { d.open = modoPainel() || d === at; }); }
   let vazio = $('#nav-nada');
   if (t && !$('a.achou', nav)) { if (!vazio) nav.insertAdjacentHTML('afterbegin', '<div id="nav-nada" class="small muted" style="padding:8px 10px">Nenhuma tela encontrada.</div>'); }
   else vazio?.remove();

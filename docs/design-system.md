@@ -35,10 +35,12 @@ Toda tela tem um código fixo, como no Iniflex, registrado em `js/lib/telas.js`:
 | AJU | Ajuda e Comunicação |
 
 ## 3. Menu lateral
-- Áreas em acordeão: abre uma área por vez, a da tela atual abre sozinha, e dentro dela um grupo por vez.
+- **Computador (> 900 px), desde 06/11/2026:** a lista de áreas fica parada. Clicar (ou Enter / → ) numa área abre um **painel ao lado**, por cima da tela, com todos os grupos abertos e o código de cada tela; com mais de 9 telas o painel usa 2 colunas. Nada no menu se move. Com um painel aberto, passar o mouse em outra área troca o painel (como numa barra de menus). Fecha ao escolher a tela, ao clicar fora, no Esc ou na ←. Setas ↑ ↓ andam entre as telas.
+- **Celular (até 900 px):** áreas em acordeão, uma por vez, e dentro dela um grupo por vez.
+- A busca no menu mostra os resultados na própria lista (sem painel).
 - Cada área tem ícone e cor. Cada item mostra o código da tela, em cinza.
 - Topo do menu: **busca no menu** (nome ou código), **Favoritos** (estrela em cada item) e **Recentes** (últimas 5 telas).
-- Botão **recolher**: o menu fica só com os ícones (64 px) e abre por cima do conteúdo ao passar o mouse. A escolha fica salva.
+- Botão **recolher**: o menu fica só com os ícones (64 px) e abre por cima do conteúdo ao passar o mouse; com o painel de uma área aberto, o menu fica aberto até o painel fechar. A escolha fica salva.
 - Grafia: palavras principais com maiúscula, conectivos em minúscula (de, do, da, dos, das, e, x, a, o, em, por, para).
 - No celular: gaveta por cima do conteúdo, que fecha ao navegar, no fundo escuro ou no Esc.
 
