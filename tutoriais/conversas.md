@@ -1,8 +1,8 @@
 ---
 titulo: Conversas
 tela: Comunicação › Conversas (AJU002)
-versao: 2.4
-atualizado: 2026-11-05
+versao: 2.5
+atualizado: 2026-11-06
 ---
 ## 1. Para que serve
 
@@ -223,3 +223,4 @@ Os avisos usam a mesma liberação do sino de notificações. Clique no **sino**
 | 2.2 | 29/10/2026 | O online e o "digitando…" passam por canais privados: só os recebe quem é da empresa ou da conversa. |
 | 2.3 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 2.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 2.5 | 06/11/2026 | Sinais de enviada (✓) e entregue/lida (✓✓) redesenhados: o ✓✓ mostrava três traços. |

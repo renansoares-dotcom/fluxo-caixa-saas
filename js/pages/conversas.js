@@ -437,8 +437,9 @@ function estadoMsg(m) {
   if (outros.every(p => ts(p.entregue_ate) >= t || ts(p.lida_ate) >= t)) return 'entregue';
   return 'enviada';
 }
-const SVG1 = '<svg viewBox="0 0 16 11" width="16" height="11"><path d="M11.1.6 4.7 7 1.9 4.2.8 5.3l3.9 3.9L12.2 1.7z" fill="currentColor"/></svg>';
-const SVG2 = '<svg viewBox="0 0 18 11" width="18" height="11"><path d="M12.6.6 6.2 7 5 5.8 3.9 6.9l2.3 2.3 7.5-7.5zM9.9 1.7 8.8.6 2.4 7 .9 5.5-.2 6.6l2.6 2.6z" fill="currentColor" transform="translate(1 0)"/><path d="M16.6.6 10.2 7l-.6-.6-1.1 1.1 1.7 1.7 7.5-7.5z" fill="currentColor"/></svg>';
+// ✓ e ✓✓ no traço do WhatsApp (06/11/2026: o ✓✓ antigo desenhava três traços)
+const SVG1 = '<svg viewBox="0 0 16 11" width="16" height="11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 5.9l3 2.9 7.2-7.3"/></svg>';
+const SVG2 = '<svg viewBox="0 0 19 11" width="19" height="11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 5.9l3 2.9 7.2-7.3"/><path d="M9.3 8.2l.6.6 7.2-7.3"/></svg>';
 function tick(m) {
   const e = estadoMsg(m);
   return e === 'lida' ? `<span class="tk lida" title="Lida">${SVG2}</span>` : e === 'entregue' ? `<span class="tk" title="Entregue">${SVG2}</span>` : `<span class="tk" title="Enviada">${SVG1}</span>`;
