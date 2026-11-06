@@ -1,8 +1,8 @@
 ---
 titulo: Contratos
 tela: Cadastros › Contratos (CAD006)
-versao: 1.3
-atualizado: 2026-10-29
+versao: 1.4
+atualizado: 2026-11-06
 ---
 ## 1. Para que serve
 
@@ -65,9 +65,11 @@ Os mesmos alertas aparecem no **Decision Center** para os administradores.
 | Acordo de confidencialidade | Troca de informações sigilosas, com prazo de sigilo. |
 | Termo de responsabilidade pelo uso de veículo | Motorista colaborador: CNH, multas e desconto de danos (art. 462, § 1º, da CLT). |
 | Termo de autorização de uso de imagem | Foto do crachá e dos sistemas internos (LGPD). |
+| Locação de veículos para transporte de cargas | Frota cedida a uma transportadora (ex.: IPLAMM → Kratos), consolidado com o jurídico em 06/11/2026: vários veículos no Anexo I, categoria “aluguel” e cadastro no RNTRC, manutenção por item, seguros com a locadora beneficiária, tributos e cláusula de recuperação judicial. |
+| Prestação de serviços de transporte rodoviário de cargas | Transportadora (ETC) prestando frete (ex.: Kratos → IPLAMM), consolidado com o jurídico em 06/11/2026: CIOT e MDF-e, CT-e, piso mínimo, retorno vazio, vale-pedágio, estadia, seguros RCTR-C/RC-DC/RC-V, subcontratação de autônomo, regime de IBS/CBS e Tabela de Fretes no Anexo I. |
 | Termo de vistoria de veículo | Lista de conferência na entrega e na devolução. |
 
-2. Preencha os **campos do modelo** (veículo, RNTRC, rota, foro, testemunhas etc.). O RNTRC e a placa vêm do cadastro do transportador, quando houver.
+2. Preencha os **campos do modelo** (veículo, RNTRC, rota, foro, testemunhas etc.). Nos dois modelos de transporte de cargas, os veículos e a tabela de fretes vão uma linha por item, com os dados separados por ponto e vírgula, e saem nos anexos. O RNTRC e a placa vêm do cadastro do transportador, quando houver.
 3. A linha em amarelo mostra o que vai sair **em branco** (ex.: endereço da outra parte, representante legal da empresa). Complete os cadastros ou preencha à mão depois.
 4. Clique em **Gerar minuta (PDF)**. A plataforma monta o documento no padrão do papel timbrado (logo, razão social, CNPJ e endereço da empresa), com a qualificação das partes, as cláusulas, o valor por extenso, o reajuste, o foro e os campos de assinatura.
 5. Na janela de impressão, escolha **Salvar como PDF**.
@@ -126,3 +128,4 @@ Os dados da empresa vêm de **Empresa e Usuários** (CNPJ, endereço e represent
 | 1.1 | 30/10/2026 | Modelos de contrato: minuta preenchida com os cadastros (9 modelos), no padrão do papel timbrado, para salvar em PDF e assinar no gov.br. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.3 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.4 | 06/11/2026 | Dois modelos novos, consolidados com as minutas do jurídico: locação de veículos para transporte de cargas e prestação de serviços de transporte rodoviário de cargas (com anexos de veículos e de fretes). |

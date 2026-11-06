@@ -284,6 +284,7 @@ function minuta(c, box, md, root) {
     if (def.bool) return `<label style="grid-column:1/-1;flex-direction:row;gap:8px;align-items:center"><input type="checkbox" data-k="${k}" ${d[k] ? 'checked' : ''} style="width:auto"> ${def.t}</label>`;
     if (def.sub) return `<fieldset style="grid-column:1/-1;border:1px solid var(--line,#ddd);border-radius:8px;padding:8px 10px;margin:0"><legend class="small">${def.t}</legend><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
       ${def.sub.map(([sk, st]) => `<label>${st}<input data-k="${k}.${sk}" value="${esc(d[k]?.[sk] ?? '')}"></label>`).join('')}</div></fieldset>`;
+    if (def.area) return `<label style="grid-column:1/-1">${def.t}<textarea data-k="${k}" rows="4" placeholder="${esc(def.ph || '')}">${esc(d[k] ?? '')}</textarea></label>`;
     return `<label style="${k === 'escopo' || k === 'rota' || k === 'uso' ? 'grid-column:1/-1' : ''}">${def.t}<input data-k="${k}" value="${esc(d[k] ?? '')}" ${def.num ? 'type="number" min="1"' : ''} placeholder="${esc(def.ph || '')}"></label>`;
   };
   box.innerHTML = `<h3 style="margin:16px 0 6px">Minuta para assinatura</h3>

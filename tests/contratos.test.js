@@ -76,3 +76,17 @@ test('transporte com autônomo cita CIOT, IPEF, piso e vale-pedágio; faltas apo
   assert.ok(s.includes('variação acumulada do IPCA'));
   assert.equal(M.MODELO_PADRAO('agregado'), 'agregado'); assert.equal(M.MODELO_PADRAO('locacao_imovel'), 'servico');
 });
+test('locação para transporte de cargas e transporte por ETC (modelos consolidados com o jurídico)', () => {
+  const emp = { ...empresa, razao_social: 'EMPRESA EXEMPLO LTDA - EM RECUPERACAO JUDICIAL' };
+  const xl = M.contexto({ empresa: emp, contrato: { ...ctr, natureza: 'receber' }, parte: { nome: 'TRANSPORTES EXEMPLO LTDA', doc: '11222333000181', endereco: 'Rua C, 3' } });
+  xl.d = { ...xl.d, rntrc: '12345678', veiculos: 'ABC1D23;FORD CARGO;2012;BRANCA;12345678901;9BFZZZ12345678901;2;3.500,00\nXYZ9A87;FORD CARGO;2012;BRANCA;;;2;3500' };
+  const hl = M.documento('locacao_veiculo_carga', xl);
+  for (const t of ['LOCADORA', 'LOCATÁRIA', 'categoria “aluguel”', 'RNTRC Digital', 'vale-pedágio obrigatório', 'RCTR-C', 'recuperação judicial', 'Anexo I — Relação dos veículos', 'R$&nbsp;7.000,00']) assert.ok(hl.includes(t) || hl.includes(t.replace('&nbsp;', ' ')), t);
+  assert.ok(M.faltas('locacao_veiculo_carga', xl).includes('RENAVAM e chassi de todos os veículos'));
+  assert.ok(M.faltas('locacao_veiculo_carga', xl).includes('processo da recuperação judicial'));
+  const xt = M.contexto({ empresa, contrato: { ...ctr, natureza: 'pagar' }, parte: { nome: 'TRANSPORTES EXEMPLO LTDA', doc: '11222333000181', endereco: 'Rua C, 3' } });
+  const ht = M.documento('transporte_etc', xt);
+  for (const t of ['CONTRATANTE', 'CONTRATADA', 'CIOT', 'MDF-e', 'piso mínimo', 'retorno vazio', 'Lei nº 10.209/2001', 'RC-DC', 'IBS e da CBS', 'Anexo I — Tabela de fretes']) assert.ok(ht.includes(t), t);
+  assert.ok(!ht.includes('recuperação judicial'));
+  assert.deepEqual(M.faltas('transporte_etc', xt), ['RNTRC', 'tabela de fretes do Anexo I']);
+});
