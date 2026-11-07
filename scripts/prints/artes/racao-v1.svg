@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1050" viewBox="0 0 1500 1050">
+<rect width="1500" height="1050" fill="#fff"/>
+<rect x="40" y="40" width="1420" height="940" fill="#2e8b57"/>
+<rect x="40" y="700" width="1420" height="280" fill="#246d44"/>
+<g transform="translate(800 90)"><text x="300" y="120" text-anchor="middle" font-size="88" font-weight="900" font-family="Arial" fill="#ffe14d">Patinhas</text>
+<ellipse cx="220" cy="380" rx="38" ry="48" fill="#fff"/>
+<ellipse cx="300" cy="330" rx="38" ry="48" fill="#fff"/>
+<ellipse cx="380" cy="380" rx="38" ry="48" fill="#fff"/>
+<ellipse cx="300" cy="470" rx="70" ry="56" fill="#fff"/>
+<text x="300" y="640" text-anchor="middle" font-size="40" font-weight="700" font-family="Arial" fill="#fff">Cães adultos · carne e vegetais</text><text x="300" y="820" text-anchor="middle" font-size="60" font-weight="900" font-family="Arial" fill="#ffe14d">1 kg</text></g>
+<g transform="translate(110 90)"><rect width="600" height="860" fill="#fff" rx="14"/>
+<text x="24" y="54" font-size="28" font-family="Arial" font-weight="800" fill="#2e8b57">Patinhas — alimento completo</text>
+<text x="24" y="100" font-size="15" font-family="Arial" font-weight="400" fill="#222">Composição básica: farinha de carne, milho integral moído, farelo de soja,</text>
+<text x="24" y="120" font-size="15" font-family="Arial" font-weight="400" fill="#222">óleo de frango, vegetais desidratados e premix vitamínico.</text>
+<text x="24" y="140" font-size="15" font-family="Arial" font-weight="400" fill="#222">Produto isento de registro (fictício).</text>
+<rect x="24" y="200" width="420" height="152" fill="#fff" stroke="#2e8b57" stroke-width="2"/>
+<text x="36" y="227" font-size="17" font-weight="700" font-family="Arial" fill="#2e8b57">INFORMAÇÃO NUTRICIONAL — porção 30 g</text>
+<line x1="24" x2="444" y1="240" y2="240" stroke="#2e8b57" stroke-width="1"/>
+<text x="36" y="260" font-size="15" font-family="Arial" fill="#2e8b57">Proteína bruta (mín.)</text><text x="432" y="260" font-size="15" font-family="Arial" text-anchor="end" fill="#2e8b57">21%</text>
+<line x1="24" x2="444" y1="268" y2="268" stroke="#2e8b57" stroke-width="1"/>
+<text x="36" y="288" font-size="15" font-family="Arial" fill="#2e8b57">Extrato etéreo (mín.)</text><text x="432" y="288" font-size="15" font-family="Arial" text-anchor="end" fill="#2e8b57">8%</text>
+<line x1="24" x2="444" y1="296" y2="296" stroke="#2e8b57" stroke-width="1"/>
+<text x="36" y="316" font-size="15" font-family="Arial" fill="#2e8b57">Matéria fibrosa (máx.)</text><text x="432" y="316" font-size="15" font-family="Arial" text-anchor="end" fill="#2e8b57">4%</text>
+<line x1="24" x2="444" y1="324" y2="324" stroke="#2e8b57" stroke-width="1"/>
+<text x="36" y="344" font-size="15" font-family="Arial" fill="#2e8b57">Umidade (máx.)</text><text x="432" y="344" font-size="15" font-family="Arial" text-anchor="end" fill="#2e8b57">12%</text>
+<rect x="36" y="512" width="275.0" height="150" fill="#fff"/>
+<rect x="50.0" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="55.2" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="60.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="63.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="68.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="70.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="73.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="81.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="86.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="89.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="91.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="102.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="107.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="109.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="115.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="117.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="125.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="128.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="135.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="143.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="146.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="151.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="164.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="169.6" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="174.8" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="180.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="185.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="187.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="190.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="198.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="206.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="208.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="211.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="216.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="219.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="221.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="229.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="234.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="239.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="242.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="245.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="252.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="265.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="271.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="284.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="289.2" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="294.4" y="520" width="2.6" height="120" fill="#111"/>
+<text x="40" y="654" font-size="17" font-family="Arial">7</text>
+<text x="65.6" y="654" font-size="17" font-family="Arial" letter-spacing="5.2">899123</text>
+<text x="185.20000000000002" y="654" font-size="17" font-family="Arial" letter-spacing="5.2">450433</text>
+<g transform="translate(560 760)" fill="none" stroke="#2e8b57" stroke-width="4"><path d="M0 -26 L22 12 L-22 12 Z"/></g><text x="560" y="768" text-anchor="middle" font-size="14" font-weight="700" font-family="Arial" fill="#2e8b57">5</text><text x="560" y="796" text-anchor="middle" font-size="12" font-family="Arial" fill="#2e8b57">PP</text>
+</g>
+<g stroke="#111" stroke-width="1.2" fill="none"><circle cx="18" cy="18" r="9"/><path d="M4 18h28M18 4v28"/></g>
+<g stroke="#111" stroke-width="1.2" fill="none"><circle cx="1482" cy="18" r="9"/><path d="M1468 18h28M1482 4v28"/></g>
+<g stroke="#111" stroke-width="1.2" fill="none"><circle cx="18" cy="1032" r="9"/><path d="M4 1032h28M18 1018v28"/></g>
+<g stroke="#111" stroke-width="1.2" fill="none"><circle cx="1482" cy="1032" r="9"/><path d="M1468 1032h28M1482 1018v28"/></g>
+<rect x="630.0" y="1020" width="50" height="16" fill="#00a0e3"/>
+<rect x="690.0" y="1020" width="50" height="16" fill="#e5007e"/>
+<rect x="750.0" y="1020" width="50" height="16" fill="#ffed00"/>
+<rect x="810.0" y="1020" width="50" height="16" fill="#1d1d1b"/>
+</svg>

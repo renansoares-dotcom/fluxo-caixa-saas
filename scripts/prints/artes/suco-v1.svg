@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1050" viewBox="0 0 1500 1050">
+<rect width="1500" height="1050" fill="#fff"/>
+<defs><linearGradient id="s1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb12b"/><stop offset="1" stop-color="#f26b1d"/></linearGradient></defs>
+<rect x="40" y="40" width="1420" height="940" fill="url(#s1)"/>
+<g transform="translate(790 80)"><text x="300" y="120" text-anchor="middle" font-size="72" font-weight="900" font-family="Arial" fill="#fff">Pomar</text><text x="300" y="190" text-anchor="middle" font-size="44" font-family="Georgia" font-style="italic" fill="#3c7a1e">do Vale</text>
+<circle cx="210" cy="460" r="150" fill="#ff8c00" stroke="#fff" stroke-width="10"/>
+<line x1="210" y1="460" x2="342.0" y2="460.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="210" y1="460" x2="316.8" y2="537.6" stroke="#ffd27a" stroke-width="6"/>
+<line x1="210" y1="460" x2="250.8" y2="585.5" stroke="#ffd27a" stroke-width="6"/>
+<line x1="210" y1="460" x2="169.2" y2="585.5" stroke="#ffd27a" stroke-width="6"/>
+<line x1="210" y1="460" x2="103.2" y2="537.6" stroke="#ffd27a" stroke-width="6"/>
+<line x1="210" y1="460" x2="78.0" y2="460.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="210" y1="460" x2="103.2" y2="382.4" stroke="#ffd27a" stroke-width="6"/>
+<line x1="210" y1="460" x2="169.2" y2="334.5" stroke="#ffd27a" stroke-width="6"/>
+<line x1="210" y1="460" x2="250.8" y2="334.5" stroke="#ffd27a" stroke-width="6"/>
+<line x1="210" y1="460" x2="316.8" y2="382.4" stroke="#ffd27a" stroke-width="6"/>
+<circle cx="400" cy="520" r="120" fill="#ff8c00" stroke="#fff" stroke-width="10"/>
+<line x1="400" y1="520" x2="502.0" y2="520.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="400" y1="520" x2="482.5" y2="580.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="400" y1="520" x2="431.5" y2="617.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="400" y1="520" x2="368.5" y2="617.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="400" y1="520" x2="317.5" y2="580.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="400" y1="520" x2="298.0" y2="520.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="400" y1="520" x2="317.5" y2="460.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="400" y1="520" x2="368.5" y2="423.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="400" y1="520" x2="431.5" y2="423.0" stroke="#ffd27a" stroke-width="6"/>
+<line x1="400" y1="520" x2="482.5" y2="460.0" stroke="#ffd27a" stroke-width="6"/>
+<path d="M200 300 q40 -60 100 -40 q-30 50 -100 40" fill="#3c7a1e"/>
+<text x="300" y="760" text-anchor="middle" font-size="54" font-weight="800" font-family="Arial" fill="#fff">LARANJA</text><text x="300" y="830" text-anchor="middle" font-size="32" font-family="Arial" fill="#fff">integral · 1 L</text></g>
+<g transform="translate(110 90)"><rect width="600" height="860" fill="#fff" rx="14"/>
+<text x="24" y="54" font-size="28" font-family="Arial" font-weight="800" fill="#f26b1d">Suco de laranja integral</text>
+<text x="24" y="100" font-size="15" font-family="Arial" font-weight="400" fill="#222">Sem adição de açúcar. Pasteurizado. Agite antes de beber.</text>
+<text x="24" y="120" font-size="15" font-family="Arial" font-weight="400" fill="#222">Após aberto, conservar em geladeira e consumir em até 3 dias.</text>
+<rect x="24" y="200" width="420" height="152" fill="#fff" stroke="#f26b1d" stroke-width="2"/>
+<text x="36" y="227" font-size="17" font-weight="700" font-family="Arial" fill="#f26b1d">INFORMAÇÃO NUTRICIONAL — porção 30 g</text>
+<line x1="24" x2="444" y1="240" y2="240" stroke="#f26b1d" stroke-width="1"/>
+<text x="36" y="260" font-size="15" font-family="Arial" fill="#f26b1d">Valor energético</text><text x="432" y="260" font-size="15" font-family="Arial" text-anchor="end" fill="#f26b1d">94 kcal</text>
+<line x1="24" x2="444" y1="268" y2="268" stroke="#f26b1d" stroke-width="1"/>
+<text x="36" y="288" font-size="15" font-family="Arial" fill="#f26b1d">Carboidratos</text><text x="432" y="288" font-size="15" font-family="Arial" text-anchor="end" fill="#f26b1d">21 g</text>
+<line x1="24" x2="444" y1="296" y2="296" stroke="#f26b1d" stroke-width="1"/>
+<text x="36" y="316" font-size="15" font-family="Arial" fill="#f26b1d">Açúcares totais</text><text x="432" y="316" font-size="15" font-family="Arial" text-anchor="end" fill="#f26b1d">18 g</text>
+<line x1="24" x2="444" y1="324" y2="324" stroke="#f26b1d" stroke-width="1"/>
+<text x="36" y="344" font-size="15" font-family="Arial" fill="#f26b1d">Vitamina C</text><text x="432" y="344" font-size="15" font-family="Arial" text-anchor="end" fill="#f26b1d">96 mg</text>
+<rect x="36" y="512" width="275.0" height="150" fill="#fff"/>
+<rect x="50.0" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="55.2" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="60.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="63.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="68.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="70.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="73.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="81.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="86.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="89.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="91.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="102.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="107.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="109.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="115.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="117.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="125.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="128.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="135.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="143.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="146.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="151.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="164.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="169.6" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="174.8" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="180.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="185.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="187.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="190.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="198.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="206.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="208.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="211.2" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="216.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="219.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="221.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="229.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="234.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="247.6" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="252.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="258.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="271.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="278.8" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="281.4" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="284.0" y="520" width="2.6" height="110" fill="#111"/>
+<rect x="289.2" y="520" width="2.6" height="120" fill="#111"/>
+<rect x="294.4" y="520" width="2.6" height="120" fill="#111"/>
+<text x="40" y="654" font-size="17" font-family="Arial">7</text>
+<text x="65.6" y="654" font-size="17" font-family="Arial" letter-spacing="5.2">899123</text>
+<text x="185.20000000000002" y="654" font-size="17" font-family="Arial" letter-spacing="5.2">450365</text>
+<g transform="translate(560 760)" fill="none" stroke="#f26b1d" stroke-width="4"><path d="M0 -26 L22 12 L-22 12 Z"/></g><text x="560" y="768" text-anchor="middle" font-size="14" font-weight="700" font-family="Arial" fill="#f26b1d">5</text><text x="560" y="796" text-anchor="middle" font-size="12" font-family="Arial" fill="#f26b1d">PP</text>
+</g>
+<g stroke="#111" stroke-width="1.2" fill="none"><circle cx="18" cy="18" r="9"/><path d="M4 18h28M18 4v28"/></g>
+<g stroke="#111" stroke-width="1.2" fill="none"><circle cx="1482" cy="18" r="9"/><path d="M1468 18h28M1482 4v28"/></g>
+<g stroke="#111" stroke-width="1.2" fill="none"><circle cx="18" cy="1032" r="9"/><path d="M4 1032h28M18 1018v28"/></g>
+<g stroke="#111" stroke-width="1.2" fill="none"><circle cx="1482" cy="1032" r="9"/><path d="M1468 1032h28M1482 1018v28"/></g>
+<rect x="630.0" y="1020" width="50" height="16" fill="#00a0e3"/>
+<rect x="690.0" y="1020" width="50" height="16" fill="#e5007e"/>
+<rect x="750.0" y="1020" width="50" height="16" fill="#ffed00"/>
+<rect x="810.0" y="1020" width="50" height="16" fill="#1d1d1b"/>
+</svg>

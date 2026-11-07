@@ -17,7 +17,14 @@
     .pt-auth{max-width:420px;margin:40px auto}
     .pt-auth form{display:grid;gap:10px}
     .pt-aviso{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:13px}
-    @media (max-width:640px){ .pt-hide-sm{display:none} }
+    .pt-n{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--neg);color:#fff;font-size:11px;text-align:center;margin-left:4px}
+    .pt-artes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+    .pt-artes .pi-card .im{height:150px}.pt-artes .pi-card .im img{max-height:150px}.pt-artes .pi-card.pt-pend{border:2px solid var(--warn)}
+    .pt-decida{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border-left:4px solid var(--warn);margin-bottom:12px}
+    .pt-botoes{display:flex;gap:8px;flex-wrap:wrap}.pt-ok{border-left:4px solid var(--pos);margin-bottom:12px}
+    .pt-termo{border:1px solid var(--border);background:var(--bg);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.45}
+    .pt-wrap{max-width:1240px}
+    @media (max-width:640px){ .pt-hide-sm{display:none} .pt-botoes .btn{flex:1} }
   </style>
 </head>
 <body>

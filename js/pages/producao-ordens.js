@@ -86,11 +86,12 @@ function nova(root) {
 // ------------------------------------------------------------ ficha da OP
 async function abrir(o, root) {
   if (!o) return;
-  let ap = [], bob = [], cons = [], nec = { linhas: [] }, custoRep = {};
+  let ap = [], bob = [], cons = [], nec = { linhas: [] }, custoRep = {}, arte = null;
   try {
     [ap, bob, cons, nec] = await Promise.all([q(sb.from('prod_apontamentos').select('*').eq('ordem_id', o.id).order('inicio')),
       q(sb.from('prod_bobinas').select('*').eq('ordem_id', o.id).order('criado_em')), q(sb.from('prod_consumos').select('*').eq('ordem_id', o.id).order('criado_em')),
       necessidadeMaterial(o).catch(() => ({ linhas: [] }))]);
+    if (o.produto_id) arte = (await sb.rpc('pre_arte_produto', { p_produto: o.produto_id }).then(r => r.data).catch(() => null))?.[0] || null;
     if (['admin', 'financeiro', 'diretor', 'leitura'].includes(state.papel)) {
       const ids = [...new Set([...cons.map(c => c.produto_id), ...nec.linhas.map(l => l.produto.id)].filter(Boolean))];
       if (ids.length) for (const f of await q(sb.from('produto_fornecedores').select('produto_id,ultimo_preco,ultima_compra').in('produto_id', ids)))
@@ -110,6 +111,7 @@ async function abrir(o, root) {
       <div><span class="muted">Quantidade</span><div>${qtd(o.quantidade)} ${esc(o.unidade)}</div></div>
       <div><span class="muted">Cliente</span><div>${esc(o.cliente || '–')}</div></div><div><span class="muted">Pedido Iniflex</span><div>${esc(o.pedido_iniflex || '–')}</div></div>
       <div><span class="muted">Entrega</span><div>${dateBR(o.entrega) || '–'}</div></div><div><span class="muted">Prioridade</span><div>${o.prioridade}</div></div>
+      ${arte ? `<div><span class="muted">Arte (pré-impressão)</span><div><a href="#/preimpressao/artes?abrir=${arte.projeto_id}" data-close><span class="badge ${arte.ok ? 'pago' : 'vencido'}">nº ${arte.numero} · ${arte.ok ? 'aprovada V' + arte.versao : 'não aprovada'}</span></a></div></div>` : ''}
       <div><span class="muted">Produzido (última etapa)</span><div><b>${qtd(Math.round(totBoa * 100) / 100)}</b> ${esc(o.unidade)} (${o.quantidade ? Math.round(totBoa / o.quantidade * 100) : 0}%)</div></div>
       <div><span class="muted">Apara / refugo</span><div>${qtd(Math.round(totRef * 100) / 100)} kg${totApBoa + totRef ? ` (${(totRef / (totApBoa + totRef) * 100).toFixed(1).replace('.', ',')}% do apontado)` : ''}</div></div>
       <div><span class="muted">Horas apontadas</span><div>${totH.toFixed(1).replace('.', ',')} h${totH && o.unidade === 'KG' ? ` · ${qtd(Math.round(ap.reduce((t, a) => t + +a.qtd_boa, 0) / totH))} kg/h` : ''}</div></div>

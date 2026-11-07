@@ -59,6 +59,8 @@ function builder(tab) {
   }
   return api;
 }
+// artes fictícias da pré-impressão (scripts/prints/artes/*.svg) servidas no lugar dos links do armazenamento
+const arteMock = (p) => /\.svg$/.test(p || '') ? new URL('./artes/' + p.split('/').pop(), import.meta.url).href : 'data:,';
 const canal = (nome) => { const ch = { nome, on() { return ch; }, subscribe(cb) { setTimeout(() => cb && cb('SUBSCRIBED'), 5); return ch; }, track: async () => {}, untrack: async () => {}, presenceState: () => ({}), send: async () => {}, unsubscribe: async () => {} }; return ch; };
 export const sbMock = {
   from: builder,
@@ -76,6 +78,6 @@ export const sbMock = {
     mfa: { getAuthenticatorAssuranceLevel: async () => ({ data: { currentLevel: 'aal1', nextLevel: 'aal1' }, error: null }), listFactors: async () => ({ data: { totp: [], all: [] }, error: null }) },
   },
   channel: canal, removeChannel() {}, getChannels: () => [], realtime: { setAuth() {} },
-  storage: { from: () => ({ upload: async () => ({ data: {}, error: null }), createSignedUrl: async () => ({ data: { signedUrl: 'data:,' }, error: null }), createSignedUrls: async (ps) => ({ data: ps.map(p => ({ path: p, signedUrl: 'data:,' })), error: null }), download: async () => ({ data: new Blob(['x']), error: null }), remove: async () => ({ data: [], error: null }), list: async () => ({ data: [], error: null }) }) },
+  storage: { from: () => ({ upload: async () => ({ data: {}, error: null }), createSignedUrl: async (p) => ({ data: { signedUrl: arteMock(p) }, error: null }), createSignedUrls: async (ps) => ({ data: ps.map(p => ({ path: p, signedUrl: arteMock(p) })), error: null }), download: async () => ({ data: new Blob(['x']), error: null }), remove: async () => ({ data: [], error: null }), list: async () => ({ data: [], error: null }) }) },
   functions: { invoke: async (n, o) => ({ data: (window.FN || {})[o?.body?.acao]?.(o.body) ?? null, error: null }) },
 };

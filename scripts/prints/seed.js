@@ -721,3 +721,98 @@ window.FN = {
   Object.assign(window.RPC, { tin_pesar: () => ({ estoque: true }), tin_reescalar: (a) => a.p_quantidade, tin_aprovar_ordem: () => ({ lote: 'T2611-0069', estoque: true }), tin_movimentar: (a) => a.p_tipo,
     tin_aprovar_versao: () => 'aprovada', tin_nova_versao: () => 'tv-x', tin_estornar_pesagem: () => null, tin_configurar: () => ({ sistemas: 0 }) });
 }
+
+// Pré-impressão (SQL 089) — clientes, embalagens, versões, pinos, decisões e clicheria FICTÍCIOS (marcas inventadas; datas relativas a hoje)
+{
+  const agora = Date.now(), H = (h) => new Date(agora - h * 3600000).toISOString(), D0 = (d) => new Date(agora - d * 86400000).toISOString().slice(0, 10);
+  const hx = (n) => Array.from({ length: 64 }, (_, i) => '0123456789abcdef'[(n * 7 + i * 13 + (i * i) % 11) % 16]).join('');
+  const CL = [['fv-vd', 'VILA DOCE ALIMENTOS LTDA', '12345678000195'], ['fv-sa', 'TORREFAÇÃO SERRA AZUL LTDA', '23456789000106'], ['fv-pv', 'POMAR DO VALE SUCOS LTDA', '34567890000117'], ['fv-pt', 'PATINHAS PET FOODS LTDA', '45678901000128']];
+  for (const [id, nome, documento] of CL) DB.favorecidos.push({ id, empresa_id: E, tipo: 'CLIENTES', nome, documento, ativo: true, tipo_pessoa: 'J', municipio: 'RECIFE', uf: 'PE' });
+  DB.favorecidos.push({ id: 'fv-cl', empresa_id: E, tipo: 'FORNECEDORES', nome: 'CLICHERIA GRAVAFLEX LTDA', documento: '56789012000139', ativo: true, tipo_pessoa: 'J', municipio: 'RECIFE', uf: 'PE' });
+  const PRD = [['pr-bisc', 'EMB-BISC-200', 'EMBALAGEM BISCOITO MARIA 200G BOPP'], ['pr-cafe', 'EMB-CAFE-500', 'EMBALAGEM CAFÉ 500G LAMINADO PET/PE'], ['pr-suco', 'ROT-SUCO-1L', 'RÓTULO SUCO LARANJA 1L BOPP'], ['pr-racao', 'EMB-RAC-1K', 'EMBALAGEM RAÇÃO 1KG PE'], ['pr-choc', 'EMB-BISC-CHOC', 'EMBALAGEM BISCOITO CHOCOLATE 200G'], ['pr-c250', 'EMB-CAFE-250', 'EMBALAGEM CAFÉ 250G LAMINADO'], ['pr-uva', 'ROT-SUCO-UVA', 'RÓTULO SUCO UVA 1L']];
+  for (const [id, codigo, descricao] of PRD) DB.produtos.push({ id, empresa_id: E, codigo, descricao, tipo: 'produto_acabado', unidade: 'KG', ativo: true, origem: 'manual' });
+  DB.prod_ordens.push({ id: 'op-cafe', empresa_id: E, numero: 1210, origem: 'plataforma', produto_id: 'pr-cafe', codigo_produto: 'EMB-CAFE-500', descricao: 'EMBALAGEM CAFÉ 500G LAMINADO PET/PE', quantidade: 2200, unidade: 'KG', favorecido_id: 'fv-sa', cliente: 'TORREFAÇÃO SERRA AZUL LTDA', entrega: D0(-6), prioridade: 2, status: 'planejada', criado_em: H(120) },
+    { id: 'op-bisc', empresa_id: E, numero: 1211, origem: 'plataforma', produto_id: 'pr-bisc', codigo_produto: 'EMB-BISC-200', descricao: 'EMBALAGEM BISCOITO MARIA 200G BOPP', quantidade: 3500, unidade: 'KG', favorecido_id: 'fv-vd', cliente: 'VILA DOCE ALIMENTOS LTDA', entrega: D0(-10), prioridade: 3, status: 'planejada', criado_em: H(60) });
+  DB.tin_cores = DB.tin_cores || [];
+  const cor = (pantone, hex) => ({ nome: pantone, pantone, hex, tin_cor_id: null });
+  const CK = ['Textos e ortografia revisados', 'Dimensões, passo e sangria conferidos', 'Cores conferidas com o padrão (Pantone / cliente)', 'Código de barras válido e com contraste', 'Informações legais (CNPJ, lote, validade, símbolo de reciclagem)', 'Registro, trapping e espessura mínima de linha', 'Posição de desbobinamento definida'];
+  DB.pre_parametros = [{ empresa_id: E, checklist: CK, exigir_checklist: true, prazo_cliente_dias: 3, bloquear_op: true, papeis_liberacao: ['admin', 'diretor', 'financeiro'],
+    termo: 'Declaro que conferi esta arte — textos, ortografia, cores, dimensões, código de barras e informações legais — e autorizo a confecção dos clichês e a impressão. Alterações depois desta aprovação geram nova arte e podem gerar custo.' }];
+  const PJ = [
+    // id, nº, cliente, produto, OP, nome, código, situação, horas desde criação, cores, ean, desb, prazo(dias), extra
+    ['pa-1', 41, 'fv-vd', 'pr-bisc', 'op-bisc', 'Biscoito Crocantíssimo Maria 200 g', 'VD-MAR-200', 'aguardando_cliente', 110, [cor('Pantone 186 C', '#c8102e'), cor('Pantone 7406 C', '#f1c400'), cor('Pantone 1395 C', '#996017'), cor('Preto', '#1d1d1b')], '7899123450129', 1, -2, {}],
+    ['pa-2', 40, 'fv-sa', 'pr-cafe', 'op-cafe', 'Café Serra Azul Extraforte 500 g', 'SA-EXT-500', 'aguardando_cliente', 170, [cor('Pantone 289 C', '#0c2340'), cor('Pantone 7404 C', '#f6d55c'), cor('Pantone 7621 C', '#ab2328'), cor('Branco', '#ffffff')], '7899123450297', 4, 2, {}],
+    ['pa-3', 39, 'fv-pv', 'pr-suco', null, 'Suco Pomar do Vale Laranja 1 L', 'PV-LAR-1L', 'aprovada', 220, [cor('Pantone 1505 C', '#ff6900'), cor('Pantone 362 C', '#509e2f'), cor('Preto', '#1d1d1b')], '7899123450365', 3, null, {}],
+    ['pa-4', 37, 'fv-pt', 'pr-racao', null, 'Ração Patinhas Cães Adultos 1 kg', 'PT-AD-1K', 'na_clicheria', 330, [cor('Pantone 355 C', '#009639'), cor('Pantone 109 C', '#ffd100'), cor('Branco', '#ffffff')], '7899123450433', 2, null, { clicheria_id: 'fv-cl', cliche_enviado_em: D0(3), cliche_previsto: D0(-1), cliche_custo: 2840, cliche_qtd: 3 }],
+    ['pa-5', 42, 'fv-vd', 'pr-choc', null, 'Biscoito Vila Doce Chocolate 200 g', 'VD-CHO-200', 'em_criacao', 20, [cor('Pantone 4625 C', '#4f2c1d'), cor('Pantone 186 C', '#c8102e')], null, 1, null, { responsavel: 'Lucas (arte-final)' }],
+    ['pa-6', 35, 'fv-sa', 'pr-c250', null, 'Café Serra Azul Tradicional 250 g', 'SA-TRA-250', 'liberada', 600, [cor('Pantone 289 C', '#0c2340'), cor('Pantone 7404 C', '#f6d55c')], '7899123450501', 4, null, { liberada_em: H(110), liberada_por: 'renata@exemplo.com.br', clicheria_id: 'fv-cl', cliche_enviado_em: D0(12), cliche_recebido_em: D0(6), cliche_custo: 1960, cliche_qtd: 2, ferramenta_id: 'pf-cl35' }],
+    ['pa-7', 38, 'fv-pv', 'pr-uva', null, 'Suco Pomar do Vale Uva 1 L', 'PV-UVA-1L', 'alteracao_solicitada', 260, [cor('Pantone 2627 C', '#4b1e5b'), cor('Pantone 362 C', '#509e2f')], '7899123450372', 3, null, {}],
+  ];
+  DB.pre_projetos = PJ.map(([id, numero, favorecido_id, produto_id, ordem_id, nome, codigo_cliente, situacao, ha, cores, ean, desbobinamento, pz, x]) => ({ id, empresa_id: E, numero, favorecido_id, produto_id, ordem_id, nome, codigo_cliente,
+    tipo: id === 'pa-6' ? 'reimpressao' : id === 'pa-1' ? 'alteracao' : 'nova', largura_mm: 250, altura_mm: 175, substrato: id === 'pa-2' || id === 'pa-6' ? 'PET 12 µm + PE 60 µm' : id === 'pa-4' ? 'PE 80 µm' : 'BOPP 20 µm',
+    processo: id === 'pa-2' || id === 'pa-6' ? 'laminacao' : 'superficie', cores, ean, desbobinamento, responsavel: x.responsavel || 'Lucas (arte-final)', prazo: pz == null ? null : D0(-pz) < D0(0) ? D0(-pz) : D0(-pz),
+    situacao, versao_aprovada_id: null, arquivado: false, criado_por: 'renata@exemplo.com.br', criado_em: H(ha), atualizado_em: H(Math.max(2, ha / 4)), ...x }));
+  DB.pre_projetos.find(p => p.id === 'pa-2').prazo = D0(1);
+  DB.pre_projetos.find(p => p.id === 'pa-1').prazo = D0(-2);
+  DB.pre_projetos.find(p => p.id === 'pa-7').atualizado_em = H(76);
+  DB.prod_ferramentas = (DB.prod_ferramentas || []).concat([{ id: 'pf-cl35', empresa_id: E, tipo: 'cliche', codigo: 'CL-0035-V1', descricao: 'Clichê Café Serra Azul Tradicional 250 g', produto_id: 'pr-c250', favorecido_id: 'fv-sa', cores: 2, localizacao: 'Pré-impressão', situacao: 'ativa', metros_usados: 0 }]);
+  const pre = (a) => `emp1/${a}`;
+  const VS = [
+    // id, projeto, nº, arquivo svg, origem, enviada (h atrás) ou null, obs, horas criação
+    ['pv-1a', 'pa-1', 1, 'biscoito-v1.svg', 'interno', 98, 'Primeira proposta, a partir da arte da linha anterior', 100],
+    ['pv-1b', 'pa-1', 2, 'biscoito-v2.svg', 'interno', 20, 'Nome “Maria Tradicional”, selo “Nova receita” e tabela nutricional da nova receita', 22],
+    ['pv-2a', 'pa-2', 1, 'cafe-v1.svg', 'interno', 100, null, 150],
+    ['pv-3a', 'pa-3', 1, 'suco-v1.svg', 'cliente', null, 'Arte final da nossa agência', 210],
+    ['pv-3b', 'pa-3', 2, 'suco-v1.svg', 'interno', 120, 'Arte do cliente com sangria, trapping e registro da impressora', 150],
+    ['pv-4a', 'pa-4', 1, 'racao-v1.svg', 'interno', 300, null, 320], ['pv-4b', 'pa-4', 2, 'racao-v1.svg', 'interno', 200, 'Tabela de níveis de garantia corrigida', 210],
+    ['pv-5a', 'pa-5', 1, 'biscoito-v1.svg', 'interno', null, 'Base da linha Maria, trocando as cores', 6],
+    ['pv-6a', 'pa-6', 1, 'cafe-v1.svg', 'interno', 560, 'Reimpressão sem mudança', 580],
+    ['pv-7a', 'pa-7', 1, 'suco-v1.svg', 'interno', 150, null, 240],
+  ];
+  DB.pre_versoes = VS.map(([id, projeto_id, numero, svg, origem, env, observacao, ha], k) => ({ id, empresa_id: E, projeto_id, numero, caminho: pre(`${projeto_id}/${svg.replace('.svg', '.pdf')}`), nome: `${projeto_id === 'pa-3' && numero === 1 ? 'suco-laranja-agencia' : DB.pre_projetos.find(p => p.id === projeto_id).codigo_cliente.toLowerCase()}-v${numero}.pdf`,
+    tipo: 'application/pdf', tamanho: 1800000 + k * 210000, hash: hx(k + 3), previa: pre(`${projeto_id}/${svg}`), previa_largura: 1500, previa_altura: 1050, paginas: 1, mm_largura: 250, mm_altura: 175.2, observacao, origem,
+    checklist: CK.map((item, i) => ({ item, ok: id === 'pv-5a' ? i < 4 : true })), enviada_em: env == null ? null : H(env), enviado_por: origem === 'cliente' ? 'compras@pomardovale.exemplo' : 'lucas@exemplo.com.br', criado_em: H(ha) }));
+  const ap = { 'pa-3': 'pv-3b', 'pa-4': 'pv-4b', 'pa-6': 'pv-6a' };
+  for (const [p, v] of Object.entries(ap)) DB.pre_projetos.find(x => x.id === p).versao_aprovada_id = v;
+  const dec = (id, projeto_id, versao_id, decisao, nome, email, h, comentario = null, origem = 'cliente', evidencia = null) => ({ id, empresa_id: E, projeto_id, versao_id, decisao, nome, email, origem, comentario, evidencia,
+    termo: decisao === 'aprovada' ? DB.pre_parametros[0].termo : null, hash: DB.pre_versoes.find(v => v.id === versao_id).hash, ip: origem === 'cliente' ? '177.10.20.30' : null,
+    navegador: origem === 'cliente' ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130' : null, criado_em: H(h) });
+  DB.pre_decisoes = [
+    dec('pd-1', 'pa-1', 'pv-1a', 'alteracao', null, 'marketing@viladoce.exemplo', 70, 'Ver os pontos marcados.'),
+    dec('pd-2', 'pa-3', 'pv-3b', 'aprovada', 'Ana Paula Ribeiro', 'compras@pomardovale.exemplo', 52),
+    dec('pd-3', 'pa-4', 'pv-4a', 'alteracao', null, 'qualidade@patinhas.exemplo', 260, 'Proteína bruta é 21%, não 23%.'),
+    dec('pd-4', 'pa-4', 'pv-4b', 'aprovada', 'Marcos Antônio Lima', 'qualidade@patinhas.exemplo', 160),
+    dec('pd-5', 'pa-6', 'pv-6a', 'aprovada', 'Carla Menezes', 'carla@serraazul.exemplo', 540, null, 'interno', 'E-mail de carla@serraazul.exemplo em 01/11, 09:42: "Pode seguir com a reimpressão igual à anterior."'),
+    dec('pd-6', 'pa-7', 'pv-7a', 'alteracao', null, 'compras@pomardovale.exemplo', 76, 'O roxo está muito escuro; usar o Pantone 2627 do manual da marca.'),
+  ];
+  const com = (id, versao_id, x, y, texto, origem, autor, h, interno = false, resolvido = false) => ({ id, empresa_id: E, versao_id, x, y, texto, origem, autor, criado_em: H(h), interno, resolvido });
+  DB.pre_comentarios = [
+    com('pc-1', 'pv-1a', 0.722, 0.29, 'Trocar “Maria” por “Maria Tradicional”, como no novo manual da linha.', 'cliente', 'marketing@viladoce.exemplo', 71, false, true),
+    com('pc-2', 'pv-1a', 0.86, 0.45, 'Incluir o selo “Nova receita” aqui, em amarelo.', 'cliente', 'marketing@viladoce.exemplo', 71, false, true),
+    com('pc-3', 'pv-1a', 0.33, 0.36, 'A tabela nutricional é da receita antiga — usar a ficha técnica nova (enviada por e-mail).', 'cliente', 'marketing@viladoce.exemplo', 70.5, false, true),
+    com('pc-4', 'pv-1a', null, null, 'Recebida a ficha técnica nova da receita; ajustar a tabela e o selo.', 'interno', 'lucas@exemplo.com.br', 68, true, true),
+    com('pc-5', 'pv-1b', 0.86, 0.47, 'Selo “Nova receita” aplicado conforme o pedido.', 'interno', 'lucas@exemplo.com.br', 21),
+    com('pc-6', 'pv-1b', 0.2, 0.56, 'Trapping de 0,15 mm no vermelho sobre o amarelo — conferir no primeiro material.', 'interno', 'lucas@exemplo.com.br', 21, true),
+    com('pc-7', 'pv-7a', 0.25, 0.2, 'O roxo está muito escuro; usar o Pantone 2627 do manual da marca.', 'cliente', 'compras@pomardovale.exemplo', 77),
+  ];
+  const ev = (projeto_id, h, texto, publico = true, autor = 'lucas@exemplo.com.br') => ({ id: Math.round(Math.random() * 1e9), empresa_id: E, projeto_id, tipo: 'x', texto, publico, autor, criado_em: H(h) });
+  DB.pre_eventos = [ev('pa-1', 110, 'Arte criada: Biscoito Crocantíssimo Maria 200 g', true, 'renata@exemplo.com.br'), ev('pa-1', 100, 'Versão 1 criada: Primeira proposta', false), ev('pa-1', 98, 'Versão 1 enviada para aprovação'),
+    ev('pa-1', 70, 'Alteração pedida na versão 1: Ver os pontos marcados.', true, 'marketing@viladoce.exemplo'), ev('pa-1', 22, 'Versão 2 criada: Nome “Maria Tradicional”, selo “Nova receita” e tabela nutricional', false), ev('pa-1', 20, 'Versão 2 enviada para aprovação'),
+    ev('pa-3', 210, 'Versão 1 enviada pelo cliente: Arte final da nossa agência', true, 'compras@pomardovale.exemplo'), ev('pa-3', 120, 'Versão 2 enviada para aprovação'), ev('pa-3', 52, 'Versão 2 APROVADA por Ana Paula Ribeiro', true, 'compras@pomardovale.exemplo'),
+    ev('pa-4', 160, 'Versão 2 APROVADA por Marcos Antônio Lima'), ev('pa-4', 72, 'Arte enviada para a clicheria'),
+    ev('pa-2', 100, 'Versão 1 enviada para aprovação')];
+  Object.assign(window.RPC, {
+    pre_enviar_cliente: () => 'aguardando_cliente', pre_registrar_decisao: () => ({ situacao: 'aprovada' }), pre_clicheria: (a) => a.p_acao, pre_liberar: () => 'liberada',
+    pre_arte_produto: (a) => { const p = DB.pre_projetos.filter(x => x.produto_id === a.p_produto).at(-1); return p ? [{ projeto_id: p.id, numero: p.numero, situacao: p.situacao, versao: DB.pre_versoes.find(v => v.id === p.versao_aprovada_id)?.numero, ok: ['aprovada', 'na_clicheria', 'liberada'].includes(p.situacao) }] : []; },
+    // Portal do Cliente (a figura do portal entra como o comprador da VILA DOCE)
+    portal_aceitar_convites: () => null,
+    portal_meus_clientes: () => [{ empresa_id: E, empresa: 'IPLAMM (exemplo)', favorecido_id: 'fv-vd', cliente: 'VILA DOCE ALIMENTOS LTDA', documento: '12.345.678/0001-95' }],
+    portal_artes: (a) => DB.pre_projetos.filter(p => p.favorecido_id === a.p_fav && p.situacao !== 'cancelada').map(p => { const v = DB.pre_versoes.filter(x => x.projeto_id === p.id && (x.enviada_em || x.origem === 'cliente')).at(-1);
+      return v && { id: p.id, numero: p.numero, nome: p.nome, codigo_cliente: p.codigo_cliente, situacao: p.situacao, versao: v.numero, versao_id: v.id, enviada_em: v.enviada_em, prazo: p.prazo, pendente: p.situacao === 'aguardando_cliente', atualizado_em: p.atualizado_em }; }).filter(Boolean)
+      .concat(a.p_fav === 'fv-vd' ? [{ id: 'pa-x1', numero: 33, nome: 'Biscoito Crocantíssimo Leite 200 g', codigo_cliente: 'VD-LEI-200', situacao: 'liberada', versao: 2, versao_id: 'pv-x1', prazo: null, pendente: false }] : []),
+    portal_arte: (a) => { const p = DB.pre_projetos.find(x => x.id === a.p_projeto); const Vs = DB.pre_versoes.filter(v => v.projeto_id === p.id && (v.enviada_em || v.origem === 'cliente'));
+      return { projeto: p, termo: DB.pre_parametros[0].termo, versoes: Vs, comentarios: DB.pre_comentarios.filter(c => !c.interno && Vs.some(v => v.id === c.versao_id)).map(c => ({ ...c, autor: c.origem === 'cliente' ? c.autor : 'Equipe' })),
+        decisoes: DB.pre_decisoes.filter(d => d.projeto_id === p.id), eventos: DB.pre_eventos.filter(e => e.projeto_id === p.id && e.publico) }; },
+    portal_arte_comentar: () => 'pc-x', portal_arte_decidir: () => ({ situacao: 'aprovada' }), portal_arte_enviar: () => 'pv-x',
+  });
+}

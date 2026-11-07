@@ -92,4 +92,12 @@ export const FIGS = [
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Receitas com a versão em uso, o custo teórico e o que está em desenvolvimento', 're'],
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Versão em teste: composição, custo teórico e comparação com a aprovada', 're|click:#tr-corpo tr[data-r="tr-1"]'],
   ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
+  // Pré-impressão (07/11/2026) — comparação, diferença, certificado e o Portal do Cliente (preimpressao-*.jpg com nome) tirados à parte
+  ['preimpressao', 'preimpressao', '## 4.', 'Painel da Pré-impressão: alertas, indicadores e o quadro das artes por etapa'],
+  ['preimpressao', 'preimpressao/artes', '## 5.', 'Artes e Aprovações', 'click:[data-f=todas]'],
+  ['preimpressao', 'preimpressao/artes', '### 5.1', 'Nova arte: a ficha técnica da embalagem', 'click:#pa-nova'],
+  ['preimpressao', 'preimpressao/artes', '### 5.3', 'Versão em rascunho com o checklist de pré-impressão', 'click:#pa-lista tr[data-p="pa-5"]'],
+  ['preimpressao', 'preimpressao/artes', '### 5.6', 'Aprovação: decisões, prova e certificado', 'click:[data-f=todas]|click:#pa-lista tr[data-p="pa-3"]|click:[data-a=aprovacao]'],
+  ['preimpressao', 'preimpressao/artes', '### 5.7', 'Clicheria e produção', 'click:[data-f=todas]|click:#pa-lista tr[data-p="pa-4"]|click:[data-a=clicheria]'],
+  ['preimpressao', 'preimpressao/artes', '## 6.', 'Parâmetros da pré-impressão', 'click:#pa-par'],
 ];

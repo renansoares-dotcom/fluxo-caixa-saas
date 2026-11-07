@@ -48,8 +48,9 @@ async function carregar() {
   const imob = temArea('cont') ? await import(`./imobilizado.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const tint = temArea('prd') ? await import(`./tintas.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const qual = temArea('prd') ? await import(`./qualidade.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const arte = temArea('com') || temArea('prd') ? await import(`./preimpressao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte };
 }
 
 // ---------------------------------------------------------------- regras
@@ -209,6 +210,13 @@ function regras(D) {
     desc: tn.map(a => a.txt).join(' · '), impacto: 0, impactoTxt: `${tn.length} ponto(s)`,
     regra: 'Ordem de preparação parada há mais de 24 h, tinta em ajuste de cor ou viscosidade, lote de tinta pronta vencido ou vencendo em 7 dias (usar a sobra mais antiga primeiro) e versão de receita em teste há mais de 15 dias.',
     acao: 'Abrir painel da casa de tintas', rota: 'tintas' });
+
+  // 21. pré-impressão: arte sem resposta do cliente no prazo, OP esperando arte, alteração parada, clichê atrasado, aprovada sem liberar
+  const ar = D.arte || [];
+  if (ar.length) out.push({ k: 'preimpressao', origem: 'Pré-impressão', urg: ar.some(a => a.nivel === 'alto') ? 'alta' : 'media', titulo: 'Destravar as artes',
+    desc: ar.map(a => a.titulo).join(' · '), impacto: 0, impactoTxt: `${ar.length} ponto(s)`,
+    regra: 'Arte com o cliente além do prazo de resposta, OP aberta de produto cuja arte mais recente não está aprovada, alteração pedida sem nova versão há 2 dias, clichê além da previsão e arte aprovada há 3 dias sem liberar para a produção.',
+    acao: 'Abrir painel da pré-impressão', rota: 'preimpressao' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }
