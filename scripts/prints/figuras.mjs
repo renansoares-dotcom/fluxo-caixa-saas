@@ -92,6 +92,9 @@ export const FIGS = [
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Receitas com a versão em uso, o custo teórico e o que está em desenvolvimento', 're'],
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Versão em teste: composição, custo teórico e comparação com a aprovada', 're|click:#tr-corpo tr[data-r="tr-1"]'],
   ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
+  // Recompras FIDC (07/11/2026)
+  ['fidc-recompras', 'fidc-recompras', '## 3.', 'Recompras: as pendências sem registro, os indicadores e os títulos recomprados'],
+  ['fidc-recompras', 'fidc-recompras', '### 3.1', 'Registrar a recompra: o título, o valor cobrado pelo fundo e o título de volta na carteira', 'click:[data-p="0"]'],
   // E-mails da Plataforma (07/11/2026)
   ['email', 'config/email', '## 3.', 'E-mails da Plataforma: remetente, como ligar o envio e os modelos'],
   ['email', 'config/email', '### 3.3', 'Editar um modelo, com a prévia do e-mail', 'click:[data-m="arte_aprovacao"]'],

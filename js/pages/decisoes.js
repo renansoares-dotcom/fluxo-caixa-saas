@@ -48,9 +48,10 @@ async function carregar() {
   const imob = temArea('cont') ? await import(`./imobilizado.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const tint = temArea('prd') ? await import(`./tintas.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const qual = temArea('prd') ? await import(`./qualidade.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const recomp = temArea('fin') ? await import(`./fidc-recompras.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const arte = temArea('com') || temArea('prd') ? await import(`./preimpressao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp };
 }
 
 // ---------------------------------------------------------------- regras
@@ -217,6 +218,13 @@ function regras(D) {
     desc: ar.map(a => a.titulo).join(' · '), impacto: 0, impactoTxt: `${ar.length} ponto(s)`,
     regra: 'Arte com o cliente além do prazo de resposta, OP aberta de produto cuja arte mais recente não está aprovada, alteração pedida sem nova versão há 2 dias, clichê além da previsão e arte aprovada há 3 dias sem liberar para a produção.',
     acao: 'Abrir painel da pré-impressão', rota: 'preimpressao' });
+
+  // 22. recompras: título recomprado vencido sem receber; recompra informada pelo fundo ou lançada à mão sem registro
+  const rc = D.recomp || [];
+  if (rc.length) out.push({ k: 'recompras', origem: 'Crédito / FIDC', urg: rc.some(a => a.nivel === 'alto') ? 'alta' : 'media', titulo: 'Cobrar e registrar as recompras',
+    desc: rc.map(a => a.titulo).join(' · '), impacto: rc.reduce((s, a) => s + (a.valor || 0), 0), impactoTxt: null,
+    regra: 'Título que a empresa recomprou do fundo e voltou para a carteira, com vencimento passado e sem recebimento; recompra que aparece no relatório do fundo ou em 2.07.11 sem registro (o título não volta para a carteira).',
+    acao: 'Abrir as recompras', rota: 'fidc-recompras' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

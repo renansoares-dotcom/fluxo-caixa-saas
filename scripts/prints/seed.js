@@ -871,3 +871,27 @@ window.FN = {
   ].map(([codigo, para, campos, situacao, erro, h], i) => ({ id: 'ef-' + i, empresa_id: E, codigo, para, campos, situacao, erro, criado_em: H(h) }));
   window.RPC.email_teste = () => 'ef-t';
 }
+
+// Recompras FIDC (SQL 093) — lista e pendências FICTÍCIAS
+{
+  const D0 = (d) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+  const R = (numero, data, fundo, documento, cliente, valor_titulo, valor_recompra, conta, st, venc, rec, rconta, extra = {}) => ({ id: 'rc' + numero, numero, data: D0(data), fundo, documento, cliente, valor_titulo, valor_recompra,
+    encargos: Math.max(0, Math.round((valor_recompra - valor_titulo) * 100) / 100), conta, vinculada: false, cancelada: false, lancamento_id: 'l' + numero, lanc_reaberto_id: 'lr' + numero,
+    reaberto_status: st, reaberto_venc: venc == null ? null : D0(venc), recebido_em: rec == null ? null : D0(rec), recebido_conta: rconta, ...extra });
+  window.RPC.fidc_recompras_lista = () => [
+    R(6, -2, 'Negocial', '1-38110/2', 'SUPERMERCADOS BOA COMPRA LTDA', 8420.5, 8611.3, 'NEGOCIAL', 'Em aberto', 12, null, null),
+    R(5, -18, 'FS', '1-37602/1', 'ATACADO SERTÃO LTDA', 5310, 5434.88, 'FS FIDC', 'Em aberto', -6, null, null),
+    R(4, -25, 'Negocial', '1-37040/3', 'DISTRIBUIDORA NORDESTE LTDA', 12750, 12988.4, 'NEGOCIAL', 'Pago', null, -9, 'UNICRED PRINCIPAL'),
+    R(3, -60, 'Contato', '1-36211/1', 'FARMÁCIAS SAÚDE MAIS LTDA', 2980, 3041.2, 'BRADESCO', 'Pago', null, -40, 'BRADESCO'),
+    R(1, -170, 'Negocial', '1-34724/1', 'MASTERCOLA (EXEMPLO)', 3186.08, 3256.17, 'NEGOCIAL', 'Pago', null, -117, 'VEXPENSES', { vinculada: true }),
+  ];
+  window.RPC.fidc_recompras_pendentes = () => [
+    { origem: 'fundo', id: 'q1', data: D0(-3), fundo: 'FS', documento: '38544-001', valor: 4185.9, cliente: 'ATACADO SERTÃO LTDA', sugestao_id: 'c1', sugestao_doc: '1-38544/1', sugestao_valor: 4102 },
+    { origem: 'manual', id: 'm1', data: D0(-12), fundo: 'Negocial', documento: 'DOCTO REC 37811/1 NEGOCIAL FIDC', valor: 6640.12, cliente: null, sugestao_id: 'c2', sugestao_doc: '1-37811/1', sugestao_valor: 6512 },
+  ];
+  window.RPC.fidc_cedidos_busca = () => [
+    { id: 'c1', data: D0(-40), documento: '1-38544/1', cliente: 'ATACADO SERTÃO LTDA', valor: 4102, fundo: 'FS', conta: 'FS FIDC', vencimento: D0(-4) },
+    { id: 'c3', data: D0(-40), documento: '1-38544/2', cliente: 'ATACADO SERTÃO LTDA', valor: 4102, fundo: 'FS', conta: 'FS FIDC', vencimento: D0(26) },
+  ];
+  DB.fidc_recompra_config = [];
+}
