@@ -95,6 +95,11 @@ export const FIGS = [
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Receitas com a versão em uso, o custo teórico e o que está em desenvolvimento', 're'],
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Versão em teste: composição, custo teórico e comparação com a aprovada', 're|click:#tr-corpo tr[data-r="tr-1"]'],
   ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
+  // Auditoria por registro e alertas (07/11/2026)
+  ['empresa-usuarios', 'auditoria?aba=registro&q=RESINAS', '### 7.1', 'Auditoria › Por registro: o registro procurado e quantas mudanças teve'],
+  ['empresa-usuarios', 'auditoria?aba=registro&q=RESINAS', '### 7.1', 'Linha do tempo do registro e a comparação de duas versões', 'click:#pr-res tr[data-i="0"]'],
+  ['empresa-usuarios', 'auditoria?aba=alertas', '### 7.2', 'Auditoria › Alertas de ações sensíveis'],
+  ['empresa-usuarios', 'auditoria?aba=alertas', '### 7.2', 'Parâmetros dos alertas: o que gera alerta e quem recebe', 'click:#al-par'],
   // Prestação de contas do PA (07/11/2026)
   ['pagamentos-antecipados', 'paraquedas', '## 7.', 'Prestação de contas: saldo pendente por pessoa e o prazo da nota de cada PA', 'click:[data-aba="nota"]'],
   ['pagamentos-antecipados', 'paraquedas', '### 7.1', 'Histórico das cobranças do PA (lembrete, cobrança, escalada e manual)', 'click:[data-aba="nota"]|click:[data-pa="hist"][data-id="pa-x16"]'],

@@ -985,3 +985,29 @@ window.FN = {
   DB.pa_cobrancas = [['escalada', 27, 'PA nº 16 sem nota fiscal há 27 dia(s) do prazo'], ['cobranca', 27, 'Nota fiscal do PA nº 16 atrasada há 27 dia(s)'], ['cobranca', 24, 'Nota fiscal do PA nº 16 atrasada há 24 dia(s)'], ['manual', 20, 'Beatriz, a tornearia prometeu a nota para esta semana?'], ['lembrete', 0, 'Nota fiscal do PA nº 16 vence em 2 dia(s)']]
     .map(([tipo, dias_atraso, mensagem], i) => ({ id: i + 1, empresa_id: E, paraquedas_id: 'pa-x16', tipo, dias_atraso, mensagem, enviado_por: tipo === 'manual' ? 'renata@exemplo.com.br' : 'automático', enviado_em: new Date(Date.now() - (i * 3 + 1) * 864e5).toISOString() }));
 }
+
+// Auditoria por registro e alertas (SQL 098) — FICTÍCIOS
+{
+  const H = (d, h) => new Date(Date.now() - d * 864e5 - h * 36e5).toISOString();
+  const fav = DB.favorecidos.find(f => f.nome.startsWith('RESINAS'));
+  fav.dados_bancarios = 'BANCO 341 AG 1520 CC 88812-4'; fav.pix = '33000167000101';
+  const ev = [
+    [9, 'renata', 'incluiu', null, null, { nome: fav.nome, documento: fav.documento, dados_bancarios: 'BANCO 237 AG 0451 CC 12034-7', pix: null, forma_pagamento: 'Boleto', tipo: 'FORNECEDORES' }],
+    [5, 'ana', 'alterou', ['forma_pagamento', 'pix'], { forma_pagamento: 'Boleto', pix: null }, { forma_pagamento: 'PIX', pix: '33000167000101' }],
+    [1, 'beatriz', 'alterou', ['dados_bancarios'], { dados_bancarios: 'BANCO 237 AG 0451 CC 12034-7' }, { dados_bancarios: 'BANCO 341 AG 1520 CC 88812-4' }],
+  ].map(([d, u, acao, campos, antes, depois], i) => ({ id: 9000 + i, empresa_id: E, user_id: 'u' + (i + 1), user_email: u + '@exemplo.com.br', tabela: 'favorecidos', registro_id: fav.id, acao, campos, antes, depois, criado_em: H(d, 3) }));
+  DB.auditoria.push(...ev);
+  window.RPC.auditoria_registros = () => [
+    { tabela: 'favorecidos', registro_id: fav.id, eventos: 3, primeiro: ev[0].criado_em, ultimo: ev[2].criado_em, usuarios: 'ana@exemplo.com.br, beatriz@exemplo.com.br, renata@exemplo.com.br', excluido: false, foto: ev[0].depois },
+    { tabela: 'lancamentos', registro_id: 'lx1', eventos: 4, primeiro: H(30, 1), ultimo: H(2, 5), usuarios: 'ana@exemplo.com.br', excluido: false, foto: { data: '2026-10-05', valor: 81600, descricao: 'COMPRA DE RESINA PEBD', favorecido_id: fav.id } },
+    { tabela: 'paraquedas', registro_id: 'px1', eventos: 2, primeiro: H(12, 2), ultimo: H(11, 2), usuarios: 'beatriz@exemplo.com.br', excluido: true, foto: { numero: 12, razao_social: 'RESINAS DO BRASIL S.A.' } },
+  ];
+  DB.audit_alertas = [
+    ['banco_beneficiario', 'Dados bancários do beneficiário alterados', `${fav.nome}: dados bancários`, 'beatriz', 1, null],
+    ['exclusao', 'Exclusão de lançamento', 'COMPRA DE EMBALAGENS · valor 6420.00 · data 2026-10-12', 'ana', 2, null],
+    ['valor_pago', 'Valor de lançamento pago alterado', 'FRETE CARGA SALVADOR/BA: 9800.00 → 11800.00', 'ana', 3, null],
+    ['papel_usuario', 'Papel ou áreas de usuário alterados', 'compras → financeiro', 'renata', 6, 'renata@exemplo.com.br'],
+    ['trava_conta', 'Trava de conta removida', 'BANCO ALFA · até 2026-09-30', 'renata', 8, 'carlos@exemplo.com.br'],
+  ].map(([regra, titulo, detalhe, u, d, visto], i) => ({ id: 500 + i, empresa_id: E, auditoria_id: regra === 'banco_beneficiario' ? 9002 : null, regra, titulo, detalhe, user_email: u + '@exemplo.com.br', criado_em: H(d, 1), visto_por: visto, visto_em: visto ? H(d - 1, 0) : null }));
+  DB.audit_alertas_config = [];
+}

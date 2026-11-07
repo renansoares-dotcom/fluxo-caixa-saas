@@ -1,8 +1,8 @@
 ---
 titulo: Empresa, usuários e auditoria
 tela: Cadastros › Empresa e Usuários (CAD007) e Auditoria (CAD008)
-versao: 1.3
-atualizado: 2026-11-05
+versao: 1.4
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -110,7 +110,63 @@ A **importação da base completa** (migração da planilha) só funciona em emp
 3. **Desfazer** volta a alteração. Quando ela faz parte de uma operação (por exemplo, uma importação), desfazer volta a operação inteira.
 4. **Exportar Excel** baixa o registro; **Carregar mais** traz as linhas mais antigas.
 
-Dentro do lançamento, o botão **Histórico** mostra a auditoria só daquele lançamento.
+O botão **Histórico** aparece dentro do lançamento, do pagamento antecipado e do beneficiário (para administrador e diretor). Ele abre a linha do tempo só daquele registro (item 7.1).
+
+A Auditoria tem três abas: **Movimentos** (a lista acima), **Por registro** e **Alertas**.
+
+### 7.1 Por registro: quem mudou, e a comparação de versões
+
+![Figura 3 — Auditoria › Por registro: o registro procurado e quantas mudanças teve (dados fictícios)](img/empresa-usuarios-3.jpg)
+
+Para saber, por exemplo, "quem mudou esta OP" ou "quem mudou o banco deste fornecedor":
+
+1. Na aba **Por registro**, procure pelo que foi gravado: o número, o nome, a descrição, o valor (com ponto, por exemplo 3186.08) ou o identificador. Se quiser, escolha **Onde** e o período.
+2. A lista mostra cada registro encontrado com:
+   - quantas mudanças teve;
+   - a primeira e a última;
+   - quem mexeu;
+   - se foi **excluído**.
+3. Clique no registro para abrir a **linha do tempo**.
+
+![Figura 4 — Linha do tempo do registro e a comparação de duas versões (dados fictícios)](img/empresa-usuarios-4.jpg)
+
+Na linha do tempo, cada mudança é uma **versão** (v1, v2…), com a data, o usuário, a ação e o que mudou.
+
+- Marque **A** e **B** para comparar duas versões quaisquer. A tabela de baixo mostra os campos diferentes, em negrito; **mostrar todos os campos** mostra o registro inteiro.
+- Clique na linha para ver o antes e o depois daquela mudança e, se precisar, **Desfazer**.
+
+### 7.2 Alertas de ações sensíveis
+
+![Figura 5 — Auditoria › Alertas de ações sensíveis (dados fictícios)](img/empresa-usuarios-5.jpg)
+
+A plataforma avisa na hora o administrador e o diretor quando alguém:
+
+- **exclui** um lançamento, beneficiário, conta, plano de contas, pagamento antecipado, borderô, contrato, conciliação ou usuário;
+- muda os **dados bancários, o Pix, a forma de pagamento ou o CNPJ/CPF de um beneficiário**, que é o caminho do "golpe do fornecedor";
+- **inclui ou remove um usuário**, ou muda o **papel** ou as **áreas** dele;
+- muda o **valor de um lançamento já pago**;
+- **remove ou altera a trava** de uma conta no fechamento;
+- muda o **número, a agência, o banco, o vínculo do extrato ou o saldo inicial** de uma conta bancária;
+- (opcional, desligado no início) mexe em lançamentos, beneficiários, contas, PAs ou usuários **fora do horário** ou no fim de semana.
+
+O aviso chega no sino, no celular e por e-mail, conforme Meus avisos (tipo "Ações sensíveis"). Quem fez a ação não recebe o próprio alerta.
+
+Na aba **Alertas**, os novos aparecem primeiro:
+
+- **Ver** abre a mudança;
+- **Marcar como visto** registra quem conferiu e quando.
+
+Enquanto houver alerta não visto, a **Central de Decisões** mostra a regra 24.
+
+![Figura 6 — Parâmetros dos alertas: o que gera alerta e quem recebe (dados fictícios)](img/empresa-usuarios-6.jpg)
+
+Em **Parâmetros** você escolhe:
+
+- quais regras valem;
+- de quais telas a exclusão gera alerta;
+- o horário de trabalho;
+- quem recebe (administrador, diretor, financeiro);
+- se as rotinas e importações sem usuário ficam de fora.
 
 ## 8. Regras e travas
 
@@ -137,3 +193,4 @@ Dentro do lançamento, o botão **Histórico** mostra a auditoria só daquele la
 | 1.1 | 28/10/2026 | Verificação em duas etapas: ativar a sua e exigir para administrador, financeiro e diretor. |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.4 | 07/11/2026 | Auditoria: aba Por registro (busca pelo que foi gravado, linha do tempo e comparação de duas versões), Histórico também no PA e no beneficiário, e aba Alertas de ações sensíveis com parâmetros (regra 24 da Central de Decisões). |

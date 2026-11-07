@@ -50,9 +50,10 @@ async function carregar() {
   const qual = temArea('prd') ? await import(`./qualidade.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const recomp = temArea('fin') ? await import(`./fidc-recompras.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const paPrest = temArea('fin') ? await import(`../lib/pa-prestacao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const audAl = await import(`./auditoria.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const arte = temArea('com') || temArea('prd') ? await import(`./preimpressao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl };
 }
 
 // ---------------------------------------------------------------- regras
@@ -235,6 +236,13 @@ function regras(D) {
     desc: pp.map(a => `${a.titulo}: ${a.detalhe}`).join(' · '), impacto: pp.reduce((s, a) => s + (a.valor || 0), 0), impactoTxt: null,
     regra: 'PA pago aguardando nota com o prazo vencido (previsão do pedido, prazo prorrogado ou o prazo padrão dos Parâmetros depois do pagamento). Alta quando o atraso passa do prazo de escalada.',
     acao: 'Abrir a prestação de contas', rota: 'paraquedas' });
+
+  // 24. auditoria: ações sensíveis ainda não vistas (exclusões, dados bancários, usuários, valor pago, travas)
+  const aa = D.audAl || [];
+  if (aa.length) out.push({ k: 'auditoria', origem: 'Auditoria', urg: aa.some(a => a.nivel === 'alto') ? 'alta' : 'media', titulo: 'Conferir as ações sensíveis',
+    desc: aa.map(a => `${a.titulo}: ${a.detalhe}`).join(' · '), impacto: 0, impactoTxt: aa[0].titulo,
+    regra: 'Alertas da Auditoria ainda não marcados como vistos (as regras ficam em Auditoria › Alertas › Parâmetros). Alta para dados bancários de beneficiário e usuários. Só para administrador e diretor.',
+    acao: 'Abrir os alertas', rota: 'auditoria?aba=alertas' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

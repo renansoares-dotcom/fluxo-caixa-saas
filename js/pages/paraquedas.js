@@ -220,8 +220,9 @@ function editar(p, root, soVer = false, pre = null) {
       <label>Conta de saída<select id="cta" ${soVer || !ed ? 'disabled' : ''}>${options(cad.contas, { selected: v.conta_id, empty: '—' })}</select></label>
     </div></fieldset>` : ''}
     ${p?.aprovado_em ? `<p class="small muted">${p.status === 'rejeitado' ? 'Rejeitado' : 'Aprovado'} em ${dateBR(p.aprovado_em)}.</p>` : ''}`,
-    foot: soVer ? '<button class="btn" data-close>Fechar</button>' : `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">${novo ? 'Enviar para aprovação' : p.status === 'rejeitado' ? 'Reenviar para aprovação' : 'Salvar'}</button>` });
+    foot: soVer ? `${!novo && ['admin', 'diretor'].includes(state.papel) ? '<button class="btn ghost" id="pq-hist" style="margin-right:auto">Histórico</button>' : ''}<button class="btn" data-close>Fechar</button>` : `${!novo && ['admin', 'diretor'].includes(state.papel) ? '<button class="btn ghost" id="pq-hist" style="margin-right:auto">Histórico</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">${novo ? 'Enviar para aprovação' : p.status === 'rejeitado' ? 'Reenviar para aprovação' : 'Salvar'}</button>` });
   if (!novo) conversaNoModal(m, 'paraquedas', p.id);
+  $('#pq-hist', m.el) && ($('#pq-hist', m.el).onclick = async () => { const { abrirHistorico } = await import(`./auditoria.js?v=${Date.now()}`); abrirHistorico('paraquedas', p.id); });
   if (soVer) return;
   // escolher um fornecedor do cadastro preenche CNPJ
   $('#rs', m.el).onchange = () => { const f = favs.find(x => x.nome === $('#rs', m.el).value.trim()); if (f && f.documento && !dig($('#doc', m.el).value)) $('#doc', m.el).value = fmtDoc(f.documento); };

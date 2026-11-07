@@ -151,9 +151,10 @@ function editar(f, root) {
         <label class="span2">Dados bancários<input name="dados_bancarios" value="${v('dados_bancarios')}"></label>
         <label class="span2">Observação<input name="observacao" value="${v('observacao')}"></label>
       </div></fieldset></form>`,
-    foot: ed ? `${f.id ? '<button class="btn danger" id="b-inat" style="margin-right:auto">' + (f.ativo === false ? 'Reativar' : 'Inativar') + '</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="b-ok">Salvar</button>` : '<button class="btn" data-close>Fechar</button>',
+    foot: ed ? `${f.id ? '<button class="btn danger" id="b-inat" style="margin-right:auto">' + (f.ativo === false ? 'Reativar' : 'Inativar') + '</button>' : ''}${f.id && ['admin', 'diretor'].includes(state.papel) ? '<button class="btn ghost" id="b-hist">Histórico</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="b-ok">Salvar</button>` : '<button class="btn" data-close>Fechar</button>',
   });
   const form = $('#bf', m.el); const F = (n) => form.querySelector(`[name="${n}"]`);
+  $('#b-hist', m.el) && ($('#b-hist', m.el).onclick = async () => { const { abrirHistorico } = await import(`./auditoria.js?v=${Date.now()}`); abrirHistorico('favorecidos', f.id, f.nome); });
   if (!ed) form.querySelectorAll('input,select').forEach(i => i.disabled = true);
   // mostra só os campos do tipo escolhido
   const ajusta = () => {
