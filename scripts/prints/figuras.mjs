@@ -35,7 +35,10 @@ export const FIGS = [
   ['fidc', 'fidc', '## 4.', 'Análise FIDC: custo e prazo por fundo'],
   ['estoque', 'estoque', '## 3.', 'Posição de Estoque com o ponto de pedido'],
   ['logistica-indicadores', 'logistica/indicadores', '## 5.', 'Metas dos indicadores', 'click:#li-metas'],
-  ['conciliacao', 'conciliacao', '### 4.2', 'Movimento do extrato com os lançamentos candidatos', 'click:#ext tr[data-id]'],
+  ['conciliacao', 'conciliacao', '### 4.2', 'Movimento do extrato com os lançamentos candidatos e a nota de confiança da sugestão', 'click:#ext tr[data-id]'],
+  ['conciliacao', 'conciliacao', '### 4.1', 'Aceitar sugestões pela faixa de confiança', 'click:#aceitar'],
+  ['conciliacao', 'conciliacao', '### 4.1.1', 'Parâmetros: janelas de dias, faixas de confiança e os pontos de cada critério', 'click:#cpar'],
+  ['conciliacao', 'conciliacao', '## 3.', 'Extratos por conta: último extrato, formato, pendentes e as contas atrasadas', 'click:#exts'],
   ['estoque-kardex', 'estoque/kardex', '## 3.', 'Kardex: saldo por local ao custo médio'],
   ['estoque-kardex', 'estoque/parametros', '## 4.', 'Parâmetros do Estoque: os locais'],
   // formulários e listas revistos na auditoria de design (11/2026); a numeração segue a ordem do texto (inserir.mjs)

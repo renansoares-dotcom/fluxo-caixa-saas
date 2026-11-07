@@ -1133,3 +1133,9 @@ table.metas-grade td.sticky{min-width:150px;white-space:normal}
 }
 @keyframes nav-painel{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){body.nav-modo-painel .nav-area.painel>.nav-corpo{animation:none}}
+/* conciliação sugerida (3.2): nota de confiança e alerta de extrato */
+.badge.conc-alta{background:color-mix(in srgb,var(--pos) 15%,transparent);color:var(--pos)}
+.badge.conc-media{background:color-mix(in srgb,var(--warn) 17%,transparent);color:var(--warn)}
+.badge.conc-baixa{background:color-mix(in srgb,var(--neg) 14%,transparent);color:var(--neg)}
+.conc-alerta{display:flex;justify-content:space-between;align-items:center;gap:12px;border-left:4px solid var(--warn);margin-bottom:12px;font-size:13px}
+.modal label.conc-f{flex-direction:row;align-items:center;gap:8px;font-weight:400}.modal label.conc-f input{width:auto;min-height:0}

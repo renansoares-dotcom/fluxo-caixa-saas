@@ -2,13 +2,15 @@
 // lançamentos e registra a conciliação.
 // Extrato à esquerda, lançamentos do sistema à direita (mesmo padrão das propostas de borderô).
 import { sb, state, q, fetchAll, podeEditar, daConta } from '../lib/data.js';
-import { $, esc, money, cls, dateBR, options, fail, toast, modal } from '../lib/ui.js';
+import { $, $$, esc, money, cls, dateBR, options, fail, toast, modal } from '../lib/ui.js';
 import { abrirLancamento } from '../lib/lanc-form.js';
 import { lerOFX, decodificarOFX } from '../lib/ofx.js';
 import { lerRelatorioERP } from '../lib/erp-extrato.js';
 import { lerVExpenses } from '../lib/vexpenses.js';
 import { normTxt } from '../lib/nf-titulos.js';
 import { PLANO_JUROS } from '../lib/notas-debito.js';
+import { confianca, configConc, ROT_FAIXA, PESOS_PADRAO, PESOS_ROTULOS } from '../lib/conc-confianca.js';
+import { ehCNAB240, lerCNAB240 } from '../lib/cnab-extrato.js';
 
 export const title = 'Conciliação Bancária';
 
@@ -16,6 +18,12 @@ const hoje = new Date();
 const mesAnt = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
 const ui = { conta: '', mes: `${mesAnt.getFullYear()}-${String(mesAnt.getMonth() + 1).padStart(2, '0')}`, filtro: 'pendente', sels: new Set(), manual: false, marcados: new Set(), abertos: false, busca: '', lf: { sinal: 'mesmo', classe: '', de: '', ate: '', vmin: '', vmax: '', ordem: 'prox' } };
 let D = null; // dados carregados
+let CFG = configConc(), CFGROW = null, SIT = []; // parâmetros (conc_config) e situação dos extratos por conta
+// grava a importação; sem o SQL 095 a coluna "formato" ainda não existe e a gravação segue sem ela
+async function inserirImportacao(row) {
+  try { return await q(sb.from('extrato_importacoes').insert(row).select().single()); }
+  catch (err) { if (!/formato/i.test(err.message || '')) throw err; const { formato, ...r } = row; return q(sb.from('extrato_importacoes').insert(r).select().single()); }
+}
 
 const dig = (s) => String(s || '').replace(/\D/g, '');
 const cent = (v) => Math.round(+v * 100);
@@ -41,9 +49,10 @@ export async function render(root) {
         <label>Mês<input type="month" name="mes" value="${ui.mes}"></label>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn" id="hist">Importações</button>
-        ${podeEditar() ? '<button class="btn" id="aceitar" disabled>Aceitar sugestões</button><button class="btn" id="imperp" title="Relatório RFLX036 do ERP (XLSX ou CSV) ou Extrato de Pagamentos da VExpenses (PDF)">Importar relatório (ERP / VExpenses)</button><button class="btn primary" id="imp">Importar extrato OFX</button>' : ''}
+        <button class="btn" id="hist">Importações</button><button class="btn" id="exts" title="Último extrato de cada conta e as contas atrasadas">Extratos por conta</button>${podeEditar() ? '<button class="btn" id="cpar">Parâmetros</button>' : ''}
+        ${podeEditar() ? '<button class="btn" id="aceitar" disabled>Aceitar sugestões</button><button class="btn" id="imperp" title="Relatório RFLX036 do ERP (XLSX ou CSV) ou Extrato de Pagamentos da VExpenses (PDF)">Importar relatório (ERP / VExpenses)</button><button class="btn primary" id="imp" title="OFX do internet banking ou CNAB 240 de extrato (segmento E)">Importar extrato (OFX ou CNAB)</button>' : ''}
       </div></div></div>
+    <div id="ext-alerta"></div>
     <div class="kpis" id="kpis"></div>
     <div class="conc-grid">
       <div class="card flush" id="ext"></div>
@@ -53,6 +62,8 @@ export async function render(root) {
   $('#imp', root) && ($('#imp', root).onclick = () => importar(root));
   $('#imperp', root) && ($('#imperp', root).onclick = () => importarERP(root));
   $('#hist', root).onclick = () => historico(root);
+  $('#exts', root).onclick = () => extratosPorConta(root);
+  $('#cpar', root) && ($('#cpar', root).onclick = () => parametros(root));
   $('#aceitar', root) && ($('#aceitar', root).onclick = () => aceitarTodas(root));
   await carregar(root);
 }
@@ -62,13 +73,16 @@ async function carregar(root) {
   const e = state.empresa.id, ini = `${ui.mes}-01`, fim = fimMes(ui.mes);
   $('#ext', root).innerHTML = '<div class="loading">Carregando…</div>'; $('#sis', root).innerHTML = '';
   try {
-    const [itens, links, lancs, abertos, imps] = await Promise.all([
+    const [cfgRows, sit, itens, links, lancs, abertos, imps] = await Promise.all([
+      q(sb.from('conc_config').select('*').eq('empresa_id', e)).catch(() => []),
+      q(sb.rpc('conc_extratos_situacao', { p_empresa: e })).catch(() => []),
       fetchAll(() => sb.from('extrato_itens').select('*').eq('empresa_id', e).eq('conta_id', ui.conta).gte('data', ini).lte('data', fim).order('data').order('created_at')),
       fetchAll(() => sb.from('conciliacoes').select('id,extrato_id,lancamento_id,grupo_id').eq('empresa_id', e).eq('conta_id', ui.conta)),
       fetchAll(() => sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,centro_custo_id,descricao,documento,conta_id,conta_destino_id').eq('empresa_id', e).or(daConta(ui.conta)).eq('status', 'Pago').gte('data', addDias(ini, -10)).lte('data', addDias(fim, 10)).order('data')),
       fetchAll(() => sb.from('lancamentos').select('id,data,valor,status,plano_id,favorecido_id,centro_custo_id,descricao,documento,conta_id,conta_destino_id').eq('empresa_id', e).eq('status', 'Em aberto').gte('data', addDias(ini, -20)).lte('data', addDias(fim, 20)).order('data')),
       q(sb.from('extrato_importacoes').select('*').eq('empresa_id', e).eq('conta_id', ui.conta).lte('saldo_data', fim).order('saldo_data', { ascending: false }).limit(1)),
     ]);
+    CFGROW = cfgRows?.[0] || null; CFG = configConc(CFGROW); SIT = sit || [];
     const imp = imps?.[0] && imps[0].saldo_data >= ini ? imps[0] : null;
     let saldoSis = null;
     if (imp?.saldo_data) { const s = await q(sb.rpc('saldos_contas', { p_empresa: e, p_ate: imp.saldo_data })); saldoSis = s?.find(x => x.conta_id === ui.conta)?.saldo_pago ?? null; }
@@ -118,23 +132,26 @@ function sugerir() {
       if (usados.has(l.id) || cent(sinal(l)) !== cent(i.valor)) continue;
       const dd = Math.abs(difDias(i.data, l.data)); if (dd > maxDias) continue;
       const af = afinidade(i, l) + (docOk(i, l) ? 2 : 0);
-      pares.push({ i, l, af, s: dd * 10 - af * 30 }); (cand[i.id] ||= []).push(af);
+      pares.push({ i, l, af, dd, doc: docOk(i, l), s: dd * 10 - af * 30 }); (cand[i.id] ||= []).push(af);
     }
     pares.sort((a, b) => a.s - b.s);
     for (const p of pares) if (!sug[p.i.id] && !usados.has(p.l.id)) {
       const outros = cand[p.i.id].length > 1 || pend.some(o => o.id !== p.i.id && !sug[o.id] && cent(o.valor) === cent(p.i.valor) && Math.abs(difDias(o.data, p.l.data)) <= maxDias);
-      sug[p.i.id] = { tipo, ids: [p.l.id], conferir: outros && p.af === 0 }; usados.add(p.l.id);
+      const c = confianca({ tipo, dd: p.dd, af: afinidade(p.i, p.l), doc: p.doc, unico: !outros }, CFG);
+      sug[p.i.id] = { tipo, ids: [p.l.id], ...c, conferir: c.faixa === 'baixa' }; usados.add(p.l.id);
     }
   };
   casar(D.lancs, 0, 'exato');   // primeiro o mesmo dia
   grupoDoDia(pend, sug, usados);
-  casar(D.lancs, 3, 'exato');
+  casar(D.lancs, CFG.diasExato, 'exato');
   for (const i of pend) {
     if (sug[i.id]) continue;
     const mesmos = D.lancs.filter(l => !usados.has(l.id) && l.data === i.data && Math.sign(sinal(l)) === Math.sign(i.valor));
-    if (mesmos.length >= 2 && cent(mesmos.reduce((s, l) => s + sinal(l), 0)) === cent(i.valor)) { sug[i.id] = { tipo: 'grupo', ids: mesmos.map(l => l.id), conferir: false }; mesmos.forEach(l => usados.add(l.id)); }
+    if (mesmos.length >= 2 && cent(mesmos.reduce((s, l) => s + sinal(l), 0)) === cent(i.valor)) {
+      const c = confianca({ tipo: 'grupo', dd: 0, af: Math.max(...mesmos.map(l => afinidade(i, l))), unico: true }, CFG);
+      sug[i.id] = { tipo: 'grupo', ids: mesmos.map(l => l.id), ...c, conferir: c.faixa === 'baixa' }; mesmos.forEach(l => usados.add(l.id)); }
   }
-  casar(D.abertos, 7, 'baixa');
+  casar(D.abertos, CFG.diasBaixa, 'baixa');
   return sug;
 }
 
@@ -149,7 +166,8 @@ function grupoDoDia(pend, sug, usados) {
     if (!its.length || !ls.length || (its.length === 1 && ls.length === 1)) continue;
     if (cent(its.reduce((s, i) => s + +i.valor, 0)) !== cent(ls.reduce((s, l) => s + sinal(l), 0))) continue;
     const erp = its.every(i => /^(erp|vx):/.test(String(i.fitid || ''))); // relatórios (ERP/VExpenses): soma exata basta
-    const g = { tipo: 'grupo', itens: its.map(i => i.id), ids: ls.map(l => l.id), conferir: !erp && its.length > 1 };
+    const c = confianca({ tipo: 'grupo', relatorio: erp, dd: 0, unico: true, variosMov: !erp && its.length > 1 }, CFG);
+    const g = { tipo: 'grupo', itens: its.map(i => i.id), ids: ls.map(l => l.id), ...c, conferir: c.faixa === 'baixa' };
     for (const i of its) sug[i.id] = g; ls.forEach(l => usados.add(l.id));
   }
   // VExpenses: o sistema costuma lançar a soma dos gastos do dia de cada colaborador numa linha só
@@ -168,17 +186,20 @@ function grupoDoDia(pend, sug, usados) {
     if (!cands.length) continue;
     const prim = nome.split(/\s+/)[0];
     const l = cands.find(c => semAc(c.descricao).includes(prim)) || (cands.length === 1 ? cands[0] : null); if (!l) continue;
-    const g = { tipo: 'grupo', itens: its.map(i => i.id), ids: [l.id], conferir: false };
+    const c = confianca({ tipo: 'grupo', relatorio: true, dd: 0, af: semAc(l.descricao).includes(prim) ? 1 : 0, unico: cands.length === 1 }, CFG);
+    const g = { tipo: 'grupo', itens: its.map(i => i.id), ids: [l.id], ...c, conferir: c.faixa === 'baixa' };
     for (const i of its) sug[i.id] = g; usados.add(l.id);
   }
 }
 
 const ROT_SUG = { exato: 'sugestão', grupo: 'sugestão (vários)', baixa: 'baixar título' };
+// etiqueta da sugestão com a nota de confiança; o título mostra o porquê de cada ponto
+const badgeSug = (s) => `<span class="badge conc-${s.faixa || 'media'}" title="${esc(`Confiança ${s.nota ?? '–'}/100 (${ROT_FAIXA[s.faixa] || ''})\n${(s.motivos || []).join('\n')}`)}">${ROT_SUG[s.tipo]} · <b>${s.nota ?? '–'}</b>${s.faixa === 'baixa' ? ' · conferir' : ''}</span>`;
 
 function pintar(root) {
   const it = D.itens; const n = (s) => it.filter(i => i.status === s).length;
   const semExt = D.lancs.filter(l => l.data >= D.ini && l.data <= D.fim && !D.lancLig.has(l.id));
-  const nSug = Object.keys(D.sug).length;
+  const nSug = Object.keys(D.sug).length, nAlta = Object.values(D.sug).filter(x => x.faixa === 'alta').length;
   const dif = D.imp && D.saldoSis != null ? Math.round((+D.imp.saldo_final - D.saldoSis) * 100) / 100 : null;
   $('#kpis', root).innerHTML = `
     <div class="kpi"><div class="k-label">Saldo no banco</div><div class="k-value">${D.imp ? money(D.imp.saldo_final) : '–'}</div><div class="k-sub">${D.imp ? `extrato em ${dateBR(D.imp.saldo_data)}` : 'importe o OFX do mês'}</div></div>
@@ -186,7 +207,8 @@ function pintar(root) {
     <div class="kpi"><div class="k-label">Diferença</div><div class="k-value ${dif ? 'neg' : dif === 0 ? 'pos' : ''}">${dif == null ? '–' : money(dif)}</div><div class="k-sub">${dif === 0 ? 'saldos batem' : dif ? 'banco − sistema' : ''}</div></div>
     <div class="kpi"><div class="k-label">Extrato do mês</div><div class="k-value">${it.length ? Math.round(n('conciliado') / it.length * 100) : 0}%</div><div class="k-sub">${n('conciliado')} conciliado(s) · ${n('pendente')} pendente(s)${n('ignorado') ? ` · ${n('ignorado')} ignorado(s)` : ''}</div></div>
     <div class="kpi"><div class="k-label">Lançamentos sem extrato</div><div class="k-value ${semExt.length ? 'neg' : ''}">${semExt.length}</div><div class="k-sub">${money(semExt.reduce((s, l) => s + sinal(l), 0))} no mês</div></div>`;
-  const ac = $('#aceitar', root); if (ac) { ac.disabled = !nSug; ac.textContent = nSug ? `Aceitar sugestões (${nSug})` : 'Aceitar sugestões'; }
+  const ac = $('#aceitar', root); if (ac) { ac.disabled = !nSug; ac.textContent = nSug ? `Aceitar sugestões (${nAlta} alta · ${nSug})` : 'Aceitar sugestões'; ac.title = 'Sugestões de confiança alta / total de sugestões'; }
+  pintarAlertaExtratos(root);
   pintarExtrato(root); pintarSistema(root);
 }
 
@@ -202,10 +224,10 @@ function pintarExtrato(root) {
     <div class="table-wrap" style="max-height:62vh">${lista.length ? `<table><thead><tr><th style="width:28px">${pendVis.length ? `<input type="checkbox" id="ext-todos" title="Selecionar todos os pendentes visíveis" ${todosMarc ? 'checked' : ''}>` : ''}</th><th>Data</th><th>Histórico</th><th class="num">Valor</th><th></th></tr></thead><tbody>
       ${lista.map(i => { const s = D.sug[i.id];
         return `<tr class="clickable ${ui.sels.has(i.id) ? 'row-sel' : ''}" data-id="${i.id}"><td>${i.status === 'pendente' ? `<input type="checkbox" data-chk ${ui.sels.has(i.id) ? 'checked' : ''}>` : ''}</td><td>${dateBR(i.data)}</td>
-        <td class="wrap">${esc(i.descricao || i.tipo || '')}${i.documento ? `<div class="small muted">doc. ${esc(i.documento)}</div>` : ''}${i.status === 'ignorado' && i.observacao ? `<div class="small muted">${esc(i.observacao)}</div>` : ''}</td>
+        <td class="wrap">${esc(i.descricao || i.tipo || '')}${i.documento ? `<div class="small muted">doc. ${esc(i.documento)}</div>` : ''}${i.status === 'ignorado' && i.observacao ? `<div class="small muted">${esc(i.observacao)}</div>` : ''}${i.status === 'pendente' && s ? `<div class="small" style="margin-top:2px">${badgeSug(s)}</div>` : ''}</td>
         <td class="num ${cls(i.valor)}">${money(i.valor)}</td>
-        <td class="small">${i.status === 'conciliado' ? `<span class="badge pago">conciliado${i.grupo_id ? ' (grupo)' : ''}</span>` : i.status === 'ignorado' ? '<span class="badge">ignorado</span>' : s ? `<span class="badge ${s.conferir ? 'vencido' : 'aberto'}" title="${s.conferir ? 'Há outro lançamento de mesmo valor e o texto não confirma: confira antes' : ''}">${ROT_SUG[s.tipo]}${s.conferir ? ' · conferir' : ''}</span>` : ''}</td></tr>`; }).join('')}
-      </tbody></table>` : `<div class="empty">${D.itens.length ? 'Nada neste filtro.' : 'Nenhum movimento importado para esta conta neste mês. Use “Importar extrato OFX” ou “Importar relatório do ERP”.'}</div>`}</div>`;
+        <td class="small">${i.status === 'conciliado' ? `<span class="badge pago">conciliado${i.grupo_id ? ' (grupo)' : ''}</span>` : i.status === 'ignorado' ? '<span class="badge">ignorado</span>' : ''}</td></tr>`; }).join('')}
+      </tbody></table>` : `<div class="empty">${D.itens.length ? 'Nada neste filtro.' : 'Nenhum movimento importado para esta conta neste mês. Use “Importar extrato (OFX ou CNAB)” ou “Importar relatório (ERP / VExpenses)”.'}</div>`}</div>`;
   $('#fx', c).onclick = (e) => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { ui.filtro = f; pintarExtrato(root); } };
   const mudou = () => {
     const sel = [...ui.sels]; const um = sel.length === 1 ? sel[0] : null;
@@ -369,7 +391,7 @@ function pintarSistema(root) {
   const cand = [...D.lancs.filter(l => !D.lancLig.has(l.id)), ...(ui.abertos ? D.abertos : [])];
   const lista = filtrarOrdenar(cand, item);
   c.innerHTML = `${cab}
-    ${s ? `<p class="small" style="margin:0 12px 8px"><span class="badge aberto">${ROT_SUG[s.tipo]}</span> ${s.tipo === 'baixa' ? 'Título em aberto com o mesmo valor: ao conciliar, ele é baixado como pago na data do extrato e nesta conta.' : s.tipo === 'grupo' ? 'Lançamentos do mesmo dia que somam o valor do extrato.' : 'Mesmo valor e data próxima.'}${s.conferir ? ' <strong class="neg">Há outro lançamento de mesmo valor: confira favorecido e descrição antes de conciliar.</strong>' : ''}</p>` : ''}
+    ${s ? `<p class="small" style="margin:0 12px 8px">${badgeSug(s)} ${s.tipo === 'baixa' ? 'Título em aberto com o mesmo valor: ao conciliar, ele é baixado como pago na data do extrato e nesta conta.' : s.tipo === 'grupo' ? 'Lançamentos do mesmo dia que somam o valor do extrato.' : 'Mesmo valor e data próxima.'}${s.conferir ? ' <strong class="neg">Confiança baixa: confira favorecido, data e descrição antes de conciliar.</strong>' : ''}${s.motivos?.length ? `<br><span class="muted">Confiança ${s.nota}/100: ${esc(s.motivos.join(' · '))}</span>` : ''}</p>` : ''}
     ${filtrosHTML(item)}${resumo(lista)}
     <div class="table-wrap" style="max-height:44vh">${lista.length ? `<table><thead><tr>${thTodos(lista)}${thOrd('data', 'Data')}${thOrd('fav', 'Favorecido / plano')}${thOrd('valor', 'Valor', 'num')}<th></th></tr></thead><tbody>${lista.slice(0, 300).map(l => linhaLanc(l, { marcado: ui.marcados.has(l.id) })).join('')}</tbody></table>` : '<div class="empty">Nenhum lançamento com esses filtros.</div>'}</div>
     <div class="conc-foot" id="cf"></div>`;
@@ -441,23 +463,103 @@ async function conciliarGrupo(itens, ids, root, semRecarregar = false) {
   } catch (e) { fail(String(e.message || e).includes('duplicate') ? new Error('Algum lançamento já estava conciliado com outro movimento. Atualize a página.') : e); }
 }
 
+// aceitar em lote pela faixa de confiança (padrão: só as de confiança alta)
 function aceitarTodas(root) {
   const vistos = new Set();
   const g = Object.entries(D.sug).filter(([, s]) => { if (vistos.has(s)) return false; vistos.add(s); return true; })
-    .map(([id, s]) => ({ item: D.itens.find(i => i.id === id), itens: s.itens ? s.itens.map(x => D.itens.find(i => i.id === x)).filter(Boolean) : null, ids: s.ids, tipo: s.tipo, conferir: s.conferir })).filter(x => x.item);
-  const nb = g.filter(x => x.tipo === 'baixa').length, nc = g.filter(x => x.conferir).length;
-  const m = modal({ title: 'Aceitar sugestões', body: `<p>Conciliar <strong>${g.length - nc}</strong> movimento(s) do extrato com os lançamentos sugeridos?</p>
-    ${nc ? `<p class="small">${nc} sugestão(ões) marcadas <strong>conferir</strong> ficam de fora: há outro lançamento de mesmo valor e o histórico do banco não confirma qual é (ex.: saques e PIX de mesmo valor no mesmo dia). Confira uma a uma.</p><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="sc"> Incluir mesmo assim as ${nc} a conferir</label>` : ''}
-    ${nb ? `<p class="small">${nb} sugestão(ões) baixam títulos em aberto (status Pago, data do extrato e esta conta).</p><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="sb" checked> Incluir as baixas de títulos em aberto</label>` : ''}`,
+    .map(([id, s]) => ({ item: D.itens.find(i => i.id === id), itens: s.itens ? s.itens.map(x => D.itens.find(i => i.id === x)).filter(Boolean) : null, ids: s.ids, tipo: s.tipo, faixa: s.faixa || 'media', nota: s.nota }))
+    .filter(x => x.item);
+  const cont = (f) => g.filter(x => x.faixa === f).length, val = (f) => g.filter(x => x.faixa === f).reduce((a, x) => a + (x.itens ? x.itens.reduce((b, i) => b + +i.valor, 0) : +x.item.valor), 0);
+  const nb = g.filter(x => x.tipo === 'baixa').length;
+  const chk = (f, t, on) => `<label class="chk conc-f"><input type="checkbox" data-fx="${f}" ${on ? 'checked' : ''} ${cont(f) ? '' : 'disabled'}> <span class="badge conc-${f}">${t}</span> <b>${cont(f)}</b> <span class="muted small">· ${money(val(f))}</span></label>`;
+  const m = modal({ title: 'Aceitar sugestões', body: `<p class="small" style="margin-top:0">Cada sugestão tem uma nota de confiança de 0 a 100: mesmo valor, data, histórico do banco, número do documento e se há outro candidato igual. Passe o mouse na etiqueta para ver o porquê.</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${chk('alta', `Confiança alta (${CFG.alta}+)`, true)}${chk('media', `Confiança média (${CFG.media} a ${CFG.alta - 1})`, false)}${chk('baixa', `Conferir (abaixo de ${CFG.media})`, false)}</div>
+    ${nb ? `<label class="chk conc-f" style="margin-top:10px"><input type="checkbox" id="sb" checked> Incluir as ${nb} baixa(s) de títulos em aberto (status Pago, data do extrato e esta conta)</label>` : ''}
+    <p class="small muted" id="tot"></p>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ok">Conciliar</button>' });
+  const escolha = () => { const fx = new Set($$('[data-fx]', m.el).filter(c => c.checked).map(c => c.dataset.fx)), baixas = $('#sb', m.el)?.checked !== false;
+    return g.filter(x => fx.has(x.faixa) && (baixas || x.tipo !== 'baixa')); };
+  const tot = () => { const sel = escolha(); $('#tot', m.el).textContent = `${sel.length} sugestão(ões) serão conciliadas.`; $('#ok', m.el).disabled = !sel.length; };
+  m.el.addEventListener('change', tot); tot();
   $('#ok', m.el).onclick = () => {
-    const baixas = $('#sb', m.el)?.checked !== false, conf = !!$('#sc', m.el)?.checked; m.close();
-    const sel = g.filter(x => (baixas || x.tipo !== 'baixa') && (conf || !x.conferir));
+    const sel = escolha(); m.close();
     const multi = sel.filter(x => x.itens && x.itens.length > 1), simples = sel.filter(x => !(x.itens && x.itens.length > 1));
     (async () => {
       for (const x of multi) await conciliarGrupo(x.itens, x.ids, root, true);
       if (simples.length) await conciliar(simples, root); else { ui.sels.clear(); await carregar(root); }
     })();
+  };
+}
+
+// faixa de alerta acima dos indicadores: contas sem extrato há mais dias que o parâmetro
+const ROT_FMT = { ofx: 'OFX', cnab240: 'CNAB 240', erp: 'Relatório do ERP', vexpenses: 'VExpenses' };
+function situacaoContas() {
+  const hoje = new Date().toISOString().slice(0, 10), lim = addDias(hoje, -CFG.alertaDias);
+  return state.cad.contas.filter(c => c.ativo !== false).map(c => {
+    const x = SIT.find(s => s.conta_id === c.id) || {};
+    const dispensada = CFG.semAlerta.has(c.id), nunca = !x.ultimo_fim;
+    const atrasada = !dispensada && (nunca ? !!(c.ofx_conta) : x.ultimo_fim < lim);
+    return { c, x, dispensada, nunca, atrasada, dias: x.ultimo_fim ? difDias(hoje, x.ultimo_fim) : null };
+  });
+}
+function pintarAlertaExtratos(root) {
+  const el = $('#ext-alerta', root); if (!el) return;
+  const at = situacaoContas().filter(s => s.atrasada);
+  el.innerHTML = at.length ? `<div class="card conc-alerta"><span><b>${at.length} conta(s) sem extrato há mais de ${CFG.alertaDias} dia(s):</b> ${at.slice(0, 5).map(s => `${esc(s.c.nome)} <span class="muted">(${s.nunca ? 'nunca importado' : 'até ' + dateBR(s.x.ultimo_fim)})</span>`).join(' · ')}${at.length > 5 ? ' …' : ''}</span>
+    <button class="btn small" id="ext-ver">Ver extratos por conta</button></div>` : '';
+  $('#ext-ver', el) && ($('#ext-ver', el).onclick = () => extratosPorConta(root));
+}
+
+function extratosPorConta(root) {
+  const L = situacaoContas().sort((a, b) => (b.atrasada - a.atrasada) || ((b.dias ?? 9999) - (a.dias ?? 9999)));
+  const sit = (s) => s.dispensada ? '<span class="badge">sem alerta</span>' : s.atrasada ? `<span class="badge vencido">${s.nunca ? 'nunca importado' : `atrasado · ${s.dias} dia(s)`}</span>` : s.nunca ? '<span class="badge">sem extrato</span>' : `<span class="badge pago">em dia${s.dias != null ? ` · ${s.dias} dia(s)` : ''}</span>`;
+  const m = modal({ title: 'Extratos por conta', wide: true, body: `<p class="small muted" style="margin-top:0">Último extrato importado de cada conta. Atrasada = último dia do extrato há mais de ${CFG.alertaDias} dia(s) (muda em Parâmetros). Contas sem extrato (ex.: caixa) podem ser dispensadas do alerta.</p>
+    <div class="table-wrap"><table><thead><tr><th>Conta</th><th>Último extrato até</th><th>Formato</th><th class="num">Pendentes</th><th>Situação</th><th></th></tr></thead><tbody>
+    ${L.map(s => `<tr data-c="${s.c.id}"><td class="wrap"><b>${esc(s.c.nome)}</b><div class="small muted">${esc([s.c.instituicao, s.c.tipo].filter(Boolean).join(' · '))}</div></td>
+      <td>${s.x.ultimo_fim ? dateBR(s.x.ultimo_fim) : '—'}${s.x.ultima_importacao ? `<div class="small muted">importado ${new Date(s.x.ultima_importacao).toLocaleDateString('pt-BR')}</div>` : ''}</td>
+      <td class="small">${esc(ROT_FMT[s.x.formato] || s.x.formato || '—')}</td><td class="num">${+s.x.pendentes ? `${s.x.pendentes}<div class="small muted">${money(s.x.pendentes_valor)}</div>` : '—'}</td>
+      <td>${sit(s)}</td><td style="white-space:nowrap"><button class="btn small" data-abrir>Abrir</button>${podeEditar() ? ` <button class="btn ghost small" data-disp>${s.dispensada ? 'Exigir extrato' : 'Dispensar alerta'}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`,
+    foot: '<button class="btn" data-close>Fechar</button>' });
+  m.el.addEventListener('click', async (e) => {
+    const tr = e.target.closest('tr[data-c]'); if (!tr) return; const id = tr.dataset.c;
+    if (e.target.matches('[data-abrir]')) { m.close(); ui.conta = id; ui.sels.clear(); ui.marcados.clear(); ui.filtro = 'pendente'; render(root); }
+    if (e.target.matches('[data-disp]')) {
+      const set = new Set(CFG.semAlerta); set.has(id) ? set.delete(id) : set.add(id);
+      try { await salvarCfg({ contas_sem_alerta: [...set] }); m.close(); toast('Alerta atualizado'); extratosPorConta(root); pintarAlertaExtratos(root); } catch (err) { fail(err); }
+    }
+  });
+}
+async function salvarCfg(campos) {
+  const row = { empresa_id: state.empresa.id, ...(CFGROW || {}), ...campos, atualizado_em: new Date().toISOString() };
+  delete row.atualizado_por;
+  const [r] = await q(sb.from('conc_config').upsert(row).select());
+  CFGROW = r || row; CFG = configConc(CFGROW);
+}
+
+// parâmetros da conciliação: janelas de dias, faixas, pesos de cada critério e o prazo do alerta de extrato
+function parametros(root) {
+  const p = CFG.pesos;
+  const m = modal({ title: 'Parâmetros da conciliação', wide: true, body: `<div class="grid-form">
+      <label class="c3">Lançamento pago de mesmo valor: até (dias)<input id="cp-de" inputmode="numeric" value="${CFG.diasExato}"></label>
+      <label class="c3">Título em aberto de mesmo valor: até (dias)<input id="cp-db" inputmode="numeric" value="${CFG.diasBaixa}"></label>
+      <label class="c3">Confiança alta a partir de<input id="cp-a" inputmode="numeric" value="${CFG.alta}"></label>
+      <label class="c3">Confiança média a partir de<input id="cp-m" inputmode="numeric" value="${CFG.media}"></label>
+      <label class="c3">Alerta de extrato: conta sem extrato há mais de (dias)<input id="cp-al" inputmode="numeric" value="${CFG.alertaDias}"></label></div>
+    <h3 style="margin:14px 0 6px">Pontos de cada critério</h3>
+    <p class="small muted" style="margin-top:0">A nota soma a base do tipo de sugestão com os critérios que se confirmam (limitada a 0–100). Negativo tira pontos.</p>
+    <div class="grid-form">${Object.keys(PESOS_PADRAO).map(k => `<label class="c3">${esc(PESOS_ROTULOS[k])}<input data-peso="${k}" inputmode="numeric" value="${p[k]}"><span class="small muted">padrão ${PESOS_PADRAO[k]}</span></label>`).join('')}</div>`,
+    foot: '<button class="btn ghost" id="cp-pad">Voltar ao padrão</button><span class="spacer" style="flex:1"></span><button class="btn" data-close>Cancelar</button><button class="btn primary" id="cp-ok">Salvar</button>' });
+  $('#cp-pad', m.el).onclick = () => { $$('[data-peso]', m.el).forEach(i => i.value = PESOS_PADRAO[i.dataset.peso]); $('#cp-a', m.el).value = 85; $('#cp-m', m.el).value = 60; $('#cp-de', m.el).value = 3; $('#cp-db', m.el).value = 7; $('#cp-al', m.el).value = 5; };
+  $('#cp-ok', m.el).onclick = async (ev) => {
+    const n = (id) => parseInt($(id, m.el).value, 10);
+    const alta = n('#cp-a'), media = n('#cp-m');
+    if (!(alta > media && media >= 0 && alta <= 100)) return toast('A confiança alta tem de ser maior que a média (0 a 100)', true);
+    const pesos = {}; for (const i of $$('[data-peso]', m.el)) { const v = parseInt(i.value, 10); if (!Number.isFinite(v)) return toast('Pontos inválidos: ' + PESOS_ROTULOS[i.dataset.peso], true); if (v !== PESOS_PADRAO[i.dataset.peso]) pesos[i.dataset.peso] = v; }
+    ev.target.disabled = true;
+    try { await salvarCfg({ dias_exato: n('#cp-de'), dias_baixa: n('#cp-db'), conf_alta: alta, conf_media: media, alerta_dias: n('#cp-al'), pesos });
+      m.close(); toast('Parâmetros salvos: sugestões recalculadas'); carregar(root); }
+    catch (err) { fail(/conc_config/.test(err.message || '') ? new Error('Rode o SQL 095 (conciliação sugerida) antes de salvar os parâmetros.') : err); ev.target.disabled = false; }
   };
 }
 
@@ -522,23 +624,24 @@ function contaDoOFX(st) {
 
 function importar(root) {
   let lidos = [];
-  const m = modal({ title: 'Importar extrato OFX', wide: true,
-    body: `<p class="small muted" style="margin-top:0">Selecione um ou mais arquivos .ofx exportados do internet banking. Movimentos já importados (mesmo identificador do banco) não são duplicados.
+  const m = modal({ title: 'Importar extrato (OFX ou CNAB 240)', wide: true,
+    body: `<p class="small muted" style="margin-top:0">Selecione um ou mais arquivos exportados do internet banking: <b>OFX</b> ou <b>CNAB 240 de extrato</b> (FEBRABAN, segmento E, o "extrato para conciliação" que o banco envia em .ret/.txt). O formato é reconhecido pelo conteúdo. Movimentos já importados não são duplicados.
       Depois da importação o sistema sugere os vínculos com os lançamentos; nada é conciliado sem a sua confirmação.</p>
-      <input type="file" id="arq" accept=".ofx,.OFX" multiple><div id="res" style="margin-top:12px"></div>`,
+      <input type="file" id="arq" accept=".ofx,.OFX,.ret,.RET,.txt,.TXT,.cnab,.CNAB,.rem,.REM" multiple><div id="res" style="margin-top:12px"></div>`,
     foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="ok" disabled>Importar</button>' });
   $('#arq', m.el).onchange = async (e) => {
     lidos = [];
     try {
-      for (const f of e.target.files) for (const st of lerOFX(decodificarOFX(await f.arrayBuffer()))) lidos.push({ arquivo: f.name, ...st, contaId: contaDoOFX(st)?.id || (e.target.files.length === 1 ? ui.conta : '') });
+      for (const f of e.target.files) { const txt = decodificarOFX(await f.arrayBuffer());
+        for (const st of (ehCNAB240(txt) ? lerCNAB240(txt) : lerOFX(txt))) lidos.push({ arquivo: f.name, formato: st.formato || 'ofx', ...st, contaId: contaDoOFX(st)?.id || (e.target.files.length === 1 ? ui.conta : '') }); }
     } catch (err) { fail(err); }
-    $('#res', m.el).innerHTML = lidos.length ? `<div class="table-wrap"><table><thead><tr><th>Arquivo</th><th>Banco / agência / conta no OFX</th><th>Período</th><th class="num">Movimentos</th><th class="num">Créditos</th><th class="num">Débitos</th><th class="num">Saldo final</th><th>Conta no sistema</th></tr></thead><tbody>
-      ${lidos.map((s, k) => `<tr data-k="${k}"><td class="small wrap">${esc(s.arquivo)}</td><td class="small">${esc([s.banco, s.agencia, s.conta].filter(Boolean).join(' / '))}${s.cartao ? ' (cartão)' : ''}</td>
+    $('#res', m.el).innerHTML = lidos.length ? `<div class="table-wrap"><table><thead><tr><th>Arquivo</th><th>Banco / agência / conta no arquivo</th><th>Período</th><th class="num">Movimentos</th><th class="num">Créditos</th><th class="num">Débitos</th><th class="num">Saldo final</th><th>Conta no sistema</th></tr></thead><tbody>
+      ${lidos.map((s, k) => `<tr data-k="${k}"><td class="small wrap">${esc(s.arquivo)}</td><td class="small">${esc([s.banco, s.agencia, s.conta].filter(Boolean).join(' / '))}${s.cartao ? ' (cartão)' : ''}<div class="muted">${s.formato === 'cnab240' ? 'CNAB 240' : 'OFX'}</div></td>
         <td class="small">${dateBR(s.inicio)} a ${dateBR(s.fim)}</td><td class="num">${s.itens.length}</td>
         <td class="num pos">${money(s.itens.filter(i => i.valor > 0).reduce((a, i) => a + i.valor, 0))}</td><td class="num neg">${money(s.itens.filter(i => i.valor < 0).reduce((a, i) => a + i.valor, 0))}</td>
         <td class="num">${s.saldo != null ? money(s.saldo) : '–'}${s.saldoData ? `<div class="small muted">${dateBR(s.saldoData)}</div>` : ''}</td>
         <td><select data-conta>${options(state.cad.contas.filter(c => c.ativo !== false), { empty: 'Selecione…', selected: s.contaId })}</select></td></tr>`).join('')}</tbody></table></div>
-      <label style="flex-direction:row;align-items:center;gap:6px;margin-top:8px"><input type="checkbox" id="lembrar" checked> Lembrar a conta do OFX no cadastro da conta bancária</label>` : '<div class="empty">Nenhum extrato lido.</div>';
+      <label style="flex-direction:row;align-items:center;gap:6px;margin-top:8px"><input type="checkbox" id="lembrar" checked> Lembrar a conta do arquivo no cadastro da conta bancária</label>` : '<div class="empty">Nenhum extrato lido.</div>';
     const ok = () => { $('#ok', m.el).disabled = !lidos.length || lidos.some(s => !s.contaId); };
     $('#res', m.el).onchange = (ev) => { const tr = ev.target.closest('tr[data-k]'); if (tr && ev.target.matches('[data-conta]')) { lidos[+tr.dataset.k].contaId = ev.target.value; lidos[+tr.dataset.k].temOFX = false; ok(); } };
     ok();
@@ -548,8 +651,8 @@ function importar(root) {
     try {
       for (const s of lidos) {
         atual = s.arquivo;
-        const imp = await q(sb.from('extrato_importacoes').insert({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: s.banco, agencia: s.agencia, conta_ofx: s.conta,
-          dt_inicio: s.inicio, dt_fim: s.fim, saldo_final: s.saldo, saldo_data: s.saldoData || s.fim, qtd: s.itens.length }).select().single());
+        const imp = await inserirImportacao({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: s.banco, agencia: s.agencia, conta_ofx: s.conta,
+          dt_inicio: s.inicio, dt_fim: s.fim, saldo_final: s.saldo, saldo_data: s.saldoData || s.fim, qtd: s.itens.length, formato: s.formato || 'ofx' });
         const n = await gravarItens(s, imp.id);
         await q(sb.from('extrato_importacoes').update({ novos: n }).eq('id', imp.id));
         novos += n; total += s.itens.length;
@@ -675,8 +778,8 @@ function importarERP(root) {
       for (const s of lidos) {
         atual = s.arquivo;
         if (limpar) { const ids = s.sumiram.filter(x => x.status !== 'conciliado').map(x => x.id); for (let i = 0; i < ids.length; i += 200) await q(sb.from('extrato_itens').delete().in('id', ids.slice(i, i + 200))); removidos += ids.length; }
-        const imp = await q(sb.from('extrato_importacoes').insert({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: s.origem === 'vexpenses' ? 'VEXPENSES (Extrato de Pagamentos)' : `ERP ${s.banco || ''}`.trim(), agencia: null, conta_ofx: null,
-          dt_inicio: s.inicio, dt_fim: s.fim, saldo_final: s.saldo, saldo_data: s.saldoData || s.fim, qtd: s.itens.length }).select().single());
+        const imp = await inserirImportacao({ empresa_id: e, conta_id: s.contaId, arquivo: s.arquivo, banco: s.origem === 'vexpenses' ? 'VEXPENSES (Extrato de Pagamentos)' : `ERP ${s.banco || ''}`.trim(), agencia: null, conta_ofx: null,
+          dt_inicio: s.inicio, dt_fim: s.fim, saldo_final: s.saldo, saldo_data: s.saldoData || s.fim, qtd: s.itens.length, formato: s.origem === 'vexpenses' ? 'vexpenses' : 'erp' });
         const n = await gravarItens(s, imp.id);
         await q(sb.from('extrato_importacoes').update({ novos: n }).eq('id', imp.id));
         novos += n; total += s.itens.length;

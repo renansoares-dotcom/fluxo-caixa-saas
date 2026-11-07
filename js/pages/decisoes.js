@@ -21,7 +21,7 @@ async function carregar() {
     Promise.resolve([]),
     q(sb.rpc('resumo_mensal', { p_empresa: e, p_ano: ano, p_status: ['Pago'], p_conta: null, p_grupo: null, p_cc: null, p_favorecido: null, p_disp: null })),
     fetchAll(() => sb.from('orcamentos').select('plano_id,mes,valor').eq('empresa_id', e).eq('cenario', 'budget').eq('ano', ano).order('id')),
-    seguro(q(sb.from('extrato_importacoes').select('conta_id,dt_fim').eq('empresa_id', e)), []),
+    seguro(q(sb.from('extrato_importacoes').select('conta_id,dt_fim').eq('empresa_id', e)).then(async (x) => { x.cfg = (await q(sb.from('conc_config').select('alerta_dias,contas_sem_alerta').eq('empresa_id', e)).catch(() => []))[0] || null; return x; }), []),
     seguro(fetchAll(() => sb.from('lancamentos').select('valor').eq('empresa_id', e).eq('status', 'Pago').is('conta_id', null).order('id')), []),
     import(`./necessidade-caixa.js?v=${Date.now()}`).then(m => m.resumoNecessidade()).catch(() => null),
   ]);
@@ -128,10 +128,11 @@ function regras(D) {
 
   // 8. extratos parados
   const ultExt = {}; for (const x of D.extratos) if (x.dt_fim && (!ultExt[x.conta_id] || x.dt_fim > ultExt[x.conta_id])) ultExt[x.conta_id] = x.dt_fim;
-  const parados = c.contas.filter(ct => ct.ativo && (ct.ofx_conta || ultExt[ct.id]) && (!ultExt[ct.id] || ultExt[ct.id] < addDias(D.hoje, -5)));
+  const cExt = D.extratos.cfg || {}, diasExt = +(cExt.alerta_dias ?? 5), semAlerta = new Set(cExt.contas_sem_alerta || []);
+  const parados = c.contas.filter(ct => ct.ativo && !semAlerta.has(ct.id) && (ct.ofx_conta || ultExt[ct.id]) && (!ultExt[ct.id] || ultExt[ct.id] < addDias(D.hoje, -diasExt)));
   if (parados.length) out.push({ k: 'extratos', origem: 'Conciliação', urg: 'media', titulo: 'Importar os extratos parados',
-    desc: `Sem extrato há mais de 5 dias: ${parados.map(ct => `${ct.nome} (${ultExt[ct.id] ? 'até ' + dateBR(ultExt[ct.id]) : 'nunca'})`).join(' · ')}. Sem extrato não há conciliação nem saldo confiável.`,
-    impacto: 0, impactoTxt: `${parados.length} conta(s)`, regra: 'Contas com OFX configurado cuja última importação termina há mais de 5 dias.', acao: 'Abrir conciliação', rota: 'conciliacao' });
+    desc: `Sem extrato há mais de ${diasExt} dia(s): ${parados.map(ct => `${ct.nome} (${ultExt[ct.id] ? 'até ' + dateBR(ultExt[ct.id]) : 'nunca'})`).join(' · ')}. Sem extrato não há conciliação nem saldo confiável.`,
+    impacto: 0, impactoTxt: `${parados.length} conta(s)`, regra: 'Contas com extrato (OFX, CNAB ou relatório) cuja última importação termina há mais dias que o parâmetro da conciliação (padrão 5); contas dispensadas em Conciliação › Extratos por conta não entram.', acao: 'Abrir conciliação', rota: 'conciliacao' });
 
   // 9. cadastros sem CNPJ/CPF
   const semDoc = c.favorecidos.filter(f => f.ativo && ['CLIENTES', 'FORNECEDORES'].includes(f.tipo) && !String(f.documento || '').replace(/\D/g, ''));

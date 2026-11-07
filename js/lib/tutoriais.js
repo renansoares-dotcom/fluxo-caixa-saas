@@ -13,7 +13,7 @@ export const MANUAIS = [
   { id: 'lancamentos', titulo: 'Lançamentos e contas a pagar / receber', area: 'Financeiro', rotas: ['lancamentos', 'abertos'],
     resumo: 'Lançar, editar, transferir, importar (NFs, XML, ERP), baixar títulos em lote e montar borderô.' },
   { id: 'conciliacao', titulo: 'Conciliação bancária', area: 'Financeiro', rotas: ['conciliacao'],
-    resumo: 'Importar o extrato (OFX, ERP, VExpenses), aceitar sugestões, conciliar um a um ou em grupo.' },
+    resumo: 'Importar o extrato (OFX, CNAB 240, ERP, VExpenses), sugestões com nota de confiança, aceitar pela faixa, conciliar um a um ou em grupo, extratos atrasados por conta.' },
   { id: 'creditos-conta-corrente', titulo: 'Créditos, adiantamentos e conta-corrente', area: 'Financeiro', rotas: ['creditos', 'conta-fornecedor'],
     resumo: 'Adiantamentos e créditos a abater, devolução, conta-corrente de fornecedor e cliente com relatório.' },
   { id: 'portal-cliente', titulo: 'Portal do Cliente', area: 'Financeiro', rotas: ['portal-clientes'],

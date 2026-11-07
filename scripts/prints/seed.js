@@ -162,6 +162,15 @@ DB.extrato_importacoes = [imp];
 DB.extrato_itens = DB.lancamentos.filter(l => l.conta_id === DB.contas[0].id && l.data >= '2026-09-01' && l.data <= HOJE).map((l, i) => { const nat = DB.plano_contas.find(p => p.id === l.plano_id).natureza;
   return { id: id('ex'), empresa_id: E, conta_id: l.conta_id, importacao_id: imp.id, data: l.data, valor: (nat === 'C' ? 1 : -1) * l.valor, tipo: nat === 'C' ? 'CREDIT' : 'DEBIT', fitid: 'F' + i, descricao: l.descricao.toUpperCase().slice(0, 30), status: i % 3 ? 'conciliado' : 'pendente', created_at: imp.created_at }; });
 DB.conciliacoes = [];
+// Conciliação sugerida (SQL 095): parâmetros e situação dos extratos por conta (FICTÍCIOS)
+DB.conc_config = [{ empresa_id: E, dias_exato: 3, dias_baixa: 7, conf_alta: 85, conf_media: 60, pesos: {}, alerta_dias: 5, contas_sem_alerta: [DB.contas[3].id] }];
+const DR = (d) => new Date(Date.now() + d * 864e5).toISOString().slice(0, 10);
+window.RPC.conc_extratos_situacao = () => [
+  { conta_id: DB.contas[0].id, ultimo_fim: DR(-1), ultima_importacao: DR(0) + 'T08:10:00Z', formato: 'cnab240', importacoes: 14, pendentes: DB.extrato_itens.filter(i => i.status === 'pendente').length, pendentes_valor: 18420.55 },
+  { conta_id: DB.contas[1].id, ultimo_fim: DR(-9), ultima_importacao: DR(-8) + 'T09:00:00Z', formato: 'ofx', importacoes: 9, pendentes: 4, pendentes_valor: -2310.4 },
+  { conta_id: DB.contas[2].id, ultimo_fim: null, ultima_importacao: null, formato: null, importacoes: 0, pendentes: 0, pendentes_valor: 0 },
+  { conta_id: DB.contas[3].id, ultimo_fim: null, ultima_importacao: null, formato: null, importacoes: 0, pendentes: 0, pendentes_valor: 0 },
+];
 // Comercial
 DB.comercial_vendedores = [{ id: 'rp1', empresa_id: E, nome: 'MARCOS VENDAS', email: 'marcos@exemplo.com.br', ativo: true, comissao_pct: 2 }];
 DB.comercial_oportunidades = [['SUPERMERCADOS', 'Sacolas personalizadas — Natal', 'proposta', 48000, 60], ['ATACADO', 'Bobinas picotadas', 'qualificado', 22000, 40], ['DISTRIBUIDORA', 'Contrato anual de sacos de lixo', 'contato', 120000, 20], ['FARMÁCIAS', 'Sacolas farmácia', 'ganha', 18000, 100]]
