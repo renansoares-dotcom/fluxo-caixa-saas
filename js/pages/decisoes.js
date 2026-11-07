@@ -46,7 +46,8 @@ async function carregar() {
   const cedida = await import(`./fidc-carteira.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const ndeb = await import(`./fiscal-notas-debito.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const imob = temArea('cont') ? await import(`./imobilizado.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob };
+  const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut };
 }
 
 // ---------------------------------------------------------------- regras
@@ -185,6 +186,13 @@ function regras(D) {
     desc: im.map(a => a.txt).join(' · '), impacto: 0, impactoTxt: `${im.length} ponto(s)`,
     regra: 'Depreciação do mês anterior calculada, classes com bens ligadas às contas contábeis, compras do ano (NF-e, lançamentos, máquinas e veículos) imobilizadas e inventário físico concluído nos últimos 12 meses.',
     acao: 'Abrir ativo imobilizado', rota: 'contab/imobilizado' });
+
+  // 18. manutenção industrial: emergências, OS atrasadas, peça parada há dias e preventivas vencidas sem OS
+  const mn = D.manut || [];
+  if (mn.length) out.push({ k: 'manutencao', origem: 'Manutenção', urg: mn.some(a => a.nivel === 'neg') ? 'alta' : 'media', titulo: 'Destravar a manutenção das máquinas',
+    desc: mn.map(a => a.txt).join(' · '), impacto: 0, impactoTxt: `${mn.length} ponto(s)`,
+    regra: 'OS de emergência aberta, OS atrasada (preventiva além do vencimento, emergência há mais de 24 h, alta há mais de 72 h), OS aguardando peça há mais de 3 dias e plano preventivo vencido sem OS. Máquina parada é produção perdida.',
+    acao: 'Abrir painel de manutenção', rota: 'manutencao' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

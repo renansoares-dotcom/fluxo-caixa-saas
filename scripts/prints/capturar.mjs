@@ -16,7 +16,7 @@ for (const [m, rota, , leg, aba] of FIGS) {
     if (passo.startsWith('scroll:')) { await p.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'start' }), passo.slice(7)); await p.waitForTimeout(300); }
     else { await p.click(passo.startsWith('click:') ? passo.slice(6) : `[data-a="${passo}"]`); await p.waitForTimeout(800); }
   }
-  await p.evaluate(() => { document.querySelectorAll('#toast-root > *').forEach(t => t.remove()); scrollTo(0, 0); });
+  await p.evaluate((rolou) => { document.querySelectorAll('#toast-root > *').forEach(t => t.remove()); if (!rolou) scrollTo(0, 0); }, !!aba?.includes('scroll:'));
   await p.screenshot({ path: `${OUT}${m}-${n}.jpg`, type: 'jpeg', quality: 80 });
   console.log(`${m}-${n}.jpg  ${leg}`);
 }

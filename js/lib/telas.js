@@ -19,6 +19,7 @@ export const TELAS = {
   // Produção
   'producao/terminal': 'PRD001', 'producao': 'PRD002', 'producao/planta': 'PRD003', 'producao/ordens': 'PRD004', 'producao/programacao': 'PRD005',
   'producao/cadastros': 'PRD006', 'producao/importar': 'PRD007',
+  'manutencao': 'PRD008', 'manutencao/ordens': 'PRD009', 'manutencao/equipamentos': 'PRD010', 'manutencao/celular': 'PRD011',
   // Logística
   'logistica': 'LOG001', 'logistica/fretes': 'LOG002', 'logistica/gestao-frota': 'LOG003', 'logistica/indicadores': 'LOG004', 'logistica/frota': 'LOG005',
   // RH / Trabalhista

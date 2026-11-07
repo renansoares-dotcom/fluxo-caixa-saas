@@ -523,3 +523,61 @@ window.FN = {
   if (esp) DB.estoque_espelho_itens = (DB.estoque_espelho_itens || []).concat([['MP0457', 'PEBD 2022N', 'KG', 18400], ['MP0460', 'PELBD 118W', 'KG', 32500], ['MP0471', 'PEAD HF0144', 'KG', 9100], ['AD0102', 'MB BRANCO 70% TIO2', 'KG', 1200]]
     .map(([codigo, descricao, unidade, quantidade]) => ({ id: id('ei'), empresa_id: E, espelho_id: esp.id, produto_id: null, codigo, descricao, deposito: 'ALMOX', unidade, quantidade })));
 }
+
+// Manutenção industrial (SQL 086) — equipamentos, planos, OS, horas e peças FICTÍCIOS (datas relativas a hoje)
+{
+  const agora = Date.now(), H = (h) => new Date(agora - h * 3600000).toISOString(), D0 = (d) => new Date(agora - d * 86400000).toISOString().slice(0, 10);
+  const pm = DB.prod_maquinas, cc = (n) => DB.centros_custo.find(c => c.nome === n)?.id;
+  DB.man_parametros = [{ empresa_id: E, custo_hora: 62.5, tolerancia_pct: 10, antecedencia_dias: 7, horas_dia: 24, abrir_os_pela_parada: true }];
+  DB.man_equipamentos = [
+    ...pm.map((m, i) => ({ id: 'me-' + (i + 1), empresa_id: E, codigo: m.codigo, nome: m.nome, tipo: 'maquina', maquina_id: m.id, setor_id: m.setor_id, centro_custo_id: cc(i === 3 ? 'CORTE E SOLDA' : 'EXTRUSÃO'), criticidade: i < 3 ? 'A' : 'B',
+      local: DB.prod_setores.find(s => s.id === m.setor_id)?.nome, fabricante: ['CARNEVALLI', 'RULLI STANDARD', 'BOBST', 'MAQPLAS'][i], modelo: ['CHD 65', 'RS 70', 'F&K 20SIX', 'CS 800'][i], ano: [2016, 2019, 2021, 2014][i],
+      situacao: i === 1 ? 'em_manutencao' : 'operando', bem_id: (DB.af_bens || [])[i]?.id || null })),
+    { id: 'me-5', empresa_id: E, codigo: 'UT-COMP1', nome: 'COMPRESSOR DE PARAFUSO 40 HP', tipo: 'utilidade', criticidade: 'A', local: 'Casa de máquinas', fabricante: 'SCHULZ', modelo: 'SRP 4040', horimetro: 18420, horimetro_em: D0(3), situacao: 'operando', centro_custo_id: cc('EXTRUSÃO') },
+    { id: 'me-6', empresa_id: E, codigo: 'UT-CHIL1', nome: 'CHILLER DE ÁGUA GELADA', tipo: 'utilidade', criticidade: 'B', local: 'Casa de máquinas', horimetro: 9310, horimetro_em: D0(10), situacao: 'operando' },
+    { id: 'me-7', empresa_id: E, codigo: 'MV-EMP1', nome: 'EMPILHADEIRA ELÉTRICA 2,5 T', tipo: 'movimentacao', criticidade: 'C', local: 'Expedição', horimetro: 6120, horimetro_em: D0(5), situacao: 'operando' }];
+  const HORAS = { 'me-1': 6480, 'me-2': 5210, 'me-3': 4390, 'me-4': 3820, 'me-5': 18420, 'me-6': 9310, 'me-7': 6120 };
+  DB.man_falhas = [['MEC-01', 'Rolamento danificado', 'mecanica'], ['MEC-02', 'Correia rompida ou patinando', 'mecanica'], ['MEC-03', 'Vazamento de óleo no redutor', 'lubrificacao'], ['ELE-01', 'Resistência queimada', 'eletrica'],
+    ['ELE-02', 'Termopar com defeito', 'instrumentacao'], ['ELE-03', 'Inversor de frequência em falha', 'eletronica'], ['PNE-01', 'Vazamento de ar comprimido', 'pneumatica'], ['HID-01', 'Bomba hidráulica sem pressão', 'hidraulica'],
+    ['OPE-01', 'Ajuste incorreto pelo operador', 'operacional'], ['MEC-04', 'Faca de corte gasta', 'mecanica']].map(([codigo, nome, categoria], i) => ({ id: 'mf-' + (i + 1), empresa_id: E, codigo, nome, categoria, ativo: true }));
+  DB.man_planos = [
+    { id: 'mpl-1', equipamento_id: 'me-1', nome: 'Lubrificação do redutor e mancais', tipo: 'lubrificacao', a_cada_dias: 15, ultima_data: D0(18), checklist: ['Verificar nível de óleo do redutor', 'Engraxar mancais do puxador', 'Conferir vazamentos'], exige_parada: false },
+    { id: 'mpl-2', equipamento_id: 'me-1', nome: 'Revisão das resistências e termopares', tipo: 'preventiva', a_cada_horas: 2000, ultima_horas: 4620, ultima_data: D0(80), checklist: ['Medir corrente de cada zona', 'Reapertar terminais', 'Testar termopares'], duracao_h: 4 },
+    { id: 'mpl-3', equipamento_id: 'me-2', nome: 'Troca de correias do motor principal', tipo: 'preventiva', a_cada_horas: 3000, ultima_horas: 2400, ultima_data: D0(150), checklist: ['Trocar jogo de correias', 'Alinhar polias'] },
+    { id: 'mpl-4', equipamento_id: 'me-3', nome: 'Limpeza e inspeção dos anilox', tipo: 'inspecao', a_cada_dias: 30, ultima_data: D0(12), checklist: ['Lavar anilox', 'Inspecionar células no microscópio', 'Registrar volume'] },
+    { id: 'mpl-5', equipamento_id: 'me-5', nome: 'Troca de óleo e filtros do compressor', tipo: 'preventiva', a_cada_horas: 4000, ultima_horas: 14200, a_cada_dias: 180, ultima_data: D0(170), checklist: ['Trocar óleo', 'Trocar filtro de ar', 'Trocar separador', 'Drenar condensado'] },
+    { id: 'mpl-6', equipamento_id: 'me-7', nome: 'Inspeção de segurança da empilhadeira', tipo: 'inspecao', a_cada_dias: 30, ultima_data: D0(20), checklist: ['Freios', 'Garfos e corrente', 'Bateria', 'Buzina e luzes'] }]
+    .map(p => ({ empresa_id: E, a_cada_dias: null, a_cada_horas: null, ultima_horas: null, pecas: [], exige_parada: true, ativo: true, ...p }));
+  if (!DB.produtos.some(p => p.codigo === 'PC-6205')) DB.produtos.push(...[['PC-6205', 'ROLAMENTO 6205 ZZ', 'PC'], ['PC-RES1', 'RESISTÊNCIA COLEIRA 1500W', 'PC'], ['PC-COR1', 'CORREIA B-62', 'PC'], ['PC-OLE1', 'ÓLEO REDUTOR ISO 220', 'L'], ['PC-FIL1', 'FILTRO DE AR COMPRESSOR', 'PC']]
+    .map(([codigo, descricao, unidade]) => ({ id: 'pr-' + codigo, empresa_id: E, codigo, descricao, tipo: 'peca_manutencao', unidade, ativo: true, origem: 'manual' })));
+  // OS: [equip, tipo, prio, situacao, descricao, horas atrás (abertura), duração h (parada), falha, solução, plano]
+  const OS = [
+    ['me-2', 'corretiva', 'emergencia', 'em_execucao', 'Motor principal desarmando com 15 min de operação', 5, null, 'ELE-03', null], ['me-3', 'corretiva', 'alta', 'aguardando_peca', 'Vazamento de óleo no redutor do desbobinador', 96, null, 'MEC-03', null],
+    ['me-1', 'lubrificacao', 'media', 'aberta', 'Lubrificação do redutor e mancais', 30, null, null, null, 'mpl-1'], ['me-5', 'preventiva', 'media', 'programada', 'Troca de óleo e filtros do compressor', 50, null, null, null, 'mpl-5'],
+    ['me-4', 'corretiva', 'media', 'solicitada', 'Solda falhando no lado esquerdo do saco', 2, null, null, null], ['me-7', 'corretiva', 'baixa', 'aberta', 'Buzina não funciona', 70, null, null, null],
+    ['me-1', 'corretiva', 'emergencia', 'concluida', 'Zona 3 não aquece', 300, 6.5, 'ELE-01', 'Troca da resistência coleira da zona 3'], ['me-1', 'corretiva', 'alta', 'concluida', 'Barulho no mancal do puxador', 620, 3, 'MEC-01', 'Troca do rolamento 6205'],
+    ['me-2', 'corretiva', 'alta', 'concluida', 'Correia patinando, perda de velocidade', 450, 4, 'MEC-02', 'Troca do jogo de correias B-62'], ['me-3', 'corretiva', 'media', 'concluida', 'Registro de cor saindo do lugar', 800, 1.5, 'OPE-01', 'Ajuste do registro e treinamento do operador'],
+    ['me-2', 'corretiva', 'emergencia', 'concluida', 'Termopar da zona 2 marcando 0 °C', 1100, 5, 'ELE-02', 'Troca do termopar tipo J'], ['me-5', 'corretiva', 'alta', 'concluida', 'Pressão de ar caindo na linha', 900, 2.5, 'PNE-01', 'Reparo de vazamento na conexão'],
+    ['me-4', 'corretiva', 'media', 'concluida', 'Faca não corta o filme', 1300, 2, 'MEC-04', 'Troca da faca de corte'], ['me-1', 'corretiva', 'alta', 'concluida', 'Resistência da zona 5 em curto', 1600, 7, 'ELE-01', 'Troca da resistência e do fusível'],
+    ['me-1', 'lubrificacao', 'media', 'concluida', 'Lubrificação do redutor e mancais', 440, null, null, 'Feito conforme checklist', 'mpl-1'], ['me-3', 'inspecao', 'media', 'concluida', 'Limpeza e inspeção dos anilox', 290, null, null, 'Anilox 360 com 12% de entupimento', 'mpl-4'],
+    ['me-7', 'inspecao', 'media', 'concluida', 'Inspeção de segurança da empilhadeira', 480, null, null, 'Sem ocorrências', 'mpl-6'], ['me-1', 'preventiva', 'media', 'concluida', 'Revisão das resistências e termopares', 1920, 4, null, 'Zonas 1 a 6 medidas, terminais reapertados', 'mpl-2'],
+    ['me-6', 'corretiva', 'media', 'concluida', 'Chiller sem refrigerar', 700, null, 'HID-01', 'Limpeza do condensador'], ['me-2', 'melhoria', 'baixa', 'concluida', 'Instalar proteção na correia', 1000, null, null, 'Proteção instalada']];
+  DB.man_ordens = OS.map(([eq, tipo, prioridade, situacao, descricao, ha, dur, fa, sol, plano], i) => {
+    const conc = situacao === 'concluida', ab = H(ha), fim = conc ? H(ha - (dur || 3) - 1) : null, parou = dur != null || (situacao === 'em_execucao' && prioridade === 'emergencia');
+    return { id: 'mo-' + (i + 1), empresa_id: E, numero: 101 + OS.length - i, equipamento_id: eq, tipo, prioridade, situacao, descricao, origem: plano ? 'plano' : i === 0 ? 'parada' : 'solicitacao', plano_id: plano || null,
+      solicitante: ['ana.paula@exemplo.com.br', 'jose.carlos@exemplo.com.br'][i % 2], solicitada_em: ab, atualizado_em: situacao === 'aguardando_peca' ? H(90) : ab, responsavel: situacao === 'solicitada' ? null : ['Marcos Lima', 'Paulo Souza'][i % 2],
+      inicio: conc || situacao === 'em_execucao' ? H(ha - 0.5) : null, fim, maquina_parou: parou, parada_inicio: parou ? ab : null, parada_fim: parou && conc ? H(ha - dur) : null,
+      falha_id: fa ? DB.man_falhas.find(f => f.codigo === fa).id : null, causa: conc && fa ? 'Desgaste natural / fim de vida útil' : null, solucao: sol,
+      vence_em: plano ? D0(Math.round(ha / 24) - 7) : null, programada_para: situacao === 'programada' ? D0(-2) : null, valor_terceiros: i === 11 ? 480 : i === 18 ? 1250 : 0, favorecido_id: null,
+      checklist: plano ? DB.man_planos.find(p => p.id === plano).checklist.map((item, k) => ({ item, ok: conc ? true : k === 0 ? true : null, obs: null })) : [], concluida_por: conc ? 'marcos@exemplo.com.br' : null };
+  });
+  DB.man_os_horas = DB.man_ordens.filter(o => o.inicio).map((o, i) => ({ id: 9000 + i, empresa_id: E, ordem_id: o.id, tecnico: o.responsavel, data: o.inicio.slice(0, 10), horas: [3, 2, 4.5, 1.5, 5, 2, 2.5, 6, 1, 1.5, 1, 4, 2, 1][i % 14], custo_hora: 62.5, descricao: null }));
+  const PC = [['mo-7', 'PC-RES1', 1, 386], ['mo-8', 'PC-6205', 2, 74], ['mo-9', 'PC-COR1', 4, 212], ['mo-14', 'PC-RES1', 1, 386], ['mo-15', 'PC-OLE1', 4, 168], ['mo-1', 'PC-6205', 1, 37]];
+  DB.man_os_pecas = PC.map(([ordem_id, p, quantidade, custo], i) => ({ id: 'mop-' + i, empresa_id: E, ordem_id, produto_id: 'pr-' + p, quantidade, custo, movimento_id: i % 2 ? 'em-x' + i : null, situacao: 'consumida', criado_em: H(10) }));
+  DB.man_leituras = [{ id: 1, empresa_id: E, equipamento_id: 'me-5', data: D0(3), horimetro: 18420 }, { id: 2, empresa_id: E, equipamento_id: 'me-5', data: D0(33), horimetro: 17910 }];
+  DB.man_anexos = [{ id: 'man-a1', empresa_id: E, ordem_id: 'mo-2', caminho: 'x/vazamento.jpg', nome: 'vazamento-redutor.jpg', tipo: 'foto' }];
+  Object.assign(window.RPC, {
+    man_horas_maquina: (a) => HORAS[a.p_equipamento] ?? 0, man_gerar_preventivas: () => 2, man_configurar: () => ({ equipamentos: 0, falhas: 0 }),
+    man_consumir_peca: () => 'mop-novo', man_estornar_peca: () => null,
+  });
+}

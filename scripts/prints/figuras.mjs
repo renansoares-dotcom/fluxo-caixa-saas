@@ -56,4 +56,16 @@ export const FIGS = [
   ['imobilizado', 'contab/imobilizado-parametros', '## 10.', 'Parâmetros do Imobilizado: regras gerais e classes'],
   // Cadastro pelas notas de entrada (07/11/2026)
   ['estoque', 'estoque/cadastro-notas', '### 5.1', 'Cadastro pelas Notas de Entrada: prontidão das notas, famílias e produtos propostos com o código do Iniflex', 'click:[data-x="1"]|scroll:#cn-corpo'],
+  // Manutenção industrial (07/11/2026) — a OS impressa (manutencao-os.jpg) e as telas do celular (manutencao-cel-*.jpg) são tiradas à parte
+  ['manutencao', 'manutencao', '## 4.', 'Painel de Manutenção: alertas, indicadores e backlog'],
+  ['manutencao', 'manutencao', '## 4.', 'Pareto das falhas, custo por equipamento e equipamentos críticos', 'scroll:#mp-par'],
+  ['manutencao', 'manutencao/ordens', '## 5.', 'Ordens de Serviço em aberto, na ordem de atendimento'],
+  ['manutencao', 'manutencao/ordens', '### 5.2', 'Nova ordem de serviço', 'click:#mo-nova'],
+  ['manutencao', 'manutencao/ordens', '### 5.3', 'Ficha da OS: custo, execução, falha, causa e solução', 'click:#mo-lista tr[data-os]'],
+  ['manutencao', 'manutencao/ordens', '### 5.3', 'Peças usadas na OS, baixadas do estoque oficial', 'click:#mo-lista tr[data-os]|click:[data-t=pecas]'],
+  ['manutencao', 'manutencao/equipamentos', '## 6.', 'Equipamentos com situação, horas de máquina, disponibilidade e preventiva'],
+  ['manutencao', 'manutencao/equipamentos', '### 6.2', 'Ficha do equipamento: indicadores, planos, falhas e histórico', 'click:#me-corpo tr[data-e="me-1"]'],
+  ['manutencao', 'manutencao/equipamentos', '## 7.', 'Planos preventivos com a próxima execução', 'pl'],
+  ['manutencao', 'manutencao/equipamentos', '### 7.1', 'Plano preventivo com intervalo, checklist e peças previstas', 'pl|click:#me-corpo tr[data-p]'],
+  ['manutencao', 'manutencao/equipamentos', '## 11.', 'Parâmetros da manutenção', 'pa'],
 ];

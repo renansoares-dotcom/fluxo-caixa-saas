@@ -1,8 +1,8 @@
 ---
 titulo: Terminal de produção
 tela: Produção › Terminal do Setor (PRD001)
-versao: 1.2
-atualizado: 2026-11-05
+versao: 1.3
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -48,6 +48,8 @@ O usuário do operador é ligado ao cadastro dele e aos setores dele em **Produ�
 1. Clique em **Parada** e escolha o motivo: setup, troca de bobina, limpeza, manutenção, falta de matéria-prima, falta de operador, falta de energia, aguardando programação…
 2. Quando a máquina voltar, clique em **Retomar**.
 
+Parada com motivo do tipo **manutenção** abre sozinha uma ordem de serviço para a manutenção. Se a máquina for crítica, a OS entra como emergência. Os detalhes estão no manual Manutenção industrial.
+
 ### 4.4 Encerrar o apontamento
 
 1. Clique em **Encerrar**.
@@ -80,3 +82,4 @@ O usuário do operador é ligado ao cadastro dele e aos setores dele em **Produ�
 | 1.0 | 28/10/2026 | Primeira versão do manual: início, bobina com etiqueta, parada, retomada e encerramento do apontamento. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.3 | 07/11/2026 | A parada de manutenção abre a ordem de serviço da manutenção. |

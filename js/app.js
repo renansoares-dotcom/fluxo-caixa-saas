@@ -41,6 +41,10 @@ const routes = {
   'producao/terminal': () => import(`./pages/producao-terminal.js?v=${V}`),
   'producao/cadastros': () => import(`./pages/producao-cadastros.js?v=${V}`),
   'producao/importar': () => import(`./pages/producao-importar.js?v=${V}`),
+  'manutencao': () => import(`./pages/manutencao.js?v=${V}`),
+  'manutencao/ordens': () => import(`./pages/manutencao-ordens.js?v=${V}`),
+  'manutencao/equipamentos': () => import(`./pages/manutencao-equipamentos.js?v=${V}`),
+  'manutencao/celular': () => import(`./pages/manutencao-celular.js?v=${V}`),
   'producao/planta': () => import(`./pages/producao-planta.js?v=${V}`),
   'logistica': () => import(`./pages/logistica.js?v=${V}`),
   'logistica/frota': () => import(`./pages/logistica-frota.js?v=${V}`),
@@ -293,7 +297,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil compras: Pagamentos Antecipados e o módulo Compras
 // perfil vendas (representante): só a área Comercial
 // perfil producao (operador no terminal do setor)
-const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens', 'estoque/kardex', 'tutoriais', 'conversas'].includes(r);
+const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens', 'manutencao/celular', 'manutencao/ordens', 'estoque/kardex', 'tutoriais', 'conversas'].includes(r);
 const rotaDeVendas = (r) => r === 'comercial' || ['comercial/carteira', 'comercial/funil', 'tutoriais', 'conversas'].includes(r);
 const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'tutoriais', 'conversas'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
@@ -305,7 +309,7 @@ async function render() {
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
   // link direto para um registro (cartão das Conversas): #/<tela>?abrir=<id> abre o registro na tela
   { const ab = new URLSearchParams(location.hash.split('?')[1] || '').get('abrir');
-    const TIPO = { 'compras/pedidos': 'pedido', 'producao/ordens': 'op', 'fidc-propostas': 'proposta', 'paraquedas': 'pa', 'logistica/fretes': 'frete', 'lancamentos': 'lancamento', 'contab/imobilizado': 'bem' };
+    const TIPO = { 'compras/pedidos': 'pedido', 'producao/ordens': 'op', 'fidc-propostas': 'proposta', 'paraquedas': 'pa', 'logistica/fretes': 'frete', 'lancamentos': 'lancamento', 'contab/imobilizado': 'bem', 'manutencao/ordens': 'os', 'manutencao/equipamentos': 'equip' };
     if (ab && TIPO[route]) { state.abrir = { tipo: TIPO[route], id: ab }; history.replaceState(null, '', '#/' + route); } }
   if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
   if (state.papel === 'vendas' && !rotaDeVendas(route)) { location.hash = '#/comercial'; return; }
