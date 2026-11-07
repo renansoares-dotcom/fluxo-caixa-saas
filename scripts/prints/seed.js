@@ -833,3 +833,20 @@ window.FN = {
     ['bordero_pendente', 'Borderô nº 52 aguardando aprovação', 'sem_aparelho', false, 96]].map(([tipo, titulo, push_situacao, urgente, h], i) => ({ id: 'nt-' + i, empresa_id: E, user_id: 'u1', tipo, titulo, corpo: '', link: '', urgente, push_situacao, enviado_em: H(h - 0.01), criado_em: H(h), lida_em: H(h - 1) })));
   window.RPC.notif_teste = () => null;
 }
+
+// Minhas aprovações (SQL 091) — lista FICTÍCIA juntando os módulos
+{
+  const agora = Date.now(), H = (h) => new Date(agora - h * 3600000).toISOString(), D0 = (d) => new Date(agora + d * 86400000).toISOString().slice(0, 10);
+  window.RPC.minhas_aprovacoes = () => [
+    ['pa', 'ap1', 214, 'POSTO SERTÃO LTDA', 'Combustível da viagem a Petrolina', 1850, 5, 0, true, '#/paraquedas', true],
+    ['pa', 'ap2', 215, 'JOSÉ CARLOS DA SILVA', 'Diária de montagem da extrusora', 420, 3, 1, false, '#/paraquedas', true],
+    ['pedido', 'ap3', 388, 'RESINAS DO BRASIL S.A.', '28/42 dias', 48600, 20, 4, false, '#/compras/pedidos', true],
+    ['requisicao', 'ap4', 91, 'Requisição de Manutenção', 'Rolamentos 6205 para a EXT-02', null, 26, 2, true, '#/compras/requisicoes', true],
+    ['bordero', 'ap5', 52, 'Borderô — Negocial', '18 título(s) · líquido R$ 176.420,00', 184300, 30, 0, false, '#/fidc-propostas', true],
+    ['prorrogacao', 'ap6', null, 'SUPERMERCADOS BOA COMPRA LTDA', 'NF 18.211 · de 10/11 para 25/11 · fluxo apertado na Black Friday', 12480, 70, 3, false, '#/portal-clientes', true],
+    ['reajuste', 'ap7', 12, 'Reajuste — Aluguel do galpão 2', 'IGP-M 4,12% · de R$ 18.000,00 para R$ 18.741,60', 18741.6, 50, 20, false, '#/contratos', true],
+    ['receita', 'ap8', 2, 'R-VM485 — Vermelho 485 — superfície PE', 'Versão 2 em teste · pigmento 57:1 de outro fornecedor', null, 96, null, false, '#/tintas/receitas', true],
+    ['arte', 'ap9', 39, 'Suco Pomar do Vale Laranja 1 L', 'POMAR DO VALE SUCOS LTDA · aprovada pelo cliente', null, 52, null, false, '#/preimpressao/artes', true],
+    ['inspecao', 'ap10', 127, 'Inspeção recebimento — RESINA PEBD LINEAR', 'lote RB-2611-07', null, 8, 0, false, '#/qualidade/inspecoes', false],
+  ].map(([tipo, id, numero, titulo, detalhe, valor, h, pz, urgente, link, lote]) => ({ tipo, id, numero, titulo, detalhe, valor, desde: H(h), prazo: pz == null ? null : D0(pz), urgente, link, lote }));
+}

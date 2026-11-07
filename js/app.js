@@ -34,6 +34,7 @@ const routes = {
   'comercial/carteira': () => import(`./pages/comercial-carteira.js?v=${V}`),
   'comercial/funil': () => import(`./pages/comercial-funil.js?v=${V}`),
   'comercial/vendedores': () => import(`./pages/comercial-vendedores.js?v=${V}`),
+  'aprovacoes': () => import(`./pages/aprovacoes.js?v=${V}`),
   'meus-avisos': () => import(`./pages/meus-avisos.js?v=${V}`),
   'preimpressao': () => import(`./pages/preimpressao.js?v=${V}`),
   'preimpressao/artes': () => import(`./pages/preimpressao-artes.js?v=${V}`),
@@ -255,12 +256,22 @@ function primeiraRota() {
 }
 const areaDaRota = (route) => ['dashboard', 'hoje', 'decisao-dia', 'decisoes', 'executivo'].includes(route) ? 'fin' : $(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
 
+// número de aprovações pendentes ao lado de "Minhas aprovações" no menu (a cada 5 minutos)
+let apTimer = null;
+async function contarAprovacoesMenu() {
+  clearInterval(apTimer);
+  const conta = async () => { if (!state.empresa) return; const { contarAprovacoes } = await import(`./pages/aprovacoes.js?v=${V}`); const n = await contarAprovacoes();
+    document.querySelectorAll('.ap-n').forEach(el => { el.hidden = !n; el.textContent = n > 99 ? '99+' : n; }); };
+  conta().catch(() => {}); apTimer = setInterval(() => conta().catch(() => {}), 300000);
+}
+
 async function entrarEmpresa(emp, papel, areas) {
   sessionStorage.removeItem('fc-escolher');
   state.empresa = emp; state.papel = papel; state.cad = null; esquecerRegimes();
   state.areas = Array.isArray(areas) && areas.length ? areas : null;
   aplicarAreas();
   iniciarNotificacoes();
+  contarAprovacoesMenu();
   iniciarChat();
   iniciarBusca();
   iniciarSelectBusca();

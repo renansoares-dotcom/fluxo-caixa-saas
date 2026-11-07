@@ -8,6 +8,8 @@ export const MANUAIS = [
     resumo: 'Ativar os avisos em cada aparelho, mandar um aviso de teste, escolher o horário de silêncio e quais avisos vão para o celular. Urgente passa sempre.' },
   { id: 'paineis', titulo: 'Painéis — Minha Manhã, Decisão do Dia, Decision Center e dashboards', area: 'Painéis', rotas: ['hoje', 'decisao-dia', 'decisoes', 'executivo', 'dashboard'],
     resumo: 'O que precisa de atenção hoje, a decisão de pagamentos do dia com aprovação, recomendações da semana e a visão da direção.' },
+  { id: 'aprovacoes', titulo: 'Minhas aprovações — tudo o que espera a sua decisão', area: 'Painéis', rotas: ['aprovacoes'],
+    resumo: 'Pagamentos antecipados, compras, borderôs, decisão do dia, prorrogações, reajustes, receitas de tinta, artes e inspeções numa lista só, com decisão em lote.' },
   { id: 'lancamentos', titulo: 'Lançamentos e contas a pagar / receber', area: 'Financeiro', rotas: ['lancamentos', 'abertos'],
     resumo: 'Lançar, editar, transferir, importar (NFs, XML, ERP), baixar títulos em lote e montar borderô.' },
   { id: 'conciliacao', titulo: 'Conciliação bancária', area: 'Financeiro', rotas: ['conciliacao'],
