@@ -46,9 +46,10 @@ async function carregar() {
   const cedida = await import(`./fidc-carteira.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const ndeb = await import(`./fiscal-notas-debito.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const imob = temArea('cont') ? await import(`./imobilizado.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const tint = temArea('prd') ? await import(`./tintas.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const qual = temArea('prd') ? await import(`./qualidade.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint };
 }
 
 // ---------------------------------------------------------------- regras
@@ -201,6 +202,13 @@ function regras(D) {
     desc: ql.map(a => a.txt).join(' · '), impacto: 0, impactoTxt: `${ql.length} ponto(s)`,
     regra: 'Inspeção de liberação pendente (máquina aguardando), inspeção fora do prazo, valor parado na quarentena, não conformidade com a ação vencida ou com material sem disposição, fornecedor com 3 lotes ou mais abaixo da meta de IQF e lotes/bobinas bloqueados.',
     acao: 'Abrir painel da qualidade', rota: 'qualidade' });
+
+  // 20. casa de tintas: ordens paradas, tinta em ajuste, sobra vencida ou vencendo, receita em teste há muito tempo
+  const tn = D.tint || [];
+  if (tn.length) out.push({ k: 'tintas', origem: 'Casa de Tintas', urg: tn.some(a => a.nivel === 'neg') ? 'alta' : 'media', titulo: 'Organizar a casa de tintas',
+    desc: tn.map(a => a.txt).join(' · '), impacto: 0, impactoTxt: `${tn.length} ponto(s)`,
+    regra: 'Ordem de preparação parada há mais de 24 h, tinta em ajuste de cor ou viscosidade, lote de tinta pronta vencido ou vencendo em 7 dias (usar a sobra mais antiga primeiro) e versão de receita em teste há mais de 15 dias.',
+    acao: 'Abrir painel da casa de tintas', rota: 'tintas' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

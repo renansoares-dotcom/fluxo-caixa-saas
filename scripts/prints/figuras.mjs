@@ -81,4 +81,15 @@ export const FIGS = [
   ['qualidade', 'qualidade/planos', '### 8.1', 'Plano de recebimento de resina com as características', 'click:#qc-corpo tr[data-p="qp-1"]'],
   ['qualidade', 'qualidade/planos', '### 8.2', 'Tabela de amostragem', 'am'],
   ['qualidade', 'qualidade/planos', '### 8.3', 'Parâmetros da qualidade', 'pa'],
+  // Casa de Tintas (07/11/2026) — ordem impressa, etiqueta e celular (casa-tintas-ordem/-etiqueta/-cel.jpg) tirados à parte
+  ['casa-tintas', 'tintas', '## 4.', 'Painel da Casa de Tintas: alertas, indicadores, bancada, consumo por cor e sobras'],
+  ['casa-tintas', 'tintas/ordens', '## 5.', 'Ordens de Preparação', 'click:[data-f=todas]'],
+  ['casa-tintas', 'tintas/ordens', '### 5.1', 'Nova ordem de preparação', 'click:#to-nova'],
+  ['casa-tintas', 'tintas/ordens', '### 5.2', 'Pesagem: previsto, pesado, desvio, balança e a correção de proporção', 'click:#to-lista tr[data-o="to-1"]'],
+  ['casa-tintas', 'tintas/ordens', '### 5.4', 'Tinta em ajuste: medição fora do padrão e o aproveitamento da sobra', 'click:[data-f=ajuste]|click:#to-lista tr[data-o="to-2"]|scroll:#aj-ok'],
+  ['casa-tintas', 'tintas/ordens', '### 5.5', 'Tinta aprovada e entregue à máquina, com o lote, a validade e o histórico das pesagens', 'click:[data-f=prontas]|click:#to-lista tr[data-o="to-4"]'],
+  ['casa-tintas', 'tintas/receitas', '### 6.1', 'Cores com o padrão e a sobra em estoque', 'co'],
+  ['casa-tintas', 'tintas/receitas', '### 6.2', 'Receitas com a versão em uso, o custo teórico e o que está em desenvolvimento', 're'],
+  ['casa-tintas', 'tintas/receitas', '### 6.2', 'Versão em teste: composição, custo teórico e comparação com a aprovada', 're|click:#tr-corpo tr[data-r="tr-1"]'],
+  ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
 ];

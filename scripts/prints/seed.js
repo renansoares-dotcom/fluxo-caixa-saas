@@ -660,3 +660,64 @@ window.FN = {
   Object.assign(window.RPC, { qual_decidir: (a) => ({ situacao: a.p_decisao, rnc_id: a.p_decisao === 'reprovada' ? 'qr-x' : null }), qual_dispor: () => 'executada', qual_bloquear: () => 'bloqueado',
     qual_gerar_recebimento: () => 0, qual_configurar: () => ({ faixas: 0 }) });
 }
+
+// Casa de Tintas (SQL 088) — insumos, cores, receitas, ordens, pesagens e sobras FICTÍCIOS (datas relativas a hoje)
+{
+  const agora = Date.now(), H = (h) => new Date(agora - h * 3600000).toISOString(), D0 = (d) => new Date(agora - d * 86400000).toISOString().slice(0, 10);
+  const lc = (c) => DB.est_locais.find(l => l.codigo === c)?.id, fam = DB.est_familias.find(f => f.codigo === 'TINTA');
+  if (!lc('TIN')) DB.est_locais.push({ id: 'el-tin', empresa_id: E, codigo: 'TIN', nome: 'Casa de tintas (tinta pronta e sobras)', finalidade: 'processo', posse: 'propria', controla_saldo: true, compoe_custo: true, permite_negativo: false, papeis: null, ordem: 40, ativo: true });
+  const INS = [['TB-AZ', 'TINTA BASE AZUL NC', 21.4], ['TB-VM', 'TINTA BASE VERMELHA NC', 23.9], ['TB-BR', 'TINTA BASE BRANCA TIO2 NC', 18.2], ['PG-AZ', 'PIGMENTO CONCENTRADO AZUL 15:3', 58.0], ['PG-VM', 'PIGMENTO CONCENTRADO VERMELHO 57:1', 64.5],
+    ['PG-PT', 'PIGMENTO CONCENTRADO PRETO', 41.0], ['VZ-NC', 'VERNIZ NITROCELULOSE', 16.8], ['SV-AC', 'SOLVENTE ACETATO DE ETILA', 7.9], ['SV-AL', 'SOLVENTE ÁLCOOL ETÍLICO', 5.6], ['RT-01', 'RETARDADOR', 12.3]];
+  for (const [codigo, descricao] of INS) if (!DB.produtos.some(p => p.codigo === codigo)) DB.produtos.push({ id: 'pr-' + codigo, empresa_id: E, codigo, descricao, tipo: 'tinta_solvente', unidade: 'KG', ativo: true, origem: 'manual', familia_id: fam?.id, local_padrao_id: lc('INS'), controla_lote: false });
+  const tp = (c, n) => ({ id: 'pr-TP-' + c, empresa_id: E, codigo: 'TP-' + c, descricao: 'TINTA PRONTA ' + n, tipo: 'tinta_solvente', unidade: 'KG', ativo: true, origem: 'manual', familia_id: fam?.id, local_padrao_id: lc('TIN'), controla_lote: true });
+  DB.produtos.push(tp('AZ286', 'AZUL 286'), tp('VM485', 'VERMELHO 485'), tp('BR01', 'BRANCO OPACO'));
+  DB.est_custos = (DB.est_custos || []).concat(INS.map(([c, , cu]) => ({ produto_id: 'pr-' + c, empresa_id: E, quantidade: 400, valor: 400 * cu, custo_medio: cu })));
+  DB.tin_parametros = [{ empresa_id: E, local_tinta_id: lc('TIN'), local_insumos_id: lc('INS'), local_maquina_id: lc('PROC-2'), tolerancia_pct: 2, validade_dias: 30, criar_produto: true, papeis_aprovacao: ['admin', 'diretor', 'financeiro'], balanca_baud: 9600 }];
+  DB.tin_sistemas = [['Solvente — nitrocelulose', 'Flexografia de superfície em PE'], ['Solvente — poliuretano', 'Laminação e verso'], ['Base água', 'Papel e baixo odor'], ['UV', 'Cura por ultravioleta']].map(([nome, descricao], i) => ({ id: 'ts-' + i, empresa_id: E, nome, descricao, ativo: true }));
+  const FV = (n) => DB.favorecidos.find(f => f.nome.startsWith(n))?.id;
+  DB.tin_cores = [
+    { id: 'tc-1', codigo: 'AZ286', nome: 'AZUL 286', padrao: 'pantone', referencia: 'Pantone 286 C', lab_l: 26.5, lab_a: 21.4, lab_b: -63.9, hex: '#0033A0', produto_id: 'pr-TP-AZ286' },
+    { id: 'tc-2', codigo: 'VM485', nome: 'VERMELHO 485', padrao: 'pantone', referencia: 'Pantone 485 C', lab_l: 48.6, lab_a: 66.9, lab_b: 51.3, hex: '#DA291C', produto_id: 'pr-TP-VM485' },
+    { id: 'tc-3', codigo: 'BR01', nome: 'BRANCO OPACO', padrao: 'instrumental', referencia: 'Opacidade ≥ 60%', lab_l: 94.8, lab_a: -0.6, lab_b: 1.9, hex: '#F4F4F2', produto_id: 'pr-TP-BR01' },
+    { id: 'tc-4', codigo: 'VD-SBC', nome: 'VERDE SUPERMERCADO', padrao: 'cliente', referencia: 'Padrão físico aprovado pelo cliente em 12/10', lab_l: 50.2, lab_a: -48.1, lab_b: 22.6, hex: '#00843D', favorecido_id: FV('SUPERMERCADOS') }]
+    .map(c => ({ empresa_id: E, sistema_id: 'ts-0', favorecido_id: null, ativo: true, criado_em: H(3000), ...c }));
+  DB.tin_receitas = [['tr-1', 'tc-1', 'R-AZ286', 'Azul 286 — superfície PE'], ['tr-2', 'tc-2', 'R-VM485', 'Vermelho 485 — superfície PE'], ['tr-3', 'tc-3', 'R-BR01', 'Branco opaco — fundo'], ['tr-4', 'tc-4', 'R-VDSBC', 'Verde do supermercado']]
+    .map(([id, cor_id, codigo, nome]) => ({ id, empresa_id: E, cor_id, codigo, nome, aplicacao: 'superficie', substrato: 'PE', ativo: true, criado_em: H(3000) }));
+  const VE = [['tv-1', 'tr-1', 1, 'obsoleta', 'Primeira versão', 2600], ['tv-2', 'tr-1', 2, 'aprovada', 'Mais pigmento: tom pedido pelo cliente', 900], ['tv-3', 'tr-1', 3, 'em_teste', 'Teste com retardador para o verão', 30],
+    ['tv-4', 'tr-2', 1, 'aprovada', 'Primeira versão', 1800], ['tv-5', 'tr-3', 1, 'aprovada', 'Primeira versão', 2000], ['tv-6', 'tr-4', 1, 'rascunho', 'Desenvolvimento para o cliente', 20]];
+  DB.tin_versoes = VE.map(([id, receita_id, numero, situacao, motivo, ha]) => ({ id, empresa_id: E, receita_id, numero, situacao, motivo, base_kg: 100, viscosidade_alvo: receita_id === 'tr-3' ? 24 : 22, viscosidade_tol: 2,
+    viscosidade_metodo: 'Copo Zahn nº 2 (s)', densidade_alvo: null, densidade_tol: null, delta_e_max: receita_id === 'tr-3' ? 2 : 1.5, criado_em: H(ha), aprovada_em: ['aprovada', 'obsoleta'].includes(situacao) ? H(ha - 20) : null, aprovada_por: ['aprovada', 'obsoleta'].includes(situacao) ? 'renata@exemplo.com.br' : null }));
+  const IT = { 'tv-1': [['TB-AZ', 64, 'base'], ['PG-AZ', 20, 'pigmento'], ['SV-AC', 16, 'solvente']], 'tv-2': [['TB-AZ', 58, 'base'], ['PG-AZ', 24, 'pigmento'], ['VZ-NC', 4, 'verniz'], ['SV-AC', 14, 'solvente']],
+    'tv-3': [['TB-AZ', 58, 'base'], ['PG-AZ', 24, 'pigmento'], ['VZ-NC', 4, 'verniz'], ['SV-AC', 11, 'solvente'], ['RT-01', 3, 'retardador']], 'tv-4': [['TB-VM', 62, 'base'], ['PG-VM', 22, 'pigmento'], ['SV-AC', 12, 'solvente'], ['SV-AL', 4, 'solvente']],
+    'tv-5': [['TB-BR', 80, 'base'], ['VZ-NC', 8, 'verniz'], ['SV-AC', 12, 'solvente']], 'tv-6': [['TB-AZ', 30, 'base'], ['PG-AZ', 6, 'pigmento'], ['TB-BR', 20, 'base'], ['SV-AC', 14, 'solvente']] };
+  DB.tin_itens = Object.entries(IT).flatMap(([versao_id, L]) => L.map(([c, quantidade, funcao], k) => ({ id: `ti-${versao_id}-${k}`, empresa_id: E, versao_id, seq: k + 1, produto_id: 'pr-' + c, quantidade, funcao, tolerancia_pct: funcao === 'pigmento' ? 1 : null,
+    instrucao: funcao === 'pigmento' ? 'adicionar devagar, com o agitador ligado' : funcao === 'solvente' ? 'ajustar a viscosidade no final' : null })));
+  const cus = Object.fromEntries(INS.map(([c, , cu]) => ['pr-' + c, cu])), ops = DB.prod_ordens || [];
+  const OR = [ // [versão, kg, situação, horas atrás, OP, pesagens: fator por item (1 = no previsto; null = falta), medições [visc, ΔE]]
+    ['tv-2', 40, 'em_pesagem', 1.5, 0, [1.004, 1.035, null, null], []], ['tv-4', 25, 'em_ajuste', 3, 1, [1, 1, 1, 1], [[26.4, 1.1]]],
+    ['tv-5', 60, 'aprovada', 6, 0, [1, 1, 1], [[23.6, 0.9]]], ['tv-2', 35, 'entregue', 26, 0, [1.01, 0.995, 1, 1.02], [[22.8, 0.7]]],
+    ['tv-2', 30, 'encerrada', 120, 1, [1, 1, 1, 1], [[24.9, 1.9], [22.2, 1.2]]], ['tv-4', 20, 'encerrada', 200, 1, [1.005, 1, 1, 1], [[21.4, 0.8]]],
+    ['tv-5', 50, 'encerrada', 260, 2, [0.998, 1, 1.01], [[24.3, 1.3]]], ['tv-2', 30, 'encerrada', 400, 0, [1, 1.012, 1, 1], [[22.5, 0.6]]], ['tv-4', 25, 'encerrada', 500, 3, [1, 0.99, 1, 1], [[23.1, 1.7], [22.0, 1.0]]]];
+  DB.tin_ordens = []; DB.tin_pesagens = []; DB.tin_medicoes = [];
+  OR.forEach(([versao_id, qtd, situacao, ha, opi, fat, med], k) => {
+    const id = 'to-' + (k + 1), v = DB.tin_versoes.find(x => x.id === versao_id), its = DB.tin_itens.filter(i => i.versao_id === versao_id), apr = ['aprovada', 'entregue', 'encerrada'].includes(situacao);
+    let tot = 0, cu = 0;
+    its.forEach((it, j) => { const f = fat[j]; if (f == null) return; const prev = Math.round(it.quantidade * qtd / 100 * 1000) / 1000, pes = Math.round(prev * f * 1000) / 1000, c = Math.round(pes * cus[it.produto_id] * 100) / 100;
+      tot += pes; cu += c; DB.tin_pesagens.push({ id: `tp-${k}-${j}`, empresa_id: E, ordem_id: id, item_id: it.id, produto_id: it.produto_id, prevista: prev, pesada: pes, desvio_pct: Math.round((pes - prev) / prev * 10000) / 100,
+        fora_tolerancia: (f - 1) * 100 > (it.tolerancia_pct ?? 2) + 0.001, justificativa: (f - 1) * 100 > (it.tolerancia_pct ?? 2) + 0.001 ? 'Passou na adição do pigmento' : null, ajuste: false, custo: c, balanca: j % 2 === 0, situacao: 'pesada', operador: 'jose@exemplo.com.br', criado_em: H(ha - 0.2 - j * 0.1) }); });
+    if (med.length > 1) { const pes = Math.round(qtd * 0.02 * 1000) / 1000, c = Math.round(pes * cus['pr-SV-AC'] * 100) / 100; tot += pes; cu += c;
+      DB.tin_pesagens.push({ id: `tp-${k}-aj`, empresa_id: E, ordem_id: id, item_id: null, produto_id: 'pr-SV-AC', prevista: null, pesada: pes, desvio_pct: null, fora_tolerancia: false, justificativa: 'Viscosidade alta: mais solvente', ajuste: true, custo: c, situacao: 'pesada', criado_em: H(ha - 0.8) }); }
+    med.forEach(([vi, de], j) => DB.tin_medicoes.push({ id: 900 + k * 10 + j, empresa_id: E, ordem_id: id, viscosidade: vi, delta_e: de, temperatura: 24, ok: Math.abs(vi - v.viscosidade_alvo) <= 2 && de <= v.delta_e_max, criado_em: H(ha - 0.6 - j * 0.3) }));
+    const cor = DB.tin_cores.find(c => c.id === DB.tin_receitas.find(r => r.id === v.receita_id).cor_id);
+    DB.tin_ordens.push({ id, empresa_id: E, numero: 60 + OR.length - k, versao_id, cor_id: cor.id, quantidade: qtd, ordem_id: ops[opi]?.id || null, situacao, quantidade_real: Math.round(tot * 1000) / 1000,
+      custo_total: apr ? Math.round(cu * 100) / 100 : null, custo_kg: apr && tot ? Math.round(cu / tot * 10000) / 10000 : null, lote_codigo: apr ? `T2611-${String(60 + OR.length - k).padStart(4, '0')}` : null,
+      validade: apr ? D0(Math.round(ha / 24) - 30) : null, entregue_kg: situacao === 'entregue' ? 28 : situacao === 'encerrada' ? Math.round(tot * 0.85) : 0, retorno_kg: situacao === 'encerrada' ? Math.round(tot * 0.1 * 10) / 10 : 0,
+      aprovada_em: apr ? H(ha - 1) : null, aprovada_por: apr ? 'renata@exemplo.com.br' : null, concessao: k === 8 ? 'ΔE 1,7 aceito para o fundo da embalagem' : null, responsavel: 'José (tinteiro)', criado_em: H(ha), atualizado_em: H(ha - 0.5) });
+  });
+  // sobras na casa de tintas (lotes da tinta pronta)
+  const SB = [['pr-TP-AZ286', 'T2611-0064', 12.5, 24], ['pr-TP-VM485', 'T2610-0057', 6.0, -3], ['pr-TP-BR01', 'T2610-0059', 18.0, 18], ['pr-TP-BR01', 'T2611-0067', 60.0, 30], ['pr-TP-AZ286', 'T2610-0054', 3.5, 2]];
+  SB.forEach(([produto_id, codigo, q, dias], i) => { DB.est_lotes.push({ id: 'lt-tn' + i, empresa_id: E, produto_id, codigo, origem: 'producao', validade: D0(-dias), fabricacao: D0(-dias + 30) });
+    DB.est_saldos.push({ id: 'ss-tn' + i, empresa_id: E, produto_id, local_id: lc('TIN'), lote_id: 'lt-tn' + i, quantidade: q, valor: Math.round(q * 27.3 * 100) / 100, ultimo_movimento: D0(1) }); });
+  Object.assign(window.RPC, { tin_pesar: () => ({ estoque: true }), tin_reescalar: (a) => a.p_quantidade, tin_aprovar_ordem: () => ({ lote: 'T2611-0069', estoque: true }), tin_movimentar: (a) => a.p_tipo,
+    tin_aprovar_versao: () => 'aprovada', tin_nova_versao: () => 'tv-x', tin_estornar_pesagem: () => null, tin_configurar: () => ({ sistemas: 0 }) });
+}
