@@ -1,8 +1,8 @@
 ---
 titulo: Pagamentos Antecipados
 tela: Financeiro › Pagamentos Antecipados (FIN008)
-versao: 1.3
-atualizado: 2026-11-05
+versao: 1.4
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -30,16 +30,16 @@ Cada pedido recebe um número: **PA nº**.
 
 ![Figura 1 — Pagamentos Antecipados aguardando aprovação (dados fictícios)](img/pagamentos-antecipados-1.jpg)
 
-No topo ficam os botões **+ Novo pagamento antecipado**, **Relatório (PDF)** e **Exportar Excel**, e o campo **Buscar** (fornecedor, CNPJ, descrição ou nº).
+No topo ficam os botões **+ Novo pagamento antecipado**, **Relatório (PDF)**, **Exportar Excel** e **Parâmetros** (prazo da nota e cobrança automática), e o campo **Buscar** (fornecedor, CNPJ, descrição ou nº).
 
 Os quatro indicadores mostram:
 
 - **Aguardando aprovação**: valor e quantidade de pedidos, com os urgentes.
 - **Aprovados para hoje**: o que está aprovado com data até hoje, e quantos ainda não foram programados.
-- **Pagos aguardando nota**: fica vermelho quando o mais antigo passa de 30 dias.
+- **Pagos aguardando nota**: fica vermelho quando o mais antigo passa de 30 dias, e mostra quantos estão com a **nota atrasada** (prazo vencido).
 - **Sem nota fiscal (sem lastro)**: pagamentos aprovados ou pagos que não terão nota.
 
-As abas separam os pedidos pela situação: **Aguardando aprovação**, **Aprovados a programar**, **No fluxo / pagos**, **Pagos aguardando nota**, **Sem nota fiscal**, **Concluídos** e **Rejeitados / cancelados**.
+As abas separam os pedidos pela situação: **Aguardando aprovação**, **Aprovados a programar**, **No fluxo / pagos**, **Prestação de contas** (os pagos aguardando nota, com o prazo), **Sem nota fiscal**, **Concluídos** e **Rejeitados / cancelados**.
 
 ## 4. Passo a passo
 
@@ -102,7 +102,7 @@ Os arquivos aceitos são PDF e fotos (JPG, PNG), com até 10 MB cada. Dá para e
 
 ### 4.7 Ligar a nota fiscal
 
-1. Abra a aba **Pagos aguardando nota** e clique em **Ligar nota**.
+1. Abra a aba **Prestação de contas** e clique em **Ligar nota**.
 2. A janela mostra as notas de entrada desse fornecedor que ainda têm valor a abater, com a mais próxima do valor no topo.
 3. Escolha a nota e clique em **Ligar e abater**. O valor da nota abate o adiantamento.
 
@@ -128,7 +128,8 @@ Clique em **Cancelar** e escreva o motivo. Se houver lançamento em aberto no fl
 - Sem **plano de contas** não dá para programar no fluxo.
 - Um pagamento não pode passar do que **falta pagar** no pedido.
 - Pagamento já baixado (Pago) não pode ser cancelado. Lançamento conciliado não pode ter o valor corrigido.
-- Pedido pago e aguardando nota há mais de **30 dias** aparece em vermelho: cobre a nota do fornecedor.
+- Pedido pago aguardando nota tem **prazo** (item 7). Vencido, a plataforma cobra quem pediu e, com o atraso grande, avisa o financeiro e o diretor.
+- Só o PA **pago e com nota** tem prazo. A prorrogação exige motivo e um prazo de hoje em diante.
 
 ## 6. Perguntas frequentes e erros comuns
 
@@ -144,7 +145,59 @@ Clique em **Cancelar** e escreva o motivo. Se houver lançamento em aberto no fl
 
 **Paguei a menos.** Registre o complemento (item 4.5). Se o valor registrado estiver errado, use **Corrigir valor** (item 4.6).
 
-## 7. Conversa sobre o registro
+## 7. Prestação de contas (prazo e cobrança da nota fiscal)
+
+![Figura 3 — Prestação de contas: saldo pendente por pessoa e o prazo da nota de cada PA (dados fictícios)](img/pagamentos-antecipados-3.jpg)
+
+Depois de pago, o PA fica na aba **Prestação de contas** até a nota fiscal ser ligada. O **prazo da nota** vem, nesta ordem:
+
+1. do prazo **prorrogado**, se alguém prorrogou;
+2. da **previsão de nota** informada no pedido;
+3. do **prazo padrão**: a data do pagamento mais N dias (padrão 15, em Parâmetros).
+
+Cada PA mostra a situação: **no prazo**, **vence em X dias** ou **atrasada há X dias**.
+
+**Saldo pendente por pessoa**: o quadro de cima soma, para cada responsável (quem pediu o PA):
+- os PAs aguardando nota e o valor;
+- quanto já está atrasado;
+- o maior atraso.
+
+**Cobrança automática** (todo dia de manhã), para quem pediu o PA:
+- um **lembrete** alguns dias antes do prazo (padrão 2);
+- a **cobrança** a cada N dias enquanto estiver atrasada (padrão 3);
+- com o atraso grande (padrão 10 dias), a **escalada**: o financeiro e o diretor também são avisados, uma vez até o prazo ser prorrogado.
+
+Os avisos chegam no sino, no celular e por e-mail, conforme as preferências de cada pessoa em **Meus avisos** (tipo "Prestação de contas do PA").
+
+**Botões de cada PA:**
+- **Ligar nota**: o mesmo do item 4.7, e o PA sai da lista.
+- **Cobrar agora**: envia a cobrança na hora, com uma mensagem sua. Se quiser, avisa também o financeiro e o diretor.
+- **Prorrogar**: novo prazo com motivo. Fica no histórico e zera a escalada.
+- **Histórico**: as cobranças enviadas.
+
+Quem é de **Compras** vê a aba **Notas a enviar**, com os próprios pedidos e o prazo de cada um, e o indicador **Notas fiscais a enviar**.
+
+A **Central de Decisões** (regra 23) mostra os PAs com a nota atrasada, com o atraso de cada responsável.
+
+### 7.1 Histórico das cobranças
+
+![Figura 4 — Histórico das cobranças do PA (lembrete, cobrança, escalada e manual) (dados fictícios)](img/pagamentos-antecipados-4.jpg)
+
+### 7.2 Parâmetros
+
+![Figura 5 — Parâmetros da prestação de contas e da cobrança automática (dados fictícios)](img/pagamentos-antecipados-5.jpg)
+
+Em **Parâmetros** você ajusta:
+- o prazo padrão da nota;
+- os dias do lembrete;
+- o intervalo das cobranças;
+- o atraso que dispara a escalada;
+- quem recebe a escalada (financeiro, diretor, administrador);
+- se a cobrança automática fica ligada.
+
+**Rodar a cobrança agora** dispara na hora os avisos pendentes do dia.
+
+## 8. Conversa sobre o registro
 
 No topo da janela do pagamento antecipado ficam dois botões das **Conversas**:
 
@@ -153,7 +206,7 @@ No topo da janela do pagamento antecipado ficam dois botões das **Conversas**:
 
 Veja o manual **Conversas** para os detalhes.
 
-## 8. Histórico de alterações
+## 9. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
@@ -161,3 +214,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do pagamento antecipado (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 05/11/2026 | Nome da tela com o código. Formulário do novo pagamento em três seções (Quem recebe, O pagamento, Classificação). Figuras refeitas. |
+| 1.4 | 07/11/2026 | Prestação de contas: prazo da nota fiscal de cada PA pago (prorrogado, previsão ou padrão), cobrança automática (lembrete, cobrança e escalada), Cobrar agora, Prorrogar, histórico, saldo pendente por pessoa, aba Notas a enviar para Compras, Parâmetros e regra 23 da Central de Decisões. |

@@ -7,12 +7,14 @@ import { erroTela, $, esc, money, dateBR, fail, toast, modal, options, parseNum,
 import { dispararAvisos } from '../lib/notif.js';
 import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 import { conversaNoModal } from '../lib/mini-chat.js';
+import { carregarPrestacao, pintarPrestacao, parametrosPA, seloPrazo } from '../lib/pa-prestacao.js';
 
 export const title = 'Pagamentos Antecipados';
 const ST = { aguardando: 'Aguardando aprovação', aprovado: 'Aprovado', rejeitado: 'Rejeitado', cancelado: 'Cancelado', pago: 'Pago — aguardando nota', nota_recebida: 'Nota recebida' };
 const ST_CLS = { aguardando: 'aberto', aprovado: 'conc', rejeitado: 'vencido', cancelado: '', pago: 'aberto', nota_recebida: 'pago' };
 const PIX = { cnpj: 'CNPJ', cpf: 'CPF', email: 'E-mail', telefone: 'Telefone', aleatoria: 'Chave aleatória' };
 const ui = { aba: null, busca: '' };
+let PREST = { S: [], porId: new Map(), cfg: {}, semSQL: true };
 let L = [], LANC = new Map(), PAG = new Map(), ANX = new Map(), SEM_TABELA = false, SEM_PAG = false, VIS = { R: [], aba: '' };
 // pagamentos do PA (SQL 053): vários por PA, cada um com lançamento, adiantamento e comprovantes
 const pags = (p) => PAG.get(p.id) || [];
@@ -38,12 +40,12 @@ const ABAS = [
   ['aguardando', 'Aguardando aprovação', (p) => p.status === 'aguardando'],
   ['programar', 'Aprovados a programar', (p) => fase(p) === 'programar'],
   ['fluxo', 'No fluxo / pagos', (p) => ['fluxo', 'pago_sist', 'parcial'].includes(fase(p))],
-  ['nota', 'Pagos aguardando nota', (p) => fase(p) === 'sem_nf'],
+  ['nota', 'Prestação de contas', (p) => fase(p) === 'sem_nf'],
   ['semnota', 'Sem nota fiscal', (p) => !p.tera_nota && !['rejeitado', 'cancelado'].includes(p.status)],
   ['ok', 'Concluídos', (p) => p.status === 'nota_recebida'],
   ['fora', 'Rejeitados / cancelados', (p) => ['rejeitado', 'cancelado'].includes(p.status)],
 ];
-const ABAS_COMPRAS = [['meus', 'Meus pedidos', () => true]];
+const ABAS_COMPRAS = [['meus', 'Meus pedidos', () => true], ['nota', 'Notas a enviar', (p) => fase(p) === 'sem_nf' && ehMeu(p)]];
 
 export async function render(root) {
   await loadCadastros();
@@ -52,7 +54,7 @@ export async function render(root) {
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
       <div><h2 style="margin:0">Pagamentos Antecipados</h2><p class="muted small" style="margin:4px 0 0">Pagamentos pedidos antes da nota fiscal. O diretor ou o financeiro autoriza; o financeiro programa no fluxo do dia; depois de pago, a nota fiscal abate o adiantamento.</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="novo">+ Novo pagamento antecipado</button><button class="btn" id="pdf" title="Relatório da aba aberta (com a busca aplicada) para imprimir ou salvar em PDF">Relatório (PDF)</button>${compras() ? '' : '<button class="btn" id="exp">Exportar Excel</button>'}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="novo">+ Novo pagamento antecipado</button><button class="btn" id="pdf" title="Relatório da aba aberta (com a busca aplicada) para imprimir ou salvar em PDF">Relatório (PDF)</button>${compras() ? '' : '<button class="btn" id="exp">Exportar Excel</button>'}${podeEditar() && !compras() ? '<button class="btn" id="pq-par" title="Prazo da nota fiscal e a cobrança automática">Parâmetros</button>' : ''}</div></div>
       <div class="toolbar" style="margin-top:10px"><label class="grow">Buscar<input id="busca" placeholder="fornecedor, CNPJ, descrição, nº" value="${esc(ui.busca)}"></label></div></div>
     <div class="kpis" id="pq-kpis"></div><div id="pq-alertas"></div>
     <div class="card" style="padding-bottom:8px"><div class="chips" id="pq-abas"></div></div>
@@ -60,6 +62,7 @@ export async function render(root) {
   $('#novo', root).onclick = () => editar(null, root);
   $('#exp', root) && ($('#exp', root).onclick = () => exportXLSX($('#pq-corpo table', root), 'pagamentos_antecipados'));
   $('#pdf', root).onclick = () => relatorioPDF();
+  $('#pq-par', root) && ($('#pq-par', root).onclick = () => parametrosPA(PREST.cfg, () => carregar(root)));
   $('#busca', root).oninput = (e) => { ui.busca = e.target.value; pintar(root); };
   $('#pq-abas', root).onclick = (e) => { const a = e.target.closest('[data-aba]')?.dataset.aba; if (a) { ui.aba = a; pintar(root); } };
   const ab = ['pa', 'pa-novo'].includes(state.abrir?.tipo) ? state.abrir : null;   // vindo da busca global ou de um pedido de compra
@@ -87,6 +90,7 @@ async function carregar(root) {
       }
     } catch (e) { if (/paraquedas_(pagamentos|anexos)|relation|schema cache|does not exist/i.test(e.message || '')) SEM_PAG = true; else fail(e); }
   }
+  PREST = await carregarPrestacao();
   const ids = [...new Set(L.map(p => p.lancamento_id).concat([...PAG.values()].flat().map(x => x.lancamento_id)).filter(Boolean))];
   if (ids.length && !compras()) for (let i = 0; i < ids.length; i += 150) for (const l of await q(sb.from('lancamentos').select('id,status,data,valor,conta_id').in('id', ids.slice(i, i + 150)))) LANC.set(l.id, l);
   pintar(root);
@@ -106,15 +110,21 @@ function pintar(root) {
   $('#pq-kpis', root).innerHTML = compras() ? `
     <div class="kpi"><div class="k-label">Aguardando aprovação</div><div class="k-value">${money(soma(p => p.status === 'aguardando'))}</div><div class="k-sub">${cont(p => p.status === 'aguardando')} pedido(s)</div></div>
     <div class="kpi"><div class="k-label">Aprovados</div><div class="k-value">${money(soma(p => ['aprovado', 'pago', 'nota_recebida'].includes(p.status)))}</div></div>
-    <div class="kpi"><div class="k-label">Rejeitados</div><div class="k-value">${cont(p => p.status === 'rejeitado')}</div><div class="k-sub">corrija e reenvie</div></div>` : `
+    <div class="kpi"><div class="k-label">Rejeitados</div><div class="k-value">${cont(p => p.status === 'rejeitado')}</div><div class="k-sub">corrija e reenvie</div></div>
+    ${(() => { const M = PREST.S.filter(s => s.criado_por === state.user?.id), at = M.filter(s => s.dias_restantes < 0); return M.length ? `<div class="kpi"><div class="k-label">Notas fiscais a enviar</div><div class="k-value ${at.length ? 'neg' : ''}">${M.length}</div><div class="k-sub">${at.length ? `${at.length} atrasada(s): peça ao fornecedor` : 'dentro do prazo'}</div></div>` : ''; })()}` : `
     <div class="kpi"><div class="k-label">Aguardando aprovação</div><div class="k-value">${money(soma(p => p.status === 'aguardando'))}</div><div class="k-sub">${cont(p => p.status === 'aguardando')} pedido(s) · ${cont(p => p.status === 'aguardando' && p.prioridade === 'urgente')} urgente(s)</div></div>
     <div class="kpi"><div class="k-label">Aprovados para hoje</div><div class="k-value">${money(soma(p => ['programar', 'fluxo'].includes(fase(p)) && p.data_pagamento <= hoje))}</div><div class="k-sub">${cont(p => fase(p) === 'programar')} ainda fora do fluxo</div></div>
-    <div class="kpi"><div class="k-label">Pagos aguardando nota</div><div class="k-value ${velho > 30 ? 'neg' : ''}">${money(semNf.reduce((s, p) => s + +p.valor, 0))}</div><div class="k-sub">${semNf.length} PA${semNf.length ? ` · mais antigo ${velho} dias` : ''}</div></div>
+    <div class="kpi"><div class="k-label">Pagos aguardando nota</div><div class="k-value ${velho > 30 ? 'neg' : ''}">${money(semNf.reduce((s, p) => s + +p.valor, 0))}</div><div class="k-sub">${semNf.length} PA${semNf.length ? ` · mais antigo ${velho} dias` : ''}${PREST.S.filter(s => s.dias_restantes < 0).length ? ` · <span class="neg">${PREST.S.filter(s => s.dias_restantes < 0).length} com a nota atrasada</span>` : ''}</div></div>
     <div class="kpi"><div class="k-label">Sem nota fiscal (sem lastro)</div><div class="k-value">${money(soma(p => !p.tera_nota && ['aprovado', 'pago'].includes(p.status)))}</div><div class="k-sub">aprovados ou pagos</div></div>`;
   const pagosSist = L.filter(p => fase(p) === 'pago_sist');
   $('#pq-alertas', root).innerHTML = !compras() && podeEditar() && pagosSist.length ? `<div class="card"><div class="alert-list"><div class="alert-row"><span class="alert-tag">Pagamento</span><div class="small">${pagosSist.length} pagamento(s) antecipado(s) já pago(s) no fluxo (${money(pagosSist.reduce((s, p) => s + +p.valor, 0))}). Confirme para virarem adiantamento ao fornecedor e aguardarem a nota. <button class="btn small" id="conf-pagos">Confirmar pagos</button></div></div></div></div>` : '';
   $('#conf-pagos', root) && ($('#conf-pagos', root).onclick = () => confirmarPagos(pagosSist, root));
 
+  if (ui.aba === 'nota') {
+    VIS = { R: L.filter(abas.find(a => a[0] === 'nota')[2]).filter(filtra), aba: abas.find(a => a[0] === 'nota')[1] };
+    pintarPrestacao($('#pq-corpo', root), { L, P: PREST, busca: ui.busca, soMeus: compras(), ligarNota: (p) => ligarNota(p, root), depois: () => carregar(root) });
+    return;
+  }
   const R = L.filter(abas.find(a => a[0] === ui.aba)[2]).filter(filtra);
   VIS = { R, aba: abas.find(a => a[0] === ui.aba)[1] };
   const sel = ui.aba === 'aguardando' && aprova();
@@ -169,7 +179,7 @@ function linha(p, sel) {
     <td>${dateBR(p.data_pagamento)}</td>
     <td class="wrap">${esc(p.razao_social)}<div class="small muted">${esc(fmtDoc(p.cnpj))}${p.pix_chave ? ` · Pix ${esc(PIX[p.pix_tipo] || '')}: ${esc(p.pix_chave)}` : ''}${p.conta_bancaria ? ` · ${esc(p.banco || '')} ag ${esc(p.agencia || '')} cc ${esc(p.conta_bancaria)}` : ''}</div></td>
     <td class="wrap small">${esc(p.descricao)}${p.pedido ? `<div class="muted">pedido ${esc(p.pedido)}</div>` : ''}${p.solicitante ? `<div class="muted">por ${esc(p.solicitante)}</div>` : ''}${p.motivo ? `<div class="neg">${esc(p.motivo)}</div>` : ''}</td>
-    <td class="small">${p.tera_nota ? `Sim${p.previsao_nota ? ` · prev. ${dateBR(p.previsao_nota)}` : ''}${atraso ? `<div class="${atraso > 30 ? 'neg' : 'muted'}">pago há ${atraso} dias</div>` : ''}` : '<span class="badge vencido">Não terá</span>'}</td>
+    <td class="small">${p.tera_nota ? `Sim${p.previsao_nota ? ` · prev. ${dateBR(p.previsao_nota)}` : ''}${PREST.porId.get(p.id) ? `<div>${seloPrazo(PREST.porId.get(p.id))}</div>` : atraso ? `<div class="${atraso > 30 ? 'neg' : 'muted'}">pago há ${atraso} dias</div>` : ''}` : '<span class="badge vencido">Não terá</span>'}</td>
     <td class="num">${money(p.valor)}${pags(p).length > 1 || (pagoDe(p) > 0 && faltaDe(p) > 0.005) ? `<div class="small muted">pago ${money(pagoDe(p))} em ${pags(p).filter(x => LANC.get(x.lancamento_id)?.status === 'Pago').length}x</div>` : ''}</td><td>${sit}</td>
     <td style="white-space:nowrap">${acoes.map(([a, t]) => `<button class="btn ghost small" data-act="${a}" data-id="${p.id}">${t}</button>`).join('')}</td></tr>`;
 }

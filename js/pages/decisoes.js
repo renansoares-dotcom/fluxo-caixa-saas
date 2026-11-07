@@ -49,9 +49,10 @@ async function carregar() {
   const tint = temArea('prd') ? await import(`./tintas.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const qual = temArea('prd') ? await import(`./qualidade.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const recomp = temArea('fin') ? await import(`./fidc-recompras.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const paPrest = temArea('fin') ? await import(`../lib/pa-prestacao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const arte = temArea('com') || temArea('prd') ? await import(`./preimpressao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest };
 }
 
 // ---------------------------------------------------------------- regras
@@ -227,6 +228,13 @@ function regras(D) {
     desc: rc.map(a => a.titulo + (a.detalhe && /taxa de recompra/.test(a.titulo) ? ` (${a.detalhe})` : '')).join(' · '), impacto: rc.reduce((s, a) => s + (a.valor || 0), 0), impactoTxt: null,
     regra: 'Título que a empresa recomprou do fundo e voltou para a carteira, com vencimento passado e sem recebimento; recompra que aparece no relatório do fundo ou em 2.07.11 sem registro (o título não volta para a carteira e a DRE não sabe o motivo); cliente com taxa de recompra no ano acima do limite dos Parâmetros da recompra (padrão 10%).',
     acao: 'Abrir as recompras', rota: 'fidc-recompras' });
+
+  // 23. prestação de contas do PA: nota fiscal atrasada (prazo da nota vencido), por responsável
+  const pp = D.paPrest || [];
+  if (pp.length) out.push({ k: 'pa_prestacao', origem: 'Pagamentos', urg: pp.some(a => a.nivel === 'alto') ? 'alta' : 'media', titulo: 'Cobrar as notas fiscais dos pagamentos antecipados',
+    desc: pp.map(a => `${a.titulo}: ${a.detalhe}`).join(' · '), impacto: pp.reduce((s, a) => s + (a.valor || 0), 0), impactoTxt: null,
+    regra: 'PA pago aguardando nota com o prazo vencido (previsão do pedido, prazo prorrogado ou o prazo padrão dos Parâmetros depois do pagamento). Alta quando o atraso passa do prazo de escalada.',
+    acao: 'Abrir a prestação de contas', rota: 'paraquedas' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

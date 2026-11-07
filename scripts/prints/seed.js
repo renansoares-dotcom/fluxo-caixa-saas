@@ -969,3 +969,19 @@ window.FN = {
     proximo: r.ativo ? D0([3, 8, 40, 28, 18][i] ?? 5) : null, ultimo_pago: D0(-([27, 22, 300, 2, 72, 70][i] ?? 30)), pagos_12m: r.valor * 10 }));
   window.RPC.lanc_recorrentes_gerar = () => 0;
 }
+
+// Prestação de contas do PA (SQL 097) — FICTÍCIOS
+{
+  const D0 = (d) => new Date(Date.now() + d * 864e5).toISOString().slice(0, 10);
+  const pa19 = DB.paraquedas.find(p => p.numero === 19);
+  const mais = [[16, 'TORNEARIA PRECISÃO LTDA', 4300, -42, 'Beatriz Rocha'], [15, 'AUTO PEÇAS CAMPINA LTDA', 1260.4, -24, 'Diego Martins'], [14, 'ELÉTRICA INDUSTRIAL SUL LTDA', 3980, -12, 'Beatriz Rocha'], [13, 'HIDRÁULICA NORDESTE ME', 720, -6, 'Carlos Lima']]
+    .map(([numero, razao, valor, d, sol]) => ({ ...pa19, id: 'pa-x' + numero, numero, razao_social: razao, valor, data_pagamento: D0(d), solicitante: sol, previsao_nota: null, descricao: 'Serviço / peças (sem a nota ainda)' }));
+  DB.paraquedas.push(...mais);
+  const S = [[pa19, -13, 'previsao', 5, 2, 'cobranca', false], ...mais.map((p, i) => [p, [-27, -9, 3, 9][i], i === 1 ? 'prorrogado' : 'padrao', [-42, -24, -12, -6][i], [6, 3, 0, 0][i], ['escalada', 'cobranca', null, null][i], i === 0])]
+    .map(([p, rest, origem, pagoHa, n, tipo, esc]) => ({ id: p.id, numero: p.numero, razao_social: p.razao_social, valor: p.valor, criado_por: 'u4', responsavel: p.solicitante,
+      data_pago: D0(typeof pagoHa === 'number' && pagoHa < 0 ? pagoHa : -20), prazo: D0(rest), origem_prazo: origem, dias_restantes: rest, cobrancas: n, ultima_cobranca: n ? new Date(Date.now() - 864e5).toISOString() : null, ultimo_tipo: tipo, escalado: esc }));
+  window.RPC.pa_prestacao = () => S;
+  DB.pa_config = [{ empresa_id: E, prazo_nota_dias: 15, lembrete_antes_dias: 2, cobrar_cada_dias: 3, escalar_apos_dias: 10, escalar_papeis: ['financeiro', 'diretor'], cobrar_ativo: true }];
+  DB.pa_cobrancas = [['escalada', 27, 'PA nº 16 sem nota fiscal há 27 dia(s) do prazo'], ['cobranca', 27, 'Nota fiscal do PA nº 16 atrasada há 27 dia(s)'], ['cobranca', 24, 'Nota fiscal do PA nº 16 atrasada há 24 dia(s)'], ['manual', 20, 'Beatriz, a tornearia prometeu a nota para esta semana?'], ['lembrete', 0, 'Nota fiscal do PA nº 16 vence em 2 dia(s)']]
+    .map(([tipo, dias_atraso, mensagem], i) => ({ id: i + 1, empresa_id: E, paraquedas_id: 'pa-x16', tipo, dias_atraso, mensagem, enviado_por: tipo === 'manual' ? 'renata@exemplo.com.br' : 'automático', enviado_em: new Date(Date.now() - (i * 3 + 1) * 864e5).toISOString() }));
+}

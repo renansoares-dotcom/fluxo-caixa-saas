@@ -95,6 +95,10 @@ export const FIGS = [
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Receitas com a versão em uso, o custo teórico e o que está em desenvolvimento', 're'],
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Versão em teste: composição, custo teórico e comparação com a aprovada', 're|click:#tr-corpo tr[data-r="tr-1"]'],
   ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
+  // Prestação de contas do PA (07/11/2026)
+  ['pagamentos-antecipados', 'paraquedas', '## 7.', 'Prestação de contas: saldo pendente por pessoa e o prazo da nota de cada PA', 'click:[data-aba="nota"]'],
+  ['pagamentos-antecipados', 'paraquedas', '### 7.1', 'Histórico das cobranças do PA (lembrete, cobrança, escalada e manual)', 'click:[data-aba="nota"]|click:[data-pa="hist"][data-id="pa-x16"]'],
+  ['pagamentos-antecipados', 'paraquedas', '### 7.2', 'Parâmetros da prestação de contas e da cobrança automática', 'click:#pq-par'],
   // Regras de classificação, rateio e recorrentes (07/11/2026)
   ['lanc-automacao', 'lanc-regras', '## 3.', 'Regras de Classificação: a condição, o resultado e quantas vezes cada regra foi usada'],
   ['lanc-automacao', 'lanc-regras', '### 3.1', 'Editar a regra, com o teste nos lançamentos dos últimos 12 meses', 'click:tbody tr:nth-child(5) [data-ed]'],
