@@ -34,6 +34,7 @@ const routes = {
   'comercial/carteira': () => import(`./pages/comercial-carteira.js?v=${V}`),
   'comercial/funil': () => import(`./pages/comercial-funil.js?v=${V}`),
   'comercial/vendedores': () => import(`./pages/comercial-vendedores.js?v=${V}`),
+  'meus-avisos': () => import(`./pages/meus-avisos.js?v=${V}`),
   'preimpressao': () => import(`./pages/preimpressao.js?v=${V}`),
   'preimpressao/artes': () => import(`./pages/preimpressao-artes.js?v=${V}`),
   'portal-clientes': () => import(`./pages/portal-admin.js?v=${V}`),
@@ -306,9 +307,9 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil compras: Pagamentos Antecipados e o módulo Compras
 // perfil vendas (representante): só a área Comercial
 // perfil producao (operador no terminal do setor)
-const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'tutoriais', 'conversas'].includes(r);
-const rotaDeVendas = (r) => r === 'comercial' || ['comercial/carteira', 'comercial/funil', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas'].includes(r);
-const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas'].includes(r) || r.startsWith('compras/');
+const rotaDeProducao = (r) => ['producao/terminal', 'producao/ordens', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
+const rotaDeVendas = (r) => r === 'comercial' || ['comercial/carteira', 'comercial/funil', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
+const rotaDeCompras = (r) => ['paraquedas', 'compras', 'estoque', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;

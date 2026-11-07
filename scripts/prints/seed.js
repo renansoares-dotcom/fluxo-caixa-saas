@@ -816,3 +816,20 @@ window.FN = {
     portal_arte_comentar: () => 'pc-x', portal_arte_decidir: () => ({ situacao: 'aprovada' }), portal_arte_enviar: () => 'pv-x',
   });
 }
+
+// Avisos (SQL 090) — catálogo e últimos avisos FICTÍCIOS
+{
+  const agora = Date.now(), H = (h) => new Date(agora - h * 3600000).toISOString();
+  DB.notif_tipos = [['paraquedas', 'Pagamentos', 'Pagamentos antecipados', 'Novo pedido para autorizar, autorizado, recusado, pago, comprovante.', false, 10], ['nd_pendente', 'Financeiro', 'Notas de débito a emitir', 'Juros e multa recebidos que pedem nota de débito.', false, 20],
+    ['prorrogacao', 'Financeiro', 'Prorrogação pedida pelo cliente', 'Cliente pediu prorrogação de vencimento no Portal.', false, 25], ['bordero', 'Crédito / FIDC', 'Borderôs', 'Proposta de borderô aguardando aprovação e a decisão.', false, 30],
+    ['decisao_dia', 'Painéis', 'Decisão do dia', 'Decisão do dia aguardando aprovação e a resposta.', false, 40], ['arte', 'Pré-impressão', 'Resposta do cliente na arte', 'Aprovação, pedido de alteração, comentário ou arquivo enviado pelo cliente no Portal.', false, 50],
+    ['os_urgente', 'Manutenção', 'Máquina parada / OS de emergência', 'OS aberta com prioridade de emergência ou com a máquina parada. Passa pelo horário de silêncio.', true, 60], ['chat', 'Comunicação', 'Mensagens nas Conversas', 'Nova mensagem (respeita o silenciar de cada conversa).', false, 70],
+    ['teste', 'Sistema', 'Aviso de teste', 'O aviso que você manda para conferir o celular.', false, 99]].map(([codigo, grupo, nome, descricao, urgente, ordem]) => ({ codigo, grupo, nome, descricao, urgente, ordem }));
+  DB.notif_preferencias = [{ user_id: 'u1', empresa_id: E, tipo: 'chat', push: false, email: false }];
+  DB.notif_horarios = [{ user_id: 'u1', empresa_id: E, silencio: true, inicio: '20:00', fim: '07:00', fim_de_semana: true, fuso: 'America/Sao_Paulo' }];
+  DB.notificacoes = (DB.notificacoes || []).concat([
+    ['os_urgente', 'MÁQUINA PARADA · OS 118 — EXT-02 Extrusora 2', 'enviado', true, 3], ['arte_decisao', 'Arte nº 39 APROVADA pelo cliente', 'enviado', false, 52],
+    ['prorrogacao_nova', 'Prorrogação pedida: SUPERMERCADOS BOA COMPRA LTDA', 'enviado', false, 70], ['chat', 'Nova mensagem de Marcos Vendas', 'desligado', false, 75],
+    ['bordero_pendente', 'Borderô nº 52 aguardando aprovação', 'sem_aparelho', false, 96]].map(([tipo, titulo, push_situacao, urgente, h], i) => ({ id: 'nt-' + i, empresa_id: E, user_id: 'u1', tipo, titulo, corpo: '', link: '', urgente, push_situacao, enviado_em: H(h - 0.01), criado_em: H(h), lida_em: H(h - 1) })));
+  window.RPC.notif_teste = () => null;
+}

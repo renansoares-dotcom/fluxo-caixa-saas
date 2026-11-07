@@ -35,7 +35,7 @@ export const TELAS = {
   'cadastros/plano': 'CAD001', 'cadastros/contas': 'CAD002', 'cadastros/favorecidos': 'CAD003', 'cadastros/centros': 'CAD004', 'cadastros/empresa': 'CAD005',
   'contratos': 'CAD006', 'config': 'CAD007', 'auditoria': 'CAD008',
   // Ajuda e Comunicação
-  'tutoriais': 'AJU001', 'conversas': 'AJU002',
+  'tutoriais': 'AJU001', 'conversas': 'AJU002', 'meus-avisos': 'AJU003',
 };
 
 const ROTA_DO_CODIGO = Object.fromEntries(Object.entries(TELAS).map(([r, c]) => [c, r]));

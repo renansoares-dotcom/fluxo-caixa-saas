@@ -28,7 +28,7 @@ export function iniciarNotificacoes() {
     document.addEventListener('click', (e) => { const p = $('#notif-painel'); if (p && !p.hidden && !e.target.closest('.notif-wrap')) p.hidden = true; });
     document.addEventListener('visibilitychange', () => { if (!document.hidden && state.empresa) buscar(); });
   }
-  registrarSW();
+  registrarSW().then(renovarInscricao);
   buscar(true);
   timer = setInterval(buscar, 60000);
 }
@@ -50,7 +50,7 @@ function tocar() {
   try { const c = new AudioContext(), o = c.createOscillator(), g = c.createGain(); o.frequency.value = 880; g.gain.value = 0.06; o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime + 0.15); } catch {}
 }
 
-async function estadoPush() {
+export async function estadoPush() {
   if (!suportaPush()) return iOS() && !instalado() ? 'ios' : 'sem';
   if (Notification.permission === 'denied') return 'bloqueado';
   const reg = await navigator.serviceWorker.getRegistration();
@@ -67,12 +67,13 @@ async function pintar() {
     ios: 'No iPhone: toque em <strong>Compartilhar › Adicionar à Tela de Início</strong>, abra pelo ícone e ative aqui.',
     sem: 'Este navegador não recebe avisos.' }[est];
   p.innerHTML = `<div class="notif-topo"><strong>Notificações</strong>${lista.some(n => !n.lida_em) ? '<button class="btn ghost small" id="notif-todas">Marcar todas como lidas</button>' : ''}</div>
-    <div class="notif-push small">${avisoTxt}</div>
+    <div class="notif-push small">${avisoTxt} <a href="#/meus-avisos" id="notif-cfg">Meus avisos</a></div>
     <div class="notif-lista">${lista.length ? lista.map(n => `<div class="notif-item ${n.lida_em ? '' : 'nova'}" data-id="${n.id}">
       <div class="notif-tit">${esc(n.titulo)}</div>${n.corpo ? `<div class="small muted">${esc(n.corpo)}</div>` : ''}
       <div class="small muted">${quando(n.criado_em)}</div></div>`).join('') : '<div class="empty small">Nenhuma notificação.</div>'}</div>`;
-  $('#push-on', p) && ($('#push-on', p).onclick = ativarPush);
-  $('#push-off', p) && ($('#push-off', p).onclick = desativarPush);
+  $('#push-on', p) && ($('#push-on', p).onclick = () => ativarPush());
+  $('#push-off', p) && ($('#push-off', p).onclick = () => desativarPush());
+  $('#notif-cfg', p).onclick = () => { p.hidden = true; };
   $('#notif-todas', p) && ($('#notif-todas', p).onclick = async () => { await marcar(lista.filter(n => !n.lida_em).map(n => n.id)); buscar(); });
   p.querySelector('.notif-lista').onclick = async (e) => {
     const it = e.target.closest('.notif-item'); if (!it) return;
@@ -90,26 +91,45 @@ async function registrarSW() {
 }
 const b64 = (s) => { const p = '='.repeat((4 - s.length % 4) % 4); const r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); };
 
-async function ativarPush() {
+export async function ativarPush(depois = pintar) {
   try {
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { toast('Permissão de aviso não concedida', true); return pintar(); }
+    if (perm !== 'granted') { toast('Permissão de aviso não concedida', true); return depois(); }
     const reg = (await registrarSW()) || await navigator.serviceWorker.ready;
     await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
+    if (sub && !mesmaChave(sub)) { await sub.unsubscribe().catch(() => {}); sub = null; }
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(VAPID_PUBLIC_KEY) });
     const j = sub.toJSON();
     await q(sb.rpc('registrar_push', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_aparelho: navigator.userAgent }));
     toast('Avisos ativados neste aparelho');
     reg.showNotification('IPLAMM · Fluxo de Caixa', { body: 'Pronto! Os avisos vão aparecer assim.', icon: 'assets/icon-192.png', badge: 'assets/icon-192.png' });
   } catch (e) { fail(e); }
-  pintar();
+  depois();
 }
-async function desativarPush() {
+export async function desativarPush(depois = pintar) {
   try {
     const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription();
     if (sub) { await q(sb.rpc('remover_push', { p_endpoint: sub.endpoint })); await sub.unsubscribe(); }
     toast('Avisos desativados neste aparelho');
   } catch (e) { fail(e); }
-  pintar();
+  depois();
+}
+// a inscrição do aparelho foi feita com a chave atual? (a chave mudou em 07/11/2026: quem tinha ativado se inscreve de novo)
+function mesmaChave(sub) {
+  try { const k = new Uint8Array(sub.options?.applicationServerKey || []), a = b64(VAPID_PUBLIC_KEY); return !k.length || (k.length === a.length && k.every((v, i) => v === a[i])); } catch { return true; }
+}
+/** ao entrar: se o aparelho tinha avisos ativos com a chave antiga, inscreve de novo sem perguntar (a permissão já foi dada) */
+async function renovarInscricao() {
+  try {
+    if (!suportaPush() || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription();
+    if (!sub || mesmaChave(sub)) {
+      if (sub) { const j = sub.toJSON(); await sb.rpc('registrar_push', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_aparelho: navigator.userAgent }); }
+      return;
+    }
+    await sub.unsubscribe().catch(() => {});
+    const nova = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(VAPID_PUBLIC_KEY) }), j = nova.toJSON();
+    await sb.rpc('registrar_push', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_aparelho: navigator.userAgent });
+  } catch (e) { console.warn('renovar aviso', e); }
 }

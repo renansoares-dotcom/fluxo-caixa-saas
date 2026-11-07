@@ -15,7 +15,7 @@ self.addEventListener('push', (e) => {
     const tag = String(d.tag || '').startsWith('chat-') && d.link ? 'chat-' + d.link : d.tag;
     return self.registration.showNotification(d.titulo || 'IPLAMM · Fluxo de Caixa', {
       body: d.corpo || '', tag, renotify: !!tag && tag.startsWith('chat-'), icon: 'assets/icon-192.png', badge: 'assets/icon-192.png',
-      data: { link: d.link || '' }, requireInteraction: /URGENTE/.test(d.titulo || ''),
+      data: { link: d.link || '' }, requireInteraction: !!d.urgente || /URGENTE/.test(d.titulo || ''), vibrate: d.urgente ? [300, 120, 300, 120, 300] : undefined,
     });
   })());
 });

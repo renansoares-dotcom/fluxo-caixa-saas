@@ -92,6 +92,9 @@ export const FIGS = [
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Receitas com a versão em uso, o custo teórico e o que está em desenvolvimento', 're'],
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Versão em teste: composição, custo teórico e comparação com a aprovada', 're|click:#tr-corpo tr[data-r="tr-1"]'],
   ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
+  // Meus avisos (07/11/2026)
+  ['avisos', 'meus-avisos', '## 3.', 'Meus avisos: este aparelho, horário de silêncio e os tipos de aviso'],
+  ['avisos', 'meus-avisos', '### 3.3', 'Seus últimos avisos e o que aconteceu com cada um', 'scroll:#ma-corpo .card.flush:last-child'],
   // Pré-impressão (07/11/2026) — comparação, diferença, certificado e o Portal do Cliente (preimpressao-*.jpg com nome) tirados à parte
   ['preimpressao', 'preimpressao', '## 4.', 'Painel da Pré-impressão: alertas, indicadores e o quadro das artes por etapa'],
   ['preimpressao', 'preimpressao/artes', '## 5.', 'Artes e Aprovações', 'click:[data-f=todas]'],

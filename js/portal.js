@@ -9,6 +9,7 @@ import { viewer, prepararArquivo, subirArquivos, linksArte, conferirArquivo, ACE
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
+const avisar = () => sb.functions.invoke('notificar', { body: {} }).catch(() => {});   // manda já o aviso à equipe (o agendamento também manda)
 const main = $('#pt-main');
 const token = new URLSearchParams(location.search).get('convite');
 const S = { clientes: [], fav: null, aba: new URLSearchParams(location.search).get('arte') ? 'artes' : 'titulos', pend: 0, arte: new URLSearchParams(location.search).get('arte') };
@@ -110,7 +111,7 @@ function pedir(t) {
   $('#pr-ok', m.el).onclick = async (ev) => {
     ev.target.disabled = true;
     try { await q(sb.rpc('portal_solicitar_prorrogacao', { p_fav: S.fav.favorecido_id, p_lancamento: t.id, p_nova_data: $('#pr-d', m.el).value || null, p_motivo: $('#pr-m', m.el).value }));
-      m.close(); toast('Pedido enviado. Você vê a resposta em "Pedidos de prorrogação".'); titulos(); } catch (err) { fail(err); ev.target.disabled = false; }
+      avisar(); m.close(); toast('Pedido enviado. Você vê a resposta em "Pedidos de prorrogação".'); titulos(); } catch (err) { fail(err); ev.target.disabled = false; }
   };
 }
 
@@ -218,7 +219,7 @@ async function arte(id, versaoSel = null) {
   $('#pa-cs') && ($('#pa-cs').onclick = async (ev) => {
     const t = $('#pa-ct').value.trim(); if (!t) return toast('Escreva o comentário', true);
     ev.target.disabled = true;
-    try { await q(sb.rpc('portal_arte_comentar', { p_fav: S.fav.favorecido_id, p_versao: v.id, p_x: marca?.x ?? null, p_y: marca?.y ?? null, p_texto: t })); toast('Comentário enviado à equipe'); arte(id, v.id); }
+    try { await q(sb.rpc('portal_arte_comentar', { p_fav: S.fav.favorecido_id, p_versao: v.id, p_x: marca?.x ?? null, p_y: marca?.y ?? null, p_texto: t })); toast('Comentário enviado à equipe'); avisar(); arte(id, v.id); }
     catch (err) { fail(err); ev.target.disabled = false; }
   });
   $('#pa-cl').onclick = (e) => { const c = e.target.closest('[data-c]'); if (c && VW) VW.centrar(c.dataset.c); };
@@ -256,7 +257,7 @@ function decidir(p, v, dec, termo, pinos, depois) {
     if (!ap && !com && !pinos) return toast('Diga o que precisa mudar', true);
     ev.target.disabled = true;
     try { await q(sb.rpc('portal_arte_decidir', { p_fav: S.fav.favorecido_id, p_versao: v.id, p_decisao: dec, p_comentario: com, p_nome: nome, p_aceite: ap ? true : false }));
-      m.close(); toast(ap ? 'Arte aprovada. Obrigado! A produção dos clichês vai começar.' : 'Pedido enviado à equipe de pré-impressão.'); depois(); }
+      avisar(); m.close(); toast(ap ? 'Arte aprovada. Obrigado! A produção dos clichês vai começar.' : 'Pedido enviado à equipe de pré-impressão.'); depois(); }
     catch (err) { fail(err); ev.target.disabled = false; }
   };
 }
@@ -275,7 +276,7 @@ function enviarArquivo(p, depois) {
       await q(sb.rpc('portal_arte_enviar', { p_fav: S.fav.favorecido_id, p_projeto: p.id, p_caminho: c.caminho, p_previa: c.previa, p_nome: f.name, p_tipo: f.type || null, p_tamanho: f.size, p_hash: prep.hash,
         p_obs: $('#ea-o', m.el).value.trim() || null, p_largura: prep.previa?.largura || null, p_altura: prep.previa?.altura || null,
         p_mm_largura: prep.previa?.mmLargura ? Math.round(prep.previa.mmLargura * 10) / 10 : null, p_mm_altura: prep.previa?.mmAltura ? Math.round(prep.previa.mmAltura * 10) / 10 : null, p_paginas: prep.previa?.paginas || null }));
-      m.close(); toast('Arquivo enviado. A equipe vai revisar e mandar a versão para a sua aprovação.'); depois(); }
+      avisar(); m.close(); toast('Arquivo enviado. A equipe vai revisar e mandar a versão para a sua aprovação.'); depois(); }
     catch (err) { fail(err); ev.target.disabled = false; ev.target.textContent = 'Enviar'; }
   };
 }
