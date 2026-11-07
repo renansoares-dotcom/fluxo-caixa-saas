@@ -54,4 +54,6 @@ export const FIGS = [
   ['imobilizado', 'contab/imobilizado', '## 7.', 'Inventário aberto: faltam conferir e conferidos', 'inv|click:[data-iv]'],
   ['imobilizado', 'contab/imobilizado', '## 8.', 'Créditos fiscais do mês: CIAP e PIS/COFINS', 'cred'],
   ['imobilizado', 'contab/imobilizado-parametros', '## 10.', 'Parâmetros do Imobilizado: regras gerais e classes'],
+  // Cadastro pelas notas de entrada (07/11/2026)
+  ['estoque', 'estoque/cadastro-notas', '### 5.1', 'Cadastro pelas Notas de Entrada: prontidão das notas, famílias e produtos propostos com o código do Iniflex', 'click:[data-x="1"]|scroll:#cn-corpo'],
 ];

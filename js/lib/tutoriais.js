@@ -34,7 +34,7 @@ export const MANUAIS = [
     resumo: 'Faturado × meta, situação dos clientes, contatos, oportunidades, propostas com calculadora e metas.' },
   { id: 'compras', titulo: 'Compras — requisições, pedidos e recebimentos', area: 'Compras', rotas: ['compras', 'compras/requisicoes', 'compras/pedidos', 'compras/recebimentos'],
     resumo: 'Da requisição à cotação, do pedido à aprovação e do recebimento conferido com a nota.' },
-  { id: 'estoque', titulo: 'Estoque e produtos', area: 'Compras', rotas: ['estoque', 'estoque/produtos', 'estoque/depara'],
+  { id: 'estoque', titulo: 'Estoque e produtos', area: 'Compras', rotas: ['estoque', 'estoque/produtos', 'estoque/depara', 'estoque/cadastro-notas'],
     resumo: 'Espelho do Iniflex, ponto de pedido e requisição automática, cadastro de produtos e de-para de fornecedores.' },
   { id: 'estoque-kardex', titulo: 'Kardex e parâmetros do estoque', area: 'Compras', rotas: ['estoque/kardex', 'estoque/parametros'],
     resumo: 'Estoque oficial por local e lote, custo médio ponderado móvel, movimentos e estorno, locais, famílias, tipos de movimento, regras por CFOP e fechamento do mês.' },

@@ -70,6 +70,7 @@ const routes = {
   'contab/balanco': () => import(`./pages/contab-balanco.js?v=${V}`),
   'contab/dre': () => import(`./pages/contab-dre.js?v=${V}`),
   'contab/dfc': () => import(`./pages/contab-dfc.js?v=${V}`),
+  'estoque/cadastro-notas': () => import(`./pages/cadastro-notas.js?v=${V}`),
   'contab/imobilizado': () => import(`./pages/imobilizado.js?v=${V}`),
   'contab/imobilizado-parametros': () => import(`./pages/imobilizado-parametros.js?v=${V}`),
   'contab/inventario': () => import(`./pages/inventario-patrimonial.js?v=${V}`),

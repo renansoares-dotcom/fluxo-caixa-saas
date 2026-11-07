@@ -497,3 +497,29 @@ window.FN = {
     contab_balancete_gerencial: () => [],
   });
 }
+
+// Cadastro pelas notas de entrada (SQL 085) — itens de compra, regras e prontidão FICTÍCIOS
+{
+  const fam = (c) => DB.est_familias.find(f => f.codigo === c);
+  if (!fam('FERRAM')) DB.est_familias.push({ id: 'ef-ferram', empresa_id: E, codigo: 'FERRAM', nome: 'Ferramental (clichês, anilox, lâminas, facas)', tipo_sped: '10', ativo: true },
+    { id: 'ef-naoest', empresa_id: E, codigo: 'NAOEST', nome: 'Não é estoque (energia, serviços, obras)', tipo_sped: '99', ativo: true });
+  const R = [[10, 'NAOEST', ['2716'], [], 'Energia elétrica'], [12, 'NAOEST', [], ['SERVICO', 'MAO DE OBRA'], 'Serviços'], [20, 'FERRAM', ['8442'], ['CLICHE', 'ANILOX'], 'Ferramental'],
+    [30, 'EPI', ['6403'], [' CA ', 'LUVA'], 'EPI'], [60, 'TINTA', ['3215', '3814'], ['TINTA', 'THINNER'], 'Tintas e solventes'], [70, 'MASTER', ['3206', '3812'], ['MASTER', 'MB '], 'Master e aditivos'],
+    [75, 'EMBAL', ['4822', '3923'], ['TUBETE', 'STRETCH'], 'Embalagens'], [80, 'RESINA', ['3901', '3902'], [], 'Resinas (só pelo NCM)'], [110, 'PECA', ['84', '85', '40'], [], 'Peças'], [200, 'CONSUMO', [], [], 'Tudo o que sobrar']];
+  DB.est_classif_regras = R.map(([ordem, f, ncm_prefixos, palavras, observacao], i) => ({ id: 'ecr-' + i, empresa_id: E, ordem, familia_id: fam(f).id, ncm_prefixos, palavras, valor_unit_min: null, observacao, ativo: true }));
+  const I = [['11222333000155', 'PETROQUÍMICA EXEMPLO', 'P2022', 'PEBD 2022N SC 25KG', 'SC', '39011010', 3200, 612000], ['44555666000177', 'DISTRIBUIDORA DE RESINAS ALFA', '000881', 'POLIETILENO BAIXA DENSIDADE 2022N', 'KG', '39011090', 41000, 389500],
+    ['11222333000155', 'PETROQUÍMICA EXEMPLO', 'P118', 'PELBD 118W BB 1.250 KG', 'BB', '39014000', 120, 1312000], ['44555666000177', 'DISTRIBUIDORA DE RESINAS ALFA', '000902', 'PEAD HF0144 SC 25KG', 'SC', '39012029', 2400, 514000],
+    ['77888999000100', 'MASTERBATCH BETA', 'MB-BR', 'MB BRANCO 70% TIO2 SC 25KG', 'SC', '32061119', 300, 118000], ['77888999000100', 'MASTERBATCH BETA', 'AD-SL', 'MB DESLIZANTE BAIXA MIGRACAO', 'KG', '38123900', 1800, 46800],
+    ['22333444000111', 'TINTAS GAMA', 'T-AZ', 'TINTA FLEXO AZUL REFLEX', 'KG', '32151100', 900, 61200], ['22333444000111', 'TINTAS GAMA', 'TH-1', 'THINNER FLEXO', 'L', '38140090', 2600, 33800],
+    ['55666777000188', 'TUBETES DELTA', 'TB76', 'TUBETE PAPELAO 76MM X 1,5M', 'UN', '48221000', 4000, 22000], ['33444555000122', 'CLICHERIA EPSILON', 'CL-901', '(006970) CLICHE 1.14 DIGITAL SACO CAFE', 'UN', '84425000', 6, 9600],
+    ['66777888000133', 'ROLAMENTOS ZETA', '6205ZZ', 'ROLAMENTO 6205 ZZ', 'PC', '84821010', 40, 1480], ['88999000000144', 'EPI ETA', 'LV-12', 'LUVA NITRILICA CA 12254', 'PAR', '40151900', 200, 1900],
+    ['99000111000155', 'DISTRIBUIDORA DE ENERGIA', 'ENE', 'ENERGIA ELETRICA', 'KWH', '27160000', 98000, 81500], ['10203040000199', 'MANUTENÇÃO TETA', 'MO-1', 'MAO DE OBRA', 'UN', '00000000', 1, 2400]];
+  window.RPC.produto_depara_pendente = () => I.map(([emit_doc, emit_nome, codigo_fornecedor, descricao, unidade, ncm, quantidade, valor]) => ({ emit_doc, emit_nome, codigo_fornecedor, descricao, unidade, ncm, quantidade, valor, notas: 3, ultima: '2026-10-20' }));
+  window.RPC.est_prontidao = () => ({ resumo: [{ sentido: 'entrada', resultado: 'sem_produto', itens: 1180, valor: 3204000 }, { sentido: 'entrada', resultado: 'nao_movimenta', itens: 42, valor: 84000 }, { sentido: 'entrada', resultado: 'sem_regra', itens: 26, valor: 91000 },
+      { sentido: 'saida', resultado: 'ok', itens: 2480, valor: 7860000 }, { sentido: 'saida', resultado: 'sem_produto', itens: 12, valor: 18000 }],
+    cfops_sem_regra: [{ sentido: 'entrada', cfop: '1252', itens: 18, valor: 81500, exemplo: 'ENERGIA ELETRICA' }, { sentido: 'entrada', cfop: '1910', itens: 8, valor: 9500, exemplo: 'BONIFICAÇÃO MB BRANCO' }], sem_local: [] });
+  // espelho do Iniflex com linhas ainda sem produto (para a sugestão do código)
+  const esp = [...(DB.estoque_espelhos || [])].sort((x, y) => y.data_ref.localeCompare(x.data_ref))[0];   // linhas novas no espelho mais recente
+  if (esp) DB.estoque_espelho_itens = (DB.estoque_espelho_itens || []).concat([['MP0457', 'PEBD 2022N', 'KG', 18400], ['MP0460', 'PELBD 118W', 'KG', 32500], ['MP0471', 'PEAD HF0144', 'KG', 9100], ['AD0102', 'MB BRANCO 70% TIO2', 'KG', 1200]]
+    .map(([codigo, descricao, unidade, quantidade]) => ({ id: id('ei'), empresa_id: E, espelho_id: esp.id, produto_id: null, codigo, descricao, deposito: 'ALMOX', unidade, quantidade })));
+}

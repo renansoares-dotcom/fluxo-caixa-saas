@@ -1,8 +1,8 @@
 ---
 titulo: Estoque e produtos
-tela: Estoque › Posição de Estoque (EST001), Produtos (EST003) e De-para de Fornecedores (EST004)
-versao: 1.4
-atualizado: 2026-11-05
+tela: Estoque › Posição de Estoque (EST001), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
+versao: 1.5
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -96,11 +96,35 @@ Clique no produto para ver:
 
 > Se o item já tem código no Iniflex, use o código do Iniflex: é ele que liga o produto ao espelho do estoque.
 
+### 5.1 Cadastro pelas Notas de Entrada (em massa)
+
+![Figura 4 — Cadastro pelas Notas de Entrada: prontidão das notas, famílias e produtos propostos com o código do Iniflex (dados fictícios)](img/estoque-4.jpg)
+
+Use esta tela para cadastrar de uma vez os produtos e os de-paras de todos os itens de compra. É o caminho para a implantação do estoque, porque sem de-para as notas de entrada não movimentam nada.
+
+1. **Antes, importe o relatório de saldo do Iniflex** em Posição de Estoque. Assim cada produto novo nasce com o **código do Iniflex**, sugerido pelo espelho, e o saldo inicial se liga sozinho na implantação.
+2. Abra **Estoque › Cadastro pelas Notas de Entrada** e escolha **Notas desde**.
+3. No topo, a **prontidão das notas** mostra, sem gravar nada, o que cada item das notas de entrada e de saída faria hoje no estoque: movimenta, não movimenta (já decidido), sem produto, CFOP sem regra ou produto sem local. Use **Criar regra** nos CFOPs que ainda não têm regra (por exemplo, 1252, energia elétrica: "não movimenta").
+4. A lista mostra os **produtos propostos**:
+   - o **mesmo material de fornecedores diferentes vira um produto só**, pelo grau (ex.: "PEBD 2022N SC 25KG" e "POLIETILENO BAIXA DENSIDADE 2022N");
+   - a **família** vem das regras de classificação: resinas, master, tintas, embalagens, ferramental, peças, EPI, limpeza, escritório, uso e consumo, imobilizado ou **não é estoque**;
+   - a **unidade** e o **fator** vêm da nota: saco de 25 kg → fator 25; big bag de 1.250 kg → 1.250; tonelada → 1.000;
+   - a **curva ABC** mostra onde está o valor: poucos produtos (curva A) somam 80% de tudo o que foi comprado.
+5. Confira cada linha: descrição, código, família e unidade. Em **Itens** você vê os itens de cada fornecedor e pode ajustar o fator ou desmarcar um item.
+6. Marque os produtos (**Marcar A e B** marca os de maior valor) e clique em **Gravar**. A plataforma cria os produtos e os de-paras de uma vez, com o último custo da nota.
+7. Os itens que **não são estoque** (energia, serviços, material de obra) ficam ligados a um produto genérico que não movimenta. Assim a nota não fica pendente.
+8. Em **Regras de classificação**, ajuste a ordem, os NCMs, as palavras e o valor mínimo de cada família. Ao salvar, a lista é reclassificada.
+
+> A família **Imobilizado** é uma sugestão para máquinas e móveis de valor unitário a partir de R$ 1.200. Confira se é bem do ativo (vai para Contabilidade › Ativo Imobilizado › A imobilizar) ou peça de reposição.
+
 ## 6. Regras e travas
 
 - O código e a descrição são obrigatórios no produto.
 - O custo de reposição só existe para itens com de-para.
 - A requisição automática só inclui itens com quantidade a comprar definida (lote econômico ou estoque máximo).
+- No cadastro em massa, um código já usado por outro produto é recusado, e o mesmo código não pode ir para dois produtos na mesma gravação. Um de-para que já existe não é duplicado.
+- Trocar o código de um produto para o do Iniflex liga na hora as linhas do espelho com esse código.
+- A prontidão das notas não grava nada: é uma simulação com as regras de hoje.
 
 ## 7. Perguntas frequentes e erros comuns
 
@@ -119,3 +143,4 @@ Clique no produto para ver:
 | 1.2 | 31/10/2026 | Nova figura: posição de estoque com o ponto de pedido. |
 | 1.3 | 31/10/2026 | Estoque oficial na plataforma (Kardex). Produto com família, tipo do item no SPED, local padrão e controle de lote; o cadastro pelas notas de saída já entra classificado. |
 | 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Novo produto em quatro seções; o rótulo "Fator (1 un. de compra = ? un.)" passou a **Fator de compra**. Figuras refeitas. |
+| 1.5 | 07/11/2026 | Nova tela Cadastro pelas Notas de Entrada: prontidão das notas para o estoque, produtos propostos por família com curva ABC, o mesmo material de fornecedores diferentes num produto só, fator pela embalagem, código do Iniflex pelo espelho, regras de classificação editáveis e criação de regra de CFOP. |
