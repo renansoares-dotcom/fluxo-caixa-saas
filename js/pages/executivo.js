@@ -1,7 +1,7 @@
 // Dashboard executivo: visão de um mês fechado para a direção — KPIs clicáveis (painel lateral com a composição),
 // saúde financeira (nota 0–100 com fatores e regras explícitas), leituras automáticas por regra, aging,
 // maiores clientes e pagamentos, evolução de 12 meses. Usa só lançamentos com conta bancária (mesma base dos saldos).
-import { sb, state, q, fetchAll, montarMatriz, montarDRE, temArea } from '../lib/data.js';
+import { sb, state, q, fetchAll, montarMatriz, comRecompras, montarDRE, temArea } from '../lib/data.js';
 import { $, esc, money0, pct, dateBR, today, fail, chart, COR, MESES, MESES_CURTO, moneyTick, exportXLSX } from '../lib/ui.js';
 import { kpiGrid, drawer, composicao, barList, score, faixa, insight, tabela, aging, trend, variacao } from '../lib/componentes.js';
 
@@ -17,7 +17,7 @@ const ui = { ref: null };
 
 async function resumo(ano) {
   const rows = await q(sb.rpc('resumo_mensal', { p_empresa: state.empresa.id, p_ano: ano, p_status: ['Pago'], p_conta: null, p_grupo: null, p_cc: null, p_favorecido: null, p_disp: null }));
-  return montarMatriz(rows.map(r => ({ plano_id: r.plano_id, mes: r.mes, total: +r.total })));
+  return comRecompras(montarMatriz(rows.map(r => ({ plano_id: r.plano_id, mes: r.mes, total: +r.total }))), ano, null, { p_status: ['Pago'], p_conta: null, p_grupo: null, p_cc: null, p_favorecido: null, p_disp: null });
 }
 
 async function carregar(ano, mes) {

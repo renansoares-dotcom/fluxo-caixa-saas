@@ -1,8 +1,8 @@
 ---
 titulo: Contabilidade — DRE, balancete, balanço e DFC
 tela: Contabilidade › DRE Gerencial (CTB001), Balancete (CTB002), Balanço Patrimonial (CTB003), DRE Contábil (CTB004), DFC (Método Direto) (CTB005) e De-para Contábil (CTB006)
-versao: 1.2
-atualizado: 2026-11-05
+versao: 1.3
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -29,6 +29,13 @@ O administrador e o financeiro importam balancetes, geram os lançamentos contá
 3. A tabela tem os meses, o **ANO** e a **AV%** (análise vertical sobre a receita).
 
 Os blocos da DRE são configurados em **Cadastros › Plano de Contas**. **Exportar Excel** baixa a tabela.
+
+**Recompras de títulos (FIDC).** No fluxo de caixa a recompra fica na 2.07.11. Na DRE, cada recompra registrada em **Financeiro › Crédito / FIDC › Recompras** vai para a linha do seu **motivo**:
+
+- inadimplência, devolução, substituição, abatimento e as demais vão para as **deduções da receita bruta**, cada uma numa linha própria, por exemplo "(−) Recompras por devolução de mercadoria";
+- erro do fundo fica **fora da DRE**, e o texto acima da tabela mostra quanto ficou de fora.
+
+A linha de cada motivo é configurada no botão **Motivos** da tela Recompras. A recompra ainda sem registro continua nas despesas financeiras. O mesmo vale para o Dashboard Executivo, o Dashboard e o Fechamento do Mês. O Orçado x Realizado continua pela 2.07.11, para comparar com o orçamento.
 
 ## 4. Balancete
 
@@ -94,3 +101,4 @@ Use o filtro **Sem conta contábil** para ver o que falta.
 | 1.0 | 28/10/2026 | Primeira versão do manual: DRE gerencial, balancete importado e da plataforma, balanço, DRE contábil, DFC e de-para contábil. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.3 | 07/11/2026 | DRE Gerencial: recompras de títulos FIDC na linha do motivo (deduções da receita ou fora da DRE). |

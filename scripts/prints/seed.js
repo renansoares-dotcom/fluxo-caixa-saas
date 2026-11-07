@@ -872,26 +872,58 @@ window.FN = {
   window.RPC.email_teste = () => 'ef-t';
 }
 
-// Recompras FIDC (SQL 093) — lista e pendências FICTÍCIAS
+// Recompras FIDC (SQL 093 e 094: motivos) — lista, pendências, motivos e painel FICTÍCIOS
 {
   const D0 = (d) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
-  const R = (numero, data, fundo, documento, cliente, valor_titulo, valor_recompra, conta, st, venc, rec, rconta, extra = {}) => ({ id: 'rc' + numero, numero, data: D0(data), fundo, documento, cliente, valor_titulo, valor_recompra,
-    encargos: Math.max(0, Math.round((valor_recompra - valor_titulo) * 100) / 100), conta, vinculada: false, cancelada: false, lancamento_id: 'l' + numero, lanc_reaberto_id: 'lr' + numero,
-    reaberto_status: st, reaberto_venc: venc == null ? null : D0(venc), recebido_em: rec == null ? null : D0(rec), recebido_conta: rconta, ...extra });
+  const MOT = [
+    ['inadimplencia', 'Inadimplência', 'O cliente não pagou ao fundo: o título volta para a carteira, em aberto, até o cliente pagar.', 'reabrir', false, false, false, false, 'receita_bruta', '(−) Títulos recomprados por inadimplência', 'plano'],
+    ['devolucao', 'Devolução de mercadoria', 'O cliente devolveu a mercadoria (total ou parcial): o título não volta, ou volta só o saldo não devolvido. A dedução da receita vem da nota de devolução.', 'baixar', true, true, false, false, 'receita_bruta', '(−) Recompras por devolução de mercadoria', 'conta'],
+    ['substituicao', 'Substituição de título', 'A nota teve erro ou foi trocada: outro título foi cedido no lugar e o primeiro entra como recompra.', 'substituir', false, false, true, false, 'receita_bruta', '(−) Títulos substituídos no fundo', 'cliente'],
+    ['abatimento', 'Abatimento ou desconto ao cliente', 'Foi concedido abatimento ou desconto: volta para a carteira só o valor que o cliente ainda vai pagar.', 'reabrir', true, false, false, true, 'receita_bruta', '(−) Abatimentos e descontos concedidos', 'plano'],
+    ['pago_empresa', 'Cliente pagou à empresa', 'O cliente pagou direto à empresa em vez de pagar ao fundo: a recompra é o repasse e o recebimento fica vinculado.', 'recebido', false, false, false, false, 'receita_bruta', '(−) Repasses ao fundo de títulos pagos à empresa', 'plano'],
+    ['prorrogacao', 'Prorrogação ou renegociação', 'O vencimento foi prorrogado ou o título renegociado com o cliente: volta em aberto com o vencimento novo.', 'reabrir', false, false, false, false, 'receita_bruta', '(−) Títulos recomprados para prorrogação', 'plano'],
+    ['erro_fundo', 'Erro do fundo ou duplicidade', 'Débito indevido do fundo (erro ou duplicidade), que será devolvido: o título não volta para a carteira.', 'nenhum', false, false, false, true, 'fora', null, 'plano'],
+    ['outros', 'Outros', 'Qualquer outro caso: descreva na observação.', 'reabrir', true, false, false, true, 'receita_bruta', '(−) Outras recompras de títulos', 'plano'],
+  ];
+  DB.fidc_recompra_motivos = MOT.map(([codigo, nome, descricao, titulo_acao, permite_parcial, exige_nota, exige_substituto, exige_obs, dre_secao, dre_rotulo, contab_modo], i) => ({
+    id: 'mo-' + codigo, empresa_id: E, codigo, nome, descricao, titulo_acao, permite_parcial, exige_nota, exige_substituto, exige_obs, dre_secao, dre_rotulo, contab_modo,
+    contab_conta_id: contab_modo === 'conta' ? 'ct-dev' : null, ativo: true, ordem: i + 1 }));
+  DB.contab_contas = (DB.contab_contas || []).concat([{ id: 'ct-dev', empresa_id: E, classificacao: '4.1.2.1.0001', descricao: 'DEVOLUÇÕES DE VENDAS', tipo: 'A', natureza: 'D', nivel: 5 }]);
+  const MO = (c) => DB.fidc_recompra_motivos.find(m => m.codigo === c);
+  const R = (numero, mot, data, fundo, documento, cliente, valor_titulo, valor_recompra, conta, st, venc, rec, rconta, extra = {}) => ({ id: 'rc' + numero, numero, data: D0(data), fundo, documento, cliente, valor_titulo, valor_recompra,
+    encargos: Math.max(0, Math.round((valor_recompra - valor_titulo) * 100) / 100), conta, vinculada: false, cancelada: false, lancamento_id: 'l' + numero, lanc_reaberto_id: st ? 'lr' + numero : null,
+    reaberto_status: st, reaberto_venc: venc == null ? null : D0(venc), recebido_em: rec == null ? null : D0(rec), recebido_conta: rconta,
+    motivo_id: MO(mot).id, motivo_nome: MO(mot).nome, motivo_codigo: mot, titulo_acao: MO(mot).titulo_acao, valor_reaberto: st ? valor_titulo : null, ...extra });
   window.RPC.fidc_recompras_lista = () => [
-    R(6, -2, 'Negocial', '1-38110/2', 'SUPERMERCADOS BOA COMPRA LTDA', 8420.5, 8611.3, 'NEGOCIAL', 'Em aberto', 12, null, null),
-    R(5, -18, 'FS', '1-37602/1', 'ATACADO SERTÃO LTDA', 5310, 5434.88, 'FS FIDC', 'Em aberto', -6, null, null),
-    R(4, -25, 'Negocial', '1-37040/3', 'DISTRIBUIDORA NORDESTE LTDA', 12750, 12988.4, 'NEGOCIAL', 'Pago', null, -9, 'UNICRED PRINCIPAL'),
-    R(3, -60, 'Contato', '1-36211/1', 'FARMÁCIAS SAÚDE MAIS LTDA', 2980, 3041.2, 'BRADESCO', 'Pago', null, -40, 'BRADESCO'),
-    R(1, -170, 'Negocial', '1-34724/1', 'MASTERCOLA (EXEMPLO)', 3186.08, 3256.17, 'NEGOCIAL', 'Pago', null, -117, 'VEXPENSES', { vinculada: true }),
+    R(8, 'devolucao', -1, 'FS', '1-38420/1', 'DISTRIBUIDORA NORDESTE LTDA', 6240, 6240, 'FS FIDC', 'Em aberto', 28, null, null, { valor_reaberto: 1560, nota_numero: 9187, rnc_numero: 42, observacao: 'Devolução de 3 de 4 bobinas: impressão fora do padrão' }),
+    R(7, 'substituicao', -4, 'Negocial', '1-38302/1', 'FARMÁCIAS SAÚDE MAIS LTDA', 3920, 3920, 'NEGOCIAL', null, null, null, null, { titulo_novo_doc: '1-38355/1' }),
+    R(6, 'inadimplencia', -2, 'Negocial', '1-38110/2', 'SUPERMERCADOS BOA COMPRA LTDA', 8420.5, 8611.3, 'NEGOCIAL', 'Em aberto', 12, null, null),
+    R(5, 'inadimplencia', -18, 'FS', '1-37602/1', 'ATACADO SERTÃO LTDA', 5310, 5434.88, 'FS FIDC', 'Em aberto', -6, null, null),
+    R(4, 'prorrogacao', -25, 'Negocial', '1-37040/3', 'DISTRIBUIDORA NORDESTE LTDA', 12750, 12988.4, 'NEGOCIAL', 'Pago', null, -9, 'UNICRED PRINCIPAL'),
+    R(3, 'abatimento', -60, 'Contato', '1-36211/1', 'FARMÁCIAS SAÚDE MAIS LTDA', 2980, 3041.2, 'BRADESCO', 'Pago', null, -40, 'BRADESCO', { valor_reaberto: 2680, observacao: 'Abatimento de 300,00 acordado pelo comercial' }),
+    R(1, 'pago_empresa', -170, 'Negocial', '1-34724/1', 'MASTERCOLA (EXEMPLO)', 3186.08, 3256.17, 'NEGOCIAL', 'Pago', null, -117, 'VEXPENSES', { vinculada: true }),
   ];
   window.RPC.fidc_recompras_pendentes = () => [
     { origem: 'fundo', id: 'q1', data: D0(-3), fundo: 'FS', documento: '38544-001', valor: 4185.9, cliente: 'ATACADO SERTÃO LTDA', sugestao_id: 'c1', sugestao_doc: '1-38544/1', sugestao_valor: 4102 },
     { origem: 'manual', id: 'm1', data: D0(-12), fundo: 'Negocial', documento: 'DOCTO REC 37811/1 NEGOCIAL FIDC', valor: 6640.12, cliente: null, sugestao_id: 'c2', sugestao_doc: '1-37811/1', sugestao_valor: 6512 },
   ];
   window.RPC.fidc_cedidos_busca = () => [
-    { id: 'c1', data: D0(-40), documento: '1-38544/1', cliente: 'ATACADO SERTÃO LTDA', valor: 4102, fundo: 'FS', conta: 'FS FIDC', vencimento: D0(-4) },
-    { id: 'c3', data: D0(-40), documento: '1-38544/2', cliente: 'ATACADO SERTÃO LTDA', valor: 4102, fundo: 'FS', conta: 'FS FIDC', vencimento: D0(26) },
+    { id: 'c1', data: D0(-40), documento: '1-38544/1', cliente: 'ATACADO SERTÃO LTDA', valor: 4102, fundo: 'FS', conta: 'FS FIDC', vencimento: D0(-4), favorecido_id: 'fv-x' },
+    { id: 'c3', data: D0(-40), documento: '1-38544/2', cliente: 'ATACADO SERTÃO LTDA', valor: 4102, fundo: 'FS', conta: 'FS FIDC', vencimento: D0(26), favorecido_id: 'fv-x' },
   ];
-  DB.fidc_recompra_config = [];
+  window.RPC.fidc_recompra_notas = () => [
+    { id: 'nd1', numero: 9214, emissao: D0(-2), parte: 'ATACADO SERTÃO LTDA', valor: 3076.5, finalidade: '4', do_cliente: true },
+    { id: 'nd2', numero: 9187, emissao: D0(-6), parte: 'DISTRIBUIDORA NORDESTE LTDA', valor: 4680, finalidade: '4', do_cliente: false },
+  ];
+  window.RPC.fidc_recompras_resumo = () => ({ cedido: 486300, recomprado: 42806.58, encargos: 873.4,
+    motivos: [['inadimplencia', 13730.5, 2], ['prorrogacao', 12750, 1], ['devolucao', 6240, 1], ['substituicao', 3920, 1], ['pago_empresa', 3186.08, 1], ['abatimento', 2980, 1]]
+      .map(([c, valor, qtd]) => ({ id: MO(c).id, nome: MO(c).nome, codigo: c, valor, qtd, encargos: 0 })),
+    fundos: [{ fundo: 'Negocial', cedido: 251400, recomprado: 28276.58, qtd: 4 }, { fundo: 'FS', cedido: 168900, recomprado: 11550, qtd: 2 }, { fundo: 'Contato', cedido: 66000, recomprado: 2980, qtd: 1 }],
+    clientes: [['DISTRIBUIDORA NORDESTE LTDA', 118400, 18990, 'Devolução de mercadoria, Prorrogação ou renegociação'], ['SUPERMERCADOS BOA COMPRA LTDA', 142300, 8420.5, 'Inadimplência'],
+      ['FARMÁCIAS SAÚDE MAIS LTDA', 52800, 6900, 'Abatimento ou desconto ao cliente, Substituição de título'], ['ATACADO SERTÃO LTDA', 96500, 5310, 'Inadimplência'], ['MASTERCOLA (EXEMPLO)', 40200, 3186.08, 'Cliente pagou à empresa']]
+      .map(([cliente, cedido, recomprado, motivos], i) => ({ favorecido_id: 'fx' + i, cliente, cedido, recomprado, qtd: 1, motivos })) });
+  DB.fidc_recompra_config = [{ empresa_id: E, prazo_dias: 0, limite_taxa_cliente: 10 }];
+  // DRE Gerencial: recompras por motivo (só acrescenta as linhas; a classe das despesas financeiras não é mexida no exemplo)
+  window.RPC.fidc_recompras_dre = (a) => +a.p_ano !== 2026 ? [] : [[8, 'inadimplencia', -5310], [9, 'abatimento', -2980], [10, 'prorrogacao', -12750], [10, 'inadimplencia', -8420.5], [11, 'devolucao', -6240], [11, 'substituicao', -3920], [11, 'erro_fundo', -1180]]
+    .map(([mes, c, total]) => ({ motivo_id: MO(c).id, motivo: MO(c).nome, dre_secao: MO(c).dre_secao, dre_rotulo: MO(c).dre_rotulo, classe_id: null, mes, total, qtd: 1 }));
 }

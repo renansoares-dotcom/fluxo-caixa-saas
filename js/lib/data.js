@@ -117,6 +117,7 @@ export function descricaoFiltros() {
 // Matriz mensal: { [plano_id]: [12 valores] } + totais por classe e por tipo
 // ---------------------------------------------------------------------
 export async function matrizMensal(ano, statusOverride) {
+  // obs.: a DRE usa comRecompras(matriz, ano, …) para levar a recompra de títulos para a linha do motivo
   const rows = await q(sb.rpc('resumo_mensal', { p_empresa: state.empresa.id, p_ano: ano, ...rpcFiltros(statusOverride) }));
   return montarMatriz(rows.map(r => ({ plano_id: r.plano_id, mes: r.mes, total: +r.total })));
 }
@@ -133,6 +134,27 @@ export function montarMatriz(rows) {
   return { conta, classe, tipo };
 }
 export const z = () => Array(12).fill(0);
+
+// Recompras de títulos (FIN021): a saída fica na 2.07.11 no fluxo de caixa, mas na DRE vai para a linha do MOTIVO
+// (deduções da receita, despesas financeiras, não operacionais ou fora da DRE). Tira o valor da classe da 2.07.11 e
+// põe numa linha própria por motivo. Sem o SQL 094 (ou sem recompras) a matriz fica como está.
+export async function comRecompras(matriz, ano, statusOverride, filtros) {
+  matriz.extra = []; matriz.recFora = z(); matriz.recPorSecao = {};
+  try {
+    const rows = await q(sb.rpc('fidc_recompras_dre', { p_empresa: state.empresa.id, p_ano: ano, ...(filtros || rpcFiltros(statusOverride)) }));
+    const by = new Map();
+    for (const r of rows) {
+      const i = r.mes - 1, v = +r.total;
+      if (matriz.classe[r.classe_id]) matriz.classe[r.classe_id][i] -= v;
+      if (r.dre_secao === 'fora') { matriz.recFora[i] += v; continue; }
+      const k = r.dre_secao + '|' + r.dre_rotulo;
+      if (!by.has(k)) by.set(k, { dre_secao: r.dre_secao, classe: { id: 'rc:' + k, label: r.dre_rotulo, recompra: true }, v: z() });
+      by.get(k).v[i] += v;
+    }
+    matriz.extra = [...by.values()];
+  } catch { /* SQL 094 ainda não executado */ }
+  return matriz;
+}
 export const soma = (a) => a.reduce((s, v) => s + v, 0);
 
 // Estrutura da DRE gerencial (mesma lógica da aba "DRE Mensal")
@@ -160,6 +182,11 @@ export function montarDRE(matriz) {
     (linhas[cl.dre_secao] ||= []).push({ classe: cl, v });
     sec[cl.dre_secao] ||= z();
     v.forEach((x, i) => sec[cl.dre_secao][i] += x);
+  }
+  for (const x of matriz.extra || []) {   // recompras por motivo (comRecompras)
+    (linhas[x.dre_secao] ||= []).push({ classe: x.classe, v: x.v });
+    sec[x.dre_secao] ||= z();
+    x.v.forEach((y, i) => sec[x.dre_secao][i] += y);
   }
   const g = (k) => sec[k] || z();
   const abs = (arr) => arr.map(Math.abs);

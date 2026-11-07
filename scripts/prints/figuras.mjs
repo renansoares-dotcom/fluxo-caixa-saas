@@ -94,7 +94,10 @@ export const FIGS = [
   ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
   // Recompras FIDC (07/11/2026)
   ['fidc-recompras', 'fidc-recompras', '## 3.', 'Recompras: as pendências sem registro, os indicadores e os títulos recomprados'],
-  ['fidc-recompras', 'fidc-recompras', '### 3.1', 'Registrar a recompra: o título, o valor cobrado pelo fundo e o título de volta na carteira', 'click:[data-p="0"]'],
+  ['fidc-recompras', 'fidc-recompras', '### 3.1', 'Registrar a recompra: o título, o motivo (aqui, devolução de mercadoria), a nota de devolução e o que volta para a carteira', 'click:#rc-novo|click:.rc-res [data-i]|click:[data-mo="mo-devolucao"]'],
+  ['fidc-recompras', 'fidc-recompras', '### 3.3', 'Recompras por motivo e taxa de recompra por fundo e por cliente', 'scroll:#rc-kpis'],
+  ['fidc-recompras', 'fidc-recompras', '## 4.', 'Motivos da recompra: o que acontece com o título, a linha na DRE e a contrapartida contábil', 'click:#rc-mtv'],
+  ['fidc-recompras', 'dre', '### 4.1', 'DRE Gerencial com as recompras na linha do motivo, dentro das deduções da receita bruta', 'scroll:#tbl'],
   // E-mails da Plataforma (07/11/2026)
   ['email', 'config/email', '## 3.', 'E-mails da Plataforma: remetente, como ligar o envio e os modelos'],
   ['email', 'config/email', '### 3.3', 'Editar um modelo, com a prévia do e-mail', 'click:[data-m="arte_aprovacao"]'],

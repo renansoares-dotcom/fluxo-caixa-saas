@@ -1,4 +1,4 @@
-import { state, filtrosHTML, bindFiltros, matrizMensal, montarDRE, descricaoFiltros, soma, mesesHeader } from '../lib/data.js';
+import { state, filtrosHTML, bindFiltros, matrizMensal, comRecompras, montarDRE, descricaoFiltros, soma, mesesHeader } from '../lib/data.js';
 import { $, esc, money, pct, cls, exportXLSX, fail, loading, chart, CORES, COR, MESES_CURTO, moneyTick } from '../lib/ui.js';
 
 export const title = 'DRE Gerencial';
@@ -20,7 +20,7 @@ async function load(root) {
   const tbl = $('#tbl', root); loading(tbl);
   $('#desc', root).textContent = 'Regime de caixa. Filtros: ' + descricaoFiltros();
   try {
-    const m = await matrizMensal(state.ano);
+    const m = await comRecompras(await matrizMensal(state.ano), state.ano);
     const { linhas, val } = montarDRE(m);
     const acum = (v) => { let s = 0; return v.map(x => s += (x || 0)); };
     const rec = val.receita_bruta;
@@ -40,6 +40,9 @@ async function load(root) {
         ${v.map(x => `<td class="num ${l.tipo === 'sec' ? cls(x) : ''}">${money(x)}</td>`).join('')}
         <td class="num ${l.tipo === 'sec' ? cls(tot) : ''}"><strong>${money(tot)}</strong></td><td class="num muted">${pct(av)}</td></tr>`;
     }).join('');
+    const fora = soma(m.recFora || []);
+    $('#desc', root).innerHTML = esc('Regime de caixa. Filtros: ' + descricaoFiltros()) + ((m.extra || []).length || fora
+      ? `<br>Recompras de títulos FIDC classificadas pelo motivo (<a href="#/fidc-recompras">Financeiro › Recompras</a>)${fora ? `; ${money(Math.abs(fora))} fora da DRE (ajuste com o fundo)` : ''}.` : '');
     tbl.innerHTML = `<table><thead><tr><th class="sticky">${state.filtros.visao === 'Pago' ? 'Realizado' : 'Projetado'}</th>${mesesHeader('<th class="num">ANO</th><th class="num">AV%</th>')}</tr></thead><tbody>${body}</tbody></table>`;
     chart($('#ch', root), {
       type: 'bar',

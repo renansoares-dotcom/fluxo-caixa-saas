@@ -1,4 +1,4 @@
-import { sb, state, q, matrizMensal, montarDRE, soma, z } from '../lib/data.js';
+import { sb, state, q, matrizMensal, comRecompras, montarDRE, soma, z } from '../lib/data.js';
 import { $, esc, money, money0, pct, cls, dateBR, today, fail, chart, CORES, COR, MESES_CURTO, moneyTick } from '../lib/ui.js';
 
 export const title = 'Dashboard';
@@ -16,7 +16,7 @@ export async function render(root) {
   try {
     const e = state.empresa.id;
     const [m, saldoIni, saldos, abertos] = await Promise.all([
-      matrizMensal(state.ano, 'Pago'),
+      matrizMensal(state.ano, 'Pago').then(m => comRecompras(m, state.ano, 'Pago')),
       q(sb.rpc('saldo_em', { p_empresa: e, p_data: `${state.ano}-01-01` })),
       q(sb.rpc('saldos_contas', { p_empresa: e })),
       q(sb.from('v_lancamentos').select('id,data,descricao,favorecido_nome,plano_nome,valor_sinal,tipo,conta_nome')
