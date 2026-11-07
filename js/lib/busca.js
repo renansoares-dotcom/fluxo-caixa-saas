@@ -104,6 +104,15 @@ async function remotos(termo) {
       texto: `PC ${p.numero}${p.pedido_iniflex ? ' · Iniflex ' + p.pedido_iniflex : ''}`, sub: `${money(p.total)} · ${dateBR(p.data_pedido)} · ${p.status}`, go: () => ir('compras/pedidos', { tipo: 'pedido', id: p.id }),
     })) })).catch(() => {}));
   }
+  if (rotaLiberada('contab/imobilizado') && !ehValor && !data) {
+    // bens do imobilizado: plaqueta, descrição, série ou local (SQL 084)
+    const lk = like.replace(/[,()]/g, ' ');
+    tarefas.push(q(sb.from('af_bens').select('id,plaqueta,descricao,local,serie,situacao,valor_aquisicao').eq('empresa_id', e)
+      .or(`plaqueta.ilike.${lk},descricao.ilike.${lk},serie.ilike.${lk},local.ilike.${lk}`).order('numero').limit(MAX)).then(rows => rows.length && out.push({ grupo: 'Ativo imobilizado', ordem: 7, itens: rows.map(b => ({
+      texto: `${b.plaqueta} · ${b.descricao}`, sub: [b.local, b.serie && 'S/N ' + b.serie, money(b.valor_aquisicao), b.situacao === 'baixado' ? 'baixado' : ''].filter(Boolean).join(' · '),
+      go: () => ir('contab/imobilizado', { tipo: 'bem', id: b.id }),
+    })) })).catch(() => {}));
+  }
   await Promise.all(tarefas);
   return out.sort((a, b) => a.ordem - b.ordem);
 }

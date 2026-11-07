@@ -27,6 +27,7 @@ export const TELAS = {
   'notas': 'FIS001', 'fiscal/apuracao': 'FIS002', 'fiscal/notas-debito': 'FIS003',
   // Contabilidade
   'dre': 'CTB001', 'contab/balancete': 'CTB002', 'contab/balanco': 'CTB003', 'contab/dre': 'CTB004', 'contab/dfc': 'CTB005', 'contab/depara': 'CTB006',
+  'contab/imobilizado': 'CTB007', 'contab/inventario': 'CTB008', 'contab/imobilizado-parametros': 'CTB009',
   // Cadastros
   'cadastros/plano': 'CAD001', 'cadastros/contas': 'CAD002', 'cadastros/favorecidos': 'CAD003', 'cadastros/centros': 'CAD004', 'cadastros/empresa': 'CAD005',
   'contratos': 'CAD006', 'config': 'CAD007', 'auditoria': 'CAD008',

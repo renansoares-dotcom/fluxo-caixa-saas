@@ -45,4 +45,13 @@ export const FIGS = [
   ['comercial', 'comercial/funil', '### 5.1', 'Nova oportunidade: Cliente e Oportunidade', 'click:#fu-nova'],
   ['comercial', 'comercial/vendedores', '## 6.', 'Representantes e Metas, com o seletor de meses aberto', 'click:#rv-tb .col-sel button'],
   ['lancamentos', 'lancamentos', '### 3.1', 'Seletor Colunas da lista de lançamentos', 'click:#bulk .col-sel button'],
+  // Ativo Imobilizado (07/11/2026)
+  ['imobilizado', 'contab/imobilizado', '## 3.', 'Painel do imobilizado: valor líquido, depreciação prevista e grau de depreciação'],
+  ['imobilizado', 'contab/imobilizado', '### 4.1', 'Bens: lista com o valor líquido e o % depreciado', 'bens'],
+  ['imobilizado', 'contab/imobilizado', '### 4.2', 'Ficha do bem: dados, depreciação, histórico e anexos', 'bens|click:tr[data-id]'],
+  ['imobilizado', 'contab/imobilizado', '## 5.', 'A imobilizar: notas de entrada, máquinas e veículos sem bem', 'cand'],
+  ['imobilizado', 'contab/imobilizado', '## 6.', 'Depreciação do mês: meses fechados, prévia e resumo por classe', 'dep|click:[data-m="2026-09"]'],
+  ['imobilizado', 'contab/imobilizado', '## 7.', 'Inventário aberto: faltam conferir e conferidos', 'inv|click:[data-iv]'],
+  ['imobilizado', 'contab/imobilizado', '## 8.', 'Créditos fiscais do mês: CIAP e PIS/COFINS', 'cred'],
+  ['imobilizado', 'contab/imobilizado-parametros', '## 10.', 'Parâmetros do Imobilizado: regras gerais e classes'],
 ];

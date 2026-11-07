@@ -45,7 +45,8 @@ async function carregar() {
   const frota = await import(`./frota.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const cedida = await import(`./fidc-carteira.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const ndeb = await import(`./fiscal-notas-debito.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb };
+  const imob = temArea('cont') ? await import(`./imobilizado.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob };
 }
 
 // ---------------------------------------------------------------- regras
@@ -177,6 +178,13 @@ function regras(D) {
     desc: fr.slice(0, 5).map(a => `${a.origem}: ${a.txt}`).join(' · ') + (fr.length > 5 ? ` · e mais ${fr.length - 5}` : ''), impacto: 0, impactoTxt: `${fr.length} pendência(s)`,
     regra: 'Documentos vencendo em até 60 dias, preventivas no limite, CNH/toxicológico/MOPP vencendo, consumo fora da média e multas com prazo de indicação em até 7 dias.',
     acao: 'Abrir gestão da frota', rota: 'logistica/gestao-frota' });
+
+  // 17. ativo imobilizado: depreciação do mês, contas das classes, compras a imobilizar e inventário físico
+  const im = D.imob || [];
+  if (im.length) out.push({ k: 'imobilizado', origem: 'Contabilidade', urg: im.some(a => a.nivel === 'warn') ? 'media' : 'baixa', titulo: 'Manter o ativo imobilizado em dia',
+    desc: im.map(a => a.txt).join(' · '), impacto: 0, impactoTxt: `${im.length} ponto(s)`,
+    regra: 'Depreciação do mês anterior calculada, classes com bens ligadas às contas contábeis, compras do ano (NF-e, lançamentos, máquinas e veículos) imobilizadas e inventário físico concluído nos últimos 12 meses.',
+    acao: 'Abrir ativo imobilizado', rota: 'contab/imobilizado' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

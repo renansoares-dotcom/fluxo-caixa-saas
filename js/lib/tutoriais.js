@@ -56,6 +56,8 @@ export const MANUAIS = [
     resumo: 'Importar os XML, ligar parcelas a recebimentos e borderôs, impostos por CFOP, relatórios de faturamento e compras, apuração (prévia) e reforma tributária: conferência da CBS/IBS, simulador 2027 e alíquotas.' },
   { id: 'contabilidade', titulo: 'Contabilidade — DRE, balancete, balanço e DFC', area: 'Contabilidade', rotas: ['dre', 'contab/balancete', 'contab/balanco', 'contab/dre', 'contab/dfc', 'contab/depara'],
     resumo: 'DRE gerencial, balancete importado e da plataforma, balanço, DRE contábil, DFC e de-para contábil.' },
+  { id: 'imobilizado', titulo: 'Ativo Imobilizado — bens, depreciação, inventário e créditos', area: 'Contabilidade', rotas: ['contab/imobilizado', 'contab/inventario', 'contab/imobilizado-parametros'],
+    resumo: 'Cadastro e ficha dos bens, compras a imobilizar, depreciação mensal com lançamento contábil e fechamento, baixa, inventário pelo QR, CIAP, PIS/COFINS e relatórios.' },
   { id: 'cadastros', titulo: 'Cadastros — plano de contas, contas, beneficiários e centros de custo', area: 'Cadastros', rotas: ['cadastros/plano', 'cadastros/contas', 'cadastros/favorecidos', 'cadastros/centros'],
     resumo: 'Plano de contas com DRE e prioridade, contas bancárias, beneficiários por aba e centros de custo.' },
   { id: 'empresa-identidade', titulo: 'Empresa — identidade visual, regime tributário e crachás', area: 'Cadastros', rotas: ['cadastros/empresa'],

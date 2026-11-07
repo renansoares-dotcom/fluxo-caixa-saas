@@ -423,3 +423,77 @@ window.FN = {
     resumo: { contratado: 'JOSÉ CARLOS DA SILVA', motorista: null, placas: ['JKL2M34'], origem: 'Caruaru', destino: 'Salvador', valor: 6300, adiantamento: 2520, quitacao: 3780, pagamento: 'eFRETE',
       notas: [4521, 4522], peso: 12400, tipo_carga: 'geral', codigo_antt: 5 }, inicio: '2026-10-30T11:00:00.000Z', fim: '2026-11-01T11:00:00.000Z' }),
 };
+
+// Ativo Imobilizado (SQL 084) — bens, contas e depreciações FICTÍCIOS (depreciação calculada pela mesma regra da plataforma)
+{
+  const CT = [['1.2.30.100.0001', 'MÁQUINAS E EQUIPAMENTOS', 'D'], ['1.2.30.900.0001', '(-) DEPRECIAÇÃO ACUMULADA DE MÁQUINAS', 'C'], ['1.2.30.100.0002', 'VEÍCULOS', 'D'],
+    ['1.2.30.900.0002', '(-) DEPRECIAÇÃO ACUMULADA DE VEÍCULOS', 'C'], ['1.2.30.100.0003', 'MÓVEIS E UTENSÍLIOS', 'D'], ['1.2.30.900.0003', '(-) DEPRECIAÇÃO ACUMULADA DE MÓVEIS', 'C'],
+    ['1.2.30.100.0004', 'COMPUTADORES E PERIFÉRICOS', 'D'], ['1.2.30.900.0004', '(-) DEPRECIAÇÃO ACUMULADA DE COMPUTADORES', 'C'], ['3.1.20.300.0001', 'DEPRECIAÇÃO', 'D'], ['3.3.10.100.0001', 'CUSTO DO IMOBILIZADO BAIXADO', 'D']];
+  DB.contab_contas = (DB.contab_contas || []).concat(CT.map(([c, d, nat], i) => ({ id: `ct-af${i}`, empresa_id: E, classificacao: c, descricao: d, tipo: 'A', natureza: nat, nivel: 5 })));
+  const K = [['TER', 'Terrenos', false, 0, 1, 'nenhum', false], ['EDI', 'Edificações e construções', true, 4, 300, 'depreciacao', false], ['INS', 'Instalações', true, 10, 120, 'depreciacao', false],
+    ['MAQ', 'Máquinas e equipamentos industriais', true, 10, 120, 'imediato', true, 0, 1, 8], ['EMP', 'Empilhadeiras e movimentação', true, 10, 120, 'nenhum', false],
+    ['VCG', 'Caminhões e veículos de carga', true, 25, 48, 'nenhum', false, 2, 3, 8], ['VPS', 'Automóveis de passageiros', true, 20, 60, 'nenhum', false, 2, 3, 8],
+    ['INF', 'Computadores e periféricos', true, 20, 60, 'nenhum', false, 6, 7, 8], ['MOV', 'Móveis e utensílios', true, 10, 120, 'nenhum', false, 4, 5, 8],
+    ['FER', 'Ferramentas, clichês e cilindros', true, 20, 60, 'nenhum', false], ['SOF', 'Softwares e licenças (intangível)', true, 20, 60, 'nenhum', false]];
+  DB.af_classes = K.map(([codigo, nome, deprecia, taxa_fiscal, vida_util_meses, credito_pis_cofins, ciap, a, d, x]) => ({ id: `ak-${codigo}`, empresa_id: E, codigo, nome, deprecia, taxa_fiscal, vida_util_meses, residual_pct: 0,
+    conta_ativo_id: a != null ? `ct-af${a}` : null, conta_deprec_id: d != null ? `ct-af${d}` : null, conta_despesa_id: x != null ? `ct-af${x}` : null, credito_pis_cofins, ciap, ativo: true, observacao: null }));
+  DB.af_parametros = [{ empresa_id: E, prefixo: 'PAT', regra_inicio: 'mes_seguinte', gerar_contabil: true, conta_custo_baixa_id: 'ct-af9', valor_minimo: 1200, ncm_imobilizado: ['8477', '8471', '8704', '9403'], planos_imobilizado: [], pis_cofins_ate: '2026-12-31', ciap_fatores: { '2026-09': 0.9612 } }];
+  const cc = (n) => DB.centros_custo.find(c => c.nome === n)?.id;
+  const B = [['EXTRUSORA BALÃO 65 MM', 'MAQ', '2021-03-10', 385000, 'Extrusão', 'EXTRUSÃO', 'EXT-01', 'MAQPLAST', 'MX-65', 'A1123', 46200],
+    ['EXTRUSORA BALÃO 55 MM', 'MAQ', '2023-08-22', 298000, 'Extrusão', 'EXTRUSÃO', 'EXT-02', 'MAQPLAST', 'MX-55', 'B2210', 35760],
+    ['IMPRESSORA FLEXOGRÁFICA 6 CORES', 'MAQ', '2022-05-04', 640000, 'Impressão', 'EXTRUSÃO', 'IMP-01', 'FLEXOTEC', 'FX-6C', 'F6-0098', 76800],
+    ['MÁQUINA DE CORTE E SOLDA AUTOMÁTICA', 'MAQ', '2024-02-15', 182000, 'Corte e solda', 'CORTE E SOLDA', null, 'SOLDAMAX', 'CS-800', 'CS8-551', 21840],
+    ['AGLUTINADOR 300 KG/H', 'MAQ', '2019-11-28', 96000, 'Recuperação', 'EXTRUSÃO', null, 'RECICLA', 'AG-300', 'R300-12', 0],
+    ['REBOBINADEIRA 1.200 MM', 'MAQ', '2026-03-16', 74500, 'Impressão', 'EXTRUSÃO', null, 'BOBITEC', 'RB-1200', 'RB-7731', 8940],
+    ['EMPILHADEIRA A GÁS 2,5 T', 'EMP', '2020-07-01', 118000, 'Expedição', 'COMERCIAL', null, 'LIFTER', 'G25', 'LF-2501', 0],
+    ['CAMINHÃO TRUCK BAÚ', 'VCG', '2022-09-12', 412000, 'Pátio', 'COMERCIAL', null, 'RODOMAX', 'R-2428', '9BR-TRUCK01', 0],
+    ['CAMINHÃO VUC', 'VCG', '2024-06-03', 228000, 'Pátio', 'COMERCIAL', null, 'RODOMAX', 'V-1016', '9BR-VUC01', 0],
+    ['AUTOMÓVEL DA DIRETORIA', 'VPS', '2023-01-20', 168000, 'Administrativo', 'ADMINISTRATIVO', null, 'AUTOCAR', 'SEDAN', '9BR-CAR01', 0],
+    ['SERVIDOR DE DADOS', 'INF', '2025-02-10', 38500, 'CPD', 'ADMINISTRATIVO', null, 'DATASERV', 'DS-220', 'SRV-7781', 4620],
+    ['NOTEBOOKS DO ADMINISTRATIVO (6)', 'INF', '2025-08-05', 31200, 'Administrativo', 'ADMINISTRATIVO', null, 'NOTEX', 'NX14', 'LOTE-06', 3744],
+    ['MOBILIÁRIO DO ESCRITÓRIO', 'MOV', '2021-01-15', 42000, 'Administrativo', 'ADMINISTRATIVO', null, null, null, null, 0],
+    ['MESAS DE INSPEÇÃO DA PRODUÇÃO', 'MOV', '2023-04-11', 12800, 'Corte e solda', 'CORTE E SOLDA', null, null, null, null, 0]];
+  const cls = (c) => DB.af_classes.find(k => k.codigo === c);
+  DB.af_bens = B.map(([descricao, c, data_aquisicao, v, local, ccn, maq, marca, modelo, serie, icms], i) => ({ id: `ab-${i + 1}`, empresa_id: E, numero: i + 1, plaqueta: `PAT-${String(i + 1).padStart(6, '0')}`, descricao, classe_id: cls(c).id,
+    marca, modelo, serie, centro_custo_id: cc(ccn), local, responsavel: i < 6 ? 'Encarregado de produção' : null, data_aquisicao, valor_aquisicao: v, valor_residual: 0, vida_util_meses: cls(c).vida_util_meses, taxa_fiscal: cls(c).taxa_fiscal,
+    data_corte: data_aquisicao < '2025-12-01' ? '2025-12-31' : null, deprec_inicial: 0, meses_iniciais: 0, icms_credito: icms, situacao: i === 6 ? 'em_manutencao' : 'em_uso', maquina_id: maq ? (DB.prod_maquinas || []).find(m => m.codigo === maq)?.id || null : null,
+    nf_numero: String(30100 + i * 7), criado_em: data_aquisicao + 'T12:00:00Z' }));
+  // implantação: acumulada até 12/2025 pela vida útil, começando no mês seguinte ao da aquisição
+  const dif = (a, b) => { const [x, y] = a.split('-').map(Number), [z, w] = b.split('-').map(Number); return (z * 12 + w) - (x * 12 + y); };
+  for (const b of DB.af_bens.filter(b => b.data_corte)) { const m = Math.min(b.vida_util_meses, Math.max(0, dif(b.data_aquisicao.slice(0, 7), '2025-12'))); b.meses_iniciais = m; b.deprec_inicial = Math.round(b.valor_aquisicao / b.vida_util_meses * m * 100) / 100; }
+  // aglutinador baixado por venda em setembro
+  Object.assign(DB.af_bens[4], { situacao: 'baixado', baixa_data: '2026-09-18', baixa_tipo: 'venda', baixa_valor: 12000, baixa_motivo: 'Vendido para recicladora (NF 4870), substituído por modelo maior' });
+  DB.af_depreciacoes = []; DB.af_calculos = [];
+  for (let mes = 1; mes <= 9; mes++) {
+    const m = `2026-${String(mes).padStart(2, '0')}`, calc = { id: `ac-${mes}`, empresa_id: E, competencia: `${m}-01`, situacao: mes <= 8 ? 'fechado' : 'calculado', qtd: 0, total: 0, total_fiscal: 0, baixas: mes === 9 ? 1 : 0, pendencias: [],
+      calculado_por: 'ana.souza@exemplo.com.br', calculado_em: `2026-${String(mes + 1).padStart(2, '0')}-03T12:00:00Z`, fechado_por: mes <= 8 ? 'renata@exemplo.com.br' : null };
+    for (const b of DB.af_bens) {
+      const k = DB.af_classes.find(x => x.id === b.classe_id); if (!k.deprecia) continue;
+      const ini = b.data_aquisicao.slice(0, 7); if (m <= ini || (b.baixa_data && b.baixa_data.slice(0, 7) <= m)) continue;
+      const ds = DB.af_depreciacoes.filter(d => d.bem_id === b.id), acum = b.deprec_inicial + ds.reduce((s2, d) => s2 + d.valor, 0), usados = b.meses_iniciais + ds.length;
+      const rest = b.valor_aquisicao - acum, faltam = b.vida_util_meses - usados; if (rest <= 0) continue;
+      const v = faltam <= 1 ? Math.round(rest * 100) / 100 : Math.round(rest / faltam * 100) / 100, vf = Math.round(Math.min(b.valor_aquisicao - acum, b.valor_aquisicao * b.taxa_fiscal / 1200) * 100) / 100;
+      DB.af_depreciacoes.push({ id: DB.af_depreciacoes.length + 1, empresa_id: E, calculo_id: calc.id, bem_id: b.id, competencia: `${m}-01`, meses: 1, valor: v, acumulada: Math.round((acum + v) * 100) / 100, valor_fiscal: vf, centro_custo_id: b.centro_custo_id });
+      calc.qtd++; calc.total = Math.round((calc.total + v) * 100) / 100; calc.total_fiscal = Math.round((calc.total_fiscal + vf) * 100) / 100;
+    }
+    DB.af_calculos.push(calc);
+  }
+  DB.af_movimentos = [{ id: 1, empresa_id: E, bem_id: 'ab-2', tipo: 'aquisicao', data: '2023-08-22', para: { valor: 298000, local: 'Extrusão' }, usuario: 'renata@exemplo.com.br', criado_em: '2026-11-07T10:00:00Z' },
+    { id: 2, empresa_id: E, bem_id: 'ab-2', tipo: 'transferencia', data: '2026-06-10', de: { local: 'Extrusão', responsavel: null }, para: { local: 'Extrusão — linha 2', responsavel: 'Encarregado de produção' }, usuario: 'ana.souza@exemplo.com.br', criado_em: '2026-06-10T14:00:00Z' }];
+  DB.af_inventarios = [{ id: 'ai-1', empresa_id: E, numero: 1, descricao: 'Inventário da produção 2026', data_inicio: '2026-10-29', filtro: {}, situacao: 'aberto', criado_por: 'renata@exemplo.com.br', criado_em: '2026-10-29T08:00:00Z' }];
+  DB.af_inventario_itens = ['ab-1', 'ab-2', 'ab-3', 'ab-6', 'ab-8', 'ab-11'].map((b, i) => ({ id: `aii-${i}`, empresa_id: E, inventario_id: 'ai-1', bem_id: b, encontrado: true,
+    local_encontrado: i === 3 ? 'Corte e solda' : DB.af_bens.find(x => x.id === b).local, estado: i === 4 ? 'regular' : 'bom', conferido_por: 'ana.souza@exemplo.com.br', conferido_em: `2026-10-29T0${8 + i}:15:00Z` }));
+  DB.af_anexos = [{ id: 'aa-1', empresa_id: E, bem_id: 'ab-1', caminho: 'x/nf.pdf', nome: 'NF 30100 extrusora.pdf', tipo: 'nota', criado_por: 'renata@exemplo.com.br', criado_em: '2026-11-07T10:00:00Z' }];
+  DB.af_ignorados = [];
+  Object.assign(window.RPC, {
+    af_candidatos: () => [
+      { origem: 'nfe', ref_id: 'nfi-1', data: '2026-10-21', documento: 'NF 88214', fornecedor: 'SELADORAS DO NORDESTE LTDA', descricao: 'SELADORA PNEUMÁTICA DE FUNDO 800 MM', ncm: '84778010', quantidade: 1, valor: 46800, icms: 5616, ipi: 0, nota_id: 'nf-x', motivo: 'NCM de bem durável e valor unitário a partir do mínimo' },
+      { origem: 'nfe', ref_id: 'nfi-2', data: '2026-10-08', documento: 'NF 1182', fornecedor: 'INFORMÁTICA EXEMPLO', descricao: 'MONITOR 27 POL', ncm: '85285200', quantidade: 4, valor: 6400, icms: 768, ipi: 0, nota_id: 'nf-y', motivo: 'NCM de bem durável e valor unitário a partir do mínimo' },
+      { origem: 'maquina', ref_id: (DB.prod_maquinas || [])[3]?.id || 'pm-x', data: null, documento: (DB.prod_maquinas || [])[3]?.codigo || 'CS-01', descricao: (DB.prod_maquinas || [])[3]?.nome || 'CORTE E SOLDA 2', quantidade: 1, valor: null, motivo: 'Máquina da produção sem bem no imobilizado' },
+      { origem: 'veiculo', ref_id: (DB.log_veiculos || [])[2]?.id || 'lv-x', data: null, documento: (DB.log_veiculos || [])[2]?.placa || 'QWE4R56', descricao: 'VUC BAÚ', quantidade: 1, valor: null, motivo: 'Veículo próprio sem bem no imobilizado' }],
+    af_calcular: (a) => { const m = String(a.p_competencia).slice(0, 7), ds = DB.af_depreciacoes.filter(d => d.competencia.slice(0, 7) === m);
+      return { competencia: a.p_competencia, qtd: ds.length || 12, total: ds.reduce((s2, d) => s2 + d.valor, 0) || 31876.45, total_fiscal: ds.reduce((s2, d) => s2 + d.valor_fiscal, 0) || 33980.12, baixas: 0, pendencias: [],
+        classes: [{ classe: 'MAQ Máquinas e equipamentos industriais', qtd: 5, valor: 13621.31, fiscal: 13621.31 }, { classe: 'VCG Caminhões e veículos de carga', qtd: 2, valor: 13333.33, fiscal: 13333.33 }, { classe: 'INF Computadores e periféricos', qtd: 2, valor: 1161.67, fiscal: 1161.67 }] }; },
+    contab_balancete_gerencial: () => [],
+  });
+}

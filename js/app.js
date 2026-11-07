@@ -70,6 +70,9 @@ const routes = {
   'contab/balanco': () => import(`./pages/contab-balanco.js?v=${V}`),
   'contab/dre': () => import(`./pages/contab-dre.js?v=${V}`),
   'contab/dfc': () => import(`./pages/contab-dfc.js?v=${V}`),
+  'contab/imobilizado': () => import(`./pages/imobilizado.js?v=${V}`),
+  'contab/imobilizado-parametros': () => import(`./pages/imobilizado-parametros.js?v=${V}`),
+  'contab/inventario': () => import(`./pages/inventario-patrimonial.js?v=${V}`),
   'conferencia': () => import(`./pages/conferencia.js?v=${V}`),
   'fechamento': () => import(`./pages/fechamento.js?v=${V}`),
   'tutoriais': () => import(`./pages/tutoriais.js?v=${V}`),
@@ -301,7 +304,7 @@ async function render() {
   const route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
   // link direto para um registro (cartão das Conversas): #/<tela>?abrir=<id> abre o registro na tela
   { const ab = new URLSearchParams(location.hash.split('?')[1] || '').get('abrir');
-    const TIPO = { 'compras/pedidos': 'pedido', 'producao/ordens': 'op', 'fidc-propostas': 'proposta', 'paraquedas': 'pa', 'logistica/fretes': 'frete', 'lancamentos': 'lancamento' };
+    const TIPO = { 'compras/pedidos': 'pedido', 'producao/ordens': 'op', 'fidc-propostas': 'proposta', 'paraquedas': 'pa', 'logistica/fretes': 'frete', 'lancamentos': 'lancamento', 'contab/imobilizado': 'bem' };
     if (ab && TIPO[route]) { state.abrir = { tipo: TIPO[route], id: ab }; history.replaceState(null, '', '#/' + route); } }
   if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
   if (state.papel === 'vendas' && !rotaDeVendas(route)) { location.hash = '#/comercial'; return; }
