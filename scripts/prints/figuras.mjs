@@ -92,6 +92,10 @@ export const FIGS = [
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Receitas com a versão em uso, o custo teórico e o que está em desenvolvimento', 're'],
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Versão em teste: composição, custo teórico e comparação com a aprovada', 're|click:#tr-corpo tr[data-r="tr-1"]'],
   ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
+  // E-mails da Plataforma (07/11/2026)
+  ['email', 'config/email', '## 3.', 'E-mails da Plataforma: remetente, como ligar o envio e os modelos'],
+  ['email', 'config/email', '### 3.3', 'Editar um modelo, com a prévia do e-mail', 'click:[data-m="arte_aprovacao"]'],
+  ['email', 'config/email', '### 3.4', 'Últimos e-mails e a situação de cada um', 'scroll:#ce-corpo .card.flush:last-child'],
   // Minhas aprovações (07/11/2026)
   ['aprovacoes', 'aprovacoes', '## 3.', 'Minhas aprovações: tudo o que espera a sua decisão, com os marcados para decidir de uma vez', 'click:[data-s="paap1"]|click:[data-s="paap2"]|click:[data-s="pedidoap3"]'],
   // Meus avisos (07/11/2026)

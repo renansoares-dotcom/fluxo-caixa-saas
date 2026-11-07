@@ -850,3 +850,24 @@ window.FN = {
     ['inspecao', 'ap10', 127, 'Inspeção recebimento — RESINA PEBD LINEAR', 'lote RB-2611-07', null, 8, 0, false, '#/qualidade/inspecoes', false],
   ].map(([tipo, id, numero, titulo, detalhe, valor, h, pz, urgente, link, lote]) => ({ tipo, id, numero, titulo, detalhe, valor, desde: H(h), prazo: pz == null ? null : D0(pz), urgente, link, lote }));
 }
+
+// E-mail da plataforma (SQL 092) — configuração e fila FICTÍCIAS (envio ainda desligado, aguardando o domínio)
+{
+  const agora = Date.now(), H = (h) => new Date(agora - h * 3600000).toISOString();
+  DB.email_config = [{ empresa_id: E, ativo: false, remetente_nome: 'IPLAMM', remetente_email: 'avisos@iplamm.com.br', responder_para: 'financeiro@iplamm.com.br', url_base: 'https://exemplo.github.io/fluxo-caixa-saas/', rodape: 'Mensagem automática da plataforma IPLAMM. Dúvidas: responda a este e-mail.' }];
+  DB.email_modelos = [];
+  window.RPC.email_padrao = () => [
+    ['portal_convite', 'Convite para o Portal do Cliente', 'Convite para o Portal do Cliente — {{empresa}}', 'Olá,\n\n{{empresa}} liberou para {{cliente}} o acesso ao Portal do Cliente. Nele você vê os títulos e as notas fiscais, pede prorrogação de vencimento e aprova as artes das embalagens.\n\nClique no botão para criar a sua senha. O convite vale até {{validade}}.', 'Criar meu acesso', 'empresa, cliente, validade'],
+    ['arte_aprovacao', 'Arte aguardando a aprovação do cliente', 'Arte nº {{numero}} aguardando a sua aprovação — {{arte}}', 'Olá,\n\nA versão {{versao}} da arte {{arte}} está pronta para a sua conferência.\n\n{{observacao}}\n\nConfira textos, cores, medidas e o código de barras. No Portal você pode marcar pontos na arte, aprovar ou pedir alteração. Responda até {{prazo}}.', 'Conferir a arte', 'empresa, cliente, arte, numero, versao, observacao, prazo'],
+    ['prorrogacao_resposta', 'Resposta do pedido de prorrogação', 'Pedido de prorrogação {{decisao}} — {{documento}}', 'Olá,\n\nO seu pedido de prorrogação do título {{documento}} foi {{decisao}}. O vencimento é {{vencimento}}.\n\n{{resposta}}', 'Abrir o Portal', 'empresa, cliente, documento, decisao, vencimento, resposta'],
+    ['aviso', 'Avisos da plataforma (Meus avisos)', '{{titulo}}', '{{texto}}', 'Abrir na plataforma', 'empresa, titulo, texto'],
+    ['teste', 'E-mail de teste', 'E-mail de teste — {{empresa}}', 'Olá {{nome}},\n\nSe você recebeu esta mensagem, o e-mail da plataforma está funcionando.', null, 'empresa, nome'],
+  ].map(([codigo, nome, assunto, corpo, botao, campos]) => ({ codigo, nome, assunto, corpo, botao, campos }));
+  DB.email_fila = [
+    ['arte_aprovacao', 'marketing@viladoce.exemplo', { empresa: 'PLÁSTICOS EXEMPLO', arte: 'Biscoito Crocantíssimo Maria 200 g', numero: 41, versao: 2 }, 'pendente', null, 20],
+    ['portal_convite', 'compras@serraazul.exemplo', { empresa: 'PLÁSTICOS EXEMPLO', cliente: 'TORREFAÇÃO SERRA AZUL LTDA' }, 'pendente', null, 26],
+    ['prorrogacao_resposta', 'financeiro@boacompra.exemplo', { empresa: 'PLÁSTICOS EXEMPLO', documento: 'NF 18.211', decisao: 'APROVADA' }, 'pendente', null, 30],
+    ['aviso', 'renata@exemplo.com.br', { empresa: 'PLÁSTICOS EXEMPLO', titulo: 'MÁQUINA PARADA · OS 118 — EXT-02 Extrusora 2' }, 'pendente', null, 3],
+  ].map(([codigo, para, campos, situacao, erro, h], i) => ({ id: 'ef-' + i, empresa_id: E, codigo, para, campos, situacao, erro, criado_em: H(h) }));
+  window.RPC.email_teste = () => 'ef-t';
+}

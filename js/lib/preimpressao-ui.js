@@ -274,7 +274,7 @@ export async function fichaArte(D, p0, { onMudou, aba = 'arte', versao = null } 
       try { await q(sb.from('pre_versoes').update({ checklist: ck }).eq('id', v.id)); v.checklist = ck; const f = P.faltaChecklist(ck);
         $('#pi-env', el).disabled = !!(f && D.Pm.exigir_checklist); el.querySelector('.pi-bloco:nth-child(2) h3 .pi-sel').outerHTML = f ? selo(`faltam ${f}`, 'warn') : selo('completo', 'pos'); } catch (err) { fail(err); e.target.checked = !e.target.checked; }
     });
-    $('#pi-env', el) && ($('#pi-env', el).onclick = acao(() => q(sb.rpc('pre_enviar_cliente', { p_versao: v.id })), `Versão ${v.numero} enviada ao cliente`));
+    $('#pi-env', el) && ($('#pi-env', el).onclick = acao(async () => { await q(sb.rpc('pre_enviar_cliente', { p_versao: v.id })); sb.functions.invoke('email', { body: {} }).catch(() => {}); }, `Versão ${v.numero} enviada ao cliente`));
     $('#pi-cl', el).onclick = async (e) => {
       const r = e.target.closest('[data-res]');
       if (r) { const c = Co.find(x => x.id === r.dataset.res); try { await q(sb.from('pre_comentarios').update({ resolvido: !c.resolvido }).eq('id', c.id)); await recarregar(); } catch (err) { fail(err); } return; }

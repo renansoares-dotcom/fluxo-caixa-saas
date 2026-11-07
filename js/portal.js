@@ -9,7 +9,7 @@ import { viewer, prepararArquivo, subirArquivos, linksArte, conferirArquivo, ACE
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
-const avisar = () => sb.functions.invoke('notificar', { body: {} }).catch(() => {});   // manda já o aviso à equipe (o agendamento também manda)
+const avisar = () => { sb.functions.invoke('notificar', { body: {} }).catch(() => {}); sb.functions.invoke('email', { body: {} }).catch(() => {}); };   // manda já o aviso à equipe (o agendamento também manda)
 const main = $('#pt-main');
 const token = new URLSearchParams(location.search).get('convite');
 const S = { clientes: [], fav: null, aba: new URLSearchParams(location.search).get('arte') ? 'artes' : 'titulos', pend: 0, arte: new URLSearchParams(location.search).get('arte') };

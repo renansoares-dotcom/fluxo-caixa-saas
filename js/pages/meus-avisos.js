@@ -6,7 +6,6 @@ import * as A from '../lib/avisos.js';
 import { estadoPush, ativarPush, desativarPush, dispararAvisos } from '../lib/notif.js';
 
 export const title = 'Meus avisos';
-const EMAIL_LIGADO = false;   // muda com o item 1.1 (e-mail da plataforma)
 const CSS = `<style>
   .ma-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:stretch}
   .ma-est{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
@@ -23,7 +22,7 @@ export async function render(root) {
   const e = state.empresa.id;
   root.innerHTML = `${CSS}<div class="mm-topo"><div><h2 style="margin:0">Meus avisos</h2><div class="muted small">O que chega no seu celular ou computador, e quando. Só você vê e muda estas escolhas.</div></div></div>
     <div id="ma-corpo"><div class="loading">Carregando…</div></div>`;
-  let Ti, Pr, Ho, Ul;
+  let Ti, Pr, Ho, Ul, EMAIL_LIGADO = false;
   try {
     [Ti, Pr, Ho, Ul] = await Promise.all([
       q(sb.from('notif_tipos').select('*').order('ordem')),
@@ -32,6 +31,7 @@ export async function render(root) {
       q(sb.from('notificacoes').select('id,tipo,titulo,criado_em,enviado_em,push_situacao,urgente').eq('empresa_id', e).order('criado_em', { ascending: false }).limit(8)),
     ]);
   } catch (err) { fail(err); $('#ma-corpo', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Confira se o SQL 090 (avisos) já foi executado.</div></div>'; return; }
+  try { EMAIL_LIGADO = !!(await q(sb.from('email_config').select('ativo').eq('empresa_id', e)))[0]?.ativo; } catch { /* SQL 092 ainda não rodado */ }
   const hor = { ...A.PADRAO, ...(Ho[0] || {}) };
   hor.inicio = String(hor.inicio).slice(0, 5); hor.fim = String(hor.fim).slice(0, 5);
   const pref = Object.fromEntries(Pr.map(p => [p.tipo, p]));
@@ -50,11 +50,11 @@ export async function render(root) {
       <p class="small" id="ma-res" style="margin:10px 0 0"></p></div></div>
     <div class="card flush" style="margin-top:16px"><div style="padding:14px 16px 0;display:flex;justify-content:space-between;align-items:center"><h2>Por tipo de aviso</h2>
         <span class="small muted">O sino da plataforma recebe tudo, sempre.</span></div>
-      <div class="table-wrap"><table class="ma-tab"><thead><tr><th>Aviso</th><th style="width:110px;text-align:center">Celular</th><th style="width:110px;text-align:center">E-mail${EMAIL_LIGADO ? '' : '<div class="small muted" style="font-weight:400">em breve</div>'}</th></tr></thead><tbody>
+      <div class="table-wrap"><table class="ma-tab"><thead><tr><th>Aviso</th><th style="width:110px;text-align:center">Celular</th><th style="width:110px;text-align:center">E-mail${EMAIL_LIGADO ? `<div class="small muted" style="font-weight:400">${esc(state.user.email)}</div>` : '<div class="small muted" style="font-weight:400">quando o envio for ligado</div>'}</th></tr></thead><tbody>
       ${grupos.map(g => `<tr><td colspan="3" class="small" style="background:var(--surface-2);font-weight:600">${esc(g)}</td></tr>` + Ti.filter(t => t.grupo === g).map(t => `<tr>
         <td><b>${esc(t.nome)}</b>${t.urgente ? ' <span class="ma-sel neg">urgente: passa pelo silêncio</span>' : ''}<div class="small muted">${esc(t.descricao || '')}</div></td>
         <td style="text-align:center"><input type="checkbox" class="sw" data-t="${t.codigo}" data-c="push" ${pref[t.codigo]?.push === false ? '' : 'checked'}></td>
-        <td style="text-align:center"><input type="checkbox" class="sw" data-t="${t.codigo}" data-c="email" ${pref[t.codigo]?.email ? 'checked' : ''} ${EMAIL_LIGADO ? '' : 'disabled title="Chega com o envio de e-mail da plataforma"'}></td></tr>`).join('')).join('')}
+        <td style="text-align:center"><input type="checkbox" class="sw" data-t="${t.codigo}" data-c="email" ${pref[t.codigo]?.email ? 'checked' : ''} ${EMAIL_LIGADO || pref[t.codigo]?.email ? '' : 'disabled title="O administrador ainda não ligou o envio de e-mail (Cadastros › E-mails da Plataforma)"'} ${t.codigo === 'chat' || t.codigo === 'teste' ? 'disabled' : ''}></td></tr>`).join('')).join('')}
       </tbody></table></div></div>
     <div class="card flush" style="margin-top:16px"><div style="padding:14px 16px 0"><h2>Seus últimos avisos</h2></div><div class="table-wrap"><table><thead><tr><th>Quando</th><th>Aviso</th><th>No celular</th></tr></thead><tbody>
       ${Ul.map(n => `<tr><td class="small">${new Date(n.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td><td class="wrap">${n.urgente ? '🔴 ' : ''}${esc(n.titulo)}</td>
@@ -79,6 +79,6 @@ export async function render(root) {
   ['#ma-sil', '#ma-ini', '#ma-fim', '#ma-fds'].forEach(s => $(s, corpo).onchange = salvarHor);
   $$('.sw', corpo).forEach(c => c.onchange = async () => {
     const t = c.dataset.t, row = { user_id: state.user.id, empresa_id: e, tipo: t, push: $(`.sw[data-t="${t}"][data-c=push]`, corpo).checked, email: $(`.sw[data-t="${t}"][data-c=email]`, corpo).checked, atualizado_em: new Date().toISOString() };
-    try { await q(sb.from('notif_preferencias').upsert(row)); toast(row.push ? 'Esse aviso vai para o celular' : 'Esse aviso fica só no sino'); } catch (err) { fail(err); c.checked = !c.checked; }
+    try { await q(sb.from('notif_preferencias').upsert(row)); toast(c.dataset.c === 'email' ? (row.email ? 'Esse aviso também vai por e-mail' : 'Esse aviso não vai mais por e-mail') : row.push ? 'Esse aviso vai para o celular' : 'Esse aviso fica só no sino'); } catch (err) { fail(err); c.checked = !c.checked; }
   });
 }

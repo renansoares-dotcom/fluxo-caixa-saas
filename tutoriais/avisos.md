@@ -1,7 +1,7 @@
 ---
 titulo: Meus avisos — celular, horário de silêncio e tipos de aviso
 tela: Comunicação › Meus avisos (AJU003)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-07
 ---
 ## 1. Para que serve
@@ -60,7 +60,7 @@ Mude o horário, desligue o fim de semana ou desmarque o silêncio. Cada mudanç
 
 Para cada tipo, marque ou desmarque **Celular**. Desmarcado, o aviso fica só no sino.
 
-A coluna **E-mail** é ligada quando a plataforma começar a enviar e-mails.
+Marque **E-mail** para receber também por e-mail, no endereço do seu login. A coluna funciona depois que o administrador ligar o envio em Cadastros › E-mails da Plataforma. As Conversas não vão por e-mail.
 
 | Grupo | Aviso | Quem recebe |
 |---|---|---|
@@ -106,4 +106,5 @@ Quem faz a ação não recebe o aviso dela.
 
 | Versão | Data | O que mudou |
 |---|---|---|
+| 1.1 | 07/11/2026 | Coluna E-mail ligada ao envio de e-mail da plataforma. |
 | 1.0 | 07/11/2026 | Primeira versão: ativar e testar por aparelho, horário de silêncio, tipos de aviso com o celular ligado ou desligado, urgente passando pelo silêncio, avisos novos (prorrogação, arte, borderô, máquina parada), envio a cada minuto e histórico dos últimos avisos. |
