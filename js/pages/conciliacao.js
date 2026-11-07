@@ -11,6 +11,8 @@ import { normTxt } from '../lib/nf-titulos.js';
 import { PLANO_JUROS } from '../lib/notas-debito.js';
 import { confianca, configConc, ROT_FAIXA, PESOS_PADRAO, PESOS_ROTULOS } from '../lib/conc-confianca.js';
 import { ehCNAB240, lerCNAB240 } from '../lib/cnab-extrato.js';
+import { carregarRegras, registrarUso } from '../lib/regras-ui.js';
+import { aplicarRegras } from '../lib/regras.js';
 
 export const title = 'Conciliação Bancária';
 
@@ -598,11 +600,16 @@ async function criar(item, root) {
     const h = k && (hist || []).find(x => x.lancamentos && chaveDesc(x.extrato_itens?.descricao) === k);
     if (h) base = { plano_id: h.lancamentos.plano_id, favorecido_id: h.lancamentos.favorecido_id, centro_custo_id: h.lancamentos.centro_custo_id };
   } catch { /* sem histórico */ }
+  // regra de classificação (Financeiro › Regras de Classificação) vale mais que o histórico
+  let regra = null;
+  try { const { regras } = await carregarRegras(); regra = aplicarRegras(regras, { descricao: item.descricao, documento: item.documento, valor: item.valor, natureza: +item.valor >= 0 ? 'E' : 'S', conta_id: ui.conta });
+    if (regra) base = { plano_id: regra.plano_id, favorecido_id: regra.favorecido_id || base.favorecido_id, centro_custo_id: regra.centro_custo_id || base.centro_custo_id }; } catch { /* sem regras */ }
   abrirLancamento({ ...base, data: item.data, status: 'Pago', valor: Math.abs(item.valor), conta_id: ui.conta, descricao: item.descricao, documento: item.documento }, async (salvo) => {
     if (!salvo) return carregar(root);
     if (salvo.status !== 'Pago' || (salvo.conta_id !== ui.conta && salvo.conta_destino_id !== ui.conta) || cent(sinal(salvo)) !== cent(item.valor)) {
       toast('Lançamento criado, mas valor/natureza/conta não batem com o movimento: concilie manualmente.', true); return carregar(root);
     }
+    if (regra && salvo.plano_id === regra.plano_id) registrarUso(regra);
     D.lancById[salvo.id] = salvo; await conciliar([{ item, ids: [salvo.id] }], root);
   });
 }

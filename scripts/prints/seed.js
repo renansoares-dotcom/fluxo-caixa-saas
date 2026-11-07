@@ -936,3 +936,36 @@ window.FN = {
   window.RPC.fidc_recompras_dre = (a) => +a.p_ano !== 2026 ? [] : [[8, 'inadimplencia', -5310], [9, 'abatimento', -2980], [10, 'prorrogacao', -12750], [10, 'inadimplencia', -8420.5], [11, 'devolucao', -6240], [11, 'substituicao', -3920], [11, 'erro_fundo', -1180]]
     .map(([mes, c, total]) => ({ motivo_id: MO(c).id, motivo: MO(c).nome, dre_secao: MO(c).dre_secao, dre_rotulo: MO(c).dre_rotulo, classe_id: null, mes, total, qtd: 1 }));
 }
+
+// Regras de classificação, rateios e recorrentes (SQL 096) — FICTÍCIOS
+{
+  const CC = (n) => DB.centros_custo.find(c => c.nome.startsWith(n)).id;
+  DB.cc_rateios = [
+    { id: 'rt1', empresa_id: E, nome: 'Energia elétrica', partes: [{ centro_custo_id: CC('EXTRUSÃO'), pct: 60 }, { centro_custo_id: CC('CORTE'), pct: 30 }, { centro_custo_id: CC('ADMIN'), pct: 10 }], ativo: true },
+    { id: 'rt2', empresa_id: E, nome: 'Aluguel do galpão', partes: [{ centro_custo_id: CC('EXTRUSÃO'), pct: 50 }, { centro_custo_id: CC('CORTE'), pct: 35 }, { centro_custo_id: CC('ADMIN'), pct: 15 }], ativo: true },
+  ];
+  const RG = (o) => ({ id: 'rg' + Math.random().toString(36).slice(2, 7), empresa_id: E, campo: 'texto', operador: 'contem', natureza: 'S', prioridade: 100, ativo: true, origem: 'manual', criado_em: '2026-10-01T10:00:00Z', ...o });
+  DB.lanc_regras = [
+    RG({ nome: 'Combustível da frota', texto: 'POSTO', plano_id: P('2.06.02').id, centro_custo_id: CC('COMERCIAL'), usos: 48, prioridade: 20 }),
+    RG({ campo: 'favorecido', operador: 'igual', texto: 'ENERGIA REGIONAL S.A.', plano_id: P('2.01.03').id, rateio_id: 'rt1', usos: 10, prioridade: 50, origem: 'sugerida' }),
+    RG({ texto: 'TARIFA', plano_id: P('2.04.01').id, centro_custo_id: CC('ADMIN'), usos: 64, origem: 'sugerida' }),
+    RG({ texto: 'FRETE', plano_id: P('2.06.01').id, centro_custo_id: CC('COMERCIAL'), usos: 23, valor_max: 20000 }),
+    RG({ campo: 'favorecido', operador: 'igual', texto: 'SISTEMAS NUVEM LTDA', plano_id: P('2.03.02').id, centro_custo_id: CC('ADMIN'), usos: 10, prioridade: 50, origem: 'sugerida' }),
+    RG({ nome: 'IOF e juros do banco', operador: 'regex', texto: '^(IOF|JUROS)\\b', plano_id: P('2.04.02').id, usos: 7, prioridade: 30 }),
+  ];
+  const D0 = (d) => new Date(Date.now() + d * 864e5).toISOString().slice(0, 10);
+  const RC = (descricao, plano, fav, valor, dia, frequencia = 'mensal', extra = {}) => ({ id: 'rr' + Math.random().toString(36).slice(2, 7), empresa_id: E, descricao, plano_id: P(plano).id, favorecido_id: fav ? F(fav).id : null,
+    centro_custo_id: extra.cc ? CC(extra.cc) : null, conta_id: DB.contas[0].id, valor, frequencia, dia, inicio: '2026-01-01', fim: extra.fim || null, ajuste_fds: 'postergar', meses_a_frente: 3, ativo: extra.ativo !== false, prioridade: extra.prior || null });
+  DB.lanc_recorrentes = [
+    RC('Aluguel do galpão', '2.03.01', 'IMÓVEIS', 12000, 10, 'mensal', { cc: 'ADMIN', prior: 'Obrigatório' }),
+    RC('Sistemas e internet', '2.03.02', 'SISTEMAS', 1890, 15, 'mensal', { cc: 'ADMIN' }),
+    RC('Seguro patrimonial', '2.03.03', null, 7400, 20, 'anual', { cc: 'ADMIN' }),
+    RC('Honorários contábeis', '2.03.03', null, 4200, 5, 'mensal', { cc: 'ADMIN', prior: 'Obrigatório' }),
+    RC('Manutenção preventiva das extrusoras', '2.03.03', null, 6500, 25, 'trimestral', { cc: 'EXTRUSÃO' }),
+    RC('Locação de empilhadeira', '2.03.03', null, 2300, 31, 'mensal', { cc: 'EXTRUSÃO', fim: '2026-09-01', ativo: false }),
+  ];
+  const R = DB.lanc_recorrentes;
+  window.RPC.lanc_recorrentes_lista = () => R.map((r, i) => ({ id: r.id, abertos: r.ativo ? (r.frequencia === 'mensal' ? 3 : 1) : 0, abertos_valor: r.ativo ? r.valor * (r.frequencia === 'mensal' ? 3 : 1) : 0,
+    proximo: r.ativo ? D0([3, 8, 40, 28, 18][i] ?? 5) : null, ultimo_pago: D0(-([27, 22, 300, 2, 72, 70][i] ?? 30)), pagos_12m: r.valor * 10 }));
+  window.RPC.lanc_recorrentes_gerar = () => 0;
+}

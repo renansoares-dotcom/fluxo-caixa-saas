@@ -4,6 +4,7 @@ import { abrirLancamento } from '../lib/lanc-form.js';
 import { importarNFs, lancarNFs } from '../lib/nf-titulos.js';
 import { importarLancamentosERP } from '../lib/erp-lancamentos.js';
 import { seletorColunas } from '../lib/colunas.js';
+import { editarLote, aplicarRegrasLote } from '../lib/regras-ui.js';
 
 export const title = 'Lançamentos';
 const PAGE = 100;
@@ -21,7 +22,9 @@ export async function render(root) {
         <div class="chips" id="meses">${['Ano', ...MESES_CURTO].map((m, i) => `<span class="chip ${!periodo() && f.mes === i ? 'on' : ''}" data-m="${i}">${m}</span>`).join('')}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="exp">Exportar Excel</button>
-          <a class="btn" href="#/conciliacao" title="Importar o extrato OFX do banco e conciliar com os lançamentos">Conciliação bancária (OFX)</a>
+          <a class="btn" href="#/conciliacao" title="Importar o extrato do banco e conciliar com os lançamentos">Conciliação bancária</a>
+          <a class="btn" href="#/lanc-regras" title="Regras que classificam os lançamentos pelo histórico">Regras</a>
+          <a class="btn" href="#/lanc-recorrentes" title="Aluguel, assinaturas e outras contas fixas que viram títulos em aberto sozinhas">Recorrentes</a>
           ${podeEditar() ? '<button class="btn" id="lanc-nf" title="Títulos a receber por NF, com parcelas">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar XML das NFs</button><button class="btn" id="imp-erp" title="Relatório RFLX036 do ERP por Conta Pagamento: cada linha vira lançamento Pago na conta">Importar do ERP</button><button class="btn primary" id="novo">+ Novo lançamento</button>' : ''}
         </div>
       </div>
@@ -40,6 +43,8 @@ export async function render(root) {
     <div class="card flush">
       <div class="toolbar" style="padding:10px 12px" id="bulk">${podeEditar() ? `<span class="muted small" id="sel-info">Nenhum selecionado</span>
         <button class="btn small" id="baixar" disabled>Marcar como pago</button>
+        <button class="btn small" id="lote" disabled title="Mudar plano, centro de custo, favorecido ou conta dos selecionados">Editar selecionados</button>
+        <button class="btn small" id="regras" disabled title="Reclassificar os selecionados pelas regras de classificação">Aplicar regras</button>
         <button class="btn small danger" id="excluir" disabled>Excluir selecionados</button>` : ''}<span class="spacer"></span></div>
       <div class="table-wrap" id="tbl" data-colunas="lancamentos"></div>
       <div class="pager" id="pager"></div>
@@ -61,6 +66,8 @@ export async function render(root) {
       const ids = selecionados(root); if (!ids.length) return;
       try { const n = await q(sb.rpc('baixar_lancamentos', { p_ids: ids })); toast(`${n} lançamento(s) marcados como pago`); load(root); } catch (e) { fail(e); }
     };
+    $('#lote', root).onclick = () => { const ids = selecionados(root); if (ids.length) editarLote(ids, () => load(root)); };
+    $('#regras', root).onclick = () => { const ids = selecionados(root); if (ids.length) aplicarRegrasLote(ids, () => load(root)).catch(fail); };
     $('#excluir', root).onclick = async () => {
       const sel = selecionados(root); const ids = sel.filter(id => !conciliados.has(id)); const bloq = sel.length - ids.length;
       if (bloq) toast(`${bloq} lançamento(s) conciliado(s) não podem ser excluídos (desfaça a conciliação antes)`, !ids.length);
@@ -161,7 +168,7 @@ function updSel(root) {
   if (!podeEditar()) return;
   const n = selecionados(root).length;
   $('#sel-info', root).textContent = n ? `${n} selecionado(s)` : 'Nenhum selecionado';
-  $('#baixar', root).disabled = $('#excluir', root).disabled = !n;
+  $('#baixar', root).disabled = $('#excluir', root).disabled = $('#lote', root).disabled = $('#regras', root).disabled = !n;
 }
 
 async function exportar() {

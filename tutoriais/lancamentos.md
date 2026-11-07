@@ -1,8 +1,8 @@
 ---
 titulo: Lançamentos e contas a pagar / receber
 tela: Financeiro › Lançamentos (FIN001) e Contas a Pagar / Receber (FIN003)
-versao: 1.4
-atualizado: 2026-11-05
+versao: 1.5
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -63,7 +63,34 @@ Clique no lançamento para abrir. Os botões são **Salvar**, **Duplicar** (abre
 
 Para mudar vários de uma vez, marque as caixas na lista e use **Marcar como pago** ou **Excluir selecionados**.
 
-### 3.4 Importações
+### 3.5 Editar selecionados e aplicar regras
+
+![Figura 4 — Editar selecionados: plano, centro de custo, conta e favorecido de vários lançamentos (dados fictícios)](img/lancamentos-4.jpg)
+
+Marque os lançamentos na lista e use os botões da barra:
+
+- **Editar selecionados**: muda o **plano de contas**, o **centro de custo**, a **conta** e o **favorecido** de todos de uma vez. Preencha só o que vai mudar.
+- **Aplicar regras**: mostra o que cada **regra de classificação** muda nos selecionados (hoje e como fica) e aplica. Se a regra tiver rateio, o lançamento também é dividido. As regras ficam em **Financeiro › Regras de Classificação**.
+
+Nos dois, os **conciliados** e as **transferências** ficam como estão, e entrada continua entrada e saída continua saída.
+
+No **lançamento novo**, a regra age sozinha: ao digitar a descrição ou o favorecido, o plano, o centro de custo e o favorecido vêm preenchidos, com o aviso **regra**.
+
+### 3.6 Dividir por centro de custo
+
+![Figura 5 — Dividir o lançamento por centro de custo, com o modelo de rateio (dados fictícios)](img/lancamentos-5.jpg)
+
+Abra o lançamento e clique em **Dividir por C. Custo**. Informe as partes (centro de custo e valor) ou escolha um **modelo de rateio**. O lançamento vira um por centro de custo:
+
+- com a mesma data, conta, plano e favorecido;
+- com a descrição terminando em "(rateio 1/3)", "(rateio 2/3)"…;
+- e a soma continua a mesma.
+
+Lançamento conciliado não se divide: desfaça a conciliação, divida e concilie de novo, em grupo.
+
+Contas fixas que se repetem todo mês (aluguel, assinaturas) ficam em **Financeiro › Lançamentos Recorrentes**: viram títulos em aberto sozinhas.
+
+### 3.7 Importações
 
 - **+ Lançar NFs**: lança títulos a receber por NF, à mão. Informe o cliente, a NF, a emissão e o valor, e clique em **Gerar parcelas** (por prazos em dias ou por nº de parcelas). Dá para juntar várias NFs antes de **Salvar títulos**.
 - **Importar XML das NFs**: escolha os XML das NF-e de venda (vários de uma vez, ou um .zip). Cada duplicata da nota vira um título em aberto a receber, com o vencimento e o documento NF-parcela. São ignoradas: nota de entrada, nota de outro CNPJ, não autorizada, cancelada e parcela já lançada.
@@ -138,3 +165,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 31/10/2026 | Juros e multa recebidos geram a nota de débito a emitir; Importar do ERP com a ação Baixar + juros. |
 | 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Listas de Lançamentos e de Contas a Pagar / Receber sem rolagem lateral (conta, centro de custo e dias na 2ª linha) e seletor **Colunas**; Excel com todas as colunas. Figuras refeitas. |
+| 1.5 | 07/11/2026 | Editar selecionados (plano, centro de custo, conta e favorecido em lote), Aplicar regras, regra de classificação no lançamento novo e Dividir por centro de custo (com modelo de rateio). |

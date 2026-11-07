@@ -2,6 +2,8 @@
 import { sb, state, q, podeEditar, loadCadastros } from './data.js';
 import { modal, options, esc, $, toast, fail, parseNum, today, money } from './ui.js';
 import { conversaNoModal } from './mini-chat.js';
+import { carregarRegras, alvoDe, registrarUso, dividirLancamento } from './regras-ui.js';
+import { aplicarRegras } from './regras.js';
 
 // transferência é um lançamento só (origem → destino) no plano de saída 3.02; os planos de entrada de transferência
 // (3.01) só aparecem quando o lançamento já é um deles (transferências antigas, em duas pontas)
@@ -76,7 +78,7 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
   </form>`;
   const hist = editando && ['admin', 'diretor'].includes(state.papel) ? '<button class="btn ghost" id="lf-hist">Histórico</button>' : '';
   const foot = ro ? `${hist}<button class="btn" data-close>Fechar</button>` :
-    `${editando ? '<button class="btn danger" id="lf-del" style="margin-right:auto">Excluir</button>' + hist + '<button class="btn" id="lf-dup">Duplicar</button>' : ''}
+    `${editando ? '<button class="btn danger" id="lf-del" style="margin-right:auto">Excluir</button>' + hist + '<button class="btn" id="lf-div" title="Divide o lançamento em vários, um por centro de custo (rateio)">Dividir por C. Custo</button><button class="btn" id="lf-dup">Duplicar</button>' : ''}
      <button class="btn" data-close>Cancelar</button><button class="btn primary" id="lf-save">Salvar</button>`;
   const m = modal({ title: editando ? 'Editar lançamento' : 'Novo lançamento', body: (editando && l.fidc_proposta_id ? '<p class="small muted" style="margin-top:0">Título vinculado a uma proposta de borderô FIDC.</p>' : '') + body, foot });
   if (editando) conversaNoModal(m, 'lancamento', l.id);
@@ -124,9 +126,33 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
       if (!r?.length) return;
       conciliado = true;
       form.querySelectorAll('input,select').forEach(i => { if (!LIVRES.includes(i.name)) i.disabled = true; });
-      $('#lf-del', m.el)?.remove();
+      $('#lf-del', m.el)?.remove(); $('#lf-div', m.el)?.remove();
       form.insertAdjacentHTML('beforebegin', '<p class="small" style="margin-top:0"><span class="badge pago">conciliado</span> Lançamento conciliado com o extrato bancário: só a descrição e os opcionais podem ser alterados. Para mudar valor, data, conta ou classificação, desfaça a conciliação em Conciliação Bancária.</p>');
     }).catch(() => {});
+  }
+
+  // regras de classificação (Financeiro › Regras de Classificação): no lançamento novo, a descrição ou o favorecido
+  // preenchem o plano, o centro de custo e o favorecido vazios. Se a pessoa escolher o plano à mão, a regra não mexe mais.
+  let regraUsada = null;
+  if (!editando) {
+    let planoManual = !!l.plano_id;
+    form.plano_id.addEventListener('change', (e) => { if (e.isTrusted) planoManual = true; });
+    form.insertAdjacentHTML('beforebegin', '<p class="small" id="lf-regra" style="margin-top:0" hidden></p>');
+    const testar = async () => {
+      if (planoManual) return;
+      const { regras } = await carregarRegras(); if (!regras.length) return;
+      const r = aplicarRegras(regras, alvoDe({ descricao: form.descricao.value, favorecido: form.favorecido.value, documento: form.documento.value, valor: parseNum(form.valor.value), conta_id: form.conta_id.value || null }));
+      const box = $('#lf-regra', m.el);
+      if (!r || !c.planoById[r.plano_id]) { if (regraUsada) { regraUsada = null; box.hidden = true; } return; }
+      if (regraUsada?.id === r.id) return;
+      regraUsada = r; form.plano_id.value = r.plano_id; form.plano_id.dispatchEvent(new Event('change'));
+      if (r.centro_custo_id && !form.centro_custo_id.value) form.centro_custo_id.value = r.centro_custo_id;
+      if (r.favorecido_id && !form.favorecido.value) form.favorecido.value = c.favById[r.favorecido_id]?.label || '';
+      box.hidden = false; box.innerHTML = `<span class="badge conc">regra</span> Classificado pela regra <b>${esc(r.nome || `"${r.texto}"`)}</b>: ${esc(c.planoById[r.plano_id].label)}${r.centro_custo_id ? ` · ${esc(c.ccById[r.centro_custo_id]?.nome || '')}` : ''}. Troque o plano se não for este caso.`;
+    };
+    let t = null; const deb = () => { clearTimeout(t); t = setTimeout(testar, 350); };
+    ['descricao', 'favorecido', 'documento', 'valor'].forEach(n => form[n].addEventListener('input', deb));
+    if (l.descricao || l.favorecido_id) testar();
   }
 
   $('#lf-save', m.el).onclick = async () => {
@@ -158,6 +184,7 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
       let encMsg = '';
       try { encMsg = await gravarEncargos(salvo, plano, { juros: parseNum(fd.enc_juros) || 0, multa: parseNum(fd.enc_multa) || 0, desconto: parseNum(fd.enc_desconto) || 0 }, encExist); }
       catch (e) { fail(new Error(`Lançamento salvo, mas juros/multa não: ${e.message || e}`)); }
+      if (regraUsada && salvo.plano_id === regraUsada.plano_id) registrarUso(regraUsada);
       toast('Lançamento salvo' + encMsg); m.close(); onSaved(salvo);
       avisarCaixaNegativo(salvo);
     } catch (e) { fail(e); }
@@ -172,6 +199,8 @@ export function abrirLancamento(base = {}, onSaved = () => {}, { duplicar = fals
       } catch (e) { fail(e); }
     };
     $('#lf-dup', m.el).onclick = () => { m.close(); abrirLancamento({ ...l, id: undefined }, onSaved, { duplicar: true }); };
+    if (l.conta_destino_id) $('#lf-div', m.el)?.remove();
+    $('#lf-div', m.el) && ($('#lf-div', m.el).onclick = () => { m.close(); dividirLancamento(l, () => onSaved()); });
   }
 }
 

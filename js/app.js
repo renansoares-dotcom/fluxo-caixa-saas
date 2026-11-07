@@ -37,6 +37,8 @@ const routes = {
   'aprovacoes': () => import(`./pages/aprovacoes.js?v=${V}`),
   'config/email': () => import(`./pages/config-email.js?v=${V}`),
   'fidc-recompras': () => import(`./pages/fidc-recompras.js?v=${V}`),
+  'lanc-regras': () => import(`./pages/lanc-regras.js?v=${V}`),
+  'lanc-recorrentes': () => import(`./pages/lanc-recorrentes.js?v=${V}`),
   'meus-avisos': () => import(`./pages/meus-avisos.js?v=${V}`),
   'preimpressao': () => import(`./pages/preimpressao.js?v=${V}`),
   'preimpressao/artes': () => import(`./pages/preimpressao-artes.js?v=${V}`),

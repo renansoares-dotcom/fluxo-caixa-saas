@@ -32,6 +32,8 @@ export const MANUAIS = [
     resumo: 'Simular o borderô, comparar fundos, enviar ao diretor, comparar com o original e analisar custos.' },
   { id: 'fidc-carteira', titulo: 'Carteira cedida — liquidação dos títulos nos fundos', area: 'Financeiro', rotas: ['fidc-carteira'],
     resumo: 'Acompanhar os títulos cedidos até o cliente pagar o fundo, importar o relatório de pagos e ver o risco de recompra.' },
+  { id: 'lanc-automacao', titulo: 'Regras de classificação, rateio e lançamentos recorrentes', area: 'Financeiro', rotas: ['lanc-regras', 'lanc-recorrentes'],
+    resumo: 'Regras que classificam pelo histórico (e sugeridas pelo que já foi classificado), modelos de rateio por centro de custo, contas fixas que viram títulos em aberto sozinhas.' },
   { id: 'fidc-recompras', titulo: 'Recompras — título negociado recomprado do fundo, por motivo', area: 'Financeiro', rotas: ['fidc-recompras'],
     resumo: 'Registrar a recompra com o motivo (inadimplência, devolução, substituição, abatimento…): saída, encargos, o que acontece com o título, a linha na DRE e a contrapartida contábil; taxa de recompra por cliente e fundo.' },
   { id: 'duplicatas', titulo: 'Duplicatas para endosso', area: 'Financeiro', rotas: ['duplicatas'],

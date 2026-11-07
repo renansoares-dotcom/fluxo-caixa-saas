@@ -95,6 +95,15 @@ export const FIGS = [
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Receitas com a versão em uso, o custo teórico e o que está em desenvolvimento', 're'],
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Versão em teste: composição, custo teórico e comparação com a aprovada', 're|click:#tr-corpo tr[data-r="tr-1"]'],
   ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
+  // Regras de classificação, rateio e recorrentes (07/11/2026)
+  ['lanc-automacao', 'lanc-regras', '## 3.', 'Regras de Classificação: a condição, o resultado e quantas vezes cada regra foi usada'],
+  ['lanc-automacao', 'lanc-regras', '### 3.1', 'Editar a regra, com o teste nos lançamentos dos últimos 12 meses', 'click:tbody tr:nth-child(5) [data-ed]'],
+  ['lanc-automacao', 'lanc-regras', '### 3.2', 'Sugerir regras pelo histórico: o que já foi classificado vira proposta', 'click:#rg-sug'],
+  ['lanc-automacao', 'lanc-regras', '## 4.', 'Modelos de rateio por centro de custo', 'rateios'],
+  ['lanc-automacao', 'lanc-recorrentes', '## 5.', 'Lançamentos Recorrentes: as contas fixas, o próximo vencimento e os títulos em aberto'],
+  ['lanc-automacao', 'lanc-recorrentes', '### 5.1', 'Cadastrar o recorrente, com a prévia dos próximos vencimentos', 'click:tbody tr:nth-child(1) [data-ed]'],
+  ['lancamentos', 'lancamentos', '### 3.5', 'Editar selecionados: plano, centro de custo, conta e favorecido de vários lançamentos', 'click:tbody tr:nth-child(3) .sel|click:tbody tr:nth-child(4) .sel|click:#lote'],
+  ['lancamentos', 'lancamentos', '### 3.6', 'Dividir o lançamento por centro de custo, com o modelo de rateio', 'click:tbody tr:nth-child(5) td:nth-child(4)|click:#lf-div|scroll:#dv-m'],
   // Recompras FIDC (07/11/2026)
   ['fidc-recompras', 'fidc-recompras', '## 3.', 'Recompras: as pendências sem registro, os indicadores e os títulos recomprados'],
   ['fidc-recompras', 'fidc-recompras', '### 3.1', 'Registrar a recompra: o título, o motivo (aqui, devolução de mercadoria), a nota de devolução e o que volta para a carteira', 'click:#rc-novo|click:.rc-res [data-i]|click:[data-mo="mo-devolucao"]'],
