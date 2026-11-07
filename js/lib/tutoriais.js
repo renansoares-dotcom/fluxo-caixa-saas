@@ -42,6 +42,8 @@ export const MANUAIS = [
     resumo: 'Para o operador: iniciar, registrar bobina com etiqueta, parada e encerramento.' },
   { id: 'producao', titulo: 'Produção — PCP, ordens, programação e planta', area: 'Produção', rotas: ['producao', 'producao/ordens', 'producao/programacao', 'producao/cadastros', 'producao/importar', 'producao/planta'],
     resumo: 'Cadastros, OPs com material e rastreabilidade, programação, OEE, planta da fábrica e importação do Iniflex.' },
+  { id: 'qualidade', titulo: 'Qualidade — inspeção com bloqueio de estoque e não conformidades', area: 'Produção', rotas: ['qualidade', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'qualidade/planos'],
+    resumo: 'Planos de inspeção, quarentena no recebimento pela nota, liberação do primeiro material na produção, decisão com laudo, RNC com disposição no estoque, bloqueio de lote e bobina, IQF dos fornecedores.' },
   { id: 'manutencao', titulo: 'Manutenção industrial — OS, preventivas, peças e indicadores', area: 'Produção', rotas: ['manutencao', 'manutencao/ordens', 'manutencao/equipamentos', 'manutencao/celular'],
     resumo: 'Equipamentos ligados às máquinas, OS corretiva e preventiva, parada automática, peças do estoque, terceiros no contas a pagar, MTBF, MTTR e disponibilidade.' },
   { id: 'logistica', titulo: 'Logística — cargas, entregas e frota', area: 'Logística', rotas: ['logistica', 'logistica/frota'],

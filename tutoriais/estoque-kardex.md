@@ -1,8 +1,8 @@
 ---
 titulo: Kardex e parâmetros do estoque
 tela: Estoque › Kardex (EST002) e Parâmetros do Estoque (EST005)
-versao: 1.2
-atualizado: 2026-10-29
+versao: 1.3
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -147,6 +147,12 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 - Movimento não se altera nem se exclui: só por estorno, e cada movimento só pode ser estornado uma vez.
 - Mês fechado não aceita movimento.
 - O custo não inclui os impostos recuperáveis (veja **Parâmetros de custo** em Posição de estoque).
+- **Qualidade**:
+  - material no local **Quarentena (QUA)** ou **Reprovado (REP)** só sai pela decisão da inspeção ou pela disposição da não conformidade;
+  - **lote bloqueado** pela qualidade não sai de nenhum local;
+  - a entrada pela nota de um produto com plano de recebimento vai para a Quarentena, e não para o local padrão.
+
+  Os detalhes estão no manual Qualidade.
 
 ## 6. Perguntas frequentes e erros comuns
 
@@ -158,6 +164,8 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 
 **O custo médio ficou estranho depois de uma entrada com data antiga.** Use **Recalcular** no kardex do produto.
 
+**"Material em quarentena aguardando a inspeção da qualidade" ou "Lote … bloqueado pela qualidade".** O material está esperando a qualidade. Peça a inspeção em Qualidade › Inspeções. Para lote bloqueado, veja Qualidade › Não Conformidades e Bloqueios.
+
 ## 7. Histórico de alterações
 
 | Versão | Data | O que mudou |
@@ -165,3 +173,4 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 | 1.0 | 31/10/2026 | Primeira versão: kardex por local e lote com custo médio ponderado móvel, movimento manual, transferência, estorno, recálculo, locais, famílias, tipos de movimento, regras por CFOP e fechamento do mês. |
 | 1.1 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.3 | 07/11/2026 | Travas da qualidade: quarentena e reprovado só saem pela qualidade, lote bloqueado não sai, entrada com plano de recebimento vai para a quarentena. |

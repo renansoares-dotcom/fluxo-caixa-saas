@@ -57,6 +57,7 @@ export const CSS = `<style>
   .mn-col{background:var(--bg);border-radius:10px;padding:8px;min-height:80px}.mn-card{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px;cursor:pointer}
   .mn-card.c-neg{border-left-color:var(--neg)}.mn-card.c-warn{border-left-color:var(--warn)}.mn-kanban{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}@media(max-width:900px){.mn-kanban{grid-template-columns:1fr}}
   .mn-kpis6{grid-template-columns:repeat(6,minmax(0,1fr))!important}@media(max-width:1100px){.mn-kpis6{grid-template-columns:repeat(3,minmax(0,1fr))!important}}@media(max-width:600px){.mn-kpis6{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+  .card label.chk{flex-direction:row;align-items:center;gap:8px;font-weight:400;color:var(--text);font-size:13px}.card label.chk input{width:auto;min-height:0}
   .mm-topo .mn-acoes{display:flex;gap:8px;align-items:end;flex-wrap:nowrap;white-space:nowrap}
 </style>`;
 

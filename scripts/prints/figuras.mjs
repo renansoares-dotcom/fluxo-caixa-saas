@@ -68,4 +68,17 @@ export const FIGS = [
   ['manutencao', 'manutencao/equipamentos', '## 7.', 'Planos preventivos com a próxima execução', 'pl'],
   ['manutencao', 'manutencao/equipamentos', '### 7.1', 'Plano preventivo com intervalo, checklist e peças previstas', 'pl|click:#me-corpo tr[data-p]'],
   ['manutencao', 'manutencao/equipamentos', '## 11.', 'Parâmetros da manutenção', 'pa'],
+  // Qualidade (07/11/2026) — o laudo impresso (qualidade-laudo.jpg) é tirado à parte
+  ['qualidade', 'qualidade', '## 4.', 'Painel da Qualidade: alertas, indicadores e fila de inspeção'],
+  ['qualidade', 'qualidade/inspecoes', '## 5.', 'Inspeções pendentes, na ordem de atendimento'],
+  ['qualidade', 'qualidade/inspecoes', '### 5.1', 'Nova inspeção', 'click:#qi-nova'],
+  ['qualidade', 'qualidade/inspecoes', '### 5.2', 'Ficha da inspeção: resultados, avaliação ao vivo e sugestão de decisão', 'click:#qi-lista tr[data-i="qi-2"]'],
+  ['qualidade', 'qualidade/inspecoes', '### 5.2', 'Inspeção de liberação reprovada, com o Cpk e a RNC aberta', 'click:[data-f=todas]|click:#qi-lista tr[data-i="qi-11"]'],
+  ['qualidade', 'qualidade/nao-conformidades', '## 6.', 'Não conformidades em aberto, com a disposição e a ação corretiva'],
+  ['qualidade', 'qualidade/nao-conformidades', '### 6.1', 'Ficha da RNC: disposição, 5 porquês, ação corretiva e eficácia', 'click:#qr-corpo tr[data-r="qr-1"]'],
+  ['qualidade', 'qualidade/nao-conformidades', '## 7.', 'Lotes e bobinas bloqueados, com o histórico', 'bloq'],
+  ['qualidade', 'qualidade/planos', '## 8.', 'Planos de inspeção'],
+  ['qualidade', 'qualidade/planos', '### 8.1', 'Plano de recebimento de resina com as características', 'click:#qc-corpo tr[data-p="qp-1"]'],
+  ['qualidade', 'qualidade/planos', '### 8.2', 'Tabela de amostragem', 'am'],
+  ['qualidade', 'qualidade/planos', '### 8.3', 'Parâmetros da qualidade', 'pa'],
 ];

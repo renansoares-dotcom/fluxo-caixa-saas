@@ -581,3 +581,82 @@ window.FN = {
     man_consumir_peca: () => 'mop-novo', man_estornar_peca: () => null,
   });
 }
+
+// Qualidade (SQL 087) — planos, amostragem, inspeções, RNC e bloqueios FICTÍCIOS (datas relativas a hoje)
+{
+  const agora = Date.now(), H = (h) => new Date(agora - h * 3600000).toISOString(), D0 = (d) => new Date(agora - d * 86400000).toISOString().slice(0, 10);
+  const lc = (c) => DB.est_locais.find(l => l.codigo === c)?.id, P = (c) => DB.produtos.find(p => p.codigo === c), FV = (n) => DB.favorecidos.find(f => f.nome.startsWith(n))?.id;
+  if (!lc('REP')) DB.est_locais.push({ id: 'el-rep', empresa_id: E, codigo: 'REP', nome: 'Reprovado (não conforme, aguardando disposição)', finalidade: 'quarentena', posse: 'propria', controla_saldo: true, compoe_custo: true, permite_negativo: false, papeis: null, ordem: 125, ativo: true });
+  DB.qual_parametros = [{ empresa_id: E, inspecionar_recebimento: true, local_quarentena_id: lc('QUA'), local_reprovado_id: lc('REP'), prazo_horas: 24, papeis_decisao: ['admin', 'diretor', 'financeiro'], meta_aprovacao_pct: 95, prazo_rnc_dias: 15 }];
+  DB.qual_amostragem = [[2, 8, 2], [9, 15, 3], [16, 25, 5], [26, 50, 8], [51, 90, 13], [91, 150, 20], [151, 280, 32], [281, 500, 50], [501, 1200, 80], [1201, 3200, 125], [3201, 10000, 200], [10001, 35000, 315], [35001, 150000, 500], [150001, 500000, 800], [500001, null, 1250]]
+    .map(([lote_min, lote_max, amostra], i) => ({ id: 'qa-' + i, empresa_id: E, lote_min, lote_max, amostra, ac: 0, re: 1 }));
+  const C = (nome, tipo, unidade, nominal, min, max, metodo, critica = false) => ({ nome, tipo, unidade, nominal, min, max, metodo, critica });
+  DB.qual_planos = [
+    { id: 'qp-1', nome: 'Recebimento de resina PEBD', etapa: 'recebimento', produto_id: P('MP-001').id, amostragem: 'fixa', amostra_fixa: 3, exige_laudo: true, instrucoes: 'Coletar 1 amostra a cada 10 sacos; conferir o laudo do lote (MFI e densidade) com a NF.',
+      caracteristicas: [C('Índice de fluidez (MFI)', 'medida', 'g/10min', 2.0, 1.8, 2.2, 'plastômetro 190 °C / 2,16 kg', true), C('Densidade', 'medida', 'g/cm³', 0.922, 0.919, 0.925, 'coluna de gradiente'), C('Umidade', 'medida', '%', null, null, 0.05, 'termobalança'), C('Contaminação / pontos pretos', 'atributo', null, null, null, null, 'visual em 1 kg')] },
+    { id: 'qp-2', nome: 'Recebimento de master branco', etapa: 'recebimento', produto_id: P('MP-002').id, amostragem: 'tabela', exige_laudo: true,
+      caracteristicas: [C('Teor de TiO2', 'medida', '%', 70, 68, 72, 'calcinação'), C('Embalagem íntegra', 'atributo')] },
+    { id: 'qp-3', nome: 'Liberação de setup — saco PEBD', etapa: 'processo', produto_id: P('PA-100').id, amostragem: 'fixa', amostra_fixa: 5, liberacao_primeira: true, instrucoes: 'Medir a espessura em 5 pontos da largura no primeiro metro da bobina; teste de solda com 3 sacos.',
+      caracteristicas: [C('Espessura', 'medida', 'µm', 100, 95, 105, 'micrômetro', true), C('Largura', 'medida', 'mm', 400, 398, 402, 'trena'), C('Tratamento corona', 'medida', 'dyn/cm', 40, 38, null, 'caneta de dyna'), C('Solda', 'atributo', null, null, null, null, 'tração manual')] },
+    { id: 'qp-4', nome: 'Inspeção final — saco PEBD', etapa: 'final', produto_id: P('PA-100').id, amostragem: 'tabela',
+      caracteristicas: [C('Dimensões', 'atributo'), C('Impressão / registro', 'atributo'), C('Contagem por pacote', 'atributo')] }]
+    .map(p => ({ empresa_id: E, familia_id: null, setor_id: null, amostra_fixa: null, exige_laudo: false, liberacao_primeira: false, instrucoes: null, ativo: true, criado_em: H(2000), ...p }));
+  // lote novo na quarentena (NF de resina recebida hoje)
+  const lq = { id: 'lt-q1', empresa_id: E, produto_id: P('MP-001').id, codigo: 'NF55188-1', lote_fornecedor: 'BRK 7911', origem: 'compra', bloqueado: false };
+  const lb = DB.est_lotes.find(l => l.codigo === 'L-2610-02'); if (lb) Object.assign(lb, { bloqueado: true, bloqueio_motivo: 'Reclamação de cliente: gel no filme (RNC 4)' });
+  DB.est_lotes.push(lq);
+  DB.est_saldos.push({ id: 'ss-q1', empresa_id: E, produto_id: lq.produto_id, local_id: lc('QUA'), lote_id: lq.id, quantidade: 12500, valor: 146875, ultimo_movimento: D0(0) },
+    { id: 'ss-q2', empresa_id: E, produto_id: P('MP-002').id, local_id: lc('QUA'), lote_id: null, quantidade: 600, valor: 12480, ultimo_movimento: D0(1) },
+    { id: 'ss-r1', empresa_id: E, produto_id: P('MP-001').id, local_id: lc('REP'), lote_id: null, quantidade: 500, valor: 5875, ultimo_movimento: D0(9) });
+  const ops = DB.prod_ordens || [], op1 = ops[0]?.id, op2 = ops[1]?.id;
+  const R = (vals) => Object.entries(vals).map(([nome, v]) => Array.isArray(v) ? { nome, valores: v } : { nome, defeitos: v });
+  const resina = (mfi, d, u, cont) => R({ 'Índice de fluidez (MFI)': mfi, Densidade: d, Umidade: u, 'Contaminação / pontos pretos': cont });
+  const IN = [ // [etapa, origem, plano, produto, qtd, un, situacao, horas atrás, fornecedor, resultados, motivo, ref]
+    ['recebimento', 'nfe', 'qp-1', 'MP-001', 12500, 'KG', 'pendente', 3, 'RESINAS', [], null, 'NF 55188 · RESINAS DO BRASIL S.A.', { movimento_id: 'mv-q1', local_destino_id: lc('MP'), lote_id: lq.id }],
+    ['recebimento', 'nfe', 'qp-2', 'MP-002', 600, 'KG', 'em_inspecao', 30, 'EMBALAGENS', R({ 'Teor de TiO2': [70.4, 69.8], 'Embalagem íntegra': 0 }), null, 'NF 3321 · EMBALAGENS PRIMAVERA LTDA', { movimento_id: 'mv-q2', local_destino_id: lc('MP'), laudo_ok: false }],
+    ['processo', 'liberacao', 'qp-3', 'PA-100', 118, 'KG', 'pendente', 1, null, [], null, null, { ordem_id: op1, lote_texto: 'B1204-001', prazo: new Date(agora + 3600000).toISOString() }],
+    ['recebimento', 'nfe', 'qp-1', 'MP-001', 12000, 'KG', 'aprovada', 700, 'RESINAS', resina([2.01, 1.98, 2.05], [0.921, 0.922, 0.922], [0.02, 0.03, 0.02], 0), null, 'NF 55031 · RESINAS DO BRASIL S.A.', { laudo_ok: true }],
+    ['recebimento', 'nfe', 'qp-1', 'MP-001', 10000, 'KG', 'aprovada', 450, 'RESINAS', resina([1.95, 2.0, 1.97], [0.920, 0.921, 0.921], [0.03, 0.03, 0.04], 0), null, 'NF 55102 · RESINAS DO BRASIL S.A.', { laudo_ok: true }],
+    ['recebimento', 'nfe', 'qp-1', 'MP-001', 5000, 'KG', 'aprovada_concessao', 220, 'RESINAS', resina([2.18, 2.24, 2.21], [0.922, 0.923, 0.922], [0.04, 0.05, 0.04], 0), 'MFI 2,24 numa amostra; aprovado para a linha de sacos grossos (e-mail do PCP)', 'NF 55150 · RESINAS DO BRASIL S.A.', { laudo_ok: true, qtd_aprovada: 5000, qtd_reprovada: 0 }],
+    ['recebimento', 'nfe', 'qp-1', 'MP-001', 2500, 'KG', 'reprovada', 216, 'RESINAS', resina([2.6, 2.7, 2.65], [0.922, 0.922, 0.923], [0.12, 0.10, 0.11], 2), 'MFI 2,7 (máx. 2,2) e umidade 0,12% (máx. 0,05%)', 'NF 55161 · RESINAS DO BRASIL S.A.', { laudo_ok: false, qtd_aprovada: 2000, qtd_reprovada: 500 }],
+    ['recebimento', 'nfe', 'qp-2', 'MP-002', 1200, 'KG', 'aprovada', 520, 'EMBALAGENS', R({ 'Teor de TiO2': [70.1, 70.3, 69.9], 'Embalagem íntegra': 0 }), null, 'NF 3290 · EMBALAGENS PRIMAVERA LTDA', { laudo_ok: true }],
+    ['recebimento', 'nfe', 'qp-2', 'MP-002', 800, 'KG', 'reprovada', 330, 'EMBALAGENS', R({ 'Teor de TiO2': [66.2, 66.8, 67.0], 'Embalagem íntegra': 1 }), 'TiO2 66% (mín. 68%) e um saco rasgado', 'NF 3305 · EMBALAGENS PRIMAVERA LTDA', { laudo_ok: true, qtd_aprovada: 0, qtd_reprovada: 800 }],
+    ['processo', 'liberacao', 'qp-3', 'PA-100', 120, 'KG', 'aprovada', 300, null, R({ Espessura: [99, 101, 100, 102, 98], Largura: [400, 401], 'Tratamento corona': [42], Solda: 0 }), null, null, { ordem_id: op2, lote_texto: 'B1205-001' }],
+    ['processo', 'liberacao', 'qp-3', 'PA-100', 115, 'KG', 'reprovada', 160, null, R({ Espessura: [91, 93, 92, 96, 94], Largura: [400, 400], 'Tratamento corona': [36], Solda: 1 }), 'Espessura 91 µm (mín. 95) e corona 36 dyn — reajustar a matriz', null, { ordem_id: op1, lote_texto: 'B1204-000' }],
+    ['processo', 'liberacao', 'qp-3', 'PA-100', 122, 'KG', 'aprovada', 150, null, R({ Espessura: [100, 101, 99, 100, 102], Largura: [401, 400], 'Tratamento corona': [41], Solda: 0 }), null, null, { ordem_id: op1, lote_texto: 'B1204-000B' }],
+    ['final', 'op', 'qp-4', 'PA-100', 1800, 'KG', 'aprovada', 240, null, R({ Dimensões: 0, 'Impressão / registro': 0, 'Contagem por pacote': 0 }), null, null, { ordem_id: ops[3]?.id }],
+    ['final', 'op', 'qp-4', 'PA-100', 4800, 'KG', 'aprovada', 90, null, R({ Dimensões: 0, 'Impressão / registro': 1, 'Contagem por pacote': 0 }), null, null, { ordem_id: op2 }]];
+  DB.qual_inspecoes = IN.map(([etapa, origem, plano_id, cod, quantidade, unidade, situacao, ha, forn, resultados, motivo, ref, extra], k) => {
+    const dec = ['aprovada', 'aprovada_concessao', 'reprovada'].includes(situacao), am = plano_id === 'qp-1' ? [3, 0, 1] : plano_id === 'qp-3' ? [5, 0, 1] : plano_id === 'qp-2' ? [quantidade > 1200 ? 125 : 80, 1, 2] : [125, 1, 2];
+    return { id: 'qi-' + (k + 1), empresa_id: E, numero: 40 + IN.length - k, etapa, origem, plano_id, produto_id: P(cod).id, quantidade, unidade, amostra: am[0], ac: am[1], re: am[2], situacao, resultados,
+      defeitos: 0, fornecedor_id: forn ? FV(forn) : null, observacao: ref, motivo, criado_em: H(ha), atualizado_em: H(ha - 2), prazo: H(ha - 24), inspetor: situacao === 'pendente' ? null : 'Carla Mendes',
+      inspecionada_em: situacao === 'pendente' ? null : H(ha - 2), decidida_em: dec ? H(ha - 3) : null, decidida_por: dec ? 'renata@exemplo.com.br' : null,
+      qtd_aprovada: dec ? (situacao === 'reprovada' ? 0 : quantidade) : null, qtd_reprovada: dec ? (situacao === 'reprovada' ? quantidade : 0) : null, laudo_ok: null, lote_id: null, movimento_id: null, local_destino_id: null, ...extra };
+  });
+  DB.qual_inspecoes[0].prazo = new Date(agora + 21 * 3600000).toISOString();
+  DB.qual_inspecoes[1].prazo = H(6);
+  const RN = [
+    ['fornecedor', 'qi-7', 'MP-001', 'RESINAS', 'Inspeção 34 reprovada: MFI 2,7 (máx. 2,2) e umidade 0,12% (máx. 0,05%)', 500, 'alta', 'devolver_fornecedor', null, 'acao', 210, 0,
+      ['Resina chegou úmida', 'Sacos armazenados ao tempo no fornecedor', 'Falta de cobertura no pátio do distribuidor'], 'Armazenagem do distribuidor sem proteção', 'Exigir laudo de umidade por lote e inspeção do pátio do distribuidor', 'Marcos (Compras)', 4],
+    ['fornecedor', 'qi-9', 'MP-002', 'EMBALAGENS', 'Inspeção 32 reprovada: TiO2 66% (mín. 68%) e um saco rasgado', 800, 'media', 'devolver_fornecedor', H(300), 'verificacao', 335, 380,
+      ['Teor de TiO2 abaixo', 'Lote produzido com outra carga mineral'], 'Troca de matéria-prima no fornecedor sem aviso', 'Fornecedor passou a enviar o laudo com o teor por lote', 'Marcos (Compras)', -5],
+    ['processo', 'qi-11', 'PA-100', null, 'Liberação reprovada: espessura 91 µm (mín. 95) e corona 36 dyn', 115, 'media', 'reclassificar', H(158), 'encerrada', 162, 120,
+      ['Espessura baixa no setup', 'Matriz descentralizada', 'Parafuso de centragem frouxo'], 'Parafuso de centragem da matriz frouxo', 'Incluir o reaperto da matriz no checklist de setup', 'Paulo (Extrusão)', -2, 'eficaz'],
+    ['cliente', null, 'PA-100', 'SUPERMERCADOS', 'Cliente reclamou de gel (pontos duros) no saco 40x60 da NF 9026', 320, 'alta', 'pendente', null, 'em_analise', 48, 0, [], null, null, 'Carla (Qualidade)', 10]];
+  DB.qual_rnc = RN.map(([origem, insp, cod, forn, descricao, quantidade, gravidade, disposicao, exec, situacao, ha, custo, porques, causa, acao_corretiva, responsavel, prazoDias, eficacia], k) => ({
+    id: 'qr-' + (k + 1), empresa_id: E, numero: k + 1, origem, inspecao_id: insp, produto_id: P(cod).id, favorecido_id: forn ? FV(forn) : null, descricao, quantidade, unidade: 'KG', gravidade, disposicao,
+    disposicao_executada_em: exec, situacao, aberta_em: H(ha), aberta_por: 'carla@exemplo.com.br', custo, porques, causa, acao_corretiva, responsavel, prazo: D0(-prazoDias), eficacia: eficacia || null,
+    acao_imediata: k === 3 ? 'Lote L-2610-02 bloqueado; inspeção 100% do estoque do produto' : 'Material segregado no local Reprovado', encerrada_em: situacao === 'encerrada' ? H(30) : null }));
+  DB.prod_bobinas = (DB.prod_bobinas || []).concat([
+    { id: 'pb-q1', empresa_id: E, codigo: 'B1204-001', ordem_id: op1, peso_kg: 118, situacao: 'estoque', qualidade: 'bloqueada', qual_inspecao_id: 'qi-3', criado_em: H(1) },
+    { id: 'pb-q2', empresa_id: E, codigo: 'B1204-002', ordem_id: op1, peso_kg: 121, situacao: 'estoque', qualidade: 'bloqueada', qual_inspecao_id: 'qi-3', criado_em: H(0.5) },
+    { id: 'pb-q3', empresa_id: E, codigo: 'B1198-014', ordem_id: op2, peso_kg: 96, situacao: 'estoque', qualidade: 'bloqueada', qual_inspecao_id: null, criado_em: H(50) }]);
+  DB.qual_bloqueios = [
+    { id: 1, empresa_id: E, tipo: 'lote', lote_id: lb?.id, acao: 'bloqueio', motivo: 'Reclamação de cliente: gel no filme (RNC 4)', usuario: 'carla@exemplo.com.br', criado_em: H(47) },
+    { id: 2, empresa_id: E, tipo: 'bobina', bobina_id: 'pb-q3', acao: 'bloqueio', motivo: 'Suspeita de solda fraca (mesma OP da reclamação)', usuario: 'carla@exemplo.com.br', criado_em: H(46) },
+    { id: 3, empresa_id: E, tipo: 'bobina', bobina_id: null, acao: 'liberacao', motivo: 'Inspeção 30', usuario: 'renata@exemplo.com.br', criado_em: H(147) },
+    { id: 4, empresa_id: E, tipo: 'bobina', bobina_id: null, acao: 'reprovacao', motivo: 'Inspeção 30', usuario: 'renata@exemplo.com.br', criado_em: H(157) }];
+  DB.qual_anexos = [{ id: 'qx-1', empresa_id: E, inspecao_id: 'qi-1', caminho: 'x/laudo.pdf', nome: 'laudo-BRK7911.pdf', tipo: 'laudo', criado_em: H(2) }];
+  Object.assign(window.RPC, { qual_decidir: (a) => ({ situacao: a.p_decisao, rnc_id: a.p_decisao === 'reprovada' ? 'qr-x' : null }), qual_dispor: () => 'executada', qual_bloquear: () => 'bloqueado',
+    qual_gerar_recebimento: () => 0, qual_configurar: () => ({ faixas: 0 }) });
+}

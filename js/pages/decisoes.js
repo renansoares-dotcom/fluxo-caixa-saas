@@ -46,8 +46,9 @@ async function carregar() {
   const cedida = await import(`./fidc-carteira.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const ndeb = await import(`./fiscal-notas-debito.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const imob = temArea('cont') ? await import(`./imobilizado.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const qual = temArea('prd') ? await import(`./qualidade.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual };
 }
 
 // ---------------------------------------------------------------- regras
@@ -193,6 +194,13 @@ function regras(D) {
     desc: mn.map(a => a.txt).join(' · '), impacto: 0, impactoTxt: `${mn.length} ponto(s)`,
     regra: 'OS de emergência aberta, OS atrasada (preventiva além do vencimento, emergência há mais de 24 h, alta há mais de 72 h), OS aguardando peça há mais de 3 dias e plano preventivo vencido sem OS. Máquina parada é produção perdida.',
     acao: 'Abrir painel de manutenção', rota: 'manutencao' });
+
+  // 19. qualidade: máquina aguardando liberação, inspeção fora do prazo, material em quarentena, RNC vencida ou sem disposição, IQF abaixo da meta
+  const ql = D.qual || [];
+  if (ql.length) out.push({ k: 'qualidade', origem: 'Qualidade', urg: ql.some(a => a.nivel === 'neg') ? 'alta' : 'media', titulo: 'Destravar a qualidade',
+    desc: ql.map(a => a.txt).join(' · '), impacto: 0, impactoTxt: `${ql.length} ponto(s)`,
+    regra: 'Inspeção de liberação pendente (máquina aguardando), inspeção fora do prazo, valor parado na quarentena, não conformidade com a ação vencida ou com material sem disposição, fornecedor com 3 lotes ou mais abaixo da meta de IQF e lotes/bobinas bloqueados.',
+    acao: 'Abrir painel da qualidade', rota: 'qualidade' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

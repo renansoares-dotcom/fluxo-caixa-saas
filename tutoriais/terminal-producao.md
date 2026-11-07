@@ -1,7 +1,7 @@
 ---
 titulo: Terminal de produção
 tela: Produção › Terminal do Setor (PRD001)
-versao: 1.3
+versao: 1.4
 atualizado: 2026-11-07
 ---
 ## 1. Para que serve
@@ -43,6 +43,8 @@ O usuário do operador é ligado ao cadastro dele e aos setores dele em **Produ�
 3. Informe a **bobina mãe** (o código da etiqueta da bobina de origem, quando houver) e o **lote da matéria-prima**.
 4. Clique em **Registrar e imprimir etiqueta**. A etiqueta sai com o QR code, que garante a rastreabilidade da bobina.
 
+Quando o produto tem plano de **liberação do primeiro material**, a primeira bobina da OP abre a inspeção de liberação na Qualidade. Essa bobina e as seguintes ficam **bloqueadas** até a aprovação, e a bobina bloqueada não é expedida. Avise a qualidade assim que registrar a primeira bobina.
+
 ### 4.3 Parada
 
 1. Clique em **Parada** e escolha o motivo: setup, troca de bobina, limpeza, manutenção, falta de matéria-prima, falta de operador, falta de energia, aguardando programação…
@@ -83,3 +85,4 @@ Parada com motivo do tipo **manutenção** abre sozinha uma ordem de serviço pa
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.3 | 07/11/2026 | A parada de manutenção abre a ordem de serviço da manutenção. |
+| 1.4 | 07/11/2026 | Bobina bloqueada até a liberação do primeiro material pela Qualidade. |
