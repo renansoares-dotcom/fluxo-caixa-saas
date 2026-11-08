@@ -7,7 +7,7 @@ export const FIGS = [
   ['portal-cliente', 'portal-clientes', '## 3.', 'Portal do Cliente: pedidos de prorrogação e acessos'],
   ['autorizacao', 'autorizacao', '## 3.', 'Autorização de Pagamentos'],
   ['pagamentos-antecipados', 'paraquedas', '## 3.', 'Pagamentos Antecipados aguardando aprovação'],
-  ['conferencia-fechamento', 'conferencia', '## 3.', 'Mapa da conferência do mês'], ['conferencia-fechamento', 'fechamento', '## 4.', 'Checklist do fechamento do mês'],
+  ['conferencia-fechamento', 'conferencia', '## 3.', 'Mapa da conferência do mês'], ['conferencia-fechamento', 'fechamento', '## 4.', 'Fechamento do mês: quanto falta para fechar e o checklist da equipe'], ['conferencia-fechamento', 'fechamento', '### 4.6', 'Fechar o mês com pendências: a lista e a justificativa', 'click:#fc-fechar'],
   ['fluxo-caixa', 'fluxo-mensal', '## 3.', 'Fluxo de Caixa Mensal'], ['fluxo-caixa', 'necessidade-caixa', '## 4.', 'Necessidade de Caixa por semana'],
   ['fluxo-caixa', 'necessidade-caixa', '### 4.2', 'Comparação dos cenários: base, otimista, pessimista e um cenário com a simulação da RJ', 'click:#nc-comp-cen'],
   ['fluxo-caixa', 'necessidade-caixa', '### 4.3', 'Premissas de um cenário com a simulação da RJ e um evento pontual', 'click:#nc-cen-btn|click:tr[data-i="3"] [data-ed]'],

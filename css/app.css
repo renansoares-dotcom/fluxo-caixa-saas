@@ -1155,3 +1155,8 @@ table.metas-grade td.sticky{min-width:150px;white-space:normal}
 .nc-sem{margin-top:14px;border-top:1px solid var(--border)}
 .nc-cens .ch-chip.on{background:color-mix(in srgb,var(--primary) 14%,var(--surface));color:var(--primary)}
 .nc-h{margin:20px 0 8px;font-size:14px}
+.fc-banner{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.fc-fechado{border-left:4px solid var(--primary)}
+.fc-barra{height:6px;background:var(--border);border-radius:99px;margin:8px 0 2px;overflow:hidden}.fc-barra i{display:block;height:100%;background:var(--primary)}
+.fc-resp{display:flex;gap:14px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--border)}
+.fc-chks{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}

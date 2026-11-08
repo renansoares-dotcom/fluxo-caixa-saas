@@ -5,15 +5,19 @@ import { sb, state, q, fetchAll, loadCadastros, montarMatriz, comRecompras, mont
 import { $, $$, esc, money, money0, pct, dateBR, fail, toast, modal, parseNum, MESES } from '../lib/ui.js';
 import { revisarSemConta } from '../lib/sem-conta.js';
 import { usosPorNota } from '../lib/creditos.js';
+import * as F from '../lib/fechamento-calc.js';
 
 export const title = 'Fechamento do Mês';
 
 const mesAnt = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const ui = { mes: mesAnt() };
+const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const gestor = () => ['admin', 'diretor', 'financeiro'].includes(state.papel);
 const fimMes = (m) => { const [a, mm] = m.split('-').map(Number); return new Date(Date.UTC(a, mm, 0)).toISOString().slice(0, 10); };
 const TOL_PCT = 10, TOL_VAL = 5000; // mesma tolerância padrão do Controle orçamentário
 
 export async function render(root) {
+  const qm = new URLSearchParams(location.hash.split('?')[1] || '').get('mes'); if (/^\d{4}-\d{2}$/.test(qm || '')) ui.mes = qm;
   root.innerHTML = `
     <div class="card"><div class="card-head" style="margin-bottom:0">
       <div><h2 style="margin:0">Fechamento do Mês</h2><p class="muted small" style="margin:4px 0 0">Cada etapa é conferida automaticamente com os dados do sistema. Verde = pronto; vermelho = falta resolver (o link leva à tela certa).</p></div>
@@ -30,6 +34,7 @@ async function carregar(root) {
   let R;
   try { R = await conferir(ui.mes); } catch (e) { fail(e); c.innerHTML = '<div class="card"><div class="empty">Não foi possível conferir o mês.</div></div>'; return; }
   pintar(c, R);
+  try { await checklist(c, R, root); } catch (e) { console.error(e); }
   const rv = $('[data-rev]', c); if (rv) rv.onclick = () => revisarSemConta(() => carregar(root));
   $$('[data-travar]', c).forEach(b => b.onclick = () => fecharConta(R, b.dataset.travar, root));
   $$('[data-destravar]', c).forEach(b => b.onclick = () => destravar(R, b.dataset.destravar, root));
@@ -132,6 +137,11 @@ async function conferir(mes) {
     const sal = saldos.find(x => x.conta_id === id);
     return { ct, temExt, cobre, ultExt: ultOfx.get(id), pend, qtd: qtdExt.get(id) || 0, mS, mE, dif, bate, saldo: sal ? +sal.saldo_pago : null, trava: trv.get(id) || null };
   }).filter(Boolean).sort((a, b) => (b.temExt - a.temExt) || a.ct.nome.localeCompare(b.ct.nome));
+  if (travas !== null) {
+    const comExt = contas.filter(x => x.temExt), falta = comExt.filter(x => !x.trava || x.trava.ate < fim);
+    etapas.push({ k: 'contas', titulo: `Contas com extrato travadas até ${dateBR(fim)}`, ok: comExt.length > 0 && !falta.length, link: '#/fechamento', acao: 'Ver as contas abaixo',
+      resumo: !comExt.length ? 'Nenhuma conta com extrato importado.' : !falta.length ? `As ${comExt.length} conta(s) com extrato estão travadas até o fim do mês.` : `<strong>${falta.length} de ${comExt.length} sem trava até o fim do mês</strong>: ${falta.map(x => esc(x.ct.nome)).join(', ')}.` });
+  }
   return { mes, ini, fim, etapas, resumo, contas, travaInstalada: travas !== null };
 }
 
@@ -141,7 +151,7 @@ function pintar(c, R) {
   const S = R.resumo;
   c.innerHTML = `
     <div class="kpis">
-      <div class="kpi"><div class="k-label">Fechamento de ${esc(nomeMes)}</div><div class="k-value ${ok === tot ? 'pos' : ''}">${ok} de ${tot}</div><div class="k-sub">${ok === tot ? 'mês pronto para fechar' : `${tot - ok} etapa(s) pendente(s)`}</div></div>
+      <div class="kpi"><div class="k-label">Conferências automáticas de ${esc(nomeMes)}</div><div class="k-value ${ok === tot ? 'pos' : ''}">${ok} de ${tot}</div><div class="k-sub">${ok === tot ? 'mês pronto para fechar' : `${tot - ok} etapa(s) pendente(s)`}</div></div>
       <div class="kpi"><div class="k-label">Receita bruta (realizado)</div><div class="k-value">${money0(S.recB)}</div><div class="k-sub">entradas ${money0(S.ent)} · saídas ${money0(Math.abs(S.sai))}</div></div>
       <div class="kpi"><div class="k-label">EBITDA gerencial</div><div class="k-value ${S.ebitda < 0 ? 'neg' : ''}">${money0(S.ebitda)}</div><div class="k-sub">margem ${pct(S.recB ? S.ebitda / S.recB : null)}</div></div>
       <div class="kpi"><div class="k-label">Resultado gerencial</div><div class="k-value ${S.resultado < 0 ? 'neg' : ''}">${money0(S.resultado)}</div><div class="k-sub">margem ${pct(S.recB ? S.resultado / S.recB : null)}</div></div>
@@ -252,4 +262,228 @@ function fecharConta(R, contaId, root) {
       toast(`${x.ct.nome} fechada até ${dateBR(info.data)}`); m.close(); carregar(root);
     } catch (e) { fail(e); }
   };
+}
+
+// =====================================================================
+// Checklist do fechamento (melhoria 3.8): tarefas com responsável e prazo em dia útil, "quanto falta para fechar",
+// fechar o mês (trava dos lançamentos pagos) e reabrir com motivo.
+// =====================================================================
+async function dadosChecklist(mes) {
+  const e = state.empresa.id;
+  const cfg0 = await q(sb.from('fechamento_config').select('*').eq('empresa_id', e).maybeSingle()).catch(() => undefined);
+  if (cfg0 === undefined) return null;   // SQL 107 ainda não rodado
+  await q(sb.rpc('fechamento_gerar', { p_empresa: e, p_mes: mes })).catch(() => 0);
+  const [modelos, tarefas, mesSit, eventos, membros] = await Promise.all([
+    q(sb.from('fechamento_modelos').select('*').eq('empresa_id', e).order('ordem').order('titulo')),
+    q(sb.from('fechamento_tarefas').select('*').eq('empresa_id', e).eq('mes', mes).order('ordem').order('prazo')),
+    q(sb.from('fechamento_meses').select('*').eq('empresa_id', e).eq('mes', mes).maybeSingle()),
+    q(sb.from('fechamento_eventos').select('*').eq('empresa_id', e).eq('mes', mes).order('em', { ascending: false }).limit(50)),
+    q(sb.rpc('listar_membros', { p_empresa: e })).catch(() => []),
+  ]);
+  const cfg = { meta_dia_util: 5, papeis_fechar: ['admin', 'diretor'], exigir_checklist: true, lembrar: true, lembrete_dias_antes: 1, cobrar_atrasadas: true, avisar_reabertura: ['admin', 'diretor', 'financeiro'], ...(cfg0 || {}) };
+  return { cfg, modelos, tarefas, mesSit, eventos, membros };
+}
+
+const nomeDe = (K, uid) => { const m = K.membros.find(x => x.user_id === uid); return m ? (m.nome || m.email.split('@')[0]) : 'pessoa'; };
+const respTxt = (K, t) => t.responsavel ? nomeDe(K, t.responsavel) : `perfil ${F.PAPEIS[t.papel] || t.papel || 'financeiro'}`;
+const podeMarcar = (t) => gestor() || t.responsavel === state.user?.id || (!t.responsavel && t.papel === state.papel);
+
+async function checklist(c, R, root) {
+  const K = await dadosChecklist(R.mes);
+  const box = document.createElement('div'); box.id = 'fc-check'; c.prepend(box);
+  if (!K) { box.innerHTML = '<div class="card"><p class="small warn" style="margin:0">O checklist com responsáveis e prazos, a trava do mês e o painel "quanto falta para fechar" precisam do SQL 107. As conferências automáticas abaixo continuam valendo.</p></div>'; return; }
+  const hoje = hojeISO(), autoOk = Object.fromEntries(R.etapas.map(x => [x.k, x.ok]));
+  const P = F.progresso(K.tarefas, autoOk, hoje, K.cfg.meta_dia_util, R.mes);
+  const fechado = K.mesSit?.situacao === 'fechado';
+  const podeFechar = K.cfg.papeis_fechar.includes(state.papel);
+  const passado = R.mes < hoje.slice(0, 7);
+  const meta = `D+${K.cfg.meta_dia_util} (${dateBR(P.dataMeta)})`;
+  const pctTxt = Math.round(P.pct * 100);
+  const banner = fechado
+    ? `<div class="card fc-banner fc-fechado"><div><strong>🔒 Mês fechado</strong> em ${new Date(K.mesSit.fechado_em).toLocaleString('pt-BR')} por ${esc(nomeDe(K, K.mesSit.fechado_por))}.
+        Os lançamentos pagos do mês não mudam data, valor, conta, classificação nem situação.${K.mesSit.justificativa ? `<div class="small muted">Fechado com pendência: ${esc(K.mesSit.justificativa)}</div>` : ''}</div>
+        ${podeFechar ? '<button class="btn noprint" id="fc-reabrir">Reabrir o mês…</button>' : ''}</div>`
+    : `<div class="card fc-banner"><div><strong>${K.mesSit?.situacao === 'reaberto' ? '🔓 Mês reaberto' : 'Mês aberto'}</strong>${K.mesSit?.situacao === 'reaberto' ? ` em ${new Date(K.mesSit.reaberto_em).toLocaleString('pt-BR')} por ${esc(nomeDe(K, K.mesSit.reaberto_por))}: ${esc(K.mesSit.motivo_reabertura || '')}` : ''}
+        <div class="small muted">Meta: fechar até ${meta}. ${passado ? `Hoje é D+${P.dHoje}.` : 'O mês ainda está em andamento.'}</div></div>
+        ${podeFechar && passado ? `<button class="btn primary noprint" id="fc-fechar">🔒 Fechar o mês…</button>` : ''}</div>`;
+  const resp = Object.values(P.porResp).sort((a, b) => b.atras - a.atras || b.pend - a.pend);
+  box.innerHTML = `${banner}
+    <div class="kpis">
+      <div class="kpi"><div class="k-label">Quanto falta para fechar</div><div class="k-value ${P.pendentes ? '' : 'pos'}">${P.pendentes ? `${P.pendentes} de ${P.total}` : 'nada'}</div>
+        <div class="fc-barra"><i style="width:${pctTxt}%"></i></div><div class="k-sub">${pctTxt}% do checklist pronto</div></div>
+      <div class="kpi"><div class="k-label">Atrasadas</div><div class="k-value ${P.atrasadas ? 'neg' : ''}">${P.atrasadas}</div><div class="k-sub">${P.venceHoje ? `${P.venceHoje} vence(m) hoje` : 'nenhuma vence hoje'}</div></div>
+      <div class="kpi"><div class="k-label">Meta de fechamento</div><div class="k-value ${P.foraDaMeta ? 'neg' : ''}">D+${K.cfg.meta_dia_util}</div><div class="k-sub">${dateBR(P.dataMeta)}${P.foraDaMeta ? ' · passou da meta' : ''}</div></div>
+      <div class="kpi"><div class="k-label">Previsão pelo checklist</div><div class="k-value">${P.ultimoPrazo ? dateBR(P.ultimoPrazo) : fechado ? 'fechado' : 'pronto'}</div><div class="k-sub">${P.ultimoPrazo ? 'prazo da última tarefa pendente' : '&nbsp;'}</div></div>
+    </div>
+    <div class="card flush"><div class="card-head" style="padding:12px 12px 0;margin:0"><div><h2 style="margin:0">Checklist do fechamento</h2>
+        <p class="muted small" style="margin:4px 0 0">Prazo em dia útil: D+1 é o 1º dia útil do mês seguinte (D+0, o último dia útil do mês). As tarefas ligadas a uma conferência automática ficam prontas sozinhas.</p></div>
+      <div class="toolbar noprint" style="margin:0">${gestor() ? '<button class="btn small" id="fc-modelo">Modelo do checklist</button><button class="btn small" id="fc-par">Parâmetros</button>' : ''}<button class="btn small" id="fc-hist">Histórico</button></div></div>
+      ${!K.tarefas.length ? `<div class="empty">${K.modelos.length ? 'O modelo não tem tarefas ativas.' : `A empresa ainda não tem um modelo de checklist.${gestor() ? '<div style="margin-top:8px"><button class="btn primary small" id="fc-padrao">Usar o modelo padrão (10 tarefas)</button></div>' : ''}`}</div>`
+      : `<div class="table-wrap"><table id="fc-t"><thead><tr><th style="width:30px"></th><th>Tarefa</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th class="noprint"></th></tr></thead><tbody>
+        ${P.itens.map(({ t, s }) => `<tr data-id="${t.id}"><td style="text-align:center;font-size:17px">${s.feita ? '<span class="pos">✔</span>' : s.atrasada ? '<span class="neg">●</span>' : '<span class="muted">○</span>'}</td>
+          <td class="wrap"><strong>${esc(t.titulo)}</strong>${t.obrigatoria === false ? ' <span class="badge">opcional</span>' : ''}${t.descricao ? `<div class="small muted">${esc(t.descricao)}</div>` : ''}
+            ${s.auto ? `<div class="small">${autoOk[t.etapa_auto] ? '<span class="pos">conferência automática ok</span>' : `<span class="neg">conferência automática pendente</span>`}</div>` : ''}${t.observacao ? `<div class="small">📝 ${esc(t.observacao)}</div>` : ''}</td>
+          <td class="nowrap small">${esc(respTxt(K, t))}${t.area ? `<div class="muted">${esc(t.area)}</div>` : ''}</td>
+          <td class="nowrap"><b>D+${t.dia_util}</b> <span class="small muted">${dateBR(t.prazo)}</span></td>
+          <td><span class="badge ${s.feita ? 'pago' : s.atrasada ? 'vencido' : s.hoje ? 'aberto' : ''}">${s.rotulo}</span>${t.feita_em && t.situacao !== 'pendente' ? `<div class="small muted">${esc(nomeDe(K, t.feita_por))}, ${new Date(t.feita_em).toLocaleDateString('pt-BR')}</div>` : ''}</td>
+          <td class="nowrap noprint">${fechado ? '' : `${t.link ? `<a class="btn ghost small" href="${esc(t.link)}">Abrir</a>` : ''}${podeMarcar(t) ? (t.situacao === 'pendente'
+              ? `${!s.auto || !autoOk[t.etapa_auto] ? `<button class="btn small ${s.auto ? '' : 'primary'}" data-ok>Feita</button>` : ''}<button class="btn ghost small" data-na>Não se aplica</button>`
+              : '<button class="btn ghost small" data-desf>Desfazer</button>') : ''}${gestor() ? '<button class="btn ghost small" data-aj title="Responsável e prazo deste mês">⚙</button>' : ''}`}</td></tr>`).join('')}
+        </tbody></table></div>`}
+      ${resp.length ? `<div class="fc-resp small">${resp.map(r => `<span class="${r.atras ? 'neg' : ''}">${esc(respTxt(K, r.t))}: ${r.pend} pendente(s)${r.atras ? `, ${r.atras} atrasada(s)` : ''}</span>`).join('')}</div>` : ''}
+    </div>`;
+
+  const re = () => carregar(root), e = state.empresa.id;
+  $('#fc-padrao', box) && ($('#fc-padrao', box).onclick = async () => { try { await q(sb.rpc('fechamento_modelo_padrao', { p_empresa: e })); toast('Modelo padrão criado'); re(); } catch (er) { fail(er); } });
+  $('#fc-modelo', box) && ($('#fc-modelo', box).onclick = () => modeloChecklist(K, re));
+  $('#fc-par', box) && ($('#fc-par', box).onclick = () => parametrosFech(K, re));
+  $('#fc-hist', box).onclick = () => historico(K, R);
+  $('#fc-fechar', box) && ($('#fc-fechar', box).onclick = () => fecharMes(K, R, P, re));
+  $('#fc-reabrir', box) && ($('#fc-reabrir', box).onclick = () => reabrirMes(R, re));
+  $('#fc-t', box) && ($('#fc-t', box).onclick = async (ev) => {
+    const id = ev.target.closest('tr')?.dataset.id; if (!id) return; const t = K.tarefas.find(x => x.id === id);
+    const marcar = async (sit, obs) => { try { await q(sb.rpc('fechamento_marcar', { p_tarefa: id, p_situacao: sit, p_observacao: obs || null })); re(); } catch (er) { fail(er); } };
+    if (ev.target.closest('[data-ok]')) marcar('feita', null);
+    if (ev.target.closest('[data-desf]')) marcar('pendente', null);
+    if (ev.target.closest('[data-na]')) {
+      const m = modal({ title: 'Não se aplica neste mês', narrow: true, body: `<p class="small" style="margin-top:0">${esc(t.titulo)}</p><label>Por quê?<input id="na-m" maxlength="300" placeholder="ex.: não houve borderô no mês"></label>`,
+        foot: '<button class="btn" data-close>Voltar</button><button class="btn primary" id="na-ok">Confirmar</button>' });
+      $('#na-ok', m.el).onclick = () => { const v = $('#na-m', m.el).value.trim(); if (v.length < 5) return toast('Diga por que não se aplica', true); m.close(); marcar('nao_aplica', v); };
+    }
+    if (ev.target.closest('[data-aj]')) ajustarTarefa(K, t, re);
+  });
+}
+
+const opcoesResp = (K, uid, papel) => `<option value="">Pelo perfil</option>${K.membros.map(m => `<option value="${m.user_id}" ${m.user_id === uid ? 'selected' : ''}>${esc(m.nome || m.email)} (${esc(F.PAPEIS[m.papel] || m.papel)})</option>`).join('')}`;
+const opcoesPapel = (p) => Object.entries(F.PAPEIS).map(([k, l]) => `<option value="${k}" ${k === (p || 'financeiro') ? 'selected' : ''}>${l}</option>`).join('');
+
+function ajustarTarefa(K, t, depois) {
+  const m = modal({ title: 'Responsável e prazo neste mês', narrow: true, body: `<p class="small" style="margin-top:0">${esc(t.titulo)}. Para mudar todos os meses, ajuste o Modelo do checklist.</p>
+    <div class="grid-form"><label class="span2">Responsável<select id="aj-r">${opcoesResp(K, t.responsavel)}</select></label>
+    <label>Perfil (sem pessoa)<select id="aj-p">${opcoesPapel(t.papel)}</select></label><label>Prazo (D+)<input id="aj-d" type="number" min="0" max="20" value="${t.dia_util}"></label></div>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="aj-ok">Salvar</button>' });
+  $('#aj-ok', m.el).onclick = async () => {
+    try { await q(sb.rpc('fechamento_ajustar', { p_tarefa: t.id, p_responsavel: $('#aj-r', m.el).value || null, p_papel: $('#aj-p', m.el).value, p_dia_util: +$('#aj-d', m.el).value })); m.close(); depois(); } catch (e) { fail(e); }
+  };
+}
+
+function modeloChecklist(K, depois) {
+  const L = K.modelos;
+  const m = modal({ title: 'Modelo do checklist do fechamento', wide: true, body: `
+    <p class="small muted" style="margin-top:0">As tarefas do modelo viram o checklist de cada mês. Mudanças valem para os meses que ainda não tinham a tarefa. Para um mês já gerado, use o ⚙ da tarefa.</p>
+    <div class="table-wrap"><table><thead><tr><th>Ordem</th><th>Tarefa</th><th>Responsável</th><th>Prazo</th><th>Conferência automática</th><th></th></tr></thead><tbody>
+    ${L.map(x => `<tr data-id="${x.id}" class="${x.ativo ? '' : 'muted'}"><td>${x.ordem}</td><td class="wrap"><b>${esc(x.titulo)}</b>${x.ativo ? '' : ' <span class="badge">inativa</span>'}${x.obrigatoria ? '' : ' <span class="badge">opcional</span>'}</td>
+      <td class="small">${esc(respTxt(K, x))}</td><td>D+${x.dia_util}</td><td class="small">${x.etapa_auto ? esc(F.ETAPAS_AUTO[x.etapa_auto]) : '—'}</td>
+      <td class="nowrap"><button class="btn ghost small" data-ed>Editar</button><button class="btn ghost small" data-del>Excluir</button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma tarefa no modelo.</td></tr>'}
+    </tbody></table></div>`, foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="md-novo">+ Nova tarefa</button>' });
+  $('#md-novo', m.el).onclick = () => { m.close(); editarModelo(K, { ordem: (L.reduce((a, x) => Math.max(a, x.ordem), 0) || 0) + 1, dia_util: 3, papel: 'financeiro', obrigatoria: true, ativo: true }, depois); };
+  m.el.querySelector('tbody').onclick = async (e) => {
+    const id = e.target.closest('tr')?.dataset.id; if (!id) return; const x = L.find(y => y.id === id);
+    if (e.target.closest('[data-ed]')) { m.close(); editarModelo(K, x, depois); }
+    if (e.target.closest('[data-del]') && await confirmDialog(`Excluir "${x.titulo}" do modelo? As tarefas dos meses já gerados continuam.`)) {
+      try { await q(sb.from('fechamento_modelos').delete().eq('id', id)); toast('Tarefa excluída do modelo'); m.close(); depois(); } catch (er) { fail(er); }
+    }
+  };
+}
+
+function editarModelo(K, x, depois) {
+  const m = modal({ title: x.id ? 'Editar tarefa do modelo' : 'Nova tarefa do modelo', body: `<div class="grid-form">
+      <label class="span2">Tarefa<input id="em-t" maxlength="120" value="${esc(x.titulo || '')}" placeholder="ex.: Conferir a folha com o financeiro"></label>
+      <label class="span2">Descrição<input id="em-d" maxlength="300" value="${esc(x.descricao || '')}"></label>
+      <label>Área<input id="em-a" maxlength="40" value="${esc(x.area || '')}" placeholder="ex.: Financeiro"></label>
+      <label>Prazo (D+)<input id="em-n" type="number" min="0" max="20" value="${x.dia_util}"></label>
+      <label>Responsável<select id="em-r">${opcoesResp(K, x.responsavel)}</select></label>
+      <label>Perfil (sem pessoa)<select id="em-p">${opcoesPapel(x.papel)}</select></label>
+      <label>Conferência automática<select id="em-e"><option value="">Nenhuma (marcar à mão)</option>${Object.entries(F.ETAPAS_AUTO).map(([k, l]) => `<option value="${k}" ${k === x.etapa_auto ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label>Link da tela<input id="em-l" value="${esc(x.link || '')}" placeholder="#/conciliacao"></label>
+      <label>Ordem<input id="em-o" type="number" min="0" max="999" value="${x.ordem}"></label>
+      <label class="chk"><input type="checkbox" id="em-ob" ${x.obrigatoria ? 'checked' : ''}> Obrigatória para fechar</label>
+      <label class="chk"><input type="checkbox" id="em-at" ${x.ativo ? 'checked' : ''}> Ativa</label></div>
+      <p class="small muted">D+1 = 1º dia útil do mês seguinte; D+0 = último dia útil do mês. Feriados nacionais e fins de semana não contam.</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="em-ok">Salvar</button>' });
+  $('#em-ok', m.el).onclick = async () => {
+    const v = (id) => $('#' + id, m.el).value;
+    const reg = { titulo: v('em-t').trim(), descricao: v('em-d').trim() || null, area: v('em-a').trim() || null, dia_util: +v('em-n'), responsavel: v('em-r') || null,
+      papel: v('em-r') ? null : v('em-p'), etapa_auto: v('em-e') || null, link: v('em-l').trim() || null, ordem: +v('em-o') || 0, obrigatoria: $('#em-ob', m.el).checked, ativo: $('#em-at', m.el).checked };
+    if (!reg.titulo) return toast('Escreva a tarefa', true);
+    if (!(reg.dia_util >= 0 && reg.dia_util <= 20)) return toast('O prazo vai de D+0 a D+20', true);
+    try {
+      if (x.id) await q(sb.from('fechamento_modelos').update(reg).eq('id', x.id)); else await q(sb.from('fechamento_modelos').insert({ ...reg, empresa_id: state.empresa.id }));
+      toast('Modelo salvo'); m.close(); depois();
+    } catch (e) { fail(e); }
+  };
+}
+
+function parametrosFech(K, depois) {
+  const c = K.cfg, chk = (arr, cls) => Object.entries(F.PAPEIS).filter(([k]) => ['admin', 'diretor', 'financeiro', 'leitura'].includes(k)).map(([k, l]) => `<label class="chk"><input type="checkbox" class="${cls}" value="${k}" ${arr.includes(k) ? 'checked' : ''}> ${l}</label>`).join('');
+  const m = modal({ title: 'Parâmetros do fechamento', body: `<div class="grid-form">
+      <label>Meta: fechar até (D+)<input id="pf-meta" type="number" min="1" max="20" value="${c.meta_dia_util}"></label>
+      <label>Lembrete antes do prazo (dias)<input id="pf-lem" type="number" min="0" max="10" value="${c.lembrete_dias_antes}"></label>
+      <label class="chk span2"><input type="checkbox" id="pf-l" ${c.lembrar ? 'checked' : ''}> Lembrar o responsável antes do prazo</label>
+      <label class="chk span2"><input type="checkbox" id="pf-c" ${c.cobrar_atrasadas ? 'checked' : ''}> Cobrar as tarefas atrasadas (um aviso por dia útil)</label>
+      <label class="chk span2"><input type="checkbox" id="pf-x" ${c.exigir_checklist ? 'checked' : ''}> Fechar com pendência exige justificativa</label>
+      <div class="span2"><span class="small">Quem fecha e reabre o mês</span><div class="fc-chks">${chk(c.papeis_fechar, 'pf-f')}</div></div>
+      <div class="span2"><span class="small">Quem é avisado quando o mês fecha ou reabre</span><div class="fc-chks">${chk(c.avisar_reabertura, 'pf-a')}</div></div></div>
+      <p class="small muted">Os avisos de lembrete e cobrança saem todo dia às 8h para o responsável da tarefa (ou para o perfil, quando não há pessoa). Tarefas ligadas a uma conferência automática não são cobradas.</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pf-ok">Salvar</button>' });
+  $('#pf-ok', m.el).onclick = async () => {
+    const reg = { empresa_id: state.empresa.id, meta_dia_util: +$('#pf-meta', m.el).value, lembrete_dias_antes: +$('#pf-lem', m.el).value, lembrar: $('#pf-l', m.el).checked,
+      cobrar_atrasadas: $('#pf-c', m.el).checked, exigir_checklist: $('#pf-x', m.el).checked,
+      papeis_fechar: $$('.pf-f', m.el).filter(i => i.checked).map(i => i.value), avisar_reabertura: $$('.pf-a', m.el).filter(i => i.checked).map(i => i.value) };
+    if (!(reg.meta_dia_util >= 1 && reg.meta_dia_util <= 20)) return toast('A meta vai de D+1 a D+20', true);
+    if (!reg.papeis_fechar.length) return toast('Escolha quem fecha o mês', true);
+    try { await q(sb.from('fechamento_config').upsert(reg, { onConflict: 'empresa_id' })); toast('Parâmetros salvos'); m.close(); depois(); } catch (e) { fail(e); }
+  };
+}
+
+function historico(K, R) {
+  const ic = { fechou: '🔒', reabriu: '🔓', tarefa: '✔' };
+  modal({ title: `Histórico do fechamento de ${R.mes.slice(5)}/${R.mes.slice(0, 4)}`, wide: true, body: K.eventos.length
+    ? `<div class="table-wrap"><table><thead><tr><th>Quando</th><th>Quem</th><th>O quê</th></tr></thead><tbody>${K.eventos.map(x => `<tr><td class="nowrap">${new Date(x.em).toLocaleString('pt-BR')}</td><td>${esc((x.por_email || '').split('@')[0])}</td>
+      <td class="wrap">${ic[x.acao] || ''} ${esc(x.detalhe || '')}${x.pendencias?.length ? `<div class="small muted">Pendências: ${x.pendencias.map(p => esc(p.titulo)).join(' · ')}</div>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="empty">Nada registrado neste mês.</div>' });
+}
+
+function fecharMes(K, R, P, depois) {
+  const auto = F.pendenciasAuto(R.etapas).filter(a => !K.tarefas.some(t => t.etapa_auto === a.k && t.situacao !== 'pendente'));
+  const tar = P.itens.filter(x => !x.s.feita && !x.s.auto && x.t.obrigatoria !== false).map(x => ({ k: 'tarefa', titulo: x.t.titulo }));
+  const pend = [...auto, ...tar];
+  const precisa = pend.length && K.cfg.exigir_checklist;
+  const m = modal({ title: `Fechar ${R.mes.slice(5)}/${R.mes.slice(0, 4)}`, body: `
+    <p style="margin-top:0">Depois de fechado, os <b>lançamentos pagos com data no mês</b> não podem mudar data, valor, conta, classificação nem situação, nem ser incluídos ou excluídos. Descrição, documento e centro de custo continuam livres. Para mudar, alguém com permissão reabre o mês com o motivo.</p>
+    ${pend.length ? `<div class="card alert-row atencao" style="display:block"><b>${pend.length} pendência(s)</b><ul class="small" style="margin:6px 0 0">${pend.map(p => `<li>${esc(p.titulo)}</li>`).join('')}</ul></div>
+      <label>Justificativa para fechar com pendência${precisa ? ' *' : ' (opcional)'}<textarea id="fm-j" rows="3" maxlength="500" placeholder="ex.: borderô 118 aprovado por e-mail; extrato do Banco X chega dia 10 e não muda o saldo"></textarea></label>`
+      : '<p class="pos"><b>Checklist completo.</b></p>'}`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="fm-ok">🔒 Fechar o mês</button>' });
+  $('#fm-ok', m.el).onclick = async () => {
+    const j = $('#fm-j', m.el)?.value.trim() || null;
+    if (precisa && (!j || j.length < 15)) return toast('Escreva a justificativa (pelo menos 15 letras)', true);
+    try { await q(sb.rpc('fechamento_fechar', { p_empresa: state.empresa.id, p_mes: R.mes, p_pendencias: auto, p_justificativa: j })); toast('Mês fechado'); m.close(); depois(); } catch (e) { fail(e); }
+  };
+}
+
+function reabrirMes(R, depois) {
+  const m = modal({ title: `Reabrir ${R.mes.slice(5)}/${R.mes.slice(0, 4)}`, narrow: true, body: `<p class="small" style="margin-top:0">Os lançamentos pagos do mês voltam a poder ser alterados. O motivo fica no histórico e a equipe é avisada.</p>
+    <label>Motivo *<textarea id="rm-m" rows="3" maxlength="500" placeholder="ex.: nota de despesa de outubro chegou depois do fechamento"></textarea></label>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn danger" id="rm-ok">Reabrir</button>' });
+  $('#rm-ok', m.el).onclick = async () => {
+    const v = $('#rm-m', m.el).value.trim(); if (v.length < 15) return toast('Explique o motivo (pelo menos 15 letras)', true);
+    try { await q(sb.rpc('fechamento_reabrir', { p_empresa: state.empresa.id, p_mes: R.mes, p_motivo: v })); toast('Mês reaberto'); m.close(); depois(); } catch (e) { fail(e); }
+  };
+}
+
+/** Central de Decisões: tarefas do fechamento atrasadas (do mês anterior) */
+export async function alertasDecisao() {
+  try {
+    const e = state.empresa.id, mes = mesAnt(), hoje = hojeISO();
+    const [T, M] = await Promise.all([
+      q(sb.from('fechamento_tarefas').select('titulo,prazo,situacao,etapa_auto,responsavel,papel,dia_util').eq('empresa_id', e).eq('mes', mes).eq('situacao', 'pendente').lt('prazo', hoje)),
+      q(sb.from('fechamento_meses').select('situacao').eq('empresa_id', e).eq('mes', mes).maybeSingle()),
+    ]);
+    if (M?.situacao === 'fechado') return [];
+    const at = T.filter(t => !t.etapa_auto); if (!at.length) return [];
+    return [{ k: 'fechamento-atrasado', origem: 'Fechamento', urg: at.length > 2 ? 'alta' : 'media', titulo: `${at.length} tarefa(s) do fechamento de ${mes.slice(5)}/${mes.slice(0, 4)} atrasada(s)`,
+      desc: at.slice(0, 4).map(t => `${t.titulo} (D+${t.dia_util}, ${dateBR(t.prazo)})`).join(' · '), regra: 'Tarefas manuais do checklist do fechamento com prazo vencido e o mês ainda aberto.',
+      impacto: 0, impactoTxt: null, acao: 'Abrir o fechamento', rota: 'fechamento?mes=' + mes }];
+  } catch { return []; }
 }

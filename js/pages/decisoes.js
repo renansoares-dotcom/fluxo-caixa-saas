@@ -52,11 +52,12 @@ async function carregar() {
   const qual = temArea('prd') ? await import(`./qualidade.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const recomp = temArea('fin') ? await import(`./fidc-recompras.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const paPrest = temArea('fin') ? await import(`../lib/pa-prestacao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const fech = temArea('fin') ? await import(`./fechamento.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const audAl = await import(`./auditoria.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const lgpd = await import(`./lgpd.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const arte = temArea('com') || temArea('prd') ? await import(`./preimpressao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd, fech };
 }
 
 // ---------------------------------------------------------------- regras
@@ -252,6 +253,9 @@ function regras(D) {
     desc: a.detalhe, impacto: 0, impactoTxt: null,
     regra: 'Solicitações de titulares com o prazo de resposta em até 3 dias ou vencido (LGPD, art. 19), revisão periódica de acessos vencida e pessoas sem entrar perto do prazo de suspensão. Só para o administrador.',
     acao: a.aba === 'solic' ? 'Abrir as solicitações' : 'Abrir a revisão de acessos', rota: `lgpd?aba=${a.aba}` });
+
+  // 26. checklist do fechamento: tarefas manuais atrasadas do mês anterior, com o mês ainda aberto
+  for (const a of D.fech || []) out.push(a);
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

@@ -1158,3 +1158,35 @@ DB.caixa_cenarios = [
       eventos: [{ data: '2027-01-20', descricao: 'Venda do terreno (fictício)', valor: 350000 }] } },
 ];
 window.RPC.caixa_registrar_alerta = () => false;
+
+// Checklist do fechamento (SQL 107) — FICTÍCIOS (mês 10/2026; hoje = D+4)
+DB.fechamento_config = [{ empresa_id: E, meta_dia_util: 5, papeis_fechar: ['admin', 'diretor'], exigir_checklist: true, lembrar: true, lembrete_dias_antes: 1, cobrar_atrasadas: true, avisar_reabertura: ['admin', 'diretor', 'financeiro'] }];
+{
+  const M = [
+    [1, 'Importar e conciliar os extratos bancários', 'Extratos até o último dia do mês, sem movimento pendente.', 'Financeiro', 1, null, 'financeiro', 'ext', '#/conciliacao'],
+    [2, 'Lançamentos pagos com conta bancária', 'Nenhum lançamento pago fora dos relatórios.', 'Financeiro', 1, null, 'financeiro', 'semconta', '#/lancamentos'],
+    [3, 'Baixar ou reprogramar os títulos vencidos', 'Nada em aberto vencido até o fim do mês.', 'Financeiro', 2, 'u2', null, 'abertos', '#/abertos'],
+    [4, 'Notas de venda ligadas ao financeiro', 'Toda nota de venda com recebimento, título ou borderô.', 'Faturamento', 2, null, 'financeiro', 'notas', '#/notas'],
+    [5, 'Decidir os borderôs FIDC do mês', 'Nenhuma proposta pendente com operação no mês.', 'Financeiro', 2, 'u3', null, 'bord', '#/fidc-propostas'],
+    [6, 'Prestação de contas dos pagamentos antecipados', 'Notas dos PAs pagos no mês recebidas ou cobradas.', 'Financeiro', 3, 'u2', null, null, '#/paraquedas'],
+    [7, 'Justificar os desvios do orçamento', 'Contas fora da tolerância com justificativa.', 'Controladoria', 4, 'u2', null, 'orc', '#/controle-orcamento'],
+    [8, 'Conferir a folha de outubro com o financeiro', 'Salários, encargos e adiantamentos lançados.', 'RH', 3, 'u5', null, null, '#/folha'],
+    [9, 'Fechar e travar as contas bancárias', 'Cada conta conciliada, batendo e travada até o fim do mês.', 'Financeiro', 4, 'u1', null, 'contas', '#/fechamento'],
+    [10, 'Revisar a DRE Gerencial e enviar à diretoria', 'Conferir as variações relevantes antes de enviar.', 'Controladoria', 5, 'u2', null, null, '#/dre'],
+    [11, 'Enviar os documentos à contabilidade', 'Extratos, notas e relatórios do mês para o escritório contábil.', 'Contabilidade', 5, null, 'financeiro', null, null],
+  ];
+  const PZ = { 1: '2026-11-03', 2: '2026-11-04', 3: '2026-11-05', 4: '2026-11-06', 5: '2026-11-09' };
+  DB.fechamento_modelos = M.map(([ordem, titulo, descricao, area, dia_util, responsavel, papel, etapa_auto, link]) => ({ id: 'fm' + ordem, empresa_id: E, ordem, titulo, descricao, area, dia_util, responsavel, papel, etapa_auto, link, obrigatoria: true, ativo: true }));
+  const SIT = { 6: ['feita', 'u2', '2026-11-05T15:20:00Z', 'Notas de 9 PAs recebidas; 2 cobradas'], 11: ['nao_aplica', 'u2', '2026-11-06T10:00:00Z', 'Envio passou a ser pelo portal do escritório'] };
+  DB.fechamento_tarefas = M.map(([ordem, titulo, descricao, area, dia_util, responsavel, papel, etapa_auto, link]) => {
+    const s = SIT[ordem] || ['pendente', null, null, null];
+    return { id: 'ft' + ordem, empresa_id: E, mes: '2026-10', modelo_id: 'fm' + ordem, ordem, titulo, descricao, area, dia_util, prazo: PZ[dia_util], responsavel, papel, etapa_auto, link, obrigatoria: true,
+      situacao: s[0], feita_por: s[1], feita_em: s[2], observacao: s[3] };
+  });
+  DB.fechamento_meses = [];
+  DB.fechamento_eventos = [
+    { id: 2, empresa_id: E, mes: '2026-10', acao: 'tarefa', detalhe: 'Enviar os documentos à contabilidade: não se aplica (Envio passou a ser pelo portal do escritório)', por_email: 'ana@exemplo.com.br', em: '2026-11-06T10:00:00Z' },
+    { id: 1, empresa_id: E, mes: '2026-10', acao: 'tarefa', detalhe: 'Prestação de contas dos pagamentos antecipados: feita (Notas de 9 PAs recebidas; 2 cobradas)', por_email: 'ana@exemplo.com.br', em: '2026-11-05T15:20:00Z' },
+  ];
+  window.RPC.fechamento_gerar = () => 0;
+}

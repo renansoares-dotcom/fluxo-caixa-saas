@@ -25,7 +25,7 @@ export const MANUAIS = [
   { id: 'pagamentos-antecipados', titulo: 'Pagamentos Antecipados', area: 'Financeiro', rotas: ['paraquedas'],
     resumo: 'Pedir, aprovar, programar e pagar antes da nota fiscal; vários pagamentos e comprovantes; ligar a nota.' },
   { id: 'conferencia-fechamento', titulo: 'Conferência do dia e Fechamento do mês', area: 'Financeiro', rotas: ['conferencia', 'fechamento'],
-    resumo: 'Mapa conta × dia com o visto, checklist do fechamento, resumo para a direção e trava das contas.' },
+    resumo: 'Mapa conta × dia com o visto, checklist com responsáveis e prazos em dia útil, quanto falta para fechar, trava das contas e do mês (reabertura justificada).' },
   { id: 'fluxo-caixa', titulo: 'Fluxo de caixa e necessidade de caixa', area: 'Financeiro', rotas: ['fluxo-mensal', 'fluxo-diario', 'necessidade-caixa'],
     resumo: 'Fluxo mensal e diário, projeção semanal por cenário (base, otimista, pessimista e personalizados) com caixa mínimo, simulação da RJ e aviso.' },
   { id: 'orcamento', titulo: 'Orçamento — budget, forecast e controle orçamentário', area: 'Financeiro', rotas: ['orcamento', 'orcado-realizado', 'controle-orcamento'],
