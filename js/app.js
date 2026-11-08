@@ -253,7 +253,7 @@ $('#empresa-switch').onclick = () => { sessionStorage.setItem('fc-escolher', '1'
 // esconde do menu as áreas que o usuário não acessa (Dashboard faz parte do Financeiro)
 function aplicarAreas() {
   $$('#nav .nav-area[data-area]').forEach(el => { if (['fin', 'com', 'cmp', 'prd', 'log', 'cpd', 'cont'].includes(el.dataset.area)) el.hidden = !temArea(el.dataset.area); });
-  for (const r of ['dashboard', 'decisao-dia', 'decisoes', 'executivo']) { const a = $(`#nav a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
+  for (const r of ['decisao-dia', 'decisoes', 'executivo']) { const a = $(`#nav a[data-route="${r}"]`); if (a) a.hidden = !temArea('fin'); }
   const pain = $('#nav .nav-area[data-area="pain"]'); if (pain) pain.hidden = !temArea('fin');
   // RH: só administrador ou quem tem a área "rh" marcada (sem marcação não dá acesso — salário é sigiloso)
   const rh = $('#nav .nav-area[data-area="rh"]'); if (rh) rh.hidden = !temRH();
@@ -263,7 +263,7 @@ function primeiraRota() {
   const a = $$('#nav a[data-route]').find(x => !x.hidden && !x.closest('.nav-area')?.hidden && x.dataset.route !== 'conversas');
   return a?.dataset.route || 'cadastros/plano';
 }
-const areaDaRota = (route) => ['dashboard', 'decisao-dia', 'decisoes', 'executivo'].includes(route) ? 'fin' : $(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
+const areaDaRota = (route) => ['decisao-dia', 'decisoes', 'executivo'].includes(route) ? 'fin' : $(`#nav a[data-route="${route}"]`)?.closest('.nav-area')?.dataset.area;
 
 // número de aprovações pendentes ao lado de "Minhas aprovações" no menu (a cada 5 minutos)
 let apTimer = null;

@@ -1134,3 +1134,14 @@ window.FN = {
   if (!DB.decisoes_dia.length) DB.decisoes_dia.push(...[[118, 0, 'Pendente', 182400], [117, 1, 'Aprovada', 151230], [116, 2, 'Aprovada', 96410], [115, 3, 'Rejeitada', -12300]].map(([numero, d, status, saldo_fim]) =>
     ({ id: 'dd' + numero, empresa_id: E, numero, data: D(d), status, saldo_fim, criado_em: H(d, 14), decidido_em: status !== 'Pendente' ? H(d, 12) : null, motivo: status === 'Rejeitada' ? 'Segurar o pagamento da resina até o borderô' : null, itens: [], contas: [] })));
 }
+
+// Meus Painéis (SQL 104) — FICTÍCIOS
+DB.paineis = [
+  { id: 'pn1', empresa_id: E, dono: 'u1', dono_nome: 'renata', nome: 'Diretoria', ordem: 1, compartilhado: true, cartoes: [
+    { t: 'resumo_diretoria', tam: 3 }, { t: 'graf_faturamento', tam: 2 }, { t: 'ind_diretoria', tam: 1, cfg: { k: 'perdas' } },
+    { t: 'graf_producao', tam: 2 }, { t: 'ind_diretoria', tam: 1, cfg: { k: 'entregas' } }, { t: 'graf_necessidade', tam: 2 }, { t: 'kpi_abertos', tam: 1 }] },
+  { id: 'pn2', empresa_id: E, dono: 'u1', dono_nome: 'renata', nome: 'Visão do ano', ordem: 2, compartilhado: false, cartoes: [
+    { t: 'kpi_saldo', tam: 1 }, { t: 'kpi_entradas_saidas', tam: 1 }, { t: 'kpi_resultado', tam: 1 }, { t: 'graf_entradas_saidas', tam: 2 }, { t: 'kpi_abertos', tam: 1 },
+    { t: 'graf_composicao', tam: 1 }, { t: 'tab_saldos', tam: 2 }, { t: 'tab_vencimentos', tam: 3 }] },
+  { id: 'pn3', empresa_id: E, dono: 'u4', dono_nome: 'carlos', nome: 'Fábrica', ordem: 1, compartilhado: true, cartoes: [{ t: 'graf_producao', tam: 2 }, { t: 'graf_qualidade', tam: 1 }, { t: 'graf_entregas', tam: 3 }] },
+];

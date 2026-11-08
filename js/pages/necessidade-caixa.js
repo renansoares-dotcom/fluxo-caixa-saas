@@ -103,7 +103,7 @@ export async function resumoNecessidade() {
   const sel = new Set(salvas ? salvas : D.saldos.filter(s => !/bloqueio/i.test(s.nome)).map(s => s.conta_id));
   const minimo = ls.get('nc-min', 50000);
   const R = calcular(sel, minimo);
-  return { minimo, saldoIni: R.saldoIni, primeira: R.semanas.find(w => w.abaixo) || null, pior: R.semanas.reduce((a, w) => (w.saldo < a.saldo ? w : a), R.semanas[0]) };
+  return { minimo, saldoIni: R.saldoIni, semanas: R.semanas, primeira: R.semanas.find(w => w.abaixo) || null, pior: R.semanas.reduce((a, w) => (w.saldo < a.saldo ? w : a), R.semanas[0]) };
 }
 
 export async function render(root) {

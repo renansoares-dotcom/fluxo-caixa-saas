@@ -1,6 +1,6 @@
 export const FIGS = [
   ['paineis', 'hoje', '## 3.', 'Minha Manhã'], ['paineis', 'decisoes?aba=pagamentos', '### 4.3', 'Central de Decisões › Pagamentos do dia'], ['paineis', 'decisoes', '### 4.1', 'Central de Decisões › Alertas, com os delegados, adiados e resolvidos'],
-  ['paineis', 'executivo', '## 6.', 'Dashboard Executivo'], ['paineis', 'dashboard', '## 7.', 'Dashboard'],
+  ['paineis', 'executivo', '## 6.', 'Dashboard Executivo'], ['paineis', 'dashboard', '## 6.', 'Meus Painéis: o painel Diretoria, com indicadores e gráficos de várias áreas'],
   ['lancamentos', 'lancamentos', '## 3.', 'Lançamentos do mês com os totais'], ['lancamentos', 'abertos', '## 4.', 'Contas a Pagar / Receber'],
   ['conciliacao', 'conciliacao', '## 4.', 'Conciliação Bancária: extrato à esquerda, lançamentos sem extrato à direita'],
   ['creditos-conta-corrente', 'creditos', '### 3.1', 'Créditos e Adiantamentos'], ['creditos-conta-corrente', 'conta-fornecedor', '## 4.', 'Conta-corrente de um cliente'],
@@ -140,6 +140,9 @@ export const FIGS = [
   ['paineis', 'decisoes', '### 4.1', 'Delegar um alerta: para quem e a instrução', 'click:.dc-rec [data-t="delegado"]'],
   ['paineis', 'decisoes?aba=saude', '### 4.2', 'Saúde da empresa: índice geral, evolução e as notas por área com os motivos'],
   ['paineis', 'decisoes?aba=historico', '### 4.4', 'Histórico: alertas tratados e as decisões de pagamentos do dia'],
+  // Meus Painéis (07/11/2026)
+  ['paineis', 'dashboard', '### 6.2', 'Editar o painel: ordem, tamanho, indicador e excluir cartões', 'click:#pn-ed'],
+  ['paineis', 'dashboard', '### 6.2', 'Adicionar cartão: o catálogo por área', 'click:#pn-ed|click:#pn-add'],
   // Recompras FIDC (07/11/2026)
   ['fidc-recompras', 'fidc-recompras', '## 3.', 'Recompras: as pendências sem registro, os indicadores e os títulos recomprados'],
   ['fidc-recompras', 'fidc-recompras', '### 3.1', 'Registrar a recompra: o título, o motivo (aqui, devolução de mercadoria), a nota de devolução e o que volta para a carteira', 'click:#rc-novo|click:.rc-res [data-i]|click:[data-mo="mo-devolucao"]'],

@@ -1,7 +1,7 @@
 ---
-titulo: Painéis — Minha Manhã, Central de Decisões e dashboards
-tela: Painéis › Minha Manhã (PAI001), Central de Decisões (PAI003), Dashboard Executivo (PAI004) e Dashboard (PAI005)
-versao: 1.4
+titulo: Painéis — Minha Manhã, Central de Decisões, Dashboard Executivo e Meus Painéis
+tela: Painéis › Minha Manhã (PAI001), Central de Decisões (PAI003), Dashboard Executivo (PAI004) e Meus Painéis (PAI005)
+versao: 1.5
 atualizado: 2026-11-07
 ---
 ## 1. Para que serve
@@ -15,7 +15,7 @@ Os painéis juntam, numa tela só, o que precisa de atenção e de decisão:
   - a saúde da empresa por área;
   - o histórico do que foi decidido.
 - **Dashboard Executivo**: a visão de um mês para a direção, com a nota de saúde financeira.
-- **Dashboard**: o resumo do ano, com entradas e saídas, saldos por conta e próximos vencimentos.
+- **Meus Painéis**: cada pessoa monta os seus painéis com os indicadores, gráficos e tabelas que mais acompanha.
 
 ## 2. Quem tem acesso
 
@@ -248,20 +248,57 @@ Só o administrador e o diretor alteram. Em **Parâmetros**:
 
 O painel usa só lançamentos com conta bancária, a mesma base dos saldos.
 
-## 6. Dashboard
+## 6. Meus Painéis
 
-![Figura 10 — Dashboard (dados fictícios)](img/paineis-5.jpg)
+![Figura 10 — Meus Painéis: o painel Diretoria, com indicadores e gráficos de várias áreas (dados fictícios)](img/paineis-5.jpg)
 
-O resumo do ano mostra:
+O antigo **Dashboard** virou **Meus Painéis**: cada pessoa monta **um ou mais painéis** com os cartões que já existem na plataforma. Quem ainda não montou nada vê o painel padrão **Visão do ano**, igual ao Dashboard antigo:
 
-- o saldo em bancos disponível;
+- o saldo em bancos;
 - as entradas e as saídas;
-- o EBITDA e o resultado gerencial;
+- o EBITDA e o resultado;
 - o que está em aberto;
-- o gráfico de entradas e saídas com o saldo;
-- a composição das saídas;
+- os gráficos de entradas e saídas e de composição das saídas;
 - os saldos por conta;
 - os próximos vencimentos.
+
+### 6.1 Os cartões
+
+| Área | Cartões |
+|---|---|
+| Financeiro | Saldo em bancos · Entradas e saídas do ano · EBITDA e resultado do ano · A pagar e a receber · Entradas × saídas e saldo · Composição das saídas · Receita e EBITDA por mês · Caixa projetado por semana · Saldos por conta · Próximos vencimentos |
+| Painel da Diretoria | Indicador da diretoria (escolha qual dos oito) · Situação dos indicadores |
+| Comercial | Faturamento líquido por mês |
+| Produção e qualidade | Produção e perdas por mês · Não conformidades por mês |
+| Logística | Entregas no prazo por mês |
+
+Cada pessoa vê só os cartões das áreas que enxerga. Os do Painel da Diretoria são para o administrador, o diretor, o financeiro e o leitura.
+
+Os cartões financeiros usam o **ano** escolhido no alto da tela. Os demais mostram os últimos 13 meses até o mês anterior. Os dados são carregados uma vez por painel, mesmo que vários cartões usem a mesma informação.
+
+### 6.2 Montar e editar
+
+![Figura 11 — Editar o painel: ordem, tamanho, indicador e excluir cartões (dados fictícios)](img/paineis-11.jpg)
+
+1. **+ Novo painel** cria um painel vazio, com o nome que você escolher.
+2. **Editar painel** abre o modo de edição:
+   - **↑ ↓** mudam a ordem;
+   - **P · M · G** escolhem o tamanho: um terço, dois terços ou a largura toda da tela;
+   - **⚙** escolhe o indicador, no cartão "Indicador da diretoria";
+   - **✕** tira o cartão.
+3. **+ Adicionar cartão** abre o catálogo, separado por área.
+4. Em **Nome**, renomeie o painel. **Excluir painel** apaga o painel (só o seu).
+5. **Concluir** sai da edição. As mudanças ficam salvas na hora.
+
+![Figura 12 — Adicionar cartão: o catálogo por área (dados fictícios)](img/paineis-12.jpg)
+
+Se você editar o painel padrão "Visão do ano", ele vira um painel seu.
+
+### 6.3 Compartilhar como modelo
+
+Marque **Compartilhar com a empresa como modelo** no modo de edição. O painel aparece em **Modelos da empresa** para as outras pessoas, que podem **Copiar para mim** e então ajustar a cópia. Só o dono altera o modelo. O sinal ⇄ ao lado do nome indica que o painel está compartilhado.
+
+Os painéis ficam guardados por pessoa e por empresa e valem em todos os aparelhos.
 
 ## 7. Perguntas frequentes e erros comuns
 
@@ -278,3 +315,4 @@ O resumo do ano mostra:
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.3 | 07/11/2026 | Minha Manhã personalizada: blocos por perfil, o que mudou desde o último acesso, resumo do dia anterior, aprovações, indicadores da diretoria e atalhos. |
 | 1.4 | 07/11/2026 | Central de Decisões: Decisão do Dia e Decision Center numa tela só, com resolver, adiar e delegar cada alerta, histórico e saúde da empresa 0–100 por área. |
+| 1.5 | 07/11/2026 | O Dashboard virou Meus Painéis: painéis montados por cada pessoa com 16 cartões de várias áreas, tamanho e ordem, e modelos compartilhados com a empresa. |
