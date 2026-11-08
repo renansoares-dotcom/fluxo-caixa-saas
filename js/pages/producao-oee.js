@@ -1,4 +1,4 @@
-// Produção › OEE e Perdas (PRD008) — melhoria 6.1 (SQL 113, 08/11/2026).
+// Produção › OEE e Perdas (PRD019) — melhoria 6.1 (SQL 113, 08/11/2026).
 // OEE por máquina com disponibilidade, desempenho e qualidade contra as metas da empresa, tendência por dia, semana ou mês,
 // as perdas em horas (do tempo planejado ao tempo efetivo), o Pareto das paradas (inclusive as OS de manutenção que
 // pararam a máquina) e do refugo. Metas e parâmetros: administrador e financeiro.

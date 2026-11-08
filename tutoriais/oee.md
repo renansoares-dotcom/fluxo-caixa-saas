@@ -1,6 +1,6 @@
 ---
 titulo: OEE e Perdas
-tela: Produção › OEE e Perdas (PRD008)
+tela: Produção › OEE e Perdas (PRD019)
 versao: 1.0
 atualizado: 2026-11-08
 ---
