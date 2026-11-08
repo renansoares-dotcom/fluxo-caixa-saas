@@ -1419,3 +1419,23 @@ window.RPC.pag_remessa_gravar = () => null;
   window.RPC.prod_custo_ops = () => LISTA;
   window.RPC.prod_custo_op = (a) => LISTA.find(x => x.ordem.id === a.p_ordem) || LISTA[0];
 }
+
+// Rastreabilidade (SQL 115) — caminho FICTÍCIO de um lote de resina até os clientes
+{
+  DB.prod_rastreio_config = [{ empresa_id: E, qr_link: true, exigir_nota: true }];
+  const o1 = { id: 'rto1', numero: 1188, numero_iniflex: '81188', produto: 'PI-040 BOBINA PEBD 40CM 0,08 (extrusão)', cliente: 'SUPERMERCADOS', status: 'concluida', emissao: '2026-10-12' };
+  const o2 = { id: 'rto2', numero: 1190, numero_iniflex: '81190', produto: 'PA-100 SACO PEBD 40X60 0,10 IMPRESSO', cliente: 'SUPERMERCADOS', status: 'concluida', emissao: '2026-10-14' };
+  const b = (codigo, ordem_id, peso, sit, extra = {}) => ({ id: 'rtb-' + codigo, codigo, ordem_id, peso_kg: peso, situacao: sit, qualidade: 'liberada', maquina: ordem_id === 'rto1' ? 'EXT-01' : 'IMP-01', criado_em: '2026-10-13T10:00:00Z', ...extra });
+  const bob = [b('B-104511', 'rto1', 612.4, 'consumida', { lote_materia: 'LT-BK-2291' }), b('B-104512', 'rto1', 598.1, 'consumida', { lote_materia: 'LT-BK-2291' }), b('B-104513', 'rto1', 605.0, 'estoque', { lote_materia: 'LT-BK-2291', qualidade: 'bloqueada' }),
+    b('B-104620', 'rto2', 590.2, 'expedida', { mae_id: 'rtb-B-104511', nota_id: 'rtn1', nota: 4561, expedida_em: '2026-10-16T14:00:00Z' }), b('B-104621', 'rto2', 583.7, 'expedida', { mae_id: 'rtb-B-104512', nota_id: 'rtn2', nota: 4570, expedida_em: '2026-10-18T09:00:00Z' })];
+  window.RPC.prod_rastrear = (a) => ({
+    termo: String(a.p_termo || '').toUpperCase(), achados: [{ tipo: 'lote', txt: 'Lote ' + String(a.p_termo || '').toUpperCase() }],
+    ops: [o1, o2], bobinas: bob,
+    materiais: [{ ordem_id: 'rto1', codigo: 'MP-001', descricao: 'RESINA PEBD LINEAR', lote: 'LT-BK-2291', lote_fornecedor: 'BRK-26-0918-A', qtd: 1450, fornecedor: 'RESINAS DO BRASIL S.A.', nota_entrada: 88214, nota_entrada_data: '2026-10-02' },
+      { ordem_id: 'rto1', codigo: 'MP-002', descricao: 'MASTERBATCH BRANCO', lote: 'MB-7731', qtd: 95, fornecedor: 'COLOR MASTER LTDA', nota_entrada: 1182, nota_entrada_data: '2026-09-25' }],
+    tintas: [{ ordem_id: 'rto2', numero: 312, cor: 'AZUL PROCESSO', lote: 'TI-312', kg: 38.5, situacao: 'entregue', componentes: [{ codigo: 'TN-BASE-AZ', lote: 'L-5521', lote_fornecedor: 'SK-2210' }, { codigo: 'TN-VERNIZ', lote: 'L-5490' }] }],
+    qualidade: [{ tipo: 'inspeção', numero: 211, situacao: 'aprovada', ordem_id: 'rto1' }, { tipo: 'RNC', numero: 37, situacao: 'em_analise', bobina_id: 'rtb-B-104513' }],
+    notas: [{ id: 'rtn1', numero: 4561, emissao: '2026-10-16', cliente: 'SUPERMERCADOS EXEMPLO LTDA', cnpj: '11', uf: 'PE', bobinas: 1, kg: 590.2, carga: 88, entrega: 'entregue' },
+      { id: 'rtn2', numero: 4570, emissao: '2026-10-18', cliente: 'ATACADO MODELO S.A.', cnpj: '22', uf: 'PB', bobinas: 1, kg: 583.7, carga: 91, entrega: 'pendente' }],
+  });
+}

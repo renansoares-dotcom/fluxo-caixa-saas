@@ -33,6 +33,8 @@ export const FIGS = [
   ['compras', 'compras', '## 3.', 'Painel de Compras'], ['compras', 'compras/pedidos', '### 4.5', 'Pedidos de Compra'],
   ['estoque', 'estoque/produtos', '## 4.', 'Cadastro de produtos'],
   ['terminal-producao', 'producao/terminal', '## 3.', 'Terminal do setor de extrusão'],
+  ['rastreabilidade', 'producao/rastreio?t=LT-BK-2291', '## 3.', 'Rastreabilidade de um lote de resina: materiais, produção com as bobinas mãe e filha, e os clientes que receberam'],
+  ['rastreabilidade', 'producao/rastreio', '## 4.', 'Expedir bobinas: a NF-e e as bobinas lidas pelo QR', 'click:#rt-exp'],
   ['custo-op', 'producao/custos', '## 3.', 'Custo das OPs: totais do período e cada OP com o custo real, o orçado, o desvio e a margem'],
   ['custo-op', 'producao/custos', '## 4.', 'Detalhe da OP: composição do custo real contra o orçado e cada material, tinta, máquina e rateio da manutenção', 'click:[data-op="opc2"]'],
   ['custo-op', 'producao/custos', '## 6.', 'Custo-hora por setor e por máquina, rateio da manutenção e limites', 'click:#co-par'],

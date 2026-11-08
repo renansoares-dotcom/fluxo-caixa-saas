@@ -52,8 +52,11 @@ async function qr() {
   await new Promise((ok, err) => { const s = document.createElement('script'); s.src = new URL('../../vendor/qrcode-generator-1.4.4.js', import.meta.url).href; s.onload = ok; s.onerror = err; document.head.appendChild(s); });
   qrLib = window.qrcode; return qrLib;
 }
+// conteúdo do QR da etiqueta: o endereço da tela de rastreabilidade (o celular abre direto) ou só o código (SQL 115)
+export const linkRastreio = (codigo) => `${location.origin}${location.pathname}#/producao/rastreio?b=${encodeURIComponent(codigo)}`;
 export async function imprimirEtiquetas(bobinas, op, maqNome = (id) => '') {
-  let gerar = null;
+  let gerar = null, comLink = true;
+  try { const c = await q(sb.from('prod_rastreio_config').select('qr_link').eq('empresa_id', state.empresa.id).maybeSingle()); if (c) comLink = c.qr_link !== false; } catch { /* sem SQL 115: só o código */ comLink = false; }
   try { const lib = await qr(); gerar = (t) => { const c = lib(0, 'M'); c.addData(t); c.make(); return c.createSvgTag({ cellSize: 3, margin: 0 }); }; } catch { gerar = null; }
   const w = window.open('', '_blank'); if (!w) return alert('Libere as janelas pop-up para imprimir as etiquetas');
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas — OP ${op.numero}</title><style>
@@ -63,7 +66,7 @@ export async function imprimirEtiquetas(bobinas, op, maqNome = (id) => '') {
       <div class="l"><b>OP ${op.numero}</b>${op.numero_iniflex ? ` · Iniflex ${esc(op.numero_iniflex)}` : ''}<br>${esc(op.codigo_produto || '')} ${esc(op.descricao || '')}<br>
       ${op.cliente ? `Cliente: ${esc(op.cliente)}<br>` : ''}Máquina: ${esc(maqNome(b.maquina_id))} · ${dateBR(String(b.criado_em || new Date().toISOString()).slice(0, 10))}${b.lote_materia ? `<br>Lote MP: ${esc(b.lote_materia)}` : ''}</div>
       <div class="p">${String(b.peso_kg).replace('.', ',')} kg${b.metros ? ` · ${b.metros} m` : ''}</div><div class="cod">${esc(b.codigo)}</div></div>
-      <div class="qr">${gerar ? gerar(b.codigo) : ''}</div></div>`).join('')}
+      <div class="qr">${gerar ? gerar(comLink ? linkRastreio(b.codigo) : b.codigo) : ''}</div></div>`).join('')}
     <script>window.onload=()=>window.print()</script></body></html>`);
   w.document.close();
 }

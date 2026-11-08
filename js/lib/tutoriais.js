@@ -52,6 +52,8 @@ export const MANUAIS = [
     resumo: 'Estoque oficial por local e lote, custo médio ponderado móvel, movimentos e estorno, locais, famílias, tipos de movimento, regras por CFOP e fechamento do mês.' },
   { id: 'terminal-producao', titulo: 'Terminal de produção', area: 'Produção', rotas: ['producao/terminal'],
     resumo: 'Para o operador: iniciar, registrar bobina com etiqueta, parada e encerramento.' },
+  { id: 'rastreabilidade', titulo: 'Rastreabilidade — do lote da resina à nota do cliente', area: 'Produção', rotas: ['producao/rastreio'],
+    resumo: 'Busca por bobina (QR), OP, lote ou NF-e; caminho materiais → produção → clientes; recolhimento; expedição das bobinas na NF-e.' },
   { id: 'custo-op', titulo: 'Custo das OPs — custo real, orçado e margem', area: 'Produção', rotas: ['producao/custos'],
     resumo: 'Custo real de cada OP (material, tinta, máquina, manutenção) contra o orçado pela estrutura, e a margem pelo preço de venda.' },
   { id: 'oee', titulo: 'OEE e Perdas — disponibilidade, desempenho e qualidade por máquina', area: 'Produção', rotas: ['producao/oee'],
