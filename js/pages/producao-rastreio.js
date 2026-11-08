@@ -4,6 +4,7 @@
 // a qualidade e, quando a busca é um lote, o resumo de quem recebeu (para um recolhimento). Expedição das bobinas na NF-e.
 import { sb, state, q, podeEditar } from '../lib/data.js';
 import { $, $$, esc, dateBR, fail, toast, modal, exportXLSX } from '../lib/ui.js';
+import { certificadoPDF } from '../lib/certificado.js';
 
 export const title = 'Rastreabilidade';
 const ui = { termo: '' };
@@ -65,11 +66,17 @@ function pintar(root) {
             <td>${b.situacao === 'expedida' && podeEditar() ? `<button class="btn ghost small" data-desf="${b.id}" title="Desfazer a expedição">↩</button>` : ''}</td></tr>`).join('') || '<tr><td class="muted">Sem bobinas registradas.</td></tr>'}</tbody></table></div>
           ${R.qualidade.filter(x => x.ordem_id === o.id || bobPorOp(o.id).some(b => b.id === x.bobina_id)).map(x => `<div class="muted">${esc(x.tipo)} nº ${x.numero} · ${esc(String(x.situacao).replace(/_/g, " "))}</div>`).join('')}</div>`).join('')}</div>
       <div><h3 style="margin:0 0 6px">3. Clientes</h3>
-        ${R.notas.map(n => `<div class="card small" style="margin-bottom:8px;border-left:3px solid var(--pos)"><b style="${destaca(n.numero)}">NF-e ${n.numero}</b> · ${dateBR(n.emissao)}<div>${esc(n.cliente || '')}${n.uf ? ` — ${esc(n.uf)}` : ''}</div>
+        ${R.notas.map(n => `<div class="card small" style="margin-bottom:8px;border-left:3px solid var(--pos)"><div style="display:flex;justify-content:space-between;gap:6px"><span><b style="${destaca(n.numero)}">NF-e ${n.numero}</b> · ${dateBR(n.emissao)}</span><button class="btn ghost small" data-cert="${n.id}" data-n="${n.numero}" title="Certificado de qualidade desta nota">Certificado</button></div><div>${esc(n.cliente || '')}${n.uf ? ` — ${esc(n.uf)}` : ''}</div>
           <div class="muted">${n.bobinas} bobina(s) · ${kg(n.kg)}${n.carga ? ` · carga ${n.carga}${n.entrega ? ` (${esc(n.entrega)})` : ''}` : ''}</div></div>`).join('') || '<div class="card small muted">Nenhuma bobina expedida em nota.</div>'}</div>
     </div>`;
   $('#rt-xls', el).onclick = exportar;
   $$('[data-desf]', el).forEach(b => b.onclick = () => desfazer(b.dataset.desf, root));
+  // certificado de qualidade da nota (melhoria 6.6, SQL 128): o mesmo PDF que o cliente baixa no Portal
+  $$('[data-cert]', el).forEach(b => b.onclick = async () => {
+    if (!window.jspdf) return fail(new Error('Gerador de PDF não carregado'));
+    b.disabled = true;
+    try { const c = await q(sb.rpc('qual_certificado', { p_nota: b.dataset.cert })); certificadoPDF(c, window.jspdf.jsPDF).save(`Certificado_NF${b.dataset.n}.pdf`); } catch (e) { fail(e); } finally { b.disabled = false; }
+  });
 }
 
 function exportar() {

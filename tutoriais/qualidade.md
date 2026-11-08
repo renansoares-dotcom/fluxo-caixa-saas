@@ -1,7 +1,7 @@
 ---
 titulo: Qualidade — inspeção com bloqueio de estoque e não conformidades
 tela: Produção › Qualidade › Painel da Qualidade (PRD012), Inspeções (PRD013), Não Conformidades e Bloqueios (PRD014) e Planos e Parâmetros (PRD015)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-07
 ---
 ## 1. Para que serve
@@ -194,9 +194,52 @@ Escolha a disposição e clique em **Executar no estoque**. Só quem decide exec
 
 A disposição executada não muda.
 
+### 6.3 Reclamação do cliente pelo Portal
+
+O cliente abre a reclamação no Portal do Cliente, na aba **Reclamações**. Ele informa a nota fiscal, o produto, o lote ou o número da bobina da etiqueta, a quantidade com problema, o que aconteceu e até 6 fotos. A plataforma então:
+
+- abre uma **RNC de origem "Reclamação de cliente"**, com o selo **Portal** na lista;
+- marca o prazo da **primeira resposta** (padrão: 2 dias);
+- avisa a equipe escolhida nos Parâmetros (sino, celular e e-mail, conforme Meus avisos);
+- manda ao cliente a confirmação com o número da reclamação.
+
+![Figura 9 — Reclamação do cliente pelo Portal na ficha da RNC: nota, lote, fotos, prazo e resposta (dados fictícios)](img/qualidade-13.jpg)
+
+Na ficha da RNC, o quadro **Cliente (Portal)** mostra o que o cliente informou e as fotos. Para tratar:
+
+1. Preencha a **Equipe** (D1) e a **Ação imediata** (D3), por exemplo o bloqueio dos lotes iguais que ainda estão na fábrica (item 7) e a reposição ao cliente;
+2. Faça a análise: 5 porquês, **causa raiz** (D4), **ação corretiva** com responsável e prazo (D5 e D6) e **Prevenção** (D7), que é o que muda em outros produtos e máquinas;
+3. Escreva a **Resposta ao cliente** e clique em **Enviar resposta ao cliente**. Ele recebe por e-mail e, se aceitou, por WhatsApp. No Portal, vê a resposta e a análise passo a passo (8D);
+4. Depois de verificar a eficácia, encerre a RNC (D8).
+
+![Figura 10 — RNC respondida ao cliente, com a análise preenchida (dados fictícios)](img/qualidade-14.jpg)
+
+O cliente diz no Portal se a resposta resolveu. Se **não resolveu**, ele escreve o motivo e a equipe recebe um aviso urgente. A RNC encerrada volta para **Em análise**. Uma nova resposta pode ser enviada a qualquer momento: o cliente avalia de novo.
+
+Na lista de RNC, o filtro **Reclamações do Portal** mostra só as que vieram do cliente. Os selos indicam:
+
+- **Aguardando resposta**: a primeira resposta ainda não foi enviada;
+- **Resposta ao cliente atrasada**: o prazo da primeira resposta passou;
+- **Cliente não aceitou**: o cliente disse que a resposta não resolveu.
+
+Uma RNC aberta pela equipe com o cliente informado também pode aparecer no Portal: marque **O cliente acompanha esta RNC no Portal**.
+
+### 6.4 Certificado de qualidade da NF-e
+
+Para cada nota com bobinas expedidas (Rastreabilidade › Expedir bobinas), a plataforma gera o **certificado de qualidade** em PDF. O certificado traz:
+
+- as bobinas da nota, com o peso, os metros e o lote da matéria-prima;
+- as OPs, incluindo a OP de extrusão das bobinas-mãe;
+- os resultados das inspeções aprovadas: especificação, média, mínimo e máximo de cada característica;
+- a declaração e o responsável que assina, definidos nos Parâmetros.
+
+![Figura 11 — Certificado de qualidade da NF-e (dados fictícios)](img/qualidade-certificado.jpg)
+
+A equipe baixa o certificado na **Rastreabilidade**: busque a nota e clique em **Certificado**. O cliente baixa na aba Notas fiscais do Portal, no mesmo botão.
+
 ## 7. Bloqueios
 
-![Figura 9 — Lotes e bobinas bloqueados, com o histórico (dados fictícios)](img/qualidade-8.jpg)
+![Figura 12 — Lotes e bobinas bloqueados, com o histórico (dados fictícios)](img/qualidade-8.jpg)
 
 1. Abra a aba **Bloqueios** em Não Conformidades e Bloqueios.
 2. Clique em **Bloquear lote ou bobina**.
@@ -212,7 +255,7 @@ O que o bloqueio faz:
 
 ## 8. Planos e Parâmetros
 
-![Figura 10 — Planos de inspeção (dados fictícios)](img/qualidade-9.jpg)
+![Figura 13 — Planos de inspeção (dados fictícios)](img/qualidade-9.jpg)
 
 ### 8.1 Planos de inspeção
 
@@ -226,11 +269,11 @@ O que o bloqueio faz:
 | Instruções | O que o inspetor deve fazer, por exemplo "medir a espessura em 5 pontos da largura". |
 | Características | Nome, tipo (medida ou atributo), unidade, nominal, mínimo, máximo, método e se é **crítica**. Característica crítica fora da especificação reprova o lote. |
 
-![Figura 11 — Plano de recebimento de resina com as características (dados fictícios)](img/qualidade-10.jpg)
+![Figura 14 — Plano de recebimento de resina com as características (dados fictícios)](img/qualidade-10.jpg)
 
 ### 8.2 Amostragem
 
-![Figura 12 — Tabela de amostragem (dados fictícios)](img/qualidade-11.jpg)
+![Figura 15 — Tabela de amostragem (dados fictícios)](img/qualidade-11.jpg)
 
 - Cada faixa de tamanho do lote tem:
   - o tamanho da amostra;
@@ -242,7 +285,7 @@ O que o bloqueio faz:
 
 ### 8.3 Parâmetros
 
-![Figura 13 — Parâmetros da qualidade (dados fictícios)](img/qualidade-12.jpg)
+![Figura 16 — Parâmetros da qualidade (dados fictícios)](img/qualidade-12.jpg)
 
 | Parâmetro | O que faz | Padrão |
 |---|---|---|
@@ -253,6 +296,14 @@ O que o bloqueio faz:
 | Meta de aprovação / IQF | Meta do painel e dos fornecedores | 95% |
 | Entrada pela nota vai para a quarentena | Desligado, a nota entra direto no local padrão, e a inspeção é feita sem bloqueio | Ligado |
 | Quem decide | Papéis que aprovam, reprovam, liberam bloqueio e executam a disposição | Administrador, diretor e financeiro |
+| O cliente abre reclamação pelo Portal | Desligado, a aba Reclamações mostra só as reclamações já abertas | Ligado |
+| O cliente vê a análise (8D) | Desligado, o cliente vê só a situação e a resposta | Ligado |
+| Prazo da primeira resposta | Dias para responder ao cliente, de 0 a 30 | 2 dias |
+| Quem recebe o aviso da reclamação | Papéis avisados da reclamação nova e da avaliação do cliente | Administrador, diretor e produção |
+| Certificado no Portal | O cliente baixa o certificado das notas com bobinas expedidas | Ligado |
+| Responsável, cargo e declaração | O que sai no fim do certificado | — |
+
+![Figura 17 — Parâmetros da reclamação pelo Portal e do certificado de qualidade (dados fictícios)](img/qualidade-15.jpg)
 
 ## 9. Como o bloqueio funciona no estoque e na produção
 
@@ -295,6 +346,8 @@ Os alertas do Painel também aparecem no **Decision Center**.
 - A disposição executada não muda, e a RNC com material só encerra com a disposição definida.
 - Os números da inspeção e da RNC são sequenciais por empresa.
 - Todas as alterações ficam na auditoria.
+- O cliente só reclama de notas dele e só vê as RNC marcadas para o Portal. Até 6 fotos por reclamação.
+- O certificado só sai para nota com bobina expedida e só mostra inspeção aprovada.
 
 ## 12. Perguntas frequentes
 
@@ -308,7 +361,9 @@ Os alertas do Painel também aparecem no **Decision Center**.
 
 No último caso, use **Buscar notas de entrada**.
 
-**O cliente reclamou de um lote que já foi entregue.** Abra uma **Nova RNC** com origem "Reclamação de cliente". Depois bloqueie os lotes e as bobinas do mesmo produto que ainda estão na fábrica e, se precisar, abra uma inspeção de origem "Reclamação".
+**O cliente reclamou de um lote que já foi entregue.** O melhor caminho é o cliente abrir pelo Portal (item 6.3). Se ele reclamou por telefone, abra uma **Nova RNC** com origem "Reclamação de cliente" e marque que ele acompanha no Portal. Em qualquer caso, bloqueie os lotes e as bobinas do mesmo produto que ainda estão na fábrica e, se precisar, abra uma inspeção de origem "Reclamação".
+
+**O certificado saiu sem resultados.** A OP não tem inspeção aprovada com plano. Registre a inspeção final (ou a de liberação) com o plano de inspeção do produto.
 
 **Como sei se o processo é capaz?** Com 5 medições ou mais e os dois limites informados, a ficha mostra o Cpk. Como referência:
 
@@ -323,3 +378,4 @@ No último caso, use **Buscar notas de entrada**.
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão. Inclui planos de inspeção, quarentena no recebimento pela nota, liberação do primeiro material e inspeção final na produção, avaliação com Cpk e sugestão pela amostragem, decisão parcial, laudo, RNC com disposição no estoque e 5 porquês, bloqueio de lote e bobina, IQF, parâmetros e Decision Center. |
+| 1.1 | 08/11/2026 | Reclamação do cliente pelo Portal (RNC com fotos, prazo da primeira resposta, 8D e resposta ao cliente, avaliação pelo cliente), certificado de qualidade da NF-e e parâmetros. |

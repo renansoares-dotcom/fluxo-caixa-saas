@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect width="640" height="480" fill="#d9d4cc"/><rect x="0" y="360" width="640" height="120" fill="#b9b2a6"/>
+<g transform="rotate(4 320 240)"><path d="M190 90 L450 90 L470 400 L170 400 Z" fill="#c8102e"/><path d="M190 90 L450 90 L452 120 L188 120 Z" fill="#f1c400"/>
+<text x="320" y="230" font-family="Arial" font-size="40" font-weight="700" fill="#fff" text-anchor="middle">BISCOITO</text><text x="320" y="270" font-family="Arial" font-size="26" fill="#fff" text-anchor="middle">MARIA 200 g</text>
+<path d="M170 400 L470 400" stroke="#7a0a1c" stroke-width="6"/><path d="M250 400 C 270 380, 300 385, 330 400 C 350 412, 370 408, 390 400" fill="#d9d4cc" stroke="#7a0a1c" stroke-width="3"/>
+<circle cx="320" cy="398" r="58" fill="none" stroke="#ffeb3b" stroke-width="5" stroke-dasharray="10 6"/></g>
+<text x="20" y="460" font-family="Arial" font-size="18" fill="#3d3d3d">Foto fictícia — fardo 3, várias unidades</text></svg>

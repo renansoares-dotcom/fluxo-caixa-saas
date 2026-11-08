@@ -1697,3 +1697,44 @@ window.RPC.pag_remessa_gravar = () => null;
     U('ex@farmavida.exemplo', 'FARMÁCIAS VIDA LTDA', null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, false)];
   DB.portal_boletos = [{ id: 'pb1', empresa_id: E, lancamento_id: 'cob-l1', linha_digitavel: linhaFicticia(dd(-12), 9800, '0000004790000020000000003'), arquivo_path: E + '/boletos/cob-l1/boleto.pdf', vencimento: dd(-12) }];
 }
+
+// Reclamação pelo Portal e certificado (SQL 128) — dados FICTÍCIOS
+{
+  const agora = Date.now(), Hh = (h) => new Date(agora - h * 36e5).toISOString(), dd = (n) => new Date(agora + n * 864e5).toISOString().slice(0, 10);
+  Object.assign(DB.qual_parametros[0], { portal_reclamacao: true, portal_mostrar_8d: true, portal_prazo_resposta_dias: 2, portal_papeis_aviso: ['admin', 'diretor', 'producao'],
+    certificado_ativo: true, certificado_responsavel: 'Carla Menezes', certificado_cargo: 'Coordenadora da Qualidade' });
+  const nota = DB.nfe_notas[DB.nfe_notas.length - 1];
+  const R1 = { id: 'qr-p1', empresa_id: E, numero: 6, origem: 'cliente', produto_id: 'pr-bisc', favorecido_id: 'fv-vd', nota_id: nota?.id, portal_visivel: true, portal_user_id: 'u-portal',
+    produto_cliente: 'Embalagem biscoito Maria 200 g', lote_cliente: 'B1211-018', quantidade_cliente: 1200, unidade_cliente: 'UN', descricao: 'A solda inferior abre na máquina de empacotar: cerca de 1.200 embalagens do fardo 3 perderam o produto.',
+    gravidade: 'alta', disposicao: 'pendente', situacao: 'aberta', aberta_em: Hh(5), aberta_por: 'Portal: compras@viladoce.exemplo', custo: 0, porques: [], prazo: dd(15), prazo_resposta: dd(1), equipe: null };
+  const R2 = { id: 'qr-p2', empresa_id: E, numero: 5, origem: 'cliente', produto_id: 'pr-bisc', favorecido_id: 'fv-vd', nota_id: nota?.id, portal_visivel: true, produto_cliente: 'Embalagem biscoito Maria 200 g',
+    lote_cliente: 'B1198-007', quantidade_cliente: 40, unidade_cliente: 'KG', descricao: 'Cor vermelha mais clara que o padrão aprovado em parte da bobina.', gravidade: 'media', disposicao: 'pendente', situacao: 'acao',
+    aberta_em: Hh(24 * 9), aberta_por: 'Portal: compras@viladoce.exemplo', custo: 0, prazo: dd(6), prazo_resposta: dd(-7), equipe: 'Carla (Qualidade), Paulo (Impressão), Lucas (Casa de Tintas)',
+    acao_imediata: 'Bobinas restantes do lote separadas e conferidas no espectrofotômetro; reposição de 40 kg enviada na NF 18233', causa: 'Viscosidade da tinta acima do padrão no fim do turno',
+    porques: ['Cor mais clara no fim da bobina', 'Tinta mais viscosa', 'Diluição não corrigida no fim do turno'], acao_corretiva: 'Medição da viscosidade a cada 2 horas, com registro no Terminal', responsavel: 'Paulo (Impressão)',
+    prevencao: 'Checklist de viscosidade incluído em todas as impressoras', resposta_cliente: 'Identificamos a viscosidade da tinta acima do padrão no fim do turno. Enviamos a reposição de 40 kg e passamos a medir a viscosidade a cada 2 horas, com registro. Acompanhamos as próximas entregas no espectrofotômetro.',
+    respondida_em: Hh(24 * 7), respondida_por: 'carla@exemplo.com.br' };
+  DB.qual_rnc.unshift(R1, R2);
+  DB.qual_anexos.push({ id: 'qx-p1', empresa_id: E, rnc_id: 'qr-p1', caminho: E + '/portal/x/reclamacao-foto1.svg', nome: 'foto1.jpg', tipo: 'foto', portal_visivel: true, criado_em: Hh(5) },
+    { id: 'qx-p2', empresa_id: E, rnc_id: 'qr-p1', caminho: E + '/portal/x/reclamacao-foto2.svg', nome: 'foto2.jpg', tipo: 'foto', portal_visivel: true, criado_em: Hh(5) });
+  const cli = (r) => ({ id: r.id, numero: r.numero, aberta_em: r.aberta_em, nota: nota?.numero, produto: r.produto_cliente, lote: r.lote_cliente, quantidade: r.quantidade_cliente, unidade: r.unidade_cliente, descricao: r.descricao,
+    situacao: r.situacao, prazo_resposta: r.prazo_resposta, resposta: r.resposta_cliente || null, respondida_em: r.respondida_em || null,
+    d8: { equipe: r.equipe, contencao: r.acao_imediata || null, causa: r.causa || null, porques: r.porques, corretiva: r.acao_corretiva || null, prazo: r.prazo, eficacia: r.eficacia || null, prevencao: r.prevencao || null },
+    fotos: DB.qual_anexos.filter(a => a.rnc_id === r.id).map(a => ({ caminho: a.caminho, nome: a.nome })) });
+  Object.assign(window.RPC, {
+    portal_qualidade_cfg: () => ({ reclamacao: true, mostrar_8d: true, certificado: true, abertas: 2 }),
+    portal_reclamacoes: () => [cli(R1), cli(R2)], portal_reclamar: () => 7, portal_reclamacao_avaliar: () => null, qual_responder_cliente: () => 2,
+    portal_certificados: () => ['pn1', 'pn2'] });
+  const CERT = { nota: { numero: 18211, serie: '1', emissao: dd(-5), chave: '26110812345678000195550010000182111000182118', cliente: 'VILA DOCE ALIMENTOS LTDA', cliente_doc: '12345678000195' },
+    empresa: { nome: 'PLÁSTICOS EXEMPLO LTDA', cnpj: '12.345.678/0001-95' }, responsavel: 'Carla Menezes', cargo: 'Coordenadora da Qualidade', bobinas: 3, kg: 1386.4, gerado_em: new Date().toISOString(),
+    texto: 'Declaramos que os produtos desta nota fiscal foram fabricados e inspecionados conforme os planos de inspeção da empresa e atendem às especificações acordadas.',
+    ops: [{ numero: 1211, produto: 'EMB-BISC-200 · EMBALAGEM BISCOITO MARIA 200G BOPP', expedida: true,
+      bobinas: [{ codigo: 'B1211-016', peso_kg: 462.1, metros: 6120, lote_materia: 'LT-BK-2291' }, { codigo: 'B1211-017', peso_kg: 458.9, metros: 6080, lote_materia: 'LT-BK-2291' }, { codigo: 'B1211-018', peso_kg: 465.4, metros: 6150, lote_materia: 'LT-BK-2302' }],
+      inspecoes: [{ numero: 214, etapa: 'processo', situacao: 'aprovada', data: dd(-6), inspetor: 'Renata', plano: 'Liberação da impressão', caracteristicas: [{ nome: 'Delta E da cor 186 C', tipo: 'medida', min: 0, max: 2 }, { nome: 'Registro', tipo: 'medida', min: 0, max: 0.3, unidade: 'mm' }, { nome: 'Código de barras', tipo: 'atributo' }],
+          resultados: [{ nome: 'Delta E da cor 186 C', valores: [0.8, 1.1, 0.9] }, { nome: 'Registro', valores: [0.1, 0.2, 0.15] }, { nome: 'Código de barras', defeitos: 0 }] },
+        { numero: 219, etapa: 'final', situacao: 'aprovada', data: dd(-5), inspetor: 'Renata', plano: 'Final embalagem BOPP', caracteristicas: [{ nome: 'Espessura', tipo: 'medida', min: 28, max: 32, unidade: 'µm' }, { nome: 'Resistência da solda', tipo: 'medida', min: 1.5, unidade: 'kgf' }, { nome: 'Aparência', tipo: 'atributo' }],
+          resultados: [{ nome: 'Espessura', valores: [29.6, 30.2, 30.1, 29.8, 30.4] }, { nome: 'Resistência da solda', valores: [2.1, 2.3, 1.9, 2.2, 2.0] }, { nome: 'Aparência', defeitos: 0 }] }] },
+      { numero: 1204, produto: 'FILME BOPP 30 µm (extrusão)', expedida: false, bobinas: [],
+        inspecoes: [{ numero: 205, etapa: 'processo', situacao: 'aprovada', data: dd(-9), inspetor: 'Paulo', plano: 'Liberação da extrusão', caracteristicas: [{ nome: 'Tratamento corona', tipo: 'medida', min: 38, unidade: 'dyn' }], resultados: [{ nome: 'Tratamento corona', valores: [40, 41, 40] }] }] }] };
+  window.RPC.portal_certificado = () => CERT; window.RPC.qual_certificado = () => CERT;
+}

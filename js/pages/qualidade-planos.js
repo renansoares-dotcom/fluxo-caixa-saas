@@ -63,12 +63,26 @@ function pintar(root) {
     <h4 style="margin:14px 0 6px">Quem decide (aprova, reprova, libera bloqueio e executa a disposição)</h4>
     <div style="display:flex;gap:16px;flex-wrap:wrap">${PAPEIS.map(([k, t]) => `<label class="chk" style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="pap" value="${k}" ${k === 'admin' ? 'checked disabled' : (p.papeis_decisao || []).includes(k) ? 'checked' : ''} ${dis}> ${t}</label>`).join('')}</div>
     <p class="muted small" style="margin-top:10px">Registrar inspeção e abrir RNC: administrador, financeiro, diretor, compras e produção. O administrador sempre decide.</p>
+    <h4 style="margin:14px 0 6px">Reclamação pelo Portal do Cliente</h4>
+    <label class="chk" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="prec" ${p.portal_reclamacao !== false ? 'checked' : ''} ${dis}> O cliente abre reclamação pelo Portal (vira RNC de origem "Reclamação de cliente")</label>
+    <label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" name="p8d" ${p.portal_mostrar_8d !== false ? 'checked' : ''} ${dis}> O cliente vê a análise (8D: equipe, contenção, causa, ações, prevenção)</label>
+    <div class="grid-form" style="margin-top:8px"><label class="xs">Prazo da primeira resposta (dias)<input name="pprz" type="number" min="0" max="30" value="${p.portal_prazo_resposta_dias ?? 2}" ${dis}></label></div>
+    <div style="margin-top:6px" class="small">Quem recebe o aviso da reclamação:</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">${[...PAPEIS, ['producao', 'Produção'], ['compras', 'Compras']].filter((x, i, a) => a.findIndex(y => y[0] === x[0]) === i).map(([k, t]) => `<label class="chk" style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="pav" value="${k}" ${(p.portal_papeis_aviso || ['admin', 'diretor', 'producao']).includes(k) ? 'checked' : ''} ${dis}> ${t}</label>`).join('')}</div>
+    <h4 style="margin:14px 0 6px">Certificado de qualidade da NF-e</h4>
+    <label class="chk" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="cat" ${p.certificado_ativo !== false ? 'checked' : ''} ${dis}> O cliente baixa o certificado no Portal (notas com bobinas expedidas)</label>
+    <div class="grid-form" style="margin-top:8px"><label class="span2">Responsável que assina<input name="cres" value="${esc(p.certificado_responsavel || '')}" ${dis} placeholder="Nome"></label>
+      <label class="span2">Cargo<input name="ccar" value="${esc(p.certificado_cargo || '')}" ${dis} placeholder="Ex.: Coordenadora da Qualidade"></label>
+      <label class="full">Declaração<textarea name="ctxt" rows="2" ${dis}>${esc(p.certificado_texto || 'Declaramos que os produtos desta nota fiscal foram fabricados e inspecionados conforme os planos de inspeção da empresa e atendem às especificações acordadas.')}</textarea></label></div>
     ${ger ? '<div style="text-align:right"><button class="btn primary" id="qpa-ok" type="button">Salvar parâmetros</button></div>' : ''}</form></div>`;
     $('#qpa-ok', c) && ($('#qpa-ok', c).onclick = async () => {
       const f = $('#qpa', c), pap = ['admin', ...$$('input[name=pap]:checked:not([disabled])', c).map(x => x.value)];
       if (f.qua.value && f.qua.value === f.rep.value) return toast('Quarentena e Reprovado precisam ser locais diferentes', true);
       try { await q(sb.from('qual_parametros').upsert({ empresa_id: state.empresa.id, local_quarentena_id: f.qua.value || null, local_reprovado_id: f.rep.value || null, prazo_horas: +f.prazo.value || 24,
-        prazo_rnc_dias: +f.prnc.value || 15, meta_aprovacao_pct: parseNum(f.meta.value) || 95, inspecionar_recebimento: f.rec.checked, papeis_decisao: [...new Set(pap)], atualizado_em: new Date().toISOString() }));
+        prazo_rnc_dias: +f.prnc.value || 15, meta_aprovacao_pct: parseNum(f.meta.value) || 95, inspecionar_recebimento: f.rec.checked, papeis_decisao: [...new Set(pap)],
+        portal_reclamacao: f.prec.checked, portal_mostrar_8d: f.p8d.checked, portal_prazo_resposta_dias: Math.min(30, Math.max(0, +f.pprz.value || 0)),
+        portal_papeis_aviso: $$('input[name=pav]:checked', c).map(x => x.value), certificado_ativo: f.cat.checked, certificado_responsavel: f.cres.value.trim() || null,
+        certificado_cargo: f.ccar.value.trim() || null, certificado_texto: f.ctxt.value.trim() || undefined, atualizado_em: new Date().toISOString() }));
         toast('Parâmetros salvos'); render(root); } catch (e) { fail(e); }
     });
     c.onclick = null;

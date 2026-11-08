@@ -84,7 +84,7 @@ export function lerDanfe(xml) {
 
 // ---------------------------------------------------------------- PDF
 // as fontes padrão do jsPDF só têm Latin-1
-const lat = (s) => String(s ?? '').replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[  ]/g, ' ').replace(/[^\x00-\xff]/g, '');
+const lat = (s) => String(s ?? '').replace(/[\u00b5\u03bc]/g, 'u').replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[  ]/g, ' ').replace(/[^\x00-\xff]/g, '');
 
 /** gera a DANFE (retrato, A4) e devolve o documento jsPDF; d = lerDanfe(xml) */
 export function danfePDF(d, jsPDF) {

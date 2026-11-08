@@ -17,6 +17,11 @@
     .pt-auth{max-width:420px;margin:40px auto}
     .pt-auth form{display:grid;gap:10px}
     .pt-aviso{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:13px}
+    .pt-8d{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-top:8px}
+    .pt-8d-p{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--border);border-radius:8px;padding:8px;opacity:.75}
+    .pt-8d-p.ok{opacity:1;border-color:var(--pos)}
+    .pt-8d-d{flex:0 0 30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;background:var(--border)}
+    .pt-8d-p.ok .pt-8d-d{background:var(--pos);color:#fff}
     .pt-n{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--neg);color:#fff;font-size:11px;text-align:center;margin-left:4px}
     .pt-artes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
     .pt-artes .pi-card .im{height:150px}.pt-artes .pi-card .im img{max-height:150px}.pt-artes .pi-card.pt-pend{border:2px solid var(--warn)}

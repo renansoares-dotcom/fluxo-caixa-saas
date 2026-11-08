@@ -13,7 +13,7 @@ export async function render(root) {
   root.innerHTML = `${CSS}<div class="mm-topo"><div><h2 style="margin:0">Não Conformidades e Bloqueios</h2><div class="muted small">Tratamento do que deu errado — do material (disposição) à causa (5 porquês e ação corretiva) — e o que está bloqueado.</div></div>
       <div class="ql-acoes"><button class="btn ghost" id="qr-xls">Excel</button><span id="qr-acao"></span></div></div>
     <div class="card toolbar"><div class="chips" id="qr-abas">${[['rnc', 'Não conformidades (RNC)'], ['bloq', 'Bloqueios']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div>
-      <span class="spacer"></span><select id="qr-f" style="max-width:170px">${[['abertas', 'Em aberto'], ['vencidas', 'Ação vencida'], ['encerrada', 'Encerradas'], ['todas', 'Todas']].map(([k, t]) => `<option value="${k}" ${ui.f === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <span class="spacer"></span><select id="qr-f" style="max-width:170px">${[['abertas', 'Em aberto'], ['vencidas', 'Ação vencida'], ['portal', 'Reclamações do Portal'], ['encerrada', 'Encerradas'], ['todas', 'Todas']].map(([k, t]) => `<option value="${k}" ${ui.f === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <input id="qr-b" placeholder="Procurar" value="${esc(ui.busca)}" style="width:170px"></div>
     <div id="qr-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#qr-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; $$('#qr-abas .chip', root).forEach(c => c.classList.toggle('on', c.dataset.a === a)); pintar(root); } };
@@ -32,14 +32,14 @@ async function pintar(root) {
   if (ui.aba === 'rnc') {
     acao.innerHTML = podeRegistrar() ? '<button class="btn primary" id="qr-nova">Nova RNC</button>' : '';
     $('#qr-nova', root) && ($('#qr-nova', root).onclick = () => novaRnc(D, { onSalvo: re }));
-    const L = D.R.filter(r => (ui.f === 'abertas' ? Q.RNC_ABERTAS.includes(r.situacao) : ui.f === 'vencidas' ? Q.rncVencida(r) : ui.f === 'encerrada' ? r.situacao === 'encerrada' : true)
+    const L = D.R.filter(r => (ui.f === 'abertas' ? Q.RNC_ABERTAS.includes(r.situacao) : ui.f === 'vencidas' ? Q.rncVencida(r) : ui.f === 'portal' ? r.portal_visivel : ui.f === 'encerrada' ? r.situacao === 'encerrada' : true)
       && (!b || `${r.numero} ${r.descricao} ${nomeProd(D, r.produto_id)} ${nomeFav(D, r.favorecido_id)} ${r.responsavel || ''}`.toLowerCase().includes(b)));
     c.innerHTML = `<div class="card flush"><div class="table-wrap"><table><thead><tr><th>RNC</th><th>O que aconteceu</th><th>Disposição</th><th>Ação corretiva</th><th>Situação</th></tr></thead><tbody>
-      ${L.map(r => `<tr class="clickable" data-r="${r.id}"><td><b>${r.numero}</b><div class="small muted">${dateBR(r.aberta_em.slice(0, 10))} · ${esc(Q.ORIGENS_RNC[r.origem])}</div><div>${selo(Q.GRAVIDADES[r.gravidade], clsGrav(r.gravidade))}</div></td>
+      ${L.map(r => `<tr class="clickable" data-r="${r.id}"><td><b>${r.numero}</b><div class="small muted">${dateBR(r.aberta_em.slice(0, 10))} · ${esc(Q.ORIGENS_RNC[r.origem])}</div><div>${selo(Q.GRAVIDADES[r.gravidade], clsGrav(r.gravidade))}${r.portal_visivel ? ' ' + selo('Portal', 'info') : ''}</div></td>
         <td class="wrap">${esc(r.descricao)}<div class="small muted">${esc([nomeProd(D, r.produto_id) !== '—' ? nomeProd(D, r.produto_id) : '', nomeFav(D, r.favorecido_id), r.quantidade != null ? `${nf(r.quantidade)} ${r.unidade || ''}` : ''].filter(Boolean).join(' · '))}</div></td>
         <td class="small">${esc(Q.DISPOSICOES[r.disposicao])}${r.disposicao_executada_em ? '<div class="muted">✔ executada</div>' : r.disposicao !== 'pendente' ? '<div class="muted">a executar</div>' : ''}</td>
         <td class="small wrap">${esc(r.acao_corretiva || '—')}<div class="muted">${esc(r.responsavel || '')}${r.prazo ? ' · até ' + dateBR(r.prazo) : ''}</div></td>
-        <td>${selo(Q.SIT_RNC[r.situacao], clsRnc(r.situacao))}${Q.rncVencida(r) ? `<div>${selo('Vencida', 'neg')}</div>` : ''}${+r.custo ? `<div class="small muted">custo ${money(r.custo)}</div>` : ''}</td></tr>`).join('')
+        <td>${selo(Q.SIT_RNC[r.situacao], clsRnc(r.situacao))}${Q.rncVencida(r) ? `<div>${selo('Vencida', 'neg')}</div>` : ''}${Q.respostaAtrasada(r) ? `<div>${selo('Resposta ao cliente atrasada', 'neg')}</div>` : r.cliente_aceite === 'nao_aceita' ? `<div>${selo('Cliente não aceitou', 'neg')}</div>` : r.portal_visivel && !r.respondida_em && Q.RNC_ABERTAS.includes(r.situacao) ? `<div>${selo('Aguardando resposta', 'warn')}</div>` : ''}${+r.custo ? `<div class="small muted">custo ${money(r.custo)}</div>` : ''}</td></tr>`).join('')
         || '<tr><td colspan="5" class="empty">Nenhuma não conformidade neste filtro.</td></tr>'}</tbody></table></div></div>`;
     c.onclick = (e) => { const r = e.target.closest('[data-r]'); if (r) fichaRnc(D, D.R.find(x => x.id === r.dataset.r), { onMudou: re }); };
     return;

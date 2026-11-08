@@ -7,13 +7,14 @@ import * as PI from './lib/preimpressao.js';
 import { CSS as CSS_ARTE } from './lib/preimpressao-css.js';
 import { exigirTermo } from './lib/lgpd-termo.js';
 import { viewer, prepararArquivo, subirArquivos, linksArte, conferirArquivo, ACEITOS } from './lib/arte-viewer.js';
+import { passos8D, SIT_CLIENTE as SIT_RECL } from './lib/qualidade.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
 const avisar = () => { sb.functions.invoke('notificar', { body: {} }).catch(() => {}); sb.functions.invoke('email', { body: {} }).catch(() => {}); sb.functions.invoke('whatsapp', { body: {} }).catch(() => {}); };   // manda já o aviso à equipe (o agendamento também manda)
 const main = $('#pt-main');
 const token = new URLSearchParams(location.search).get('convite');
-const S = { clientes: [], fav: null, aba: new URLSearchParams(location.search).get('arte') ? 'artes' : (new URLSearchParams(location.search).get('aba') === 'entregas' ? 'entregas' : 'titulos'), pend: 0, arte: new URLSearchParams(location.search).get('arte') };
+const S = { clientes: [], fav: null, aba: new URLSearchParams(location.search).get('arte') ? 'artes' : (['entregas', 'reclamacoes', 'notas'].includes(new URLSearchParams(location.search).get('aba')) ? new URLSearchParams(location.search).get('aba') : 'titulos'), pend: 0, arte: new URLSearchParams(location.search).get('arte') };
 const base = () => location.href.split('#')[0].split('?')[0];
 
 // ---------------------------------------------------------------- autenticação
@@ -80,10 +81,13 @@ const carregarScript = (src) => new Promise((ok, er) => { if (document.querySele
 async function pintar() {
   const c = S.fav;
   try { S.lista = await q(sb.rpc('portal_artes', { p_fav: c.favorecido_id })); } catch { S.lista = []; }
+  if (S.qcfgFav !== c.favorecido_id) { S.qcfgFav = c.favorecido_id; try { S.qcfg = await q(sb.rpc('portal_qualidade_cfg', { p_fav: c.favorecido_id })) || {}; } catch { S.qcfg = {}; } }
+  const comRecl = S.qcfg?.reclamacao || +S.qcfg?.abertas > 0;
+  if (S.aba === 'reclamacoes' && !comRecl) S.aba = 'titulos';
   S.pend = S.lista.filter(a => a.pendente).length;
   if (S.pend && S.aba === 'titulos' && !S.vistoArtes) { S.vistoArtes = true; }
   main.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">${esc(c.cliente)}</h2><div class="muted small">${esc(c.documento || '')} · fornecedor: ${esc(c.empresa)}</div></div></div>
-    <div class="card toolbar"><div class="chips" id="pt-abas">${[['titulos', 'Títulos'], ['notas', 'Notas fiscais'], ['entregas', 'Entregas'], ['compras', 'O que comprei'], ['pedidos', 'Pedidos de prorrogação'], ...(S.lista.length ? [['artes', 'Artes para aprovar']] : [])]
+    <div class="card toolbar"><div class="chips" id="pt-abas">${[['titulos', 'Títulos'], ['notas', 'Notas fiscais'], ['entregas', 'Entregas'], ['compras', 'O que comprei'], ['pedidos', 'Pedidos de prorrogação'], ...(S.lista.length ? [['artes', 'Artes para aprovar']] : []), ...(comRecl ? [['reclamacoes', 'Reclamações']] : [])]
       .map(([k, t]) => `<span class="chip ${S.aba === k ? 'on' : ''}" data-a="${k}">${t}${k === 'artes' && S.pend ? ` <b class="pt-n">${S.pend}</b>` : ''}</span>`).join('')}<span class="chip" id="pt-wa" title="Receber os avisos pelo WhatsApp">📱 WhatsApp</span></div></div>
     ${S.pend && S.aba !== 'artes' ? `<div class="pt-aviso" style="margin-top:12px;cursor:pointer" id="pt-ir-artes">🎨 <b>${S.pend} arte(s) aguardando a sua aprovação.</b> Clique para conferir e aprovar.</div>` : ''}
     <div id="pt-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
@@ -91,7 +95,7 @@ async function pintar() {
   $('#pt-ir-artes') && ($('#pt-ir-artes').onclick = () => { S.aba = 'artes'; pintar(); });
   $('#pt-wa').onclick = () => whatsapp();
   registrar(S.aba);
-  ({ titulos, notas, entregas, compras, pedidos, artes })[S.aba]().catch(err => { fail(err); $('#pt-corpo').innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; });
+  ({ titulos, notas, entregas, compras, pedidos, artes, reclamacoes })[S.aba]().catch(err => { fail(err); $('#pt-corpo').innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; });
 }
 
 async function titulos() {
@@ -156,11 +160,18 @@ function pedir(t) {
 
 async function notas() {
   const N = await q(sb.rpc('portal_notas', { p_fav: S.fav.favorecido_id, p_de: new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10) }));
+  let CT = new Set(); if (S.qcfg?.certificado !== false) { try { CT = new Set((await q(sb.rpc('portal_certificados', { p_fav: S.fav.favorecido_id }))).map(x => x.portal_certificados ?? x)); } catch {} }
   $('#pt-corpo').innerHTML = `<div class="card flush"><div class="table-wrap" style="max-height:70vh"><table><thead><tr><th>Nota</th><th>Emissão</th><th class="num">Valor</th><th class="pt-hide-sm">Parcelas</th><th class="pt-hide-sm">Chave de acesso</th><th></th></tr></thead><tbody>
     ${N.map(n => `<tr><td>${n.numero}${n.serie ? '-' + esc(n.serie) : ''}</td><td>${dateBR(n.emissao)}</td><td class="num">${money(n.valor)}</td>
       <td class="small pt-hide-sm">${(n.parcelas || []).map(p => `${dateBR(p.vencimento)} ${money(p.valor)}`).join('<br>')}</td><td class="small pt-hide-sm" style="font-family:monospace">${esc(n.chave || '')}</td>
-      <td style="white-space:nowrap">${n.tem_xml ? `<button class="btn small" data-d="${n.id}" data-n="${n.numero}">DANFE</button><button class="btn ghost small" data-x="${n.id}" data-n="${n.numero}">XML</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma nota nos últimos 13 meses.</td></tr>'}</tbody></table></div></div>
+      <td style="white-space:nowrap">${n.tem_xml ? `<button class="btn small" data-d="${n.id}" data-n="${n.numero}">DANFE</button><button class="btn ghost small" data-x="${n.id}" data-n="${n.numero}">XML</button>` : ''}${CT.has(n.id) ? `<button class="btn ghost small" data-ct="${n.id}" data-n="${n.numero}" title="Certificado de qualidade dos lotes desta nota">Certificado</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma nota nos últimos 13 meses.</td></tr>'}</tbody></table></div></div>
     <p class="small muted">A DANFE é gerada a partir do XML autorizado. A autenticidade pode ser conferida no portal da NF-e com a chave de acesso.</p>`;
+  $$('[data-ct]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { const c = await q(sb.rpc('portal_certificado', { p_fav: S.fav.favorecido_id, p_nota: b.dataset.ct }));
+      await carregarScript('vendor/jspdf-4.2.1.umd.min.js'); await carregarScript('vendor/jspdf-autotable-5.0.9.min.js');
+      const { certificadoPDF } = await import('./lib/certificado.js'); registrar('certificado'); certificadoPDF(c, window.jspdf.jsPDF).save(`Certificado_NF${b.dataset.n}.pdf`); } catch (err) { fail(err); } finally { b.disabled = false; }
+  });
   $$('[data-d]').forEach(b => b.onclick = async () => {
     b.disabled = true;
     try { const xml = await q(sb.rpc('portal_nota_xml', { p_fav: S.fav.favorecido_id, p_nota: b.dataset.d })); if (!xml) return toast('XML indisponível', true);
@@ -187,6 +198,75 @@ async function entregas() {
       <td>${e.canhoto_path ? `<button class="btn ghost small" data-can="${esc(e.canhoto_path)}">Canhoto</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">Nenhuma entrega da nossa frota nos últimos 4 meses.</td></tr>'}</tbody></table></div></div>
     <p class="small muted">Mostra as entregas feitas pelos nossos caminhões. Entregas por transportadora não aparecem aqui.</p>`;
   $$('[data-can]').forEach(b => b.onclick = async () => { const { data, error } = await sb.storage.from('logistica').createSignedUrl(b.dataset.can, 600); if (error || !data) return toast('Canhoto indisponível', true); registrar('canhoto'); window.open(data.signedUrl, '_blank', 'noopener'); });
+}
+
+// reclamações (melhoria 6.6, SQL 128): o cliente abre, acompanha a análise (8D), recebe a resposta e diz se resolveu
+const SIT_CLS = { aberta: 'negoc', em_analise: 'aberto', acao: 'aberto', verificacao: 'aberto', encerrada: 'pago' };
+async function reclamacoes() {
+  const R = await q(sb.rpc('portal_reclamacoes', { p_fav: S.fav.favorecido_id }));
+  const fotos = {};
+  const caminhos = R.flatMap(r => (r.fotos || []).map(f => f.caminho));
+  if (caminhos.length) { const { data } = await sb.storage.from('qualidade').createSignedUrls(caminhos, 3600); (data || []).forEach(x => { if (x.signedUrl) fotos[x.path] = x.signedUrl; }); }
+  $('#pt-corpo').innerHTML = `<div class="card toolbar" style="justify-content:space-between"><div><b>Reclamações e não conformidades</b><div class="small muted">Conte o que aconteceu: a nossa equipe da qualidade analisa e responde por aqui, por e-mail e WhatsApp.</div></div>
+      ${S.qcfg?.reclamacao ? '<button class="btn primary" id="rc-nova">Nova reclamação</button>' : ''}</div>
+    ${R.map(r => { const d8 = r.d8 ? passos8D({ ...r.d8, descricao: r.descricao, encerrada_em: r.encerrada_em }) : null;
+      return `<div class="card" style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><b>Reclamação nº ${r.numero}</b> <span class="badge ${SIT_CLS[r.situacao] || ''}">${esc(SIT_RECL[r.situacao] || r.situacao)}</span>
+          <div class="small muted">Aberta em ${dateBR(r.aberta_em.slice(0, 10))}${r.nota ? ` · NF ${r.nota}` : ''}${r.produto ? ` · ${esc(r.produto)}` : ''}${r.lote ? ` · lote ${esc(r.lote)}` : ''}${r.quantidade ? ` · ${String(+r.quantidade).replace('.', ',')} ${esc(r.unidade || '')}` : ''}</div></div>
+          ${!r.respondida_em && r.prazo_resposta ? `<div class="small muted">Primeira resposta até ${dateBR(r.prazo_resposta)}</div>` : ''}</div>
+        <p style="margin:8px 0">${esc(r.descricao)}</p>
+        ${(r.fotos || []).length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${r.fotos.map(f => fotos[f.caminho] ? `<a href="${fotos[f.caminho]}" target="_blank" rel="noopener"><img src="${fotos[f.caminho]}" alt="${esc(f.nome)}" style="width:84px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></a>` : '').join('')}</div>` : ''}
+        ${r.resposta ? `<div class="pt-aviso" style="margin-top:10px;background:var(--pos-soft);color:inherit"><b>Resposta da qualidade</b> <span class="small muted">${new Date(r.respondida_em).toLocaleDateString('pt-BR')}</span><div style="white-space:pre-wrap;margin-top:4px">${esc(r.resposta)}</div></div>` : ''}
+        ${d8 ? `<details style="margin-top:10px" ${r.situacao !== 'aberta' ? 'open' : ''}><summary class="small"><b>Análise (8D)</b> — ${d8.filter(p => p.feito).length} de 8 passos</summary>
+          <div class="pt-8d">${d8.map(p => `<div class="pt-8d-p ${p.feito ? 'ok' : ''}"><span class="pt-8d-d">${p.d}</span><div><b>${esc(p.titulo)}</b><div class="small ${p.texto ? '' : 'muted'}">${esc(p.texto || 'em andamento')}</div></div></div>`).join('')}</div></details>` : ''}
+        ${r.resposta ? (r.cliente_avaliou_em ? `<div class="small" style="margin-top:8px">${r.cliente_aceite === 'aceita' ? '✔ Você aceitou a resposta' : '✖ Você informou que não resolveu'}${r.cliente_comentario ? `: “${esc(r.cliente_comentario)}”` : ''} <span class="muted">(${new Date(r.cliente_avaliou_em).toLocaleDateString('pt-BR')})</span></div>`
+          : `<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><span class="small" style="align-self:center">A resposta resolveu?</span><button class="btn small" data-av="${r.id}" data-ok="1">Sim, resolveu</button><button class="btn ghost small" data-av="${r.id}" data-ok="0">Não resolveu</button></div>`) : ''}
+      </div>`; }).join('') || '<div class="card" style="margin-top:12px"><div class="empty">Nenhuma reclamação aberta. Se algum produto chegou com problema, use "Nova reclamação".</div></div>'}`;
+  $('#rc-nova') && ($('#rc-nova').onclick = () => novaReclamacao());
+  $$('[data-av]').forEach(b => b.onclick = () => avaliarReclamacao(b.dataset.av, b.dataset.ok === '1'));
+}
+
+function avaliarReclamacao(id, ok) {
+  const m = modal({ title: ok ? 'A resposta resolveu' : 'A resposta não resolveu', body: `<label>${ok ? 'Comentário (opcional)' : 'O que ainda não está resolvido?'}<textarea id="av-c" rows="3"></textarea></label>`,
+    foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="av-ok">Enviar</button>` });
+  $('#av-ok', m.el).onclick = async (ev) => { ev.target.disabled = true;
+    try { await q(sb.rpc('portal_reclamacao_avaliar', { p_fav: S.fav.favorecido_id, p_rnc: id, p_aceita: ok, p_comentario: $('#av-c', m.el).value || null })); avisar(); m.close(); toast(ok ? 'Obrigado pelo retorno' : 'Recebido: a equipe da qualidade vai reavaliar'); reclamacoes(); }
+    catch (err) { fail(err); ev.target.disabled = false; } };
+}
+
+// foto reduzida (1600 px, JPEG 0,8) para subir pelo celular
+async function reduzirFoto(file) {
+  try { const img = await createImageBitmap(file), k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const cv = Object.assign(document.createElement('canvas'), { width: Math.round(img.width * k), height: Math.round(img.height * k) });
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); return await new Promise(ok => cv.toBlob(b => ok(b || file), 'image/jpeg', 0.8)); } catch { return file; }
+}
+async function novaReclamacao() {
+  let N = []; try { N = await q(sb.rpc('portal_notas', { p_fav: S.fav.favorecido_id, p_de: new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10) })); } catch {}
+  const m = modal({ title: 'Nova reclamação', body: `
+    <label>Nota fiscal<select id="nr-n"><option value="">— não sei / não se aplica —</option>${N.map(n => `<option value="${n.id}">NF ${n.numero} · ${dateBR(n.emissao)} · ${money(n.valor)}</option>`).join('')}</select></label>
+    <label style="margin-top:8px">Produto<input id="nr-p" maxlength="200" placeholder="Ex.: sacola 40x50 impressa"></label>
+    <div style="display:flex;gap:8px;margin-top:8px"><label style="flex:2">Lote ou nº da bobina (na etiqueta)<input id="nr-l" maxlength="100"></label>
+      <label style="flex:1">Quantidade com problema<input id="nr-q" inputmode="decimal"></label><label style="flex:0 0 90px">Unidade<select id="nr-u"><option>KG</option><option>UN</option><option>MIL</option><option>BOB</option><option>FD</option></select></label></div>
+    <label style="margin-top:8px">O que aconteceu *<textarea id="nr-d" rows="4" maxlength="3000" placeholder="Ex.: a solda abre ao encher a sacola com 5 kg; aconteceu no fardo 3"></textarea></label>
+    <label style="margin-top:8px">Fotos (até 6)<input type="file" id="nr-f" accept="image/*" multiple></label>
+    <p class="small muted">A equipe da qualidade recebe na hora e responde por aqui, por e-mail e WhatsApp.</p>`,
+    foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="nr-ok">Enviar reclamação</button>` });
+  $('#nr-ok', m.el).onclick = async (ev) => {
+    const desc = $('#nr-d', m.el).value.trim(), fs = [...$('#nr-f', m.el).files];
+    if (desc.length < 10) return toast('Conte o que aconteceu (pelo menos 10 caracteres)', true);
+    if (fs.length > 6) return toast('Até 6 fotos', true);
+    const qt = $('#nr-q', m.el).value.trim() ? parseFloat($('#nr-q', m.el).value.replace(/\./g, '').replace(',', '.')) : null;
+    if (qt != null && !(qt > 0)) return toast('Quantidade inválida', true);
+    ev.target.disabled = true; ev.target.textContent = 'Enviando…';
+    try {
+      const pasta = `${S.fav.empresa_id}/portal/${crypto.randomUUID()}/`, caminhos = [];
+      for (const [i, f] of fs.entries()) { const b = await reduzirFoto(f), c = `${pasta}foto${i + 1}.jpg`;
+        const { error } = await sb.storage.from('qualidade').upload(c, b, { contentType: 'image/jpeg' }); if (error) throw error; caminhos.push(c); }
+      const n = await q(sb.rpc('portal_reclamar', { p_fav: S.fav.favorecido_id, p_nota: $('#nr-n', m.el).value || null, p_produto: $('#nr-p', m.el).value || null, p_lote: $('#nr-l', m.el).value || null,
+        p_quantidade: qt, p_unidade: qt ? $('#nr-u', m.el).value : null, p_descricao: desc, p_fotos: caminhos }));
+      avisar(); m.close(); toast(`Reclamação nº ${n} enviada. Você recebe a confirmação por e-mail.`); S.qcfgFav = null; S.aba = 'reclamacoes'; pintar();
+    } catch (err) { fail(err); ev.target.disabled = false; ev.target.textContent = 'Enviar reclamação'; }
+  };
 }
 
 // WhatsApp (melhoria 1.1b, SQL 125): o cliente cadastra o celular e aceita (ou deixa de aceitar) receber os avisos

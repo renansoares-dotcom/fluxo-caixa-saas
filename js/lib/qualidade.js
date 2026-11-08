@@ -134,3 +134,25 @@ export function alertas({ inspecoes = [], rncs = [], quarentena = 0, bloqueados 
   if (bloqueados > 0) out.push({ nivel: 'warn', k: 'bloqueados', txt: `${bloqueados} lote(s)/bobina(s) bloqueados pela qualidade` });
   return out;
 }
+
+// ---------------------------------------------------------------- reclamação pelo Portal (melhoria 6.6)
+/** situação da reclamação como o cliente vê */
+export const SIT_CLIENTE = { aberta: 'Recebida', em_analise: 'Em análise', acao: 'Ação em andamento', verificacao: 'Verificando a eficácia', encerrada: 'Encerrada', cancelada: 'Cancelada' };
+/** os 8 passos (8D) a partir dos campos da RNC: { d, titulo, texto, feito } */
+export function passos8D(x = {}) {
+  const pq = (x.porques || []).filter(Boolean);
+  const causa = [x.causa, pq.length ? 'Por quês: ' + pq.map((p, i) => `${i + 1}) ${p}`).join(' ') : ''].filter(Boolean).join(' — ');
+  const impl = x.corretiva ? [x.prazo ? `Prazo ${String(x.prazo).slice(0, 10).split('-').reverse().join('/')}` : '', x.eficacia === 'eficaz' ? 'eficácia verificada' : x.eficacia === 'nao_eficaz' ? 'ação não foi eficaz: nova ação em estudo' : ''].filter(Boolean).join(' · ') : '';
+  return [
+    { d: 'D1', titulo: 'Equipe', texto: x.equipe || '' },
+    { d: 'D2', titulo: 'Descrição do problema', texto: x.descricao || '' },
+    { d: 'D3', titulo: 'Contenção (ação imediata)', texto: x.contencao || '' },
+    { d: 'D4', titulo: 'Causa raiz', texto: causa },
+    { d: 'D5', titulo: 'Ação corretiva', texto: x.corretiva || '' },
+    { d: 'D6', titulo: 'Implementação e eficácia', texto: impl, feito: x.eficacia === 'eficaz' },
+    { d: 'D7', titulo: 'Prevenção (para não repetir)', texto: x.prevencao || '' },
+    { d: 'D8', titulo: 'Encerramento', texto: x.encerrada_em ? `Encerrada em ${String(x.encerrada_em).slice(0, 10).split('-').reverse().join('/')}` : '', feito: !!x.encerrada_em },
+  ].map(p => ({ ...p, feito: p.feito ?? !!p.texto }));
+}
+/** resposta ao cliente atrasada: sem resposta e o prazo passou */
+export const respostaAtrasada = (r, hoje = new Date().toISOString().slice(0, 10)) => !!(r.portal_visivel && !r.respondida_em && r.prazo_resposta && r.prazo_resposta < hoje && !['encerrada', 'cancelada'].includes(r.situacao));

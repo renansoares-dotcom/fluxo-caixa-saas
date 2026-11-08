@@ -1,7 +1,7 @@
 ---
 titulo: Portal do Cliente
 tela: Financeiro › Portal do Cliente (FIN006)
-versao: 1.6
+versao: 1.7
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -103,22 +103,40 @@ O portal funciona no celular.
 
 - Em **Notas fiscais**, o botão **DANFE** gera o PDF da nota a partir do XML autorizado, com o código de barras da chave de acesso. O botão **XML** baixa o arquivo da nota.
 
-![Figura 9 — Notas fiscais com DANFE e XML (dados fictícios)](img/portal-cliente-notas.jpg)
+![Figura 9 — Notas fiscais com DANFE, XML e certificado de qualidade (dados fictícios)](img/portal-cliente-notas.jpg)
+
+- O botão **Certificado** aparece nas notas com bobinas expedidas e baixa o certificado de qualidade dos lotes da nota (manual **Qualidade**, item 6.4).
 
 ![Figura 10 — A DANFE gerada pelo portal (dados fictícios)](img/portal-cliente-danfe.jpg)
 
 - A aba **Entregas** mostra as notas entregues pela frota da empresa: programada, saiu para entrega (com quantas entregas faltam antes da dele), entregue com quem recebeu e o **canhoto** assinado, ou não entregue. Os dados vêm do App do Motorista.
 - O botão **📱 WhatsApp** cadastra o celular do cliente com o aceite: as mensagens de arte, prorrogação e entrega vão também pelo WhatsApp (manual **WhatsApp da Plataforma**).
 
-### 3.6 Uso do Portal
+### 3.6 Reclamações (para o cliente)
 
-![Figura 11 — Uso do Portal: quem entrou, quantos dias e o que consultou e baixou (dados fictícios)](img/portal-cliente-2.jpg)
+Na aba **Reclamações**, o cliente clica em **Nova reclamação** e informa a nota, o produto, o lote ou o número da bobina, a quantidade, o que aconteceu e até 6 fotos. Ele recebe por e-mail a confirmação com o número e o prazo da primeira resposta.
+
+![Figura 11 — Nova reclamação no portal (dados fictícios)](img/portal-cliente-reclamar.jpg)
+
+Cada reclamação mostra:
+
+- a situação: recebida, em análise, ação em andamento, verificando a eficácia ou encerrada;
+- a resposta da qualidade;
+- a **análise em 8 passos (8D)**, quando a empresa mostra: equipe, descrição, contenção, causa raiz, ação corretiva, implementação e eficácia, prevenção e encerramento.
+
+O cliente responde se a resposta **resolveu** ou **não resolveu**. "Não resolveu" pede o motivo e devolve a reclamação para análise. O tratamento pela equipe está no manual **Qualidade**, item 6.3.
+
+![Figura 12 — Reclamações no portal, com a resposta e a análise 8D (dados fictícios)](img/portal-cliente-reclamacoes.jpg)
+
+### 3.7 Uso do Portal
+
+![Figura 13 — Uso do Portal: quem entrou, quantos dias e o que consultou e baixou (dados fictícios)](img/portal-cliente-2.jpg)
 
 A aba **Uso do Portal** mostra, para cada acesso liberado, nos últimos 30 dias, 90 dias ou 12 meses:
 
 - o último acesso e em quantos dias diferentes o cliente entrou;
 - as abas que abriu (títulos, notas, entregas, artes);
-- o que baixou (DANFE, XML, boleto, PIX e canhoto);
+- o que baixou (DANFE, XML, boleto, PIX, canhoto e certificado);
 - as artes que respondeu e os pedidos de prorrogação. O 📱 indica quem aceitou receber avisos pelo WhatsApp.
 
 No topo, quantos clientes usaram o portal no período e o total de documentos baixados. Quem não entra há muito tempo é candidato a um lembrete com o link do portal.
@@ -161,3 +179,4 @@ No topo, quantos clientes usaram o portal no período e o total de documentos ba
 | 1.4 | 08/11/2026 | Aba Entregas (situação, fila e canhoto) e cadastro do WhatsApp com aceite. |
 | 1.5 | 08/11/2026 | Pagar com PIX (QR e copia e cola) nos títulos em aberto. |
 | 1.6 | 08/11/2026 | Boleto do título (linha digitável e PDF), DANFE em PDF gerada do XML e aba Uso do Portal. |
+| 1.7 | 08/11/2026 | Reclamação pelo portal com fotos, resposta e análise 8D, avaliação da resposta e certificado de qualidade nas notas. |

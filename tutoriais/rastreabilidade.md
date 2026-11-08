@@ -1,7 +1,7 @@
 ---
 titulo: Rastreabilidade
 tela: Produção › Rastreabilidade (PRD021)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -68,6 +68,8 @@ Em **Expedir bobinas**:
 
 Uma bobina expedida por engano volta ao estoque pelo botão **↩** na coluna Produção (administrador e financeiro), com o motivo. Fica registrado na Auditoria.
 
+Em cada nota da coluna Clientes, o botão **Certificado** gera o certificado de qualidade da nota em PDF: bobinas, OPs e resultados das inspeções aprovadas. O cliente baixa o mesmo certificado no Portal (manual **Qualidade**, item 6.4).
+
 ## 5. Etiqueta com QR
 
 A etiqueta impressa na OP (Terminal do Setor e Ordens de Produção) traz o QR com o **endereço desta tela**. O celular abre a rastreabilidade da bobina direto. O leitor de código de barras do computador também funciona: a busca entende o endereço e fica só com o código.
@@ -92,3 +94,4 @@ Em **Parâmetros** (administrador e financeiro):
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 08/11/2026 | Primeira versão: busca por bobina, OP, lote ou NF-e; caminho materiais → produção → clientes com bobinas mãe e filha, tintas e qualidade; resumo para recolhimento; expedição na NF-e; QR da etiqueta com link; Excel. |
+| 1.1 | 08/11/2026 | Botão Certificado em cada nota: certificado de qualidade da NF-e em PDF. |

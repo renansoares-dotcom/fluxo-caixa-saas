@@ -209,7 +209,9 @@ export async function fichaRnc(D, r, { onMudou } = {}) {
       <label class="xs">Custo (R$)<input name="custo" inputmode="decimal" value="${+r.custo ? nf(r.custo) : ''}" ${reg && aberta ? '' : 'disabled'}></label>
       <label class="xs">Situação<select name="sit" ${reg ? '' : 'disabled'}>${Object.entries(Q.SIT_RNC).map(([k, t]) => `<option value="${k}" ${r.situacao === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label class="full">Ação imediata (contenção)<input name="aim" value="${esc(r.acao_imediata || '')}" ${reg && aberta ? '' : 'disabled'} placeholder="Ex.: segregar o lote, avisar a expedição, inspecionar 100% as bobinas da OP"></label>
+      <label class="full">Equipe (D1)<input name="equipe" value="${esc(r.equipe || '')}" ${reg && aberta ? '' : 'disabled'} placeholder="Ex.: qualidade, encarregado da extrusão, comercial"></label>
     </div>
+    ${r.origem === 'cliente' || r.portal_visivel ? `<div id="fr-cli" class="ql-cli"><div class="loading small">Carregando o que veio do cliente…</div></div>` : ''}
     <h4 style="margin:12px 0 4px">Disposição do material</h4>
     <div class="grid-form" style="align-items:end">
       <label class="span2">Disposição<select name="disp" ${dec && !r.disposicao_executada_em ? '' : 'disabled'}>${Object.entries(Q.DISPOSICOES).map(([k, t]) => `<option value="${k}" ${r.disposicao === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
@@ -225,15 +227,19 @@ export async function fichaRnc(D, r, { onMudou } = {}) {
       <label class="xs">Prazo<input type="date" name="prazo" value="${r.prazo || ''}" ${reg && aberta ? '' : 'disabled'}></label>
       <label class="xs">Eficácia<select name="efi" ${reg ? '' : 'disabled'}><option value="">—</option><option value="eficaz" ${r.eficacia === 'eficaz' ? 'selected' : ''}>Eficaz</option><option value="nao_eficaz" ${r.eficacia === 'nao_eficaz' ? 'selected' : ''}>Não eficaz</option></select></label>
       <label class="xs">Verificada em<input type="date" name="efd" value="${r.eficacia_em || ''}" ${reg ? '' : 'disabled'}></label>
+      <label class="full">Prevenção (D7) — o que muda para não acontecer em outros produtos<input name="prev" value="${esc(r.prevencao || '')}" ${reg ? '' : 'disabled'} placeholder="Ex.: checklist de setup da solda em todas as máquinas"></label>
     </div></form>`,
     foot: `<span class="spacer"></span><button class="btn" id="fr-imp">Imprimir RNC</button>${reg ? '<button class="btn primary" id="fr-ok">Salvar</button>' : ''}` });
   conversaNoModal(md, 'qual_rnc', r.id);
   const el = md.el, f = $('#fr', el);
+  if ($('#fr-cli', el)) blocoCliente(r, $('#fr-cli', el), { reg, onMudou: () => { md.close(); onMudou?.(); } });
   $('#fr-imp', el).onclick = () => imprimirRnc(D, r);
   $('#fr-ok', el) && ($('#fr-ok', el).onclick = async () => {
     const reg2 = { descricao: f.desc.value.trim() || r.descricao, gravidade: f.grav.value, custo: f.custo.value.trim() ? parseNum(f.custo.value) : 0, situacao: f.sit.value,
       acao_imediata: f.aim.value.trim() || null, porques: $$('[data-pq]', el).map(x => x.value.trim()).filter(Boolean), causa: f.causa.value.trim() || null,
-      acao_corretiva: f.acao.value.trim() || null, responsavel: f.resp.value.trim() || null, prazo: f.prazo.value || null, eficacia: f.efi.value || null, eficacia_em: f.efd.value || null };
+      acao_corretiva: f.acao.value.trim() || null, responsavel: f.resp.value.trim() || null, prazo: f.prazo.value || null, eficacia: f.efi.value || null, eficacia_em: f.efd.value || null,
+      equipe: f.equipe.value.trim() || null, prevencao: f.prev.value.trim() || null };
+    if (f.pvis && !f.pvis.disabled) reg2.portal_visivel = f.pvis.checked;
     if (!f.qtd.disabled) reg2.quantidade = f.qtd.value.trim() ? parseNum(f.qtd.value) : null;
     if (!r.disposicao_executada_em && !f.disp.disabled && f.disp.value !== r.disposicao && !(insp?.movimento_id)) reg2.disposicao = f.disp.value;
     if (reg2.situacao === 'encerrada' && reg2.eficacia !== 'eficaz' && !await confirmDialog('Encerrar sem a eficácia verificada como "Eficaz"?')) return;
@@ -244,6 +250,32 @@ export async function fichaRnc(D, r, { onMudou } = {}) {
     if (!await confirmDialog(`Executar "${Q.DISPOSICOES[d]}"? ${insp?.movimento_id ? 'O material sai do local Reprovado.' : ''}`)) return;
     try { const x = await q(sb.rpc('qual_dispor', { p_rnc: r.id, p_disposicao: d, p_local: f.dloc.value || null, p_obs: null }));
       toast(x === 'aguardando_nf_devolucao' ? 'Disposição registrada: a NF de devolução vai baixar o material do Reprovado' : 'Disposição executada'); md.close(); onMudou?.(); } catch (e) { fail(e); }
+  });
+}
+
+// o que veio do cliente pelo Portal (melhoria 6.6, SQL 128): nota, lote, fotos, prazo da resposta, resposta e avaliação
+async function blocoCliente(r, box, { reg, onMudou }) {
+  const [N, A] = await Promise.all([r.nota_id ? q(sb.from('nfe_notas').select('numero,emissao').eq('id', r.nota_id)).catch(() => []) : [],
+    q(sb.from('qual_anexos').select('*').eq('rnc_id', r.id).eq('portal_visivel', true).order('criado_em')).catch(() => [])]);
+  let urls = {}; if (A.length) { const { data } = await sb.storage.from(BUCKET).createSignedUrls(A.map(a => a.caminho), 3600); (data || []).forEach(x => { if (x.signedUrl) urls[x.path] = x.signedUrl; }); }
+  const atras = Q.respostaAtrasada(r), nota = N[0];
+  box.innerHTML = `<h4 style="margin:12px 0 4px">Cliente (Portal)</h4>
+    <div class="small">${[nota ? `NF ${nota.numero} de ${dateBR(nota.emissao)}` : '', r.produto_cliente ? `produto: ${esc(r.produto_cliente)}` : '', r.lote_cliente ? `lote: ${esc(r.lote_cliente)}` : '',
+      r.quantidade_cliente ? `quantidade: ${nf(r.quantidade_cliente)} ${esc(r.unidade_cliente || '')}` : ''].filter(Boolean).join(' · ') || '<span class="muted">Sem nota nem lote informados.</span>'}
+      ${r.prazo_resposta && !r.respondida_em ? ` · primeira resposta até <b>${dateBR(r.prazo_resposta)}</b> ${atras ? selo('Atrasada', 'neg') : ''}` : ''}</div>
+    ${A.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${A.map(a => urls[a.caminho] ? `<a href="${urls[a.caminho]}" target="_blank" rel="noopener"><img src="${urls[a.caminho]}" alt="${esc(a.nome)}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></a>` : '').join('')}</div>` : ''}
+    ${r.favorecido_id ? `<label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" form="fr" name="pvis" ${r.portal_visivel ? 'checked' : ''} ${reg ? '' : 'disabled'}> O cliente acompanha esta RNC no Portal (análise 8D e resposta)</label>` : ''}
+    <div style="margin-top:8px"><div class="small" style="margin-bottom:4px"><b>Resposta ao cliente</b>${r.respondida_em ? ` <span class="muted">— enviada em ${hora(r.respondida_em)} por ${esc(r.respondida_por || '')}</span>` : ''}</div>
+      <textarea id="fr-resp" rows="3" style="width:100%;box-sizing:border-box" ${reg ? '' : 'disabled'} placeholder="O que foi encontrado, o que fizemos com o material dele e o que muda para não repetir">${esc(r.resposta_cliente || '')}</textarea></div>
+    ${reg && r.favorecido_id ? `<div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="btn" type="button" id="fr-env">${r.respondida_em ? 'Enviar nova resposta' : 'Enviar resposta ao cliente'}</button></div>` : ''}
+    ${r.cliente_avaliou_em ? `<div class="small" style="margin-top:6px">${r.cliente_aceite === 'aceita' ? selo('Cliente aceitou a resposta', 'pos') : selo('Cliente NÃO aceitou a resposta', 'neg')} ${r.cliente_comentario ? `“${esc(r.cliente_comentario)}”` : ''} <span class="muted">${hora(r.cliente_avaliou_em)}</span></div>` : ''}`;
+  $('#fr-env', box) && ($('#fr-env', box).onclick = async (ev) => {
+    const t = $('#fr-resp', box).value.trim(); if (t.length < 10) return toast('Escreva a resposta ao cliente', true);
+    if (!await confirmDialog('Enviar a resposta ao cliente? Ele recebe por e-mail (e WhatsApp, se aceitou) e vê no Portal com a análise.')) return;
+    ev.target.disabled = true;
+    try { const n = await q(sb.rpc('qual_responder_cliente', { p_rnc: r.id, p_resposta: t }));
+      sb.functions.invoke('email', { body: {} }).catch(() => {}); sb.functions.invoke('whatsapp', { body: {} }).catch(() => {});
+      toast(n ? `Resposta enviada (${n} mensagem(ns))` : 'Resposta publicada no Portal (o cliente não tem e-mail ativo no Portal)'); onMudou?.(); } catch (e) { fail(e); ev.target.disabled = false; }
   });
 }
 
@@ -286,10 +318,11 @@ export function imprimirRnc(D, r) {
     extraCss: '.ass{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:50px} .ass div{border-top:1px solid #000;padding-top:4px;text-align:center;font-size:10pt}',
     corpo: `<h2>1. Identificação</h2>${T(['Campo', 'Valor'], [['Origem / gravidade', `${Q.ORIGENS_RNC[r.origem]} · ${Q.GRAVIDADES[r.gravidade]}`], ['Aberta', `${hora(r.aberta_em)} por ${esc(r.aberta_por || '')}`],
       ['Cliente / fornecedor', esc(nomeFav(D, r.favorecido_id)) || '—'], ['Quantidade', r.quantidade != null ? `${nf(r.quantidade)} ${esc(r.unidade || '')}` : '—'], ['Situação', Q.SIT_RNC[r.situacao]]])}
-      <h2>2. Descrição</h2><p>${esc(r.descricao)}</p><p><b>Ação imediata:</b> ${esc(r.acao_imediata || '—')}</p>
+      <h2>2. Descrição</h2><p>${esc(r.descricao)}</p><p><b>Equipe:</b> ${esc(r.equipe || '—')}</p><p><b>Ação imediata:</b> ${esc(r.acao_imediata || '—')}</p>
       <h2>3. Disposição do material</h2><p>${esc(Q.DISPOSICOES[r.disposicao])}${r.disposicao_executada_em ? ` — executada em ${hora(r.disposicao_executada_em)}` : ''}</p>
       <h2>4. Análise da causa (5 porquês)</h2>${(r.porques || []).length ? `<ol>${r.porques.map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : '<p>—</p>'}<p><b>Causa raiz:</b> ${esc(r.causa || '—')}</p>
       <h2>5. Ação corretiva</h2><p>${esc(r.acao_corretiva || '—')}</p><p><b>Responsável:</b> ${esc(r.responsavel || '—')} · <b>Prazo:</b> ${dateBR(r.prazo) || '—'}</p>
       <p><b>Eficácia:</b> ${r.eficacia === 'eficaz' ? 'Eficaz' : r.eficacia === 'nao_eficaz' ? 'Não eficaz' : 'Não verificada'}${r.eficacia_em ? ` em ${dateBR(r.eficacia_em)}` : ''} · <b>Custo da não qualidade:</b> ${money(r.custo || 0)}</p>
+      <p><b>Prevenção:</b> ${esc(r.prevencao || '—')}</p>${r.resposta_cliente ? `<h2>6. Resposta ao cliente</h2><p style="white-space:pre-wrap">${esc(r.resposta_cliente)}</p><p class="small">Enviada em ${hora(r.respondida_em)}${r.cliente_aceite ? ` · cliente ${r.cliente_aceite === 'aceita' ? 'aceitou' : 'não aceitou'}${r.cliente_comentario ? ': ' + esc(r.cliente_comentario) : ''}` : ''}</p>` : ''}
       <div class="ass"><div>Qualidade</div><div>Responsável pela ação</div></div>`, rodape: 'Base: não conformidades da qualidade na plataforma' });
 }

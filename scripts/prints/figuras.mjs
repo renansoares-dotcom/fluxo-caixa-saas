@@ -126,6 +126,9 @@ export const FIGS = [
   ['qualidade', 'qualidade/planos', '### 8.1', 'Plano de recebimento de resina com as características', 'click:#qc-corpo tr[data-p="qp-1"]'],
   ['qualidade', 'qualidade/planos', '### 8.2', 'Tabela de amostragem', 'am'],
   ['qualidade', 'qualidade/planos', '### 8.3', 'Parâmetros da qualidade', 'pa'],
+  ['qualidade', 'qualidade/nao-conformidades', '### 6.3', 'Reclamação do cliente pelo Portal na ficha da RNC: nota, lote, fotos, prazo e resposta', 'rnc|click:#qr-corpo tr[data-r="qr-p1"]|scroll:#fr-cli'],
+  ['qualidade', 'qualidade/nao-conformidades', '### 6.3', 'RNC respondida ao cliente, com a análise preenchida', 'rnc|click:#qr-corpo tr[data-r="qr-p2"]|scroll:#fr-cli'],
+  ['qualidade', 'qualidade/planos', '### 8.3', 'Parâmetros da reclamação pelo Portal e do certificado de qualidade', 'pa|scroll:[name=cres]'],
   // Casa de Tintas (07/11/2026) — ordem impressa, etiqueta e celular (casa-tintas-ordem/-etiqueta/-cel.jpg) tirados à parte
   ['casa-tintas', 'tintas', '## 4.', 'Painel da Casa de Tintas: alertas, indicadores, bancada, consumo por cor e sobras'],
   ['casa-tintas', 'tintas/ordens', '## 5.', 'Ordens de Preparação', 'click:[data-f=todas]'],
