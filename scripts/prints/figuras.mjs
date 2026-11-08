@@ -96,6 +96,8 @@ export const FIGS = [
   ['manutencao', 'manutencao/equipamentos', '## 7.', 'Planos preventivos com a próxima execução', 'pl'],
   ['manutencao', 'manutencao/equipamentos', '### 7.1', 'Plano preventivo com intervalo, checklist e peças previstas', 'pl|click:#me-corpo tr[data-p]'],
   ['manutencao', 'manutencao/equipamentos', '## 11.', 'Parâmetros da manutenção', 'pa'],
+  ['manutencao', 'manutencao/preventivas', '### 7.3', 'Preventivas por horas: uso do intervalo, ritmo de horas por dia e a data prevista'],
+  ['manutencao', 'manutencao/preventivas', '### 7.3', 'Peças críticas: saldo, mínimo, ponto de pedido, o previsto nos planos e o consumo', 'scroll:#pv-pec'],
   // Qualidade (07/11/2026) — o laudo impresso (qualidade-laudo.jpg) é tirado à parte
   ['qualidade', 'qualidade', '## 4.', 'Painel da Qualidade: alertas, indicadores e fila de inspeção'],
   ['qualidade', 'qualidade/inspecoes', '## 5.', 'Inspeções pendentes, na ordem de atendimento'],

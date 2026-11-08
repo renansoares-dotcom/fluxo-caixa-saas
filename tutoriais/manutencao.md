@@ -1,8 +1,8 @@
 ---
 titulo: Manutenção industrial — OS, preventivas, peças e indicadores
-tela: Produção › Manutenção › Painel de Manutenção (PRD008), Ordens de Serviço (PRD009), Equipamentos e Planos (PRD010) e Manutenção no Celular (PRD011)
-versao: 1.0
-atualizado: 2026-11-07
+tela: Produção › Manutenção › Painel de Manutenção (PRD008), Ordens de Serviço (PRD009), Equipamentos e Planos (PRD010), Manutenção no Celular (PRD011) e Preventivas e Peças (PRD022)
+versao: 1.1
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -192,7 +192,7 @@ Na ficha também é possível registrar a **leitura do horímetro** e abrir uma 
 ### 7.2 Como a preventiva é gerada
 
 - Por **data**: a OS é aberta **X dias antes** do vencimento. O X é a antecedência definida nos Parâmetros (padrão: 7 dias).
-- Por **horas**: a OS é aberta quando a máquina chega a **90% das horas** do intervalo.
+- Por **horas**: a OS é aberta quando a máquina chega a **90% das horas** do intervalo (percentual ajustável em Preventivas e Peças › Parâmetros).
 - Cada plano tem **uma OS aberta de cada vez**. Gerar de novo não duplica.
 - A OS preventiva já nasce com a data de vencimento e o checklist.
 - **Abrir OS agora**, na ficha do plano, antecipa a execução.
@@ -204,6 +204,55 @@ A coluna **Próxima** mostra a situação de cada plano:
 - **em dia**, em verde.
 
 Ao lado aparece a OS que já está aberta para o plano, se houver.
+
+### 7.3 Preventivas e Peças Críticas
+
+![Figura 12 — Preventivas por horas: uso do intervalo, ritmo de horas por dia e a data prevista (dados fictícios)](img/manutencao-12.jpg)
+
+A tela **Preventivas e Peças** mostra quando cada preventiva por horas vai vencer, pelo ritmo real das máquinas.
+
+As **horas de máquina** são a última leitura do horímetro mais as horas apontadas na produção depois da leitura. Sem leitura, valem só os apontamentos. Lance uma leitura em **Lançar leitura do horímetro** sempre que alguém conferir o horímetro na máquina.
+
+Para cada plano por horas, a tabela mostra:
+
+- o **intervalo** e as horas **desde a última** execução;
+- o **uso do intervalo**: em verde, abaixo do percentual que gera a OS; em amarelo, a OS já é gerada; em vermelho, vencida;
+- o **ritmo**: a média de horas por dia dos últimos 30 dias (ajustável);
+- a **previsão**: a data em que o intervalo vai ser atingido nesse ritmo;
+- a **fonte das horas** e se já há OS aberta.
+
+![Figura 13 — Peças críticas: saldo, mínimo, ponto de pedido, o previsto nos planos e o consumo (dados fictícios)](img/manutencao-13.jpg)
+
+As **peças críticas** são as que não podem faltar (resistência, rolamento, correia, lâmina de solda). Para cada peça, cadastre em **+ Peça crítica**:
+
+- o **mínimo** e o **ponto de pedido**;
+- a máquina (ou deixe vazio, se a peça serve a várias).
+
+A tabela mostra:
+
+- o **saldo** do estoque oficial;
+- o **previsto nos planos**: as peças dos planos que vencem nos próximos 30 dias (ajustável);
+- o **consumo** dos últimos 12 meses nas OS e o último preço.
+
+A **situação** é uma destas:
+
+| Situação | Quando |
+|---|---|
+| Abaixo do mínimo | O saldo está menor que o mínimo. |
+| Comprar | O saldo chegou ao ponto de pedido, ou o saldo menos o previsto fica abaixo do mínimo. |
+| OK | Nenhuma das anteriores. |
+| Estoque não implantado | O saldo inicial ainda não foi implantado no Kardex. |
+
+**Requisição de compra** cria a requisição das peças "abaixo" e "comprar". A quantidade sugerida é o ponto de pedido mais o previsto, menos o saldo. A requisição é urgente quando há peça abaixo do mínimo.
+
+Todo dia às 7h37, quem é administrador, diretor, compras ou produção recebe o aviso **Peça crítica abaixo do mínimo**. O aviso da mesma peça repete no máximo a cada 7 dias (ajustável).
+
+Em **Parâmetros** desta tela:
+
+- o percentual do intervalo que gera a OS (padrão 90%);
+- os dias do ritmo (padrão 30);
+- o horizonte das peças previstas (padrão 30 dias);
+- o aviso diário e o intervalo entre avisos (padrão 7 dias).
 
 ## 8. Ligação com a produção
 
@@ -233,7 +282,7 @@ As OS atrasadas, as emergências, as peças aguardadas há mais de 3 dias e os p
 
 ## 10. Manutenção no Celular
 
-![Figura 12 — Fila do técnico no celular (dados fictícios)](img/manutencao-cel-1.jpg)
+![Figura 14 — Fila do técnico no celular (dados fictícios)](img/manutencao-cel-1.jpg)
 
 ### 10.1 Pedir manutenção (operador)
 
@@ -249,7 +298,7 @@ A prioridade é definida sozinha:
 - outra máquina parada: **alta**;
 - máquina rodando: **média**.
 
-![Figura 13 — Pedido de manutenção pelo celular (dados fictícios)](img/manutencao-cel-2.jpg)
+![Figura 15 — Pedido de manutenção pelo celular (dados fictícios)](img/manutencao-cel-2.jpg)
 
 ### 10.2 Fila do técnico
 
@@ -261,7 +310,7 @@ A prioridade é definida sozinha:
 
 ## 11. Parâmetros
 
-![Figura 14 — Parâmetros da manutenção (dados fictícios)](img/manutencao-11.jpg)
+![Figura 16 — Parâmetros da manutenção (dados fictícios)](img/manutencao-11.jpg)
 
 | Parâmetro | O que faz | Padrão |
 |---|---|---|
@@ -305,3 +354,4 @@ O **catálogo de falhas** fica na aba de mesmo nome. Cada falha tem código, des
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão. Inclui equipamentos ligados às máquinas, ao imobilizado e ao centro de custo; OS com checklist, horas, peças do estoque, terceiros no contas a pagar, fotos e impressão; planos por dias e horas de máquina; parada automática com a produção; indicadores; celular; parâmetros e Decision Center. |
+| 1.1 | 08/11/2026 | Nova tela Preventivas e Peças (PRD022): horas de máquina pelo horímetro mais os apontamentos depois da leitura; uso do intervalo, ritmo e data prevista de cada plano por horas; percentual que gera a OS ajustável; peças críticas com mínimo, ponto de pedido, previsto nos planos, consumo, requisição de compra e aviso diário. |

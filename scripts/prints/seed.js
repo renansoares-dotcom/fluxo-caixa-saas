@@ -1439,3 +1439,21 @@ window.RPC.pag_remessa_gravar = () => null;
       { id: 'rtn2', numero: 4570, emissao: '2026-10-18', cliente: 'ATACADO MODELO S.A.', cnpj: '22', uf: 'PB', bobinas: 1, kg: 583.7, carga: 91, entrega: 'pendente' }],
   });
 }
+
+// Preventivas por horas e peças críticas (SQL 116) — situação FICTÍCIA
+{
+  const hoje = new Date('2026-11-08T12:00:00'), d = (n) => { const x = new Date(hoje); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+  window.RPC.man_preventivas_horas = () => [
+    { plano_id: 'ph1', plano: 'Troca do óleo da redutora', equipamento: 'EXT-02 EXTRUSORA 2', criticidade: 'A', a_cada_horas: 2000, desde_ultima: 2045, pct: 102.3, ritmo_h_dia: 19.4, dias_restantes: 0, previsao: d(0), fonte: 'horímetro + apontamentos', os_aberta: 1 },
+    { plano_id: 'ph2', plano: 'Revisão das resistências do cilindro', equipamento: 'EXT-01 EXTRUSORA 1', criticidade: 'A', a_cada_horas: 1500, desde_ultima: 1388, pct: 92.5, ritmo_h_dia: 20.1, dias_restantes: 5.6, previsao: d(6), fonte: 'horímetro + apontamentos', os_aberta: 1 },
+    { plano_id: 'ph3', plano: 'Lubrificação dos rolos de impressão', equipamento: 'IMP-01 IMPRESSORA FLEXO', criticidade: 'B', a_cada_horas: 500, desde_ultima: 341, pct: 68.2, ritmo_h_dia: 16.8, dias_restantes: 9.5, previsao: d(10), fonte: 'apontamentos', os_aberta: 0 },
+    { plano_id: 'ph4', plano: 'Troca da lâmina de solda', equipamento: 'CS-01 CORTE E SOLDA 1', criticidade: 'B', a_cada_horas: 800, desde_ultima: 302, pct: 37.8, ritmo_h_dia: 14.2, dias_restantes: 35.1, previsao: d(36), fonte: 'apontamentos', os_aberta: 0 },
+    { plano_id: 'ph5', plano: 'Inspeção do bobinador', equipamento: 'EXT-02 EXTRUSORA 2', criticidade: 'A', a_cada_horas: 1000, desde_ultima: 210, pct: 21, ritmo_h_dia: 19.4, dias_restantes: 40.7, previsao: d(41), fonte: 'horímetro + apontamentos', os_aberta: 0 }];
+  window.RPC.man_pecas_situacao = () => [
+    { id: 'pc1', produto_id: 'pp1', codigo: 'PC-RES-220', descricao: 'RESISTÊNCIA CERÂMICA 220V 1500W', unidade: 'UN', equipamento: 'EXT-01 EXTRUSORA 1', minimo: 4, ponto_pedido: 6, saldo: 3, consumo_12m: 14, previsto_planos: 4, situacao: 'abaixo', ultimo_preco: 385.0 },
+    { id: 'pc2', produto_id: 'pp2', codigo: 'PC-LAM-800', descricao: 'LÂMINA DE SOLDA 800 MM', unidade: 'UN', equipamento: 'CS-01 CORTE E SOLDA 1', minimo: 2, ponto_pedido: 3, saldo: 3, consumo_12m: 9, previsto_planos: 1, situacao: 'comprar', ultimo_preco: 212.4 },
+    { id: 'pc3', produto_id: 'pp3', codigo: 'PC-ROL-6206', descricao: 'ROLAMENTO 6206 2RS', unidade: 'UN', equipamento: null, minimo: 6, ponto_pedido: 10, saldo: 18, consumo_12m: 22, previsto_planos: 2, situacao: 'ok', ultimo_preco: 48.9 },
+    { id: 'pc4', produto_id: 'pp4', codigo: 'PC-OLEO-220', descricao: 'ÓLEO REDUTOR ISO 220 (BALDE 20 L)', unidade: 'UN', equipamento: 'EXT-02 EXTRUSORA 2', minimo: 1, ponto_pedido: 2, saldo: 2, consumo_12m: 5, previsto_planos: 1, situacao: 'comprar', ultimo_preco: 690.0 },
+    { id: 'pc5', produto_id: 'pp5', codigo: 'PC-COR-B68', descricao: 'CORREIA B-68', unidade: 'UN', equipamento: 'IMP-01 IMPRESSORA FLEXO', minimo: 2, ponto_pedido: 3, saldo: 5, consumo_12m: 4, previsto_planos: 0, situacao: 'ok', ultimo_preco: 75.3 }];
+  DB.man_parametros = (DB.man_parametros || []).map(p => ({ ...p, gerar_horas_pct: 90, dias_ritmo: 30, horizonte_pecas_dias: 30, avisar_pecas: true, avisar_pecas_dias: 7 }));
+}

@@ -18,7 +18,7 @@ export const TELAS = {
   'estoque': 'EST001', 'estoque/kardex': 'EST002', 'estoque/produtos': 'EST003', 'estoque/depara': 'EST004', 'estoque/parametros': 'EST005', 'estoque/cadastro-notas': 'EST006', 'estoque/implantacao': 'EST007',
   // Produção
   'producao/terminal': 'PRD001', 'producao': 'PRD002', 'producao/planta': 'PRD003', 'producao/ordens': 'PRD004', 'producao/programacao': 'PRD005',
-  'producao/cadastros': 'PRD006', 'producao/importar': 'PRD007', 'producao/oee': 'PRD019', 'producao/custos': 'PRD020', 'producao/rastreio': 'PRD021',
+  'producao/cadastros': 'PRD006', 'producao/importar': 'PRD007', 'producao/oee': 'PRD019', 'producao/custos': 'PRD020', 'producao/rastreio': 'PRD021', 'manutencao/preventivas': 'PRD022',
   'manutencao': 'PRD008', 'manutencao/ordens': 'PRD009', 'manutencao/equipamentos': 'PRD010', 'manutencao/celular': 'PRD011',
   'qualidade': 'PRD012', 'qualidade/inspecoes': 'PRD013', 'qualidade/nao-conformidades': 'PRD014', 'qualidade/planos': 'PRD015',
   'tintas': 'PRD016', 'tintas/ordens': 'PRD017', 'tintas/receitas': 'PRD018',

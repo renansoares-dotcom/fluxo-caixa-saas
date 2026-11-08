@@ -64,7 +64,7 @@ export const MANUAIS = [
     resumo: 'Planos de inspeção, quarentena no recebimento pela nota, liberação do primeiro material na produção, decisão com laudo, RNC com disposição no estoque, bloqueio de lote e bobina, IQF dos fornecedores.' },
   { id: 'casa-tintas', titulo: 'Casa de Tintas — receitas versionadas, preparação e pesagem', area: 'Produção', rotas: ['tintas', 'tintas/ordens', 'tintas/receitas'],
     resumo: 'Cores e receitas com versões aprovadas, ordem de preparação com pesagem conferida e balança, correção de proporção, medição de viscosidade e ΔE, lote com etiqueta, entrega à máquina e sobras.' },
-  { id: 'manutencao', titulo: 'Manutenção industrial — OS, preventivas, peças e indicadores', area: 'Produção', rotas: ['manutencao', 'manutencao/ordens', 'manutencao/equipamentos', 'manutencao/celular'],
+  { id: 'manutencao', titulo: 'Manutenção industrial — OS, preventivas, peças e indicadores', area: 'Produção', rotas: ['manutencao', 'manutencao/ordens', 'manutencao/equipamentos', 'manutencao/celular', 'manutencao/preventivas'],
     resumo: 'Equipamentos ligados às máquinas, OS corretiva e preventiva, parada automática, peças do estoque, terceiros no contas a pagar, MTBF, MTTR e disponibilidade.' },
   { id: 'logistica', titulo: 'Logística — cargas, entregas e frota', area: 'Logística', rotas: ['logistica', 'logistica/frota'],
     resumo: 'Montagem automática de cargas, romaneio, mapa, baixa das entregas, frota e parâmetros.' },

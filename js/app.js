@@ -95,6 +95,7 @@ const routes = {
   'producao/oee': () => import(`./pages/producao-oee.js?v=${V}`),
   'producao/custos': () => import(`./pages/producao-custos.js?v=${V}`),
   'producao/rastreio': () => import(`./pages/producao-rastreio.js?v=${V}`),
+  'manutencao/preventivas': () => import(`./pages/manutencao-preventivas.js?v=${V}`),
   'contab/dre': () => import(`./pages/contab-dre.js?v=${V}`),
   'contab/dfc': () => import(`./pages/contab-dfc.js?v=${V}`),
   'estoque/cadastro-notas': () => import(`./pages/cadastro-notas.js?v=${V}`),
