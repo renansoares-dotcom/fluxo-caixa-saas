@@ -13,14 +13,14 @@ self.addEventListener('fetch', (e) => {
   const r = e.request, u = new URL(r.url);
   if (r.method !== 'GET' || u.origin !== self.location.origin) return;          // Supabase e outros sites: direto
   e.respondWith((async () => {
-    const c = await caches.open(CACHE);
+    const c = await caches.open(CACHE), nav = r.mode === 'navigate', app = /\/(index\.html)?$/.test(u.pathname);   // portal.html e cotacao.html não viram o index guardado
     try {
       const resp = await fetch(r);
-      if (resp.ok && resp.type === 'basic') c.put(r.mode === 'navigate' ? 'index.html' : r, resp.clone()).catch(() => {});
+      if (resp.ok && resp.type === 'basic' && (!nav || app)) c.put(nav ? 'index.html' : r, resp.clone()).catch(() => {});
       return resp;
     } catch (err) {
       // sem sinal: a página abre pelo index guardado; scripts com ?v= diferente casam pelo caminho
-      const hit = r.mode === 'navigate' ? await c.match('index.html') : (await c.match(r)) || (await c.match(r, { ignoreSearch: true }));
+      const hit = nav ? (app ? await c.match('index.html') : null) : (await c.match(r)) || (await c.match(r, { ignoreSearch: true }));
       if (hit) return hit;
       throw err;
     }

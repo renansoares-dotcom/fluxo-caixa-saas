@@ -1809,3 +1809,28 @@ window.RPC.pag_remessa_gravar = () => null;
   if (v1) DB.pre_eventos = (DB.pre_eventos || []).concat([{ id: 9901, empresa_id: E, projeto_id: 'pa-1', tipo: 'lembrete', texto: 'Lembrete 1 de 3 enviado ao cliente (versão ' + v1.numero + ')', publico: false, autor: 'plataforma', criado_em: new Date(Date.parse(v1.enviada_em) + 2 * 864e5).toISOString() }]);
   window.RPC.pre_lembrar_agora = () => 2;
 }
+
+// Cotação por link (SQL 132) — requisição, cotações e convites FICTÍCIOS
+{
+  const agora = Date.now(), Hh = (h) => new Date(agora - h * 36e5).toISOString(), dd = (n) => new Date(agora + n * 864e5).toISOString().slice(0, 10);
+  const R = { id: 'rq-cot', empresa_id: E, numero: 53, solicitante: 'Paulo (Extrusão)', centro_custo_id: DB.compras_requisicoes[0].centro_custo_id, necessidade: dd(12), prioridade: 'normal', status: 'aprovada', criado_em: Hh(72), observacao: 'Reposição do estoque de matéria-prima para a programação de dezembro' };
+  DB.compras_requisicoes.unshift(R);
+  const IT = [['rqi1', 'RESINA PEBD LINEAR (SACO 25 KG)', 'KG', 10000, 9.8], ['rqi2', 'MASTERBATCH BRANCO 60%', 'KG', 400, 21], ['rqi3', 'ADITIVO DESLIZANTE', 'KG', 120, 34]];
+  DB.compras_requisicao_itens.push(...IT.map(([id, descricao, unidade, quantidade, valor_estimado]) => ({ id, empresa_id: E, requisicao_id: R.id, descricao, unidade, quantidade, valor_estimado })));
+  const C = [['cq1', 'RESINAS DO BRASIL S.A.', 7, '28/42/56', [28, 42, 56], 0, false, [9.45, 20.5, 35.9]], ['cq2', 'POLÍMEROS NORDESTE LTDA', 4, 'à vista', [0], 380, true, [9.3, 22.4, 31.5]],
+    ['cq3', 'COLOR MASTER LTDA', 10, '30 dias', [30], 150, true, [null, 19.8, 33.2]]];
+  DB.compras_cotacoes = DB.compras_cotacoes.concat(C.map(([id, fornecedor, prazo_entrega_dias, condicao_pagamento, parcelas_dias, frete, link]) => ({ id, empresa_id: E, requisicao_id: R.id, fornecedor, prazo_entrega_dias, condicao_pagamento, parcelas_dias, frete,
+    validade: dd(10), escolhida: false, respondida_pelo_fornecedor: link, criado_em: Hh(link ? 20 : 40) })));
+  C.forEach(([cid, , , , , , , pr]) => pr.forEach((v, k) => { if (v != null) DB.compras_cotacao_itens.push({ id: cid + k, empresa_id: E, cotacao_id: cid, requisicao_item_id: IT[k][0], valor_unitario: v }); }));
+  DB.compras_parametros = [{ empresa_id: E, alcada_valor: 5000, previsao_automatica: true, cotacao_link_dias: 5, taxa_mensal_vp: 1.5, cotacao_mostra_estimado: false, cotacao_mensagem: 'Entrega no galpão 2 (Caruaru). Informe o preço com ICMS e IPI.' }];
+  const tk = (n) => String(n).repeat(64).slice(0, 64);
+  DB.compras_cotacao_convites = [
+    { id: 'cv1', empresa_id: E, requisicao_id: R.id, fornecedor: 'POLÍMEROS NORDESTE LTDA', email: 'vendas@polimerosne.exemplo', telefone: null, token: tk('a'), expira_em: dd(2), situacao: 'respondido', aberto_em: Hh(26), respondido_em: Hh(20), cotacao_id: 'cq2', criado_em: Hh(48) },
+    { id: 'cv2', empresa_id: E, requisicao_id: R.id, fornecedor: 'COLOR MASTER LTDA', email: 'comercial@colormaster.exemplo', telefone: '81988776655', token: tk('b'), expira_em: dd(2), situacao: 'respondido', aberto_em: Hh(30), respondido_em: Hh(22), cotacao_id: 'cq3', criado_em: Hh(48) },
+    { id: 'cv3', empresa_id: E, requisicao_id: R.id, fornecedor: 'PLÁSTICOS DO AGRESTE', email: null, telefone: '81977665544', token: tk('c'), expira_em: dd(2), situacao: 'aberto', aberto_em: Hh(6), criado_em: Hh(48) },
+    { id: 'cv4', empresa_id: E, requisicao_id: R.id, fornecedor: 'DISTRIBUIDORA QUÍMICA SUL', email: 'cotacoes@dqsul.exemplo', telefone: null, token: tk('d'), expira_em: dd(2), situacao: 'recusado', recusa_motivo: 'Não atendemos Pernambuco', respondido_em: Hh(30), criado_em: Hh(48) }];
+  window.RPC.compras_convidar = () => tk('e');
+  window.RPC.cotacao_link_abrir = () => ({ empresa: 'PLÁSTICOS EXEMPLO LTDA', fornecedor: 'PLÁSTICOS DO AGRESTE', numero: 53, necessidade: dd(12), situacao: 'aberto', expira_em: dd(2), vencido: false,
+    mensagem: 'Entrega no galpão 2 (Caruaru). Informe o preço com ICMS e IPI.', itens: IT.map(([id, descricao, unidade, quantidade]) => ({ id, descricao, unidade, quantidade, observacao: id === 'rqi1' ? 'Índice de fluidez entre 0,8 e 1,2' : null, preco: null })), resposta: null });
+  window.RPC.cotacao_link_responder = () => null; window.RPC.cotacao_link_recusar = () => null;
+}

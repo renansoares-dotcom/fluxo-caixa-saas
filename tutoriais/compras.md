@@ -1,7 +1,7 @@
 ---
 titulo: Compras — requisições, pedidos e recebimentos
 tela: Compras › Painel de Compras (CMP001), Requisições e Cotações (CMP002), Pedidos de Compra (CMP003) e Recebimentos (CMP004)
-versao: 1.3
+versao: 1.4
 atualizado: 2026-11-05
 ---
 ## 1. Para que serve
@@ -59,11 +59,50 @@ Abra a requisição (filtro **Aguardando aprovação**) e clique em **Aprovar** 
 2. Informe o **fornecedor**, o prazo de entrega em dias, as **parcelas** (por exemplo `28/56/84`), a condição de pagamento, o **frete**, a validade e o **preço unitário de cada item**.
 3. Clique em **Salvar**. Repita para cada fornecedor.
 
-A requisição mostra o **mapa comparativo de cotações**: o menor preço de cada item e o **menor total** ficam em verde. Cotação sem preço em algum item aparece como **incompleta**.
+#### Cotação por link
+
+Em vez de digitar, peça a cotação ao fornecedor por um **link**. Ele abre a página, sem cadastro nem senha, e preenche o preço de cada item, o frete, o prazo de entrega, a condição de pagamento e a validade.
+
+1. Na requisição aprovada, clique em **Convidar por link**.
+2. Informe cada fornecedor (da lista ou um nome novo), o **e-mail** e, se quiser, o **WhatsApp**. Sem e-mail, vale o do cadastro do fornecedor.
+3. Escreva uma mensagem, se precisar (por exemplo: local de entrega, impostos inclusos).
+4. Clique em **Gerar links e enviar e-mails**.
+
+![Figura 2 — Convidar fornecedores por link (dados fictícios)](img/compras-6.jpg)
+
+O fornecedor recebe o e-mail com o botão para preencher. Para mandar pelo WhatsApp, use **WhatsApp** ou **Copiar link** na lista de convites. O link vale 5 dias (parâmetro).
+
+![Figura 3 — A página que o fornecedor preenche (dados fictícios)](img/compras-cotacao-link.jpg)
+
+Quando o fornecedor responde, a cotação entra no mapa com a marca **pelo link** e o comprador recebe um aviso. Até o link vencer, o fornecedor pode corrigir a resposta. Ele também pode clicar em **Não vamos cotar**, com o motivo.
+
+A lista **Cotação por link** mostra cada convite: enviado, abriu o link, respondeu, não vai cotar ou cancelado. **Cancelar** desativa o link.
+
+![Figura 4 — Convites da cotação por link: quem abriu, respondeu ou recusou (dados fictícios)](img/compras-5.jpg)
+
+#### Mapa comparativo
+
+![Figura 5 — Mapa comparativo: menor preço de cada item, prazo, frete, total e valor presente (dados fictícios)](img/compras-4.jpg)
+
+A requisição mostra o **mapa comparativo de cotações**:
+
+- o menor preço de cada item fica em verde e em negrito;
+- as linhas de **prazo de entrega**, **frete** e **total**, com o menor total em verde;
+- o **valor presente**: o total trazido a hoje pela condição de pagamento, com a taxa dos parâmetros (padrão 1,5% ao mês). Assim, 28/42/56 dias e à vista podem ser comparados. O menor valor presente fica em verde;
+- cotação sem preço em algum item aparece como **incompleta**.
+
+Abaixo do mapa, a tela resume a melhor por total e, se for outra, a melhor pela condição de pagamento. Também mostra quanto a compra sairia mais barata se cada item fosse comprado de quem cobra menos, sem contar fretes e pedido mínimo.
+
+Os **Parâmetros da cotação** (administrador e diretor) definem:
+
+- por quantos dias vale o link;
+- a taxa do valor presente;
+- se o fornecedor vê o preço estimado da requisição;
+- a mensagem padrão do convite.
 
 ### 4.4 Gerar o pedido de compra
 
-![Figura 2 — Novo pedido de compra: Pedido e Itens (dados fictícios)](img/compras-3.jpg)
+![Figura 6 — Novo pedido de compra: Pedido e Itens (dados fictícios)](img/compras-3.jpg)
 
 1. No mapa, clique em **Gerar pedido** na cotação escolhida. Se não houver cotação, use **Pedido sem cotação**: os preços estimados entram no pedido e podem ser ajustados no rascunho.
 2. Confirme o **fornecedor do cadastro**. Se o fornecedor da cotação não estiver cadastrado, escolha o cadastro correspondente ou peça ao Financeiro para cadastrar.
@@ -76,7 +115,7 @@ Também dá para criar um pedido avulso, sem requisição, em **Pedidos de Compr
 
 ### 4.5 Completar e aprovar o pedido
 
-![Figura 3 — Pedidos de Compra (dados fictícios)](img/compras-2.jpg)
+![Figura 7 — Pedidos de Compra (dados fictícios)](img/compras-2.jpg)
 
 A lista mostra o **Nº** (com a data do pedido e o nº do Iniflex na 2ª linha), o **Fornecedor** (com a condição de pagamento na 2ª linha), a **Situação**, os **Itens**, a **Entrega prevista** (em vermelho se já passou) e o **Total** (com o quanto já foi recebido na 2ª linha). O botão **Colunas**, ao lado do Excel, mostra ou oculta cada uma dessas informações, e a escolha fica guardada para você. O **Excel** sai com todas as colunas.
 
@@ -113,6 +152,7 @@ Os recebimentos ficam em **Últimos recebimentos**, com as divergências encontr
 - Cancelar exige **motivo**. Pedido já recebido não pode ser cancelado.
 - Pedido com recebimento **não volta** para rascunho.
 - A previsão no contas a pagar é refeita sempre que o pedido muda, e sai quando ele é recebido ou cancelado.
+- O link de cotação é único por fornecedor e só serve para aquela requisição. Ele para de funcionar quando vence, quando é cancelado, quando a requisição sai de "aprovada" ou quando a cotação é escolhida para o pedido.
 
 ## 6. Perguntas frequentes e erros comuns
 
@@ -123,6 +163,10 @@ Os recebimentos ficam em **Últimos recebimentos**, com as divergências encontr
 **A nota não aparece no recebimento.** Ela ainda não foi importada, ou foi emitida antes dos 30 dias anteriores ao pedido. Importe o XML em Notas Fiscais › Entradas.
 
 **A nota veio em outra unidade (por exemplo, caixa em vez de unidade).** Cadastre o **de-para do fornecedor** em **Estoque › De-para de Fornecedores**, com o fator de conversão. Os próximos recebimentos já convertem sozinhos.
+
+**O fornecedor diz que o link não abre.** O link venceu ou foi cancelado. Gere outro convite na requisição.
+
+**O fornecedor não recebeu o e-mail.** Confira o e-mail no convite, ou use **Copiar link** e mande pelo WhatsApp.
 
 **Errei o fornecedor de um pedido aprovado.** Use **Voltar para rascunho**, corrija e aprove de novo. Se já houver recebimento, cancele e faça outro pedido.
 
@@ -143,3 +187,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** do pedido de compra (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Lista de Pedidos de Compra com as informações secundárias na 2ª linha e seletor **Colunas**; formulário do novo pedido em seções. Figuras refeitas. |
+| 1.4 | 08/11/2026 | Cotação por link: convite por e-mail ou WhatsApp, página do fornecedor sem cadastro, resposta e recusa, lista de convites; mapa comparativo com o menor preço por item, prazo, valor presente e a compra dividida; parâmetros da cotação. |

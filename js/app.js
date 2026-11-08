@@ -365,7 +365,7 @@ async function render() {
   if (route === 'decisao-dia') { const qs = location.hash.split('?')[1]; history.replaceState(null, '', '#/decisoes?aba=pagamentos' + (qs ? '&' + qs : '')); route = 'decisoes'; }
   // link direto para um registro (cartão das Conversas): #/<tela>?abrir=<id> abre o registro na tela
   { const ab = new URLSearchParams(location.hash.split('?')[1] || '').get('abrir');
-    const TIPO = { 'compras/pedidos': 'pedido', 'producao/ordens': 'op', 'fidc-propostas': 'proposta', 'paraquedas': 'pa', 'logistica/fretes': 'frete', 'lancamentos': 'lancamento', 'contab/imobilizado': 'bem', 'manutencao/ordens': 'os', 'manutencao/equipamentos': 'equip', 'qualidade/inspecoes': 'insp', 'qualidade/nao-conformidades': 'rnc', 'tintas/ordens': 'tinta', 'preimpressao/artes': 'arte' };
+    const TIPO = { 'compras/pedidos': 'pedido', 'producao/ordens': 'op', 'fidc-propostas': 'proposta', 'paraquedas': 'pa', 'logistica/fretes': 'frete', 'lancamentos': 'lancamento', 'contab/imobilizado': 'bem', 'manutencao/ordens': 'os', 'manutencao/equipamentos': 'equip', 'qualidade/inspecoes': 'insp', 'qualidade/nao-conformidades': 'rnc', 'tintas/ordens': 'tinta', 'preimpressao/artes': 'arte', 'compras/requisicoes': 'requisicao' };
     if (ab && TIPO[route]) { state.abrir = { tipo: TIPO[route], id: ab }; history.replaceState(null, '', '#/' + route); } }
   if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
   if (state.papel === 'vendas' && !rotaDeVendas(route)) { location.hash = '#/comercial'; return; }
