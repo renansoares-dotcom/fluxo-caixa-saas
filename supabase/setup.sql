@@ -15555,6 +15555,12 @@ select (select count(*) from information_schema.tables where table_schema = 'pub
 -- Migração ADITIVA (requer SQL 100 e 101).
 -- =====================================================================
 
+do $$ begin
+  if not exists (select 1 from pg_proc where proname = '_dir_pode') then
+    raise exception 'Rode antes o SQL 101 (20261107000101_painel_diretoria.sql). Nada foi alterado.';
+  end if;
+end $$;
+
 alter table public.membros_acessos add column if not exists acesso_anterior timestamptz;
 
 -- lgpd_entrar (SQL 100) passa a guardar o acesso anterior; o resto continua igual
@@ -15701,6 +15707,13 @@ select (select count(*) from information_schema.tables where table_schema = 'pub
 -- Saúde da empresa 0–100 por área, calculada pelos alertas abertos e pelos indicadores do Painel da Diretoria, com uma
 -- foto por dia para a tendência. Pesos e faixas configuráveis. Migração ADITIVA (requer SQL 101 para os indicadores).
 -- =====================================================================
+
+-- depende do SQL 101 (função _dir_pode): avisa antes de começar, em vez de falhar no meio
+do $$ begin
+  if not exists (select 1 from pg_proc where proname = '_dir_pode') then
+    raise exception 'Rode antes o SQL 101 (20261107000101_painel_diretoria.sql). Nada foi alterado.';
+  end if;
+end $$;
 
 create table if not exists public.decisoes_config (
   empresa_id uuid primary key references public.empresas(id) on delete cascade,

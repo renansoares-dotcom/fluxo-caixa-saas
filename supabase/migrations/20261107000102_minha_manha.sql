@@ -9,6 +9,12 @@
 -- Migração ADITIVA (requer SQL 100 e 101).
 -- =====================================================================
 
+do $$ begin
+  if not exists (select 1 from pg_proc where proname = '_dir_pode') then
+    raise exception 'Rode antes o SQL 101 (20261107000101_painel_diretoria.sql). Nada foi alterado.';
+  end if;
+end $$;
+
 alter table public.membros_acessos add column if not exists acesso_anterior timestamptz;
 
 -- lgpd_entrar (SQL 100) passa a guardar o acesso anterior; o resto continua igual
