@@ -50,6 +50,8 @@ export const FIGS = [
   ['producao', 'producao/ordens', '## 4.', 'Ordens de produção em aberto'], ['producao', 'producao/programacao', '## 5.', 'Programação da semana'], ['producao', 'producao/planta', '## 7.', 'Planta da Fábrica ao vivo: produzindo, em manutenção, parada longa e setup, com a OP e o ritmo'],
   ['logistica', 'logistica/frota', '## 3.', 'Frota e Parâmetros'], ['logistica', 'logistica', '## 4.', 'Cargas e Entregas'],
   ['frota', 'logistica/gestao-frota', '## 3.', 'Painel da frota: custo por veículo e alertas'], ['frota', 'logistica/gestao-frota', '## 5.', 'Abastecimentos com o consumo de cada trecho', 'abast'], ['frota', 'logistica/gestao-frota', '## 8.', 'Motoristas com CNH, toxicológico e alertas', 'mot'],
+  ['frota', 'logistica/gestao-frota', '## 3.', 'Avisos de vencimento: antecedência, quem recebe, palavras do VExpenses e o que está vencendo', 'painel|click:#gf-avisos'],
+  ['frota', 'logistica/gestao-frota', '## 5.', 'Combustível do extrato da VExpenses: veículo e motorista sugeridos, km e litros do cupom', 'abast|file:#a-vx|fill:.modal tbody tr:nth-child(2) .vx-k=120870|fill:.modal tbody tr:nth-child(2) .vx-l=70'],
   ['app-motorista', 'logistica/motorista', '## 3.', 'App do Motorista: a rota do dia na ordem de entrega, com a próxima em destaque'],
   ['app-motorista', 'logistica/motorista', '### 4.2', 'Entrega: quem recebeu, foto do canhoto e assinatura na tela', 'click:[data-ent="cn-app3"]|fill:#me-nome=CARLOS MENDES'],
   ['app-motorista', 'logistica/motorista', '### 4.3', 'Ocorrência com foto e "não entregue"', 'click:[data-oc="cn-app4"]'],

@@ -85,12 +85,43 @@ export function custoMes(v, mes, { abast = [], manut = [], multas = [], locacaoM
   const doMes = (d) => (d || '').slice(0, 7) === mes;
   const ab = abast.filter(a => a.veiculo_id === v.id && doMes(a.data));
   const combustivel = ab.reduce((s, a) => s + +a.valor, 0);
-  const manutencao = manut.filter(m => m.veiculo_id === v.id && doMes(m.data)).reduce((s, m) => s + +m.valor, 0);
+  const mm = manut.filter(m => m.veiculo_id === v.id && doMes(m.data));
+  const pneus = mm.filter(m => m.tipo === 'pneus').reduce((s, m) => s + +m.valor, 0);   // melhoria 7.3: pneus à parte
+  const manutencao = mm.filter(m => m.tipo !== 'pneus').reduce((s, m) => s + +m.valor, 0);
   const mult = multas.filter(m => m.veiculo_id === v.id && doMes(m.data_infracao) && m.situacao !== 'cancelada').reduce((s, m) => s + +m.valor, 0);
   const kms = abast.filter(a => a.veiculo_id === v.id && (doMes(a.data) || a.data < mes + '-01')).map(a => ({ km: +a.km, data: a.data }));
   const antes = kms.filter(k => k.data < mes + '-01').sort((a, b) => b.km - a.km)[0];
   const noMes = kms.filter(k => doMes(k.data)).sort((a, b) => b.km - a.km)[0];
   const km = noMes && antes ? noMes.km - antes.km : (ab.length > 1 ? Math.max(...ab.map(a => +a.km)) - Math.min(...ab.map(a => +a.km)) : 0);
-  const total = r2(combustivel + manutencao + mult + (+locacaoMensal || 0));
-  return { combustivel: r2(combustivel), manutencao: r2(manutencao), multas: r2(mult), locacao: r2(+locacaoMensal || 0), total, km, custoKm: km > 0 ? r2(total / km) : null, litros: r2(ab.reduce((s, a) => s + +a.litros, 0)) };
+  const total = r2(combustivel + manutencao + pneus + mult + (+locacaoMensal || 0));
+  const porKm = (x) => km > 0 ? Math.round(x / km * 1000) / 1000 : null;
+  return { combustivel: r2(combustivel), manutencao: r2(manutencao), pneus: r2(pneus), kmComb: porKm(combustivel), kmManut: porKm(manutencao), kmPneus: porKm(pneus), multas: r2(mult), locacao: r2(+locacaoMensal || 0), total, km, custoKm: km > 0 ? r2(total / km) : null, litros: r2(ab.reduce((s, a) => s + +a.litros, 0)) };
+}
+
+// ---------- melhoria 7.3: combustível do extrato da VExpenses ----------
+const semAc = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+export const palavrasCombustivel = (txt) => String(txt || '').split(/[,;\n]/).map(p => semAc(p).trim()).filter(Boolean);
+
+/**
+ * gastos do extrato da VExpenses (lerVExpenses().itens) que parecem combustível, prontos para virar abastecimento:
+ * sugere o motorista pelo nome do colaborador e o veículo pelo último abastecimento desse motorista (ou pelo motorista do veículo).
+ * itens: [{ fitid, data, valor (negativo = gasto), tipo, descricao: "desc — nome" }]
+ */
+export function combustivelVExpenses(itens, { palavras = [], motoristas = [], veiculos = [], abast = [] } = {}) {
+  const P = palavras.length ? palavras : palavrasCombustivel('POSTO, COMBUST, DIESEL');
+  const ja = new Set(abast.map(a => a.vexp_ref).filter(Boolean));
+  const out = [];
+  for (const it of itens) {
+    if (it.tipo !== 'CARTAO' || !(it.valor < 0)) continue;
+    const [desc, nome = ''] = String(it.descricao).split(' — ');
+    const D = semAc(desc);
+    if (!P.some(p => D.includes(p))) continue;
+    const N = semAc(nome).trim(), prim = N.split(/\s+/)[0];
+    const mot = motoristas.find(m => semAc(m.nome).trim() === N) || motoristas.find(m => prim && semAc(m.nome).split(/\s+/)[0] === prim && semAc(m.nome).includes(N.split(/\s+/).slice(-1)[0] || '#'));
+    const ult = mot ? abast.filter(a => a.motorista_id === mot.id).sort((a, b) => b.data.localeCompare(a.data))[0] : null;
+    const vei = (ult && veiculos.find(v => v.id === ult.veiculo_id)) || (mot && veiculos.find(v => v.motorista && semAc(v.motorista).trim() === semAc(mot.nome).trim())) || null;
+    out.push({ ref: it.fitid, data: it.data, valor: Math.round(-it.valor * 100) / 100, posto: desc.trim(), colaborador: nome.trim(), motorista_id: mot?.id || null, veiculo_id: vei?.id || null,
+      combustivel: /ARLA/.test(D) ? 'arla' : /GASOLINA/.test(D) ? 'gasolina' : /ETANOL|ALCOOL/.test(D) ? 'etanol' : 'diesel_s10', importado: ja.has(it.fitid) });
+  }
+  return out.sort((a, b) => a.data.localeCompare(b.data));
 }

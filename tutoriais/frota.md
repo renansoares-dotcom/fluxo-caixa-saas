@@ -1,7 +1,7 @@
 ---
 titulo: Gestão da frota e motoristas
 tela: Logística › Gestão da Frota (LOG003)
-versao: 1.3
+versao: 1.4
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -24,9 +24,36 @@ Quem edita a logística: **administrador, financeiro e diretor**. Os demais perf
 ![Figura 1 — Painel da frota: custo por veículo e alertas (dados fictícios)](img/frota-1.jpg)
 
 1. Abra **Logística › Gestão da Frota**.
-2. Escolha o **mês**. Para cada veículo: km rodados (pelo hodômetro dos abastecimentos), combustível, manutenção, multas, locação (do contrato), total, custo por km e consumo médio.
+2. Escolha o **mês**. Para cada veículo aparecem:
+   - km rodados (pelo hodômetro dos abastecimentos);
+   - combustível, manutenção, **pneus** (as manutenções do tipo Pneus, separadas das demais), multas e locação (do contrato);
+   - o total;
+   - o **custo por km**, com a divisão embaixo: combustível · manutenção · pneus por km;
+   - o consumo médio.
 3. A coluna **Custo/km usado nas cargas** mostra o valor que a montagem de cargas usa hoje. Clique em **usar** para trocar pelo custo real do mês.
 4. Em **Alertas**: documentos vencendo em até 60 dias, preventivas no limite, CNH, toxicológico e MOPP vencendo, consumo fora da média e multas com prazo de indicação perto. Os mesmos alertas aparecem no **Decision Center**.
+
+### 3.1 Avisos de vencimento
+
+Além dos alertas na tela, a plataforma **avisa todo dia às 7h40**, no sino e no celular, o que vai vencer:
+
+- documentos do veículo (o mais recente de cada tipo, só de veículos ativos);
+- CNH, exame toxicológico e curso MOPP dos motoristas ativos;
+- preventivas, pela data ou pelo km (o que vier primeiro).
+
+Cada item é avisado **uma vez ao entrar na antecedência** e **outra vez ao vencer**. Quem clicou em **Avisar agora** vê o resultado na tela e não recebe o aviso.
+
+Clique em **Avisos de vencimento**, no painel, para configurar:
+
+- ligar ou desligar o aviso diário;
+- a **antecedência em dias** (padrão 30);
+- para preventiva por km, avisar **faltando quantos km** (padrão 1.000);
+- **quem recebe** (administrador, diretor, financeiro e/ou produção);
+- as palavras que identificam combustível no extrato da VExpenses (seção 5).
+
+A janela também lista o que está na antecedência agora. **Avisar agora** manda os itens que ainda não foram avisados.
+
+![Figura 2 — Avisos de vencimento: antecedência, quem recebe, palavras do VExpenses e o que está vencendo (dados fictícios)](img/frota-4.jpg)
 
 ## 4. Veículos: documentos e preventivas
 
@@ -38,12 +65,20 @@ Quem edita a logística: **administrador, financeiro e diretor**. Os demais perf
 
 ## 5. Abastecimento
 
-![Figura 2 — Abastecimentos com o consumo de cada trecho (dados fictícios)](img/frota-2.jpg)
+![Figura 3 — Abastecimentos com o consumo de cada trecho (dados fictícios)](img/frota-2.jpg)
 
 1. Na aba **Abastecimento**, preencha veículo, motorista, data, **km do hodômetro**, litros, valor, combustível e posto. Marque **Tanque cheio** quando completar o tanque.
 2. A plataforma lembra o último veículo, motorista, combustível e posto, para agilizar a digitação.
 3. O km atual do veículo é atualizado sozinho. Se o km digitado for menor que o último, a plataforma pergunta antes de gravar.
-4. **Km/l** pelo método do tanque cheio: distância entre dois abastecimentos com tanque cheio ÷ litros colocados nesse intervalo (inclusive os parciais). Em vermelho, os trechos 15% piores que a média do veículo: pode ser vazamento, desvio de combustível, defeito ou erro de digitação.
+4. **Importar do VExpenses**: envie o PDF do **Extrato de Pagamentos** da VExpenses. A plataforma:
+   - traz os gastos em posto, pelas palavras configuradas nos Avisos de vencimento;
+   - sugere o **motorista** pelo nome do colaborador do cartão e o **veículo** pelo último abastecimento desse motorista;
+   - escolhe o combustível pela descrição (ARLA, gasolina, etanol ou diesel).
+
+   Informe o **km** e os **litros** do cupom e clique em **Registrar os marcados**. Um gasto já importado aparece marcado e não entra de novo.
+
+   ![Figura 4 — Combustível do extrato da VExpenses: veículo e motorista sugeridos, km e litros do cupom (dados fictícios)](img/frota-5.jpg)
+5. **Km/l** pelo método do tanque cheio: distância entre dois abastecimentos com tanque cheio ÷ litros colocados nesse intervalo (inclusive os parciais). Em vermelho, os trechos 15% piores que a média do veículo: pode ser vazamento, desvio de combustível, defeito ou erro de digitação.
 
 ## 6. Manutenção
 
@@ -62,7 +97,7 @@ Quem edita a logística: **administrador, financeiro e diretor**. Os demais perf
 
 ## 8. Motoristas
 
-![Figura 3 — Motoristas com CNH, toxicológico e alertas (dados fictícios)](img/frota-3.jpg)
+![Figura 5 — Motoristas com CNH, toxicológico e alertas (dados fictícios)](img/frota-3.jpg)
 
 1. Na aba **Motoristas**, clique em **Incluir motorista**. Se ele for empregado, escolha o **colaborador do RH**: nome e CPF vêm preenchidos.
 2. Informe CNH (número, categoria, validade e se tem EAR), exame **toxicológico** (data e validade: a plataforma sugere 2 anos e 6 meses depois do exame; confira no laudo), **MOPP** (produtos perigosos, quando houver) e a data do **termo de responsabilidade** assinado.
@@ -86,3 +121,4 @@ Quem edita a logística: **administrador, financeiro e diretor**. Os demais perf
 | 1.1 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 08/11/2026 | Ficha do motorista com o login do App do Motorista. |
+| 1.4 | 08/11/2026 | Pneus em coluna própria e custo por km dividido (combustível, manutenção, pneus); avisos diários de vencimento (documentos, CNH/toxicológico/MOPP e preventivas) com antecedência, km e papéis configuráveis; importação do combustível do extrato da VExpenses. |

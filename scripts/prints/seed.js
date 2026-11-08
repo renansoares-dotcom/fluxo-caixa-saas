@@ -1908,3 +1908,25 @@ window.RPC.pag_remessa_gravar = () => null;
     r('NATAL / RN', L(0, 0, 0, 0), L(5, 22, 19800, 6336), 'sem_base'),
     r('FORTALEZA/CE', L(0, 0, 0, 0), L(2, 0, 0, 4800), 'sem_base')] });
 }
+
+// Frota: pneus, VExpenses e avisos de vencimento (SQL 136) — dados FICTÍCIOS
+{
+  Object.assign(DB.log_parametros[0], { frota_alerta_ativo: true, frota_alerta_dias: 30, frota_alerta_km: 1000, frota_alerta_papeis: ['admin', 'financeiro', 'diretor'],
+    frota_vexp_palavras: 'POSTO, COMBUST, DIESEL, SHELL, IPIRANGA, PETROBRAS, RAIZEN, ALE COMBUST, GASOLINA, ETANOL, ARLA' });
+  const [V1, , V3] = DB.log_veiculos, [M1, M2] = DB.frota_motoristas;
+  globalThis.MOCK_VEXPENSES = { inicio: '2026-11-01', fim: '2026-11-07', itens: [
+    { fitid: 'vx:1', data: '2026-11-02', valor: -1238.00, tipo: 'CARTAO', descricao: 'AUTO POSTO BR-232 — PAULO SANTOS' },
+    { fitid: 'vx:2', data: '2026-11-02', valor: -38.90, tipo: 'CARTAO', descricao: 'RESTAURANTE DO TREVO — PAULO SANTOS' },
+    { fitid: 'vx:3', data: '2026-11-03', valor: -433.30, tipo: 'CARTAO', descricao: 'POSTO IPIRANGA CARUARU — RICARDO ALMEIDA' },
+    { fitid: 'vx:4', data: '2026-11-05', valor: -96.00, tipo: 'CARTAO', descricao: 'ARLA 32 POSTO SHELL — PAULO SANTOS' },
+    { fitid: 'vx:5', data: '2026-11-06', valor: -1190.25, tipo: 'CARTAO', descricao: 'AUTO POSTO BR-232 — PAULO SANTOS' }] };
+  DB.frota_abastecimentos.push({ id: 'fa-vx', empresa_id: E, veiculo_id: V1.id, motorista_id: M1.id, data: '2026-11-02', km: Math.max(...DB.frota_abastecimentos.filter(a => a.veiculo_id === V1.id).map(a => +a.km)) + 690, litros: 200, valor: 1238, combustivel: 'diesel_s10', tanque_cheio: true, posto: 'AUTO POSTO BR-232', origem: 'vexpenses', vexp_ref: 'vx:1' });
+  window.RPC.frota_vencimentos = () => [
+    { chave: 'a', fase: 'vencido', origem: V3.codigo, item: 'CRLV / licenciamento', vence: '2026-11-10', dias: -2, falta_km: null },
+    { chave: 'b', fase: 'aviso', origem: 'PAULO SANTOS', item: 'CNH', vence: '2026-11-20', dias: 12, falta_km: null },
+    { chave: 'c', fase: 'aviso', origem: V1.codigo, item: 'Preventiva: Troca de óleo e filtros', vence: '2026-11-20', dias: 12, falta_km: 640 },
+    { chave: 'd', fase: 'aviso', origem: V1.codigo, item: 'Seguro', vence: '2026-12-05', dias: 27, falta_km: null }];
+  window.RPC.frota_avisar_agora = () => 0;
+  DB.frota_manutencoes.push({ id: 'fm-pn', empresa_id: E, veiculo_id: V1.id, data: '2026-11-04', km: 120500, tipo: 'pneus', oficina: 'PNEUS DO AGRESTE', descricao: 'Recapagem de 4 pneus de tração', valor: 2240 },
+    { id: 'fm-pv', empresa_id: E, veiculo_id: V1.id, data: '2026-11-05', km: 120600, tipo: 'preventiva', oficina: 'OFICINA DIESEL CENTRO', descricao: 'Lubrificação e regulagem de freios', valor: 380 });
+}

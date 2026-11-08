@@ -5,6 +5,7 @@ import { $, $$, esc, toast, fail, modal, confirmDialog, today, dateBR, money, op
 import { podeLogistica, TIPOS_VEICULO } from '../lib/logistica.js';
 import * as F from '../lib/frota.js';
 import { valorMensal } from '../lib/contratos.js';
+import { lerVExpenses } from '../lib/vexpenses.js';
 
 export const title = 'Gestão da Frota';
 const BUCKET = 'frota';
@@ -27,7 +28,8 @@ async function carregar() {
     seg(q(sb.from('contratos').select('id,numero,parte_nome,objeto,valor,periodicidade,natureza,status').eq('empresa_id', e))),   // só admin lê contratos
     seg(q(sb.from('rh_colaboradores').select('id,nome,cpf,situacao').eq('empresa_id', e).order('nome'))),
   ]);
-  D = { V, M, Dc, P, Mn, A, Mu, C, R, hoje: today(), vById: Object.fromEntries(V.map(v => [v.id, v])), mById: Object.fromEntries(M.map(m => [m.id, m])) };
+  const LP = (await q(sb.from('log_parametros').select('*').eq('empresa_id', e)).catch(() => []))[0] || null;
+  D = { V, M, Dc, P, Mn, A, Mu, C, R, LP, hoje: today(), vById: Object.fromEntries(V.map(v => [v.id, v])), mById: Object.fromEntries(M.map(m => [m.id, m])) };
   return D;
 }
 const nomeV = (id) => { const v = D.vById[id]; return v ? `${v.codigo}${v.placa ? ' · ' + v.placa : ''}` : '—'; };
@@ -73,15 +75,17 @@ function painel(corpo, root) {
   corpo.innerHTML = `<div class="kpis">${kpi('Veículos ativos', ativos.length, `${ativos.filter(v => v.propriedade !== 'proprio').length} locados/agregados`)}${kpi('Custo no mês', money(tot.total), `combustível ${money(tot.comb)}`)}
       ${kpi('Km rodados', nf(tot.km), 'pelo hodômetro dos abastecimentos')}${kpi('Custo por km', tot.km ? money(tot.total / tot.km) : '–', 'frota toda')}
       ${kpi('Alertas', al.length, al.filter(a => a.nivel === 'neg').length + ' urgentes', al.some(a => a.nivel === 'neg') ? 'neg' : al.length ? 'warn' : '')}</div>
-    <div class="card toolbar" style="margin-top:12px"><label class="small" style="display:flex;gap:6px;align-items:center">Mês <input type="month" id="gf-mes" value="${ui.mes}"></label></div>
-    <div class="card flush" style="margin-top:12px"><div class="table-wrap"><table><thead><tr><th>Veículo</th><th>Tipo</th><th class="num">Km no mês</th><th class="num">Combustível</th><th class="num">Manutenção</th><th class="num">Multas</th><th class="num">Locação</th><th class="num">Total</th><th class="num">Custo/km</th><th class="num">Km/l (média)</th><th class="num">Custo/km usado nas cargas</th></tr></thead><tbody>
+    <div class="card toolbar" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center"><label class="small" style="display:flex;gap:6px;align-items:center">Mês <input type="month" id="gf-mes" value="${ui.mes}"></label>
+      <button class="btn small" id="gf-avisos">Avisos de vencimento</button></div>
+    <div class="card flush" style="margin-top:12px"><div class="table-wrap"><table><thead><tr><th>Veículo</th><th>Tipo</th><th class="num">Km no mês</th><th class="num">Combustível</th><th class="num">Manutenção</th><th class="num">Pneus</th><th class="num">Multas</th><th class="num">Locação</th><th class="num">Total</th><th class="num">Custo/km</th><th class="num">Km/l (média)</th><th class="num" title="Custo por km usado na montagem das cargas">Custo/km nas cargas</th></tr></thead><tbody>
       ${linhas.map(({ v, c, cons }) => `<tr><td><b>${esc(v.codigo)}</b><div class="small muted">${esc(v.placa || '')} · ${F.PROPRIEDADE[v.propriedade || 'proprio']}</div></td><td class="small">${esc(TIPOS_VEICULO[v.tipo] || v.tipo)}</td>
-        <td class="num">${nf(c.km)}</td><td class="num">${money(c.combustivel)}</td><td class="num">${money(c.manutencao)}</td><td class="num">${money(c.multas)}</td><td class="num">${money(c.locacao)}</td><td class="num"><b>${money(c.total)}</b></td>
-        <td class="num">${c.custoKm != null ? money(c.custoKm) : '–'}</td><td class="num">${cons.media != null ? nf(cons.media, 2) : '–'}</td>
+        <td class="num">${nf(c.km)}</td><td class="num">${money(c.combustivel)}</td><td class="num">${money(c.manutencao)}</td><td class="num">${money(c.pneus)}</td><td class="num">${money(c.multas)}</td><td class="num">${money(c.locacao)}</td><td class="num"><b>${money(c.total)}</b></td>
+        <td class="num">${c.custoKm != null ? money(c.custoKm) : '–'}${c.custoKm != null ? `<div class="small muted" title="combustível · manutenção · pneus, por km">${[c.kmComb, c.kmManut, c.kmPneus].map(x => nf(x, 2)).join(' · ')}</div>` : ''}</td><td class="num">${cons.media != null ? nf(cons.media, 2) : '–'}</td>
         <td class="num">${v.custo_km != null ? money(v.custo_km) : '<span class="muted">—</span>'}${c.custoKm != null ? ` <button class="btn small ghost" data-ck="${v.id}" data-v="${c.custoKm}" title="Usar o custo/km deste mês na montagem das cargas">usar ${money(c.custoKm)}</button>` : ''}</td></tr>`).join('')
-        || '<tr><td colspan="11" class="empty">Nenhum veículo cadastrado. Inclua em Frota e parâmetros.</td></tr>'}</tbody></table></div></div>
+        || '<tr><td colspan="12" class="empty">Nenhum veículo cadastrado. Inclua em Frota e parâmetros.</td></tr>'}</tbody></table></div></div>
     <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Alertas</h3>${al.map(a => `<div class="small ${cls(a.nivel)}">• <b>${esc(a.origem)}</b> — ${esc(a.txt)}</div>`).join('') || '<div class="muted small">Nenhum alerta. Documentos, preventivas, motoristas e multas em dia.</div>'}</div>`;
   $('#gf-mes', corpo).onchange = (e) => { if (e.target.value) { ui.mes = e.target.value; painel(corpo, root); } };
+  $('#gf-avisos', corpo).onclick = () => avisos(root);
   $$('[data-ck]', corpo).forEach(b => b.onclick = async () => {
     if (!(await confirmDialog(`Usar ${money(+b.dataset.v)} por km como custo deste veículo na montagem das cargas?`))) return;
     try { await q(sb.from('log_veiculos').update({ custo_km: +b.dataset.v }).eq('id', b.dataset.ck)); toast('Custo por km atualizado'); refazer(root); } catch (err) { fail(err); }
@@ -250,7 +254,8 @@ function abastecimentos(corpo, root) {
   const kml = {}; for (const c of Object.values(porV)) for (const t of c.trechos) kml[t.id] = t;
   const xs = D.A.filter(a => (!ui.veic || a.veiculo_id === ui.veic) && a.data.slice(0, 7) === ui.mes);
   const ult = ls.get('gf-abast', {});
-  corpo.innerHTML = `<div class="card"><h3 style="margin:0 0 8px">Registrar abastecimento</h3>
+  corpo.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">Registrar abastecimento</h3>
+        <span><input type="file" id="a-vx" accept="application/pdf" hidden><button class="btn small" id="a-vxb" title="Lê o Extrato de Pagamentos da VExpenses e traz os gastos em posto">Importar do VExpenses</button></span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;align-items:end">
         <label>Veículo<select id="a-v">${D.V.filter(v => v.situacao !== 'inativo').map(v => `<option value="${v.id}" ${v.id === (ui.veic || ult.v) ? 'selected' : ''}>${esc(v.codigo)}${v.placa ? ' · ' + esc(v.placa) : ''}</option>`).join('')}</select></label>
         <label>Motorista<select id="a-m"><option value="">—</option>${D.M.filter(m => m.ativo).map(m => `<option value="${m.id}" ${m.id === ult.m ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select></label>
@@ -271,6 +276,9 @@ function abastecimentos(corpo, root) {
   ligarFiltros(corpo, root, abastecimentos);
   const dica = () => { const v = D.vById[$('#a-v', corpo).value]; $('#a-dica', corpo).textContent = v?.km_atual ? `Último km registrado: ${nf(v.km_atual)} em ${dateBR(v.km_atual_em)}.` : ''; };
   dica(); $('#a-v', corpo).onchange = dica;
+  $('#a-vxb', corpo).onclick = () => $('#a-vx', corpo).click();
+  $('#a-vx', corpo).onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { importarVExpenses(await lerVExpenses(await f.arrayBuffer(), f.name), root); } catch (err) { fail(err); } };
   $('#a-ok', corpo).onclick = async (ev) => {
     const G = (id) => $('#' + id, corpo), v = D.vById[G('a-v').value], km = +G('a-k').value, lt = +G('a-l').value, vl = +G('a-r').value;
     if (!v || !km || !lt || !(vl >= 0)) return toast('Informe veículo, km, litros e valor', true);
@@ -285,6 +293,64 @@ function abastecimentos(corpo, root) {
     } catch (err) { fail(err); ev.target.disabled = false; }
   };
   $$('[data-del]', corpo).forEach(b => b.onclick = async () => { if (!(await confirmDialog('Excluir este abastecimento?'))) return; try { await q(sb.from('frota_abastecimentos').delete().eq('id', b.dataset.del)); refazer(root); } catch (err) { fail(err); } });
+}
+
+// melhoria 7.3: gastos em posto do extrato da VExpenses viram abastecimentos (km e litros vêm do cupom)
+function importarVExpenses(ex, root) {
+  const linhas = F.combustivelVExpenses(ex.itens || [], { palavras: F.palavrasCombustivel(D.LP?.frota_vexp_palavras), motoristas: D.M, veiculos: D.V, abast: D.A });
+  if (!linhas.length) return toast('Nenhum gasto de combustível no extrato (confira as palavras em Painel › Avisos de vencimento).', true);
+  const optV = (sel) => `<option value="">— veículo —</option>${D.V.filter(v => v.situacao !== 'inativo').map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.codigo)}</option>`).join('')}`;
+  const optM = (sel) => `<option value="">—</option>${D.M.filter(m => m.ativo).map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}`;
+  const md = modal({ title: `Combustível do VExpenses — ${dateBR(ex.inicio)} a ${dateBR(ex.fim)}`, wide: true, body: `
+    <p class="small">Gastos em posto do extrato. Informe o <b>km do hodômetro</b> e os <b>litros</b> do cupom; o veículo e o motorista vêm sugeridos pelo colaborador do cartão. Os já importados aparecem marcados e não entram de novo.</p>
+    <div class="table-wrap"><table><thead><tr><th></th><th>Data</th><th>Colaborador · posto</th><th class="num">Valor</th><th>Veículo</th><th>Motorista</th><th>Km</th><th>Litros</th><th>Cheio</th></tr></thead><tbody>
+    ${linhas.map((l, i) => `<tr data-i="${i}" class="${l.importado ? 'muted' : ''}"><td><input type="checkbox" class="vx-s" ${l.importado ? 'disabled' : 'checked'}></td><td>${dateBR(l.data)}</td>
+      <td class="small">${esc(l.colaborador)}<div class="muted">${esc(l.posto)}</div>${l.importado ? '<div class="pos">já importado</div>' : ''}</td><td class="num">${money(l.valor)}</td>
+      <td><select class="vx-v" ${l.importado ? 'disabled' : ''}>${optV(l.veiculo_id)}</select></td><td><select class="vx-m" ${l.importado ? 'disabled' : ''}>${optM(l.motorista_id)}</select></td>
+      <td><input class="vx-k" type="number" style="width:100px" ${l.importado ? 'disabled' : ''}></td><td><input class="vx-l" type="number" step="0.001" style="width:90px" ${l.importado ? 'disabled' : ''}></td>
+      <td><input type="checkbox" class="vx-t" checked ${l.importado ? 'disabled' : ''}></td></tr>`).join('')}</tbody></table></div>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="vx-ok">Registrar os marcados</button>' });
+  $('#vx-ok', md.el).onclick = async (ev) => {
+    const rows = [];
+    for (const tr of $$('tr[data-i]', md.el)) {
+      if (!$('.vx-s', tr).checked) continue;
+      const l = linhas[+tr.dataset.i], v = $('.vx-v', tr).value, km = +$('.vx-k', tr).value, lt = +$('.vx-l', tr).value;
+      if (!v || !km || !lt) return toast(`${dateBR(l.data)} ${l.colaborador}: informe veículo, km e litros (ou desmarque a linha)`, true);
+      rows.push({ empresa_id: state.empresa.id, veiculo_id: v, motorista_id: $('.vx-m', tr).value || null, data: l.data, km, litros: lt, valor: l.valor, combustivel: l.combustivel,
+        tanque_cheio: $('.vx-t', tr).checked, posto: l.posto, origem: 'vexpenses', vexp_ref: l.ref });
+    }
+    if (!rows.length) return toast('Marque ao menos uma linha', true);
+    ev.target.disabled = true;
+    try { await q(sb.from('frota_abastecimentos').insert(rows)); md.close(); toast(`${rows.length} abastecimento(s) registrado(s)`); refazer(root); }
+    catch (err) { fail(err); ev.target.disabled = false; }
+  };
+}
+
+// melhoria 7.3: aviso de vencimento (documentos, motoristas, preventivas) e palavras do VExpenses
+async function avisos(root) {
+  const P = D.LP || {}, papeis = [['admin', 'Administrador'], ['diretor', 'Diretor'], ['financeiro', 'Financeiro'], ['producao', 'Produção']], sel = P.frota_alerta_papeis || ['admin', 'financeiro', 'diretor'];
+  let lista = [];
+  try { lista = await q(sb.rpc('frota_vencimentos', { p_empresa: state.empresa.id })); } catch { lista = []; }
+  const md = modal({ title: 'Avisos de vencimento da frota', wide: true, body: `
+    <label class="chk"><input type="checkbox" id="fa-on" ${P.frota_alerta_ativo === false ? '' : 'checked'}> Avisar todo dia (7h40) o que entrou na antecedência e o que venceu</label>
+    <div class="grid-form" style="margin-top:8px">
+      <label class="xs">Antecedência (dias)<input id="fa-d" type="number" min="1" max="180" value="${P.frota_alerta_dias ?? 30}"></label>
+      <label class="xs">Preventiva por km: avisar faltando (km)<input id="fa-k" type="number" min="0" max="50000" value="${P.frota_alerta_km ?? 1000}"></label></div>
+    <div style="margin-top:8px"><b class="small">Quem recebe</b><div style="display:flex;gap:14px;margin-top:4px">${papeis.map(([k, t]) => `<label class="chk"><input type="checkbox" class="fa-p" value="${k}" ${sel.includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div></div>
+    <label style="margin-top:10px">Palavras que identificam combustível no extrato da VExpenses (separadas por vírgula)<input id="fa-vx" value="${esc(P.frota_vexp_palavras ?? 'POSTO, COMBUST, DIESEL')}"></label>
+    <h3 style="margin:14px 0 6px">Na antecedência agora (${lista.length})</h3>
+    <div class="table-wrap"><table><thead><tr><th>Veículo / motorista</th><th>Item</th><th>Vence</th><th>Situação</th></tr></thead><tbody>
+    ${lista.map(x => `<tr><td>${esc(x.origem)}</td><td>${esc(x.item)}</td><td>${x.vence ? dateBR(x.vence) : ''}${x.falta_km != null ? `<div class="small muted">${+x.falta_km <= 0 ? 'passou ' + nf(-x.falta_km) : 'faltam ' + nf(x.falta_km)} km</div>` : ''}</td>
+      <td class="${x.fase === 'vencido' ? 'neg' : 'warn'}">${x.fase === 'vencido' ? 'vencido' : x.dias != null ? `em ${x.dias} dia(s)` : 'perto do km'}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Nada vencendo na antecedência.</td></tr>'}</tbody></table></div>
+    <p class="small muted">Cada item avisa uma vez ao entrar na antecedência e outra vez ao vencer. O aviso chega no sino e no celular de quem tem os papéis marcados.</p>`,
+    foot: '<button class="btn" id="fa-agora">Avisar agora</button><span style="flex:1"></span><button class="btn" data-close>Cancelar</button><button class="btn primary" id="fa-ok">Salvar</button>' });
+  const salvar = async () => {
+    const nv = { frota_alerta_ativo: $('#fa-on', md.el).checked, frota_alerta_dias: Math.min(180, Math.max(1, +$('#fa-d', md.el).value || 30)), frota_alerta_km: Math.min(50000, Math.max(0, +$('#fa-k', md.el).value || 0)),
+      frota_alerta_papeis: $$('.fa-p:checked', md.el).map(x => x.value), frota_vexp_palavras: $('#fa-vx', md.el).value.trim() || 'POSTO' };
+    if (D.LP) await q(sb.from('log_parametros').update(nv).eq('empresa_id', state.empresa.id)); else await q(sb.from('log_parametros').insert({ empresa_id: state.empresa.id, ...nv }));
+  };
+  $('#fa-ok', md.el).onclick = async () => { try { await salvar(); md.close(); toast('Avisos salvos'); refazer(root); } catch (err) { fail(err); } };
+  $('#fa-agora', md.el).onclick = async () => { try { await salvar(); const n = await q(sb.rpc('frota_avisar_agora', { p_empresa: state.empresa.id })); toast(n ? `${n} aviso(s) novo(s) enviado(s)` : 'Nenhum item novo: os da lista já foram avisados'); } catch (err) { fail(err); } };
 }
 
 // ---------------------------------------------------------------- multas

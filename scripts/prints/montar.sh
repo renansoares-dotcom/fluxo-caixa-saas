@@ -11,4 +11,6 @@ sed -i "s#import { createClient } from '../vendor/supabase-2.117.2.esm.js';#impo
 cp "$R"/cotacao.html "$A"/
 sed -i "s#import { createClient } from '../vendor/supabase-2.117.2.esm.js';#import { sbMock } from './lib/mock-sb.js';#; s#const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });#const sb = sbMock;#" "$A"/js/cotacao.js
 sed -i "s#import { createClient } from '../../vendor/supabase-2.117.2.esm.js';#import { sbMock } from './mock-sb.js';#; s#export const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);#export const sb = sbMock;#" "$A"/js/lib/data.js
+# Extrato da VExpenses simulado (a figura da importação de combustível não precisa de um PDF real)
+sed -i "s#^export async function lerVExpenses(buf, nome = '', pdfjs) {#export async function lerVExpenses(buf, nome = '', pdfjs) {\n  if (globalThis.MOCK_VEXPENSES) return globalThis.MOCK_VEXPENSES;#" "$A"/js/lib/vexpenses.js
 cd "$A" && exec python3 -m http.server 8840

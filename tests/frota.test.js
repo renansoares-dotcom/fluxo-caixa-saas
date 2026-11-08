@@ -44,3 +44,25 @@ test('custo do veículo no mês', () => {
   const c = F.custoMes(v, '2026-10', { abast, manut: [{ veiculo_id: 'v1', data: '2026-10-05', valor: 900 }], multas: [{ veiculo_id: 'v1', data_infracao: '2026-10-03', valor: 100, situacao: 'paga' }], locacaoMensal: 1200 });
   assert.equal(c.total, 5800); assert.equal(c.km, 2000); assert.equal(c.custoKm, 2.9); assert.equal(c.combustivel, 3600);
 });
+
+test('melhoria 7.3: pneus à parte e custo por km por componente', async () => {
+  const F = await import('../js/lib/frota.js');
+  const v = { id: 'v1' }, abast = [{ veiculo_id: 'v1', data: '2026-09-30', km: 1000, litros: 100, valor: 600 }, { veiculo_id: 'v1', data: '2026-10-20', km: 3000, litros: 500, valor: 3000 }];
+  const c = F.custoMes(v, '2026-10', { abast, manut: [{ veiculo_id: 'v1', data: '2026-10-05', valor: 900, tipo: 'corretiva' }, { veiculo_id: 'v1', data: '2026-10-06', valor: 1600, tipo: 'pneus' }] });
+  assert.equal(c.manutencao, 900); assert.equal(c.pneus, 1600); assert.equal(c.total, 5500); assert.equal(c.km, 2000);
+  assert.equal(c.kmComb, 1.5); assert.equal(c.kmPneus, 0.8); assert.equal(c.kmManut, 0.45);
+});
+test('melhoria 7.3: combustível do extrato da VExpenses', async () => {
+  const F = await import('../js/lib/frota.js');
+  const itens = [
+    { fitid: 'a#1', data: '2026-10-02', valor: -850.4, tipo: 'CARTAO', descricao: 'AUTO POSTO SÃO JOÃO — JOSÉ CARLOS SILVA' },
+    { fitid: 'b#1', data: '2026-10-03', valor: -45, tipo: 'CARTAO', descricao: 'RESTAURANTE BOM PRATO — JOSÉ CARLOS SILVA' },
+    { fitid: 'c#1', data: '2026-10-01', valor: -120, tipo: 'CARTAO', descricao: 'ARLA 32 POSTO BR — MARIA SOUZA' },
+    { fitid: 'd#1', data: '2026-10-04', valor: 30, tipo: 'ESTORNO', descricao: 'POSTO X — MARIA SOUZA' }];
+  const mot = [{ id: 'm1', nome: 'Jose Carlos Silva' }, { id: 'm2', nome: 'Pedro Lima' }];
+  const vei = [{ id: 'v1', codigo: 'TRK' }, { id: 'v2', codigo: 'VUC', motorista: 'Pedro Lima' }];
+  const r = F.combustivelVExpenses(itens, { palavras: F.palavrasCombustivel('posto, arla'), motoristas: mot, veiculos: vei, abast: [{ motorista_id: 'm1', veiculo_id: 'v1', data: '2026-09-28' }, { vexp_ref: 'c#1' }] });
+  assert.equal(r.length, 2);
+  assert.deepEqual([r[0].ref, r[0].combustivel, r[0].importado, r[0].motorista_id], ['c#1', 'arla', true, null]);
+  assert.deepEqual([r[1].valor, r[1].motorista_id, r[1].veiculo_id, r[1].posto], [850.4, 'm1', 'v1', 'AUTO POSTO SÃO JOÃO']);
+});
