@@ -10,7 +10,7 @@ await p.goto('http://localhost:8840/index.html#/lancamentos'); await p.waitForTi
 const cont = {};
 for (const [m, rota, , leg, aba] of FIGS) {
   const n = cont[m] = (cont[m] || 0) + 1; if (so && !so.includes(m)) continue;
-  await p.evaluate((r) => { document.querySelectorAll('.modal-back').forEach(m => m.remove()); location.hash = '#/x'; setTimeout(() => { location.hash = '#/' + r; }, 50); }, rota); await p.waitForTimeout(2000);
+  await p.evaluate((r) => { document.querySelectorAll('.modal-back, .cp-drawer-back').forEach(m => m.remove()); location.hash = '#/x'; setTimeout(() => { location.hash = '#/' + r; }, 50); }, rota); await p.waitForTimeout(2000);
   // passos separados por "|": aba (data-a), click:<seletor> ou scroll:<seletor>, na ordem
   if (aba) for (const passo of aba.split('|')) {
     if (passo.startsWith('scroll:')) { await p.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'start' }), passo.slice(7)); await p.waitForTimeout(300); }

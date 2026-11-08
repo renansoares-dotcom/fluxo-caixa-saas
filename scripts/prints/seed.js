@@ -1288,3 +1288,48 @@ window.RPC.pag_remessa_gravar = () => null;
   for (const o of DB.fidc_operacoes) if (o.custo_total == null) o.custo_total = +o.desagio + +o.ad_valorem + +o.tarifas + +o.iof + +o.encargos;
   DB.fidc_comparador_config = [{ empresa_id: E, cdi_aa: 13.65, cdi_data: '2026-11-03', periodo_meses: 12, faixas_prazo: [30, 45, 60, 90], respeitar_limites: true, economia_minima: 100 }];
 }
+
+// Índices financeiros (SQL 111) — plano contábil resumido e balancetes mensais FICTÍCIOS (jan/2025 a nov/2026)
+{
+  const S = [['1', 'ATIVO'], ['1.1', 'ATIVO CIRCULANTE'], ['1.1.1', 'DISPONÍVEL'], ['1.1.2', 'CLIENTES'], ['1.1.3', 'OUTROS CRÉDITOS'], ['1.1.5', 'ESTOQUE'],
+    ['1.2', 'ATIVO NÃO CIRCULANTE'], ['1.2.1', 'REALIZÁVEL A LONGO PRAZO'], ['1.2.3', 'IMOBILIZADO'], ['1.2.30.7', '(-) DEPRECIAÇÕES ACUMULADAS'],
+    ['2', 'PASSIVO'], ['2.1', 'PASSIVO CIRCULANTE'], ['2.1.1', 'OBRIGAÇÕES DO CIRCULANTE'], ['2.1.3', 'FORNECEDORES'], ['2.1.4', 'OBRIGAÇÕES TRIBUTÁRIAS'], ['2.1.5', 'OBRIGAÇÕES TRABALHISTAS'],
+    ['2.2', 'PASSIVO NÃO CIRCULANTE'], ['2.2.1', 'PASSIVO EXIGÍVEL A LONGO PRAZO'], ['2.3', 'PATRIMÔNIO LÍQUIDO'], ['2.3.1', 'CAPITAL SOCIAL'], ['2.3.5', 'LUCROS OU PREJUÍZOS ACUMULADOS'],
+    ['3', 'CUSTOS E DESPESAS'], ['3.2', 'DESPESAS OPERACIONAIS'], ['3.2.1', 'DESPESAS COM VENDAS'], ['3.2.2', 'DESPESAS ADMINISTRATIVAS'], ['3.2.20.5', 'DESPESAS FINANCEIRAS'],
+    ['4', 'RECEITAS'], ['4.1', 'RECEITAS OPERACIONAIS'], ['4.1.1', 'RECEITA BRUTA DE VENDAS'], ['4.1.2', '(-) DEDUÇÕES DA RECEITA BRUTA'], ['4.1.3', 'RECEITAS FINANCEIRAS'],
+    ['5', 'CONTAS DE APURAÇÃO'], ['5.1', 'CUSTOS DOS PRODUTOS VENDIDOS']];
+  const pai = (c) => { const p = c.split('.'); for (let n = p.length - 1; n > 0; n--) { const x = S.find(s => s[0] === p.slice(0, n).join('.')); if (x) return 'ix-' + x[0]; } return null; };
+  DB.contab_contas = (DB.contab_contas || []).concat(S.map(([c, d]) => ({ id: 'ix-' + c, empresa_id: E, classificacao: c, descricao: d, tipo: 'S', natureza: ['1', '3', '5'].includes(c[0]) ? 'D' : 'C', nivel: c.split('.').length, pai_id: pai(c) })));
+  const A = {}; // analíticas: uma por grupo
+  for (const c of ['1.1.1', '1.1.2', '1.1.3', '1.1.5', '1.2.1', '1.2.3', '1.2.30.7', '2.1.1', '2.1.3', '2.1.4', '2.1.5', '2.2.1', '2.3.1', '2.3.5', '3.2.1', '3.2.2', '3.2.20.5', '4.1.1', '4.1.2', '4.1.3', '5.1']) {
+    A[c] = 'ixa-' + c; DB.contab_contas.push({ id: A[c], empresa_id: E, classificacao: c + '.1.0001', descricao: S.find(s => s[0] === c)[1] + ' (exemplo)', tipo: 'A', natureza: ['1', '3', '5'].includes(c[0]) ? 'D' : 'C', nivel: c.split('.').length + 2, pai_id: 'ix-' + c });
+  }
+  DB.contab_saldos_abertura = [{ empresa_id: E, conta_id: A['1.1.1'], data: '2024-12-31', saldo: 0 }];
+  DB.contab_balancetes = DB.contab_balancetes || [];
+  DB.indices_config = [];
+  DB.indices_comentarios = [{ empresa_id: E, mes: '2026-10-01', texto: 'A liquidez corrente voltou a subir em outubro com a renegociação de fornecedores para 60 dias. O prazo de recebimento caiu com a cessão de títulos ao FIDC.\nPróximo passo: alongar a dívida bancária de curto prazo.', atualizado_em: '2026-11-05T10:00:00Z' }];
+  // série mensal: t = 0 (jan/2025) … 22 (nov/2026); valores redondos e fictícios
+  const t0 = (ym) => (+ym.slice(0, 4) - 2025) * 12 + (+ym.slice(5, 7) - 1);
+  const fluxo = (t) => { const rb = 2600000 + 180000 * Math.sin(t / 2) + 9000 * t; return { rb, ded: rb * 0.22, cmv: rb * 0.78 * 0.66, dv: rb * 0.05, da: 205000, df: 128000 - 1500 * t, rf: 6000, dep: 75000 }; };
+  const saldoFim = (t) => {
+    const crise = Math.exp(-((t - 15) ** 2) / 18);   // aperto no meio de 2026
+    const v = {
+      '1.1.1': 260000 - 170000 * crise + 4000 * t, '1.1.2': 2300000 - 380000 * crise - 9000 * t, '1.1.3': 310000, '1.1.5': 1500000 + 250000 * crise, '1.2.1': 420000,
+      '1.2.3': 9200000 + 20000 * t, '1.2.30.7': -(3100000 + 75000 * (t + 1)),
+      '2.1.1': -(1350000 + 220000 * crise - 8000 * t), '2.1.3': -(1450000 + 300000 * crise + 8000 * t), '2.1.4': -820000, '2.1.5': -460000, '2.2.1': -(5200000 - 30000 * t), '2.3.1': -3000000,
+    };
+    // resultado do ano corrente (jan até o mês) nas contas de resultado
+    const ano = Math.floor(t / 12) * 12; const ac = { '4.1.1': 0, '4.1.2': 0, '5.1': 0, '3.2.1': 0, '3.2.2': 0, '3.2.20.5': 0, '4.1.3': 0 };
+    for (let k = ano; k <= t; k++) { const f = fluxo(k); ac['4.1.1'] -= f.rb; ac['4.1.2'] += f.ded; ac['5.1'] += f.cmv; ac['3.2.1'] += f.dv; ac['3.2.2'] += f.da + f.dep; ac['3.2.20.5'] += f.df; ac['4.1.3'] -= f.rf; }
+    Object.assign(v, ac);
+    v['2.3.5'] = -Object.values(v).reduce((s, x) => s + x, 0);   // prejuízos acumulados fecham o balanço
+    return v;
+  };
+  window.RPC.contab_balancete_gerencial = (a) => {
+    const t = t0(String(a.p_fim)); if (t < 0) return [];
+    const fim = saldoFim(t), ini = t % 12 === 0 ? Object.fromEntries(Object.keys(fim).map(k => [k, /^[345]/.test(k) ? 0 : saldoFim(t - 1)[k]])) : saldoFim(t - 1);
+    const f = fluxo(t), mov = { '4.1.1': [0, f.rb], '4.1.2': [f.ded, 0], '5.1': [f.cmv, 0], '3.2.1': [f.dv, 0], '3.2.2': [f.da + f.dep, 0], '3.2.20.5': [f.df, 0], '4.1.3': [0, f.rf], '1.2.30.7': [0, f.dep] };
+    return Object.keys(fim).map(c => { const d = fim[c] - (ini[c] || 0); const [db, cr] = mov[c] || (d >= 0 ? [d, 0] : [0, -d]);
+      return { conta_id: A[c], saldo_anterior: Math.round((ini[c] || 0) * 100) / 100, debito: Math.round(db * 100) / 100, credito: Math.round(cr * 100) / 100, saldo_atual: Math.round(fim[c] * 100) / 100 }; });
+  };
+}

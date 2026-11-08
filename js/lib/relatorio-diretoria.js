@@ -3,7 +3,7 @@
 // corridos pelas margens da página (@page), com "Página X de Y". Usado pelo Painel da Diretoria (melhoria 2.4).
 //
 // spec = { nome, rodape, empresa: { nome, nomeOficial, cnpj, endereco }, ident: [[rótulo, valor]], titulo, subtitulo,
-//          secoes: [{ titulo, novaPagina, blocos: ['parágrafo' | { p } | { itens } | { tabela } | { fontes } | { deliberacao }] }] }
+//          secoes: [{ titulo, novaPagina, blocos: ['parágrafo' | { p } | { itens } | { tabela } | { fontes } | { deliberacao } | { assinaturas }] }] }
 // Texto dos blocos aceita HTML simples (<b>, <i>) — escape o que vier do usuário antes.
 import { toast } from './ui.js';
 
@@ -57,6 +57,7 @@ export function htmlDiretoria(s, { barra = true, auto = true } = {}) {
         out.push(`<div class="tb"><div class="cap">Tabela ${tabN} – ${amp(t.titulo)}</div><table>${col}<thead><tr>${t.cab.map((c, i) => `<th class="${dir.has(i) ? 'r' : ''}">${amp(c)}</th>`).join('')}</tr></thead><tbody>${
           t.linhas.map((l, li) => `<tr class="${t.total && li === t.linhas.length - 1 ? 'tot' : ''}">${l.map((c, i) => `<td class="${dir.has(i) ? 'r' : ''}">${amp(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>${t.nota ? `<div class="nota">${amp(t.nota)}</div>` : ''}</div>`);
       } else if (b.fontes) out.push(`<div class="fon">${b.fontes.map(([t, u], i) => `<div>[${i + 1}] ${amp(t)}.${u ? ` <a href="${u}">${amp(u)}</a>` : ''}</div>`).join('')}</div>`);
+      else if (b.assinaturas) out.push(`<div class="ass">${b.assinaturas.map(a => `<div>${amp(a)}<div class="d">Data: ____/____/______</div></div>`).join('')}</div>`);
       else if (b.deliberacao) {
         const d = b.deliberacao;
         out.push(`<div class="tb del"><table><thead><tr><th>Item</th><th>Aprovado</th><th>Não aprovado</th></tr></thead><tbody>${d.itens.map((x, i) => `<tr><td>${i + 1}. ${amp(x)}</td><td>( )</td><td>( )</td></tr>`).join('')}</tbody></table></div>`);

@@ -90,6 +90,7 @@ const routes = {
   'contab/balancete': () => import(`./pages/contab-balancete.js?v=${V}`),
   'contab/depara': () => import(`./pages/contab-depara.js?v=${V}`),
   'contab/balanco': () => import(`./pages/contab-balanco.js?v=${V}`),
+  'contab/indices': () => import(`./pages/contab-indices.js?v=${V}`),
   'contab/dre': () => import(`./pages/contab-dre.js?v=${V}`),
   'contab/dfc': () => import(`./pages/contab-dfc.js?v=${V}`),
   'estoque/cadastro-notas': () => import(`./pages/cadastro-notas.js?v=${V}`),
