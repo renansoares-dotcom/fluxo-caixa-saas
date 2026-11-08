@@ -1,7 +1,7 @@
 ---
 titulo: Portal do Cliente
 tela: Financeiro › Portal do Cliente (FIN006)
-versao: 1.4
+versao: 1.5
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -94,9 +94,10 @@ O portal funciona no celular.
 
 ![Figura 7 — A arte no celular (dados fictícios)](img/portal-cliente-cel.jpg)
 
-### 3.5 Entregas e WhatsApp (para o cliente)
+### 3.5 Entregas, PIX e WhatsApp (para o cliente)
 
 - A aba **Entregas** mostra as notas entregues pela frota da empresa: programada, saiu para entrega (com quantas entregas faltam antes da dele), entregue com quem recebeu e o **canhoto** assinado, ou não entregue. Os dados vêm do App do Motorista.
+- Em **Títulos**, o botão **Pagar com PIX** mostra o QR e o PIX copia e cola do título, com o valor (manual **Cobrança**).
 - O botão **📱 WhatsApp** cadastra o celular do cliente com o aceite: as mensagens de arte, prorrogação e entrega vão também pelo WhatsApp (manual **WhatsApp da Plataforma**).
 
 ## 4. Regras e travas
@@ -128,3 +129,4 @@ O portal funciona no celular.
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.3 | 07/11/2026 | Aprovação de artes pelo cliente: aviso e aba de artes, pinos, comparação de versões, aprovação com declaração e assinatura, pedido de alteração, envio de arquivo, comprovante e celular. |
 | 1.4 | 08/11/2026 | Aba Entregas (situação, fila e canhoto) e cadastro do WhatsApp com aceite. |
+| 1.5 | 08/11/2026 | Pagar com PIX (QR e copia e cola) nos títulos em aberto. |

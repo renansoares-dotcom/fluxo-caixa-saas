@@ -98,12 +98,27 @@ async function titulos() {
       ${neg.length ? `<div class="kpi"><div class="k-label">Com banco</div><div class="k-value">${money(tot(neg))}</div><div class="k-sub">${neg.length} título(s)</div></div>` : ''}</div>
     <div class="card flush" style="margin-top:12px"><div style="padding:14px 16px 0"><h2>A pagar</h2></div><div class="table-wrap"><table><thead><tr><th>Vencimento</th><th>Documento</th><th class="num">Valor</th><th>Prorrogação</th><th></th></tr></thead><tbody>
       ${ab.map(t => `<tr><td class="${t.data < h ? 'neg' : ''}">${dateBR(t.data)}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td><td class="small">${esc(rotPr(t.prorrogacao))}</td>
-        <td>${t.pode_prorrogar ? `<button class="btn ghost small" data-pr="${t.id}">Pedir prorrogação</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum título em aberto.</td></tr>'}</tbody></table></div></div>
+        <td style="white-space:nowrap"><button class="btn small" data-pix="${t.id}">Pagar com PIX</button>${t.pode_prorrogar ? `<button class="btn ghost small" data-pr="${t.id}">Pedir prorrogação</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum título em aberto.</td></tr>'}</tbody></table></div></div>
     ${neg.length ? `<div class="card flush" style="margin-top:12px"><div style="padding:14px 16px 0"><h2>Pagar pelo boleto do banco</h2><p class="pt-aviso" style="margin:0 0 12px">Estes títulos foram transferidos a uma instituição financeira. O pagamento deve ser feito pelo boleto enviado pelo banco; dúvidas sobre eles, inclusive prorrogação, são tratadas com a instituição indicada no boleto.</p></div>
       <div class="table-wrap"><table><thead><tr><th>Vencimento</th><th>Documento</th><th class="num">Valor</th></tr></thead><tbody>${neg.map(t => `<tr><td>${dateBR(t.data)}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
     <div class="card flush" style="margin-top:12px"><div style="padding:14px 16px 0"><h2>Pagos — 12 meses</h2></div><div class="table-wrap" style="max-height:360px"><table><thead><tr><th>Pago em</th><th>Documento</th><th class="num">Valor</th></tr></thead><tbody>
       ${pg.map(t => `<tr><td>${dateBR(t.data)}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Nenhum pagamento registrado.</td></tr>'}</tbody></table></div></div>`;
   $$('[data-pr]').forEach(b => b.onclick = () => pedir(ab.find(t => t.id === b.dataset.pr)));
+  $$('[data-pix]').forEach(b => b.onclick = () => pagarPix(ab.find(t => t.id === b.dataset.pix)));
+}
+
+// PIX do título (melhoria 3.3, SQL 126): QR e copia e cola com o valor e o número do título
+let qrLib = null;
+async function pagarPix(t) {
+  let P; try { P = await q(sb.rpc('portal_pix', { p_fav: S.fav.favorecido_id, p_lancamento: t.id })); } catch (err) { return fail(err); }
+  if (!qrLib) { await new Promise((ok, er) => { const sc = document.createElement('script'); sc.src = 'vendor/qrcode-generator-1.4.4.js'; sc.onload = ok; sc.onerror = er; document.head.appendChild(sc); }).catch(() => {}); qrLib = window.qrcode || null; }
+  let svg = ''; if (qrLib) { const g = qrLib(0, 'M'); g.addData(P.brcode); g.make(); svg = g.createSvgTag({ cellSize: 5, margin: 2 }); }
+  const m = modal({ title: `Pagar com PIX — ${t.documento || ''}`, body: `<div style="text-align:center">${svg}</div>
+    <p style="text-align:center;margin:6px 0"><b>${money(P.valor)}</b> · vencimento ${dateBR(P.vencimento)}<br><span class="small muted">para ${esc(P.recebedor || '')}</span></p>
+    <label>PIX copia e cola<textarea id="px-c" rows="4" readonly style="width:100%;font-family:monospace;font-size:12px">${esc(P.brcode)}</textarea></label>
+    <p class="small muted">Abra o aplicativo do banco, escolha PIX › Ler QR code ou Copia e cola. A baixa aparece aqui depois que o financeiro conferir o pagamento.</p>`,
+    foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="px-cp">Copiar o código</button>' });
+  $('#px-cp', m.el).onclick = () => { navigator.clipboard?.writeText(P.brcode).then(() => toast('Código copiado')).catch(() => { $('#px-c', m.el).select(); document.execCommand('copy'); toast('Código copiado'); }); };
 }
 const rotPr = (s) => !s ? '' : s.startsWith('pendente') ? 'em análise' : s.startsWith('aprovada') ? 'aprovada' : s.startsWith('recusada') ? 'recusada' + s.slice(8) : '';
 

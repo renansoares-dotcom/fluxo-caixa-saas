@@ -83,6 +83,7 @@ const routes = {
   'fiscal/apuracao': () => import(`./pages/fiscal-apuracao.js?v=${V}`),
   'fiscal/notas-debito': () => import(`./pages/fiscal-notas-debito.js?v=${V}`),
   'abertos': () => import(`./pages/abertos.js?v=${V}`),
+  'cobranca': () => import(`./pages/cobranca.js?v=${V}`),
   'creditos': () => import(`./pages/creditos.js?v=${V}`),
   'conta-fornecedor': () => import(`./pages/conta-fornecedor.js?v=${V}`),
   'paraquedas': () => import(`./pages/paraquedas.js?v=${V}`),

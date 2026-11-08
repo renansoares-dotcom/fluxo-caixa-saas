@@ -96,6 +96,8 @@ export const MANUAIS = [
     resumo: 'Logos, cores e dados da empresa nos relatórios e na plataforma; regime tributário por vigência (Simples, MEI, Presumido, Real); crachás com foto e QR Code, impressos em A4.' },
   { id: 'contratos', titulo: 'Contratos', area: 'Cadastros', rotas: ['contratos'],
     resumo: 'Contratos com vigência, aviso prévio e reajuste; PDF assinado no gov.br; parcelas no fluxo de caixa. Só administradores.' },
+  { id: 'cobranca', titulo: 'Cobrança — aging, régua e PIX', area: 'Financeiro', rotas: ['cobranca'],
+    resumo: 'Aging por faixa e por cliente, régua automática por e-mail e WhatsApp com PIX copia e cola, pausas, histórico e Cobrar agora; PIX também no Portal.' },
   { id: 'whatsapp', titulo: 'WhatsApp da Plataforma — modelos, aceite e fila', area: 'Cadastros', rotas: ['config/whatsapp'],
     resumo: 'As mensagens do e-mail também pelo WhatsApp (API oficial): modelos aprovados na Meta, aceite do cliente e da equipe, teste e fila.' },
   { id: 'email', titulo: 'E-mails da Plataforma — remetente, modelos e fila', area: 'Cadastros', rotas: ['config/email'],

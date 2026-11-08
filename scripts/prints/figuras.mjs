@@ -195,6 +195,11 @@ export const FIGS = [
   ['fidc-recompras', 'fidc-recompras', '## 4.', 'Motivos da recompra: o que acontece com o título, a linha na DRE e a contrapartida contábil', 'click:#rc-mtv'],
   ['fidc-recompras', 'dre', '### 4.1', 'DRE Gerencial com as recompras na linha do motivo, dentro das deduções da receita bruta', 'scroll:#tbl'],
   // E-mails da Plataforma (07/11/2026)
+  ['cobranca', 'cobranca', '## 3.', 'Aging: o que está em aberto por faixa de atraso e por cliente'],
+  ['cobranca', 'cobranca', '### 3.2', 'Títulos do cliente com a última cobrança, Cobrar agora, Pausar e PIX', 'click:[data-p]'],
+  ['cobranca', 'cobranca', '## 4.', 'Régua: as etapas, ligadas e quantas mensagens saíram', 'click:[data-aba="regua"]'],
+  ['cobranca', 'cobranca', '## 5.', 'Histórico de tudo o que foi mandado', 'click:[data-aba="historico"]'],
+  ['cobranca', 'cobranca', '## 7.', 'Parâmetros da cobrança e o PIX da empresa', 'click:#cb-par'],
   ['whatsapp', 'config/whatsapp', '## 3.', 'WhatsApp da Plataforma: número, como ligar e os modelos aprovados'],
   ['whatsapp', 'config/whatsapp', '### 3.2', 'Modelo: nome na Meta, campos na ordem, texto sugerido e prévia', 'click:[data-m="entrega_saiu"]'],
   ['whatsapp', 'config/whatsapp', '### 3.4', 'Últimas mensagens e a situação de cada uma', 'scroll:#wa-corpo .card.flush:last-child'],

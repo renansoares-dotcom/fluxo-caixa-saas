@@ -1643,3 +1643,20 @@ window.RPC.pag_remessa_gravar = () => null;
   DB.wa_fila = [F(3, 'entrega_feita', '5581991234567', 'enviado'), F(25, 'entrega_saiu', '5581991234567', 'enviado'), F(26, 'entrega_saiu', '5587988776655', 'enviado'),
     F(70, 'aviso', '5581998765432', 'enviado'), F(130, 'arte_aprovacao', '5581977665544', 'erro', '132001: Template name does not exist in the translation'), F(200, 'teste', '5581998765432', 'enviado')];
 }
+
+// Cobrança (SQL 126) — títulos em aberto e régua FICTÍCIOS
+{
+  const hoje = new Date().toISOString().slice(0, 10), dd = (n) => new Date(Date.parse(hoje + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+  const pl = DB.plano_contas.find(p => p.codigo === '1.01.01'), fv = (n) => DB.favorecidos.find(f => f.nome.startsWith(n));
+  const T = [['SUPERMERCADOS', 6, 18400, '4812/1'], ['SUPERMERCADOS', -12, 9800, '4790/2'], ['DISTRIBUIDORA', -2, 12600, '4801/1'], ['DISTRIBUIDORA', -38, 7300, '4702/3'],
+    ['ATACADO', -95, 21500, '4511/2'], ['ATACADO', -64, 6200, '4588/1'], ['FARMÁCIAS', 3, 5400, '4820/1'], ['FARMÁCIAS', 15, 5400, '4820/2'], ['SUPERMERCADOS', 25, 18400, '4812/2'], ['DISTRIBUIDORA', -20, 4100, '4760/1']];
+  T.forEach(([n, d, v, doc], k) => { const f = fv(n); if (f) DB.lancamentos.push({ id: 'cob-l' + k, empresa_id: E, data: dd(d), plano_id: pl.id, favorecido_id: f.id, valor: v, descricao: 'NF ' + doc.split('/')[0] + ' — duplicata', documento: doc, status: 'Em aberto', conta_id: DB.contas[0].id }); });
+  const fs = fv('SUPERMERCADOS'), fd = fv('DISTRIBUIDORA'), fa = fv('ATACADO');
+  if (fs) fs.email = 'financeiro@boacompra.exemplo';
+  DB.cob_config = [{ empresa_id: E, ativo: true, pix_chave: '12345678000195', pix_nome: 'PLASTICOS EXEMPLO LTDA', pix_cidade: 'CARUARU', valor_minimo: 100, excluir_cedidos: true, canais: ['email', 'whatsapp'] }];
+  DB.cob_etapas = [[-3, 'cob_lembrete'], [0, 'cob_vencimento'], [3, 'cob_atraso'], [10, 'cob_atraso'], [30, 'cob_atraso']].map(([dias, modelo], k) => ({ id: 'ce' + k, empresa_id: E, dias, modelo, ativo: true }));
+  const V = (min, l, dias, mod, canal, para, manual) => ({ id: 'cv' + min, empresa_id: E, lancamento_id: l, etapa_dias: dias, modelo: mod, canal, para, manual: !!manual, criado_por: manual ? 'renata@exemplo.com.br' : null, criado_em: new Date(Date.now() - min * 3600e3).toISOString() });
+  DB.cob_envios = [V(2, 'cob-l1', 10, 'cob_atraso', 'email', 'financeiro@boacompra.exemplo'), V(3, 'cob-l1', 10, 'cob_atraso', 'whatsapp', '5581991234567'), V(5, 'cob-l2', null, 'cob_atraso', 'email', 'contas@distribuidora.exemplo', true),
+    V(26, 'cob-l9', 3, 'cob_atraso', 'sem_contato', null), V(50, 'cob-l0', -3, 'cob_lembrete', 'email', 'financeiro@boacompra.exemplo'), V(170, 'cob-l1', 3, 'cob_atraso', 'email', 'financeiro@boacompra.exemplo')];
+  DB.cob_pausas = fa ? [{ id: 'cp1', empresa_id: E, favorecido_id: fa.id, ate: dd(12), motivo: 'Negociação do parcelamento com o diretor (reunião dia 15)', criado_por: 'renata@exemplo.com.br' }] : [];
+}

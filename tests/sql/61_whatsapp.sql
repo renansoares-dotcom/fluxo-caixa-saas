@@ -64,7 +64,7 @@ select public.wa_teste('e000000a-0000-0000-0000-000000000000');
 insert into wa_config(empresa_id, ativo, phone_number_id) values ('e000000a-0000-0000-0000-000000000000', true, '123456789012345');
 select pg_temp.ok((select count(*) = 1 from wa_fila where codigo = 'teste' and para = '5581977776666'), 'teste na fila');
 select pg_temp.falha($$update wa_config set phone_number_id = 'abc'$$, 'phone id inválido');
-select pg_temp.ok((select count(*) from wa_padrao()) = 6, 'seis modelos sugeridos');
+select pg_temp.ok((select count(*) from wa_padrao()) >= 6, 'modelos sugeridos (6 do SQL 125 e os que vieram depois)');
 select pg_temp.entrar('b0000000-0000-0000-0000-00000000000b');
 select pg_temp.ok((select count(*) = 0 from wa_fila) and (select count(*) = 0 from wa_contatos), 'outra empresa não vê');
 reset role;

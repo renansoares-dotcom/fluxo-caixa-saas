@@ -1,8 +1,8 @@
 ---
 titulo: Lançamentos e contas a pagar / receber
 tela: Financeiro › Lançamentos (FIN001) e Contas a Pagar / Receber (FIN003)
-versao: 1.5
-atualizado: 2026-11-07
+versao: 1.6
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -97,6 +97,9 @@ Contas fixas que se repetem todo mês (aluguel, assinaturas) ficam em **Financei
 - **Importar do ERP**: use o relatório **RFLX036 — Extrato de Contas por Quebra por Conta Pagamento**, exportado em XLSX. Cada linha vira um lançamento **Pago** na conta do relatório, com o plano de contas pela "Conta Pagamento" do ERP e o favorecido pelo emitente. O que já existe (mesmo dia, valor e conta) é pulado, e o título em aberto da NF citada é baixado em vez de criar outro. Recebimento acima do título vira **Baixar + juros**: o título baixa pela face e a diferença vai para 1.02.17, gerando a nota de débito (desmarque se for pagamento a maior). Nada é gravado antes da sua revisão.
 - **Exportar Excel**: baixa os lançamentos filtrados, com todas as colunas.
 
+
+> O aging por faixa de atraso, a régua de cobrança e o PIX ficam em **Financeiro › Cobrança** (manual **Cobrança**).
+
 ## 4. Contas a Pagar / Receber
 
 ![Figura 3 — Contas a Pagar / Receber (dados fictícios)](img/lancamentos-2.jpg)
@@ -166,3 +169,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.3 | 31/10/2026 | Juros e multa recebidos geram a nota de débito a emitir; Importar do ERP com a ação Baixar + juros. |
 | 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Listas de Lançamentos e de Contas a Pagar / Receber sem rolagem lateral (conta, centro de custo e dias na 2ª linha) e seletor **Colunas**; Excel com todas as colunas. Figuras refeitas. |
 | 1.5 | 07/11/2026 | Editar selecionados (plano, centro de custo, conta e favorecido em lote), Aplicar regras, regra de classificação no lançamento novo e Dividir por centro de custo (com modelo de rateio). |
+| 1.6 | 08/11/2026 | Indicação da tela Cobrança (aging, régua e PIX). |
