@@ -1112,3 +1112,25 @@ window.FN = {
     dia: { fin: { recebido: 186420.55, pago: 142310.18, lancamentos: 47 }, fat: { notas: 14, valor: 52380.4 }, entradas: { notas: 6, valor: 71240 },
       prod: { boa: 17850, refugo: 1210, apontamentos: 38 }, rnc: 1, log: { cargas: 3, entregues: 11, problemas: 1 } } });
 }
+
+// Central de Decisões (SQL 103) — FICTÍCIOS
+{
+  const H = (d, h = 0) => new Date(Date.now() - d * 864e5 - h * 36e5).toISOString(), D = (d) => H(d).slice(0, 10), F = (d) => new Date(Date.now() + d * 864e5).toISOString().slice(0, 10);
+  DB.decisoes_config = []; DB.decisoes_dia ||= [];
+  const pessoas = [['u3', 'Renata Alves', 'admin'], ['u1', 'Ana Souza', 'financeiro'], ['u2', 'Beatriz Rocha', 'financeiro'], ['u4', 'Carlos Lima', 'diretor']].map(([user_id, nome, papel]) => ({ user_id, nome, papel }));
+  const hist = [
+    ['extratos', 'Conciliação', 'Importar os extratos parados', 'delegado', null, 'Beatriz Rocha', 'Importar o OFX do Banco Alfa e conciliar até segunda', 'renata', 0.1],
+    ['cadastro-doc', 'Cadastro', 'Completar CNPJ/CPF dos beneficiários', 'adiado', F(10), null, 'Aguardando a planilha da contabilidade', 'ana', 1],
+    ['fidc-barato', 'FIDC', 'Priorizar o fundo mais barato nas antecipações', 'resolvido', null, null, 'Borderô de quinta enviado à Negocial; a FS só para o Grupo Total', 'carlos', 2],
+    ['caixa-minimo', 'Caixa', 'Cobrir a falta de caixa prevista', 'adiado', D(1), null, 'Esperar a liberação do borderô', 'renata', 6],
+    ['pago-sem-conta', 'Caixa', 'Lançamentos pagos sem conta bancária', 'resolvido', null, null, 'Contas informadas nos 12 lançamentos de setembro', 'beatriz', 9],
+  ];
+  window.RPC.decisoes_situacao = () => ({
+    atual: Object.fromEntries(hist.map(([k, origem, titulo, situacao, ate, dn, nota, u, d]) => [k, { situacao, ate, delegado_para: dn ? 'u2' : null, delegado_nome: dn, nota, por_email: u + '@exemplo.com.br', criado_em: H(d), assinatura: situacao === 'resolvido' ? (k === 'fidc-barato' ? 'x' : 'y') : null }])),
+    historico: hist.map(([chave, origem, titulo, situacao, ate, delegado_nome, nota, u, d], i) => ({ id: i, chave, origem, titulo, situacao, ate, delegado_nome, nota, por_email: u + '@exemplo.com.br', criado_em: H(d, 2) })),
+    pessoas });
+  DB.saude_historico = Array.from({ length: 30 }, (_, i) => { const g = Math.round(58 + i * 0.6 + (i % 4) * 2 - (i % 7 === 3 ? 6 : 0)); return { empresa_id: E, dia: D(30 - i), geral: g,
+    areas: { fin: g - 12 + (i % 3), com: 88, cmp: 92, prd: g - 2, qua: 80 + (i % 5), log: 90, fis: 85, gov: 76 + (i % 4) }, alertas: 14 - Math.floor(i / 4) }; });
+  if (!DB.decisoes_dia.length) DB.decisoes_dia.push(...[[118, 0, 'Pendente', 182400], [117, 1, 'Aprovada', 151230], [116, 2, 'Aprovada', 96410], [115, 3, 'Rejeitada', -12300]].map(([numero, d, status, saldo_fim]) =>
+    ({ id: 'dd' + numero, empresa_id: E, numero, data: D(d), status, saldo_fim, criado_em: H(d, 14), decidido_em: status !== 'Pendente' ? H(d, 12) : null, motivo: status === 'Rejeitada' ? 'Segurar o pagamento da resina até o borderô' : null, itens: [], contas: [] })));
+}

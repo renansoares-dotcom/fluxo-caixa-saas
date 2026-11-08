@@ -338,7 +338,9 @@ async function render() {
   if (!state.cad) { try { await loadCadastros(); } catch (e) { fail(e); return; } }
   lerCores();
   chatFechado(null);            // a tela Conversas diz qual conversa está aberta
-  const route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
+  let route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
+  // Decisão do Dia virou uma aba da Central de Decisões (melhoria 2.3): os links antigos continuam funcionando
+  if (route === 'decisao-dia') { const qs = location.hash.split('?')[1]; history.replaceState(null, '', '#/decisoes?aba=pagamentos' + (qs ? '&' + qs : '')); route = 'decisoes'; }
   // link direto para um registro (cartão das Conversas): #/<tela>?abrir=<id> abre o registro na tela
   { const ab = new URLSearchParams(location.hash.split('?')[1] || '').get('abrir');
     const TIPO = { 'compras/pedidos': 'pedido', 'producao/ordens': 'op', 'fidc-propostas': 'proposta', 'paraquedas': 'pa', 'logistica/fretes': 'frete', 'lancamentos': 'lancamento', 'contab/imobilizado': 'bem', 'manutencao/ordens': 'os', 'manutencao/equipamentos': 'equip', 'qualidade/inspecoes': 'insp', 'qualidade/nao-conformidades': 'rnc', 'tintas/ordens': 'tinta', 'preimpressao/artes': 'arte' };

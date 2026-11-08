@@ -1,7 +1,7 @@
 ---
 titulo: Minhas aprovações — tudo o que espera a sua decisão
 tela: Painéis › Minhas aprovações (PAI006)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-07
 ---
 ## 1. Para que serve
@@ -13,7 +13,7 @@ Juntar numa lista só **tudo o que espera a sua decisão**, de todos os módulos
 | Pagamento antecipado | Financeiro › Pagamentos Antecipados | Administrador, diretor e financeiro |
 | Pedido de compra e requisição | Compras | Administrador e diretor |
 | Borderô FIDC | Crédito / FIDC › Propostas de Borderô | Diretor |
-| Decisão do dia | Painéis › Decisão do Dia | Diretor e administrador |
+| Decisão do dia | Painéis › Central de Decisões › Pagamentos do dia | Diretor e administrador |
 | Prorrogação do cliente | Portal do Cliente | Administrador e financeiro |
 | Reajuste de contrato | Cadastros › Contratos | Administrador |
 | Receita de tinta em teste | Casa de Tintas › Cores e Receitas | Quem aprova receita (Parâmetros da casa de tintas) |
@@ -75,3 +75,4 @@ A janela de confirmação lista tudo o que vai ser decidido. Se algum item não 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão: nove tipos de aprovação numa lista só, ordem por urgência e prazo, decisão individual e em lote, número de pendências no menu. |
+| 1.1 | 07/11/2026 | O Decision Center e a Decisão do Dia passaram a ser a Central de Decisões. |

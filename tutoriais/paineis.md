@@ -1,22 +1,29 @@
 ---
-titulo: Painéis — Minha Manhã, Decisão do Dia, Decision Center e dashboards
-tela: Painéis › Minha Manhã (PAI001), Decisão do Dia (PAI002), Decision Center (PAI003), Dashboard Executivo (PAI004) e Dashboard (PAI005)
-versao: 1.3
+titulo: Painéis — Minha Manhã, Central de Decisões e dashboards
+tela: Painéis › Minha Manhã (PAI001), Central de Decisões (PAI003), Dashboard Executivo (PAI004) e Dashboard (PAI005)
+versao: 1.4
 atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
 Os painéis juntam, numa tela só, o que precisa de atenção e de decisão:
 
-- **Minha Manhã**: a tela inicial. Mostra a situação do dia, a agenda, as decisões pendentes do seu perfil e os alertas.
-- **Decisão do Dia**: o que entra e o que sai hoje (e nos próximos dias), com o saldo de cada banco. Serve para simular e registrar a decisão de pagamentos e antecipações do dia, que vai para o diretor aprovar.
-- **Decision Center**: recomendações da semana, calculadas por regras explícitas sobre os dados da plataforma.
+- **Minha Manhã**: a tela inicial, montada por blocos que cada pessoa escolhe.
+- **Central de Decisões**: reúne quatro coisas:
+  - os alertas calculados por regras explícitas, que podem ser resolvidos, adiados ou delegados;
+  - os pagamentos do dia (simular, registrar e aprovar);
+  - a saúde da empresa por área;
+  - o histórico do que foi decidido.
 - **Dashboard Executivo**: a visão de um mês para a direção, com a nota de saúde financeira.
 - **Dashboard**: o resumo do ano, com entradas e saídas, saldos por conta e próximos vencimentos.
 
 ## 2. Quem tem acesso
 
-A **Minha Manhã** é de todos os perfis, e cada um vê só as suas áreas. Os demais painéis fazem parte da área **Financeiro**. Na Decisão do Dia:
+A **Minha Manhã** é de todos os perfis, e cada um vê só as suas áreas. Os demais painéis fazem parte da área **Financeiro**. Na Central de Decisões:
+
+- o administrador, o diretor e o financeiro resolvem, adiam e delegam os alertas; os parâmetros são do administrador e do diretor.
+
+Nos Pagamentos do dia:
 
 - o administrador e o financeiro registram e enviam a decisão;
 - o diretor e o administrador aprovam ou rejeitam.
@@ -77,11 +84,99 @@ Clique em **Personalizar**:
 
 A escolha vale para você, nesta empresa, em todos os aparelhos. **Voltar ao padrão** devolve os blocos do seu perfil.
 
-## 4. Decisão do Dia
+## 4. Central de Decisões
 
-![Figura 4 — Decisão do Dia (dados fictícios)](img/paineis-2.jpg)
+A **Central de Decisões** junta numa tela só o antigo Decision Center e a antiga Decisão do Dia. Ela tem quatro abas:
 
-### 4.1 Simular
+- **Alertas**;
+- **Pagamentos do dia**;
+- **Saúde da empresa**;
+- **Histórico**.
+
+Os links antigos da Decisão do Dia (avisos, aprovações) abrem direto a aba **Pagamentos do dia**.
+
+### 4.1 Alertas
+
+![Figura 4 — Central de Decisões › Alertas, com os delegados, adiados e resolvidos (dados fictícios)](img/paineis-3.jpg)
+
+Os alertas são calculados com **regras fixas** sobre os dados da plataforma, sem inteligência artificial. Cada um mostra:
+
+- o motivo;
+- o impacto estimado;
+- a urgência;
+- a **regra usada** ("Como foi calculado");
+- o botão para a tela certa.
+
+Exemplos de alerta:
+
+- cobrir a falta de caixa prevista;
+- cobrar os títulos vencidos de maior valor;
+- priorizar o fundo FIDC mais barato;
+- importar os extratos parados;
+- conferir as ações sensíveis da Auditoria;
+- responder às solicitações de titulares (LGPD).
+
+Os quadros no alto contam os alertas abertos por origem. Clique num quadro para filtrar. Use as abas **Abertos**, **Delegados a mim**, **Adiados** e **Resolvidos** e o filtro de **urgência**.
+
+Em cada alerta, o administrador, o diretor e o financeiro podem:
+
+| Ação | O que acontece |
+|---|---|
+| **Resolver** | Exige dizer o que foi feito. O alerta some **enquanto o conteúdo for o mesmo**. Se mudar (outro valor, mais itens), ele volta marcado "voltou". |
+| **Adiar** | Escolha até quando (padrão: 7 dias, ajustável). O alerta volta sozinho na data. |
+| **Delegar** | Escolha a pessoa e escreva a instrução. Ela recebe um aviso no sino e o alerta mostra "Delegado a…". Ele continua aberto até ser resolvido. |
+| **Reabrir** | Nos adiados e resolvidos: o alerta volta para os abertos. |
+
+![Figura 5 — Delegar um alerta: para quem e a instrução (dados fictícios)](img/paineis-8.jpg)
+
+Tudo fica registrado com quem fez, quando e a observação (aba **Histórico**).
+
+### 4.2 Saúde da empresa
+
+![Figura 6 — Saúde da empresa: índice geral, evolução e as notas por área com os motivos (dados fictícios)](img/paineis-9.jpg)
+
+Um índice de **0 a 100** para a empresa e para cada área:
+
+- Financeiro;
+- Comercial;
+- Compras e estoque;
+- Produção;
+- Qualidade;
+- Logística;
+- Fiscal e contábil;
+- Governança.
+
+Cada área começa com 100 e perde pontos:
+
+| Motivo | Pontos (padrão) |
+|---|---|
+| Alerta aberto de urgência alta | −20 |
+| Alerta aberto de urgência média | −8 |
+| Alerta aberto de urgência baixa | −3 |
+| Indicador do Painel da Diretoria (mês anterior) fora da meta | −15 |
+| Indicador em atenção | −5 |
+
+Como cada alerta conta:
+
+- resolvidos e adiados não contam;
+- delegados contam até serem resolvidos;
+- a nota nunca fica abaixo de 0.
+
+O índice **geral** é a média das áreas. As faixas são:
+
+- **Saudável**: 80 ou mais;
+- **Atenção**: de 60 a 79;
+- **Crítica**: abaixo de 60.
+
+Cada cartão de área lista os motivos que mais tiram pontos. Toda vez que a tela é aberta, a plataforma guarda a **foto do dia**. O gráfico **Evolução** mostra a tendência e cada área mostra a variação no período.
+
+### 4.3 Pagamentos do dia
+
+![Figura 7 — Central de Decisões › Pagamentos do dia (dados fictícios)](img/paineis-2.jpg)
+
+É a antiga Decisão do Dia, sem mudanças: simular, registrar e aprovar a decisão de pagamentos.
+
+#### Simular
 
 1. Escolha o **dia**.
 2. O **saldo de abertura** é o saldo dos bancos no fim do dia anterior.
@@ -100,7 +195,7 @@ A escolha vale para você, nesta empresa, em todos os aparelhos. **Voltar ao pad
 
 A **Decisão sugerida** resume o que a plataforma propõe para o dia.
 
-### 4.2 Registrar e aprovar
+#### Registrar e aprovar
 
 1. Escreva uma **observação** e clique em **Salvar rascunho** ou **Enviar para aprovação**.
 2. O diretor abre a decisão e clica em **Aprovar** ou **Rejeitar**. Decisão aprovada pode ser **reaberta**: ela volta como rejeitada para ser refeita.
@@ -108,30 +203,27 @@ A **Decisão sugerida** resume o que a plataforma propõe para o dia.
 
 **Imprimir** gera a decisão no padrão IPLAMM. **Copiar resumo (WhatsApp)** copia o texto pronto para colar na conversa.
 
-## 5. Decision Center
+### 4.4 Histórico
 
-![Figura 5 — Decision Center (dados fictícios)](img/paineis-3.jpg)
+![Figura 8 — Histórico: alertas tratados e as decisões de pagamentos do dia (dados fictícios)](img/paineis-10.jpg)
 
-As **Recomendações da semana** mostram, para cada uma, o motivo, o impacto estimado, a urgência, a **regra usada** e a ação, com o link para a tela certa. Exemplos:
+Mostra duas listas:
 
-- cobrir a falta de caixa prevista;
-- identificar lançamentos pagos sem conta;
-- cobrar os títulos vencidos de maior valor;
-- reduzir a dependência dos maiores clientes;
-- priorizar o fundo FIDC mais barato;
-- rever as despesas acima do orçamento;
-- investigar o aumento das recompras;
-- importar os extratos parados;
-- completar o CNPJ/CPF dos beneficiários;
-- repor os itens abaixo do ponto de pedido.
+- os alertas **tratados** nos últimos 90 dias: quem, quando, o que fez (resolveu, adiou, delegou, reabriu), o alerta e a observação;
+- as **decisões de pagamentos do dia**, com a situação e o saldo final previsto. **Abrir** leva à aba Pagamentos do dia naquele dia.
 
-Filtre por **urgência**. **Adiar 7 dias** esconde uma recomendação por uma semana, e **Trazer de volta** a mostra de novo. **Recalcular** refaz a lista.
+### 4.5 Parâmetros
 
-As recomendações seguem regras fixas e mostram a regra que usaram; não há inteligência artificial nelas.
+Só o administrador e o diretor alteram. Em **Parâmetros**:
 
-## 6. Dashboard Executivo
+- os **pontos** de cada tipo de alerta e de indicador;
+- as **faixas** (saudável a partir de / crítica abaixo de);
+- o **prazo padrão** para adiar;
+- o **peso de cada área** no índice geral. Com peso 0, a área sai da média, mas continua aparecendo.
 
-![Figura 6 — Dashboard Executivo (dados fictícios)](img/paineis-4.jpg)
+## 5. Dashboard Executivo
+
+![Figura 9 — Dashboard Executivo (dados fictícios)](img/paineis-4.jpg)
 
 1. Escolha o **mês de referência**.
 2. Os indicadores podem ser clicados para ver a composição:
@@ -156,9 +248,9 @@ As recomendações seguem regras fixas e mostram a regra que usaram; não há in
 
 O painel usa só lançamentos com conta bancária, a mesma base dos saldos.
 
-## 7. Dashboard
+## 6. Dashboard
 
-![Figura 7 — Dashboard (dados fictícios)](img/paineis-5.jpg)
+![Figura 10 — Dashboard (dados fictícios)](img/paineis-5.jpg)
 
 O resumo do ano mostra:
 
@@ -171,13 +263,13 @@ O resumo do ano mostra:
 - os saldos por conta;
 - os próximos vencimentos.
 
-## 8. Perguntas frequentes e erros comuns
+## 7. Perguntas frequentes e erros comuns
 
-**O saldo de abertura da Decisão do Dia não bate com o banco.** Falta lançar ou conciliar algo do dia anterior. Veja a Conferência do dia.
+**O saldo de abertura dos Pagamentos do dia não bate com o banco.** Falta lançar ou conciliar algo do dia anterior. Veja a Conferência do dia.
 
 **Uma recomendação não faz sentido para nós.** Use **Adiar 7 dias**. Se a regra estiver errada para a IPLAMM, avise o administrador para ajustá-la.
 
-## 9. Histórico de alterações
+## 8. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
@@ -185,3 +277,4 @@ O resumo do ano mostra:
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.3 | 07/11/2026 | Minha Manhã personalizada: blocos por perfil, o que mudou desde o último acesso, resumo do dia anterior, aprovações, indicadores da diretoria e atalhos. |
+| 1.4 | 07/11/2026 | Central de Decisões: Decisão do Dia e Decision Center numa tela só, com resolver, adiar e delegar cada alerta, histórico e saúde da empresa 0–100 por área. |

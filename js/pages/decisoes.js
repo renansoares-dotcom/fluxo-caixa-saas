@@ -1,9 +1,11 @@
-// Decision Center: recomendações da semana calculadas com regras explícitas sobre os dados da plataforma (sem IA).
-// Cada recomendação mostra o motivo, o impacto estimado, a urgência, a regra usada e a ação.
+// Central de Decisões (antigo Decision Center + Decisão do Dia, melhoria 2.3, SQL 103): abas Alertas, Pagamentos do dia,
+// Saúde da empresa e Histórico. Alertas calculados com regras explícitas sobre os dados da plataforma (sem IA): motivo,
+// impacto, urgência, regra e ação; cada um pode ser resolvido, adiado ou delegado, e tudo fica no histórico.
 import { sb, state, q, fetchAll, temArea, isAdmin } from '../lib/data.js';
-import { $, $$, esc, money0, pct, dateBR, fail, today } from '../lib/ui.js';
+import { $, $$, esc, money0, pct, dateBR, fail, today, toast, modal } from '../lib/ui.js';
+import { AREAS, estado, assinatura, saude, faixa, FAIXA, PESOS_PADRAO } from '../lib/decisoes-calc.js';
 
-export const title = 'Decision Center';
+export const title = 'Central de Decisões';
 
 const addDias = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const ls = { get: (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -254,39 +256,155 @@ function regras(D) {
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }
 
+const ABAS = [['alertas', 'Alertas'], ['pagamentos', 'Pagamentos do dia'], ['saude', 'Saúde da empresa'], ['historico', 'Histórico']];
+const ui = { aba: 'alertas', origem: '', urg: '', ver: 'abertos' };
+const podeTratar = () => ['admin', 'diretor', 'financeiro'].includes(state.papel);
+const podeParam = () => ['admin', 'diretor'].includes(state.papel);
+let cache = null;   // { todas, S (situação), cfg, inds }
+
 export async function render(root) {
-  if (!temArea('fin') || state.papel === 'compras') { root.innerHTML = '<div class="card"><p>O Decision Center usa os dados do Financeiro.</p></div>'; return; }
-  root.innerHTML = '<div class="loading">Calculando as recomendações…</div>';
-  let D; try { D = await carregar(); } catch (e) { fail(e); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; return; }
-  const todas = regras(D);
-  const ui = { origem: '', urg: '', adiadas: false };
-  const adiadas = () => { const a = ls.get('dc-adiadas', {}), h = today(); for (const k of Object.keys(a)) if (a[k] < h) delete a[k]; ls.set('dc-adiadas', a); return a; };
-  const pintar = () => {
-    const ad = adiadas();
-    const vis = todas.filter(r => (!ui.origem || r.origem === ui.origem) && (!ui.urg || r.urg === ui.urg) && (ui.adiadas ? ad[r.k] : !ad[r.k]));
-    const origens = [...new Set(todas.map(r => r.origem))];
-    root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Recomendações da semana</h2><div class="muted small">Calculadas agora com regras fixas sobre os dados da plataforma. Clique em "Como foi calculado" para ver a regra de cada uma.</div></div>
-        <button class="btn ghost small" id="dc-at">Recalcular</button></div>
-      <div class="kpis">${origens.map(o => { const n = todas.filter(r => r.origem === o && !ad[r.k]).length;
-        return `<div class="kpi clickable ${ui.origem === o ? 'on' : ''}" data-o="${esc(o)}"><div class="k-label">${esc(o)}</div><div class="k-value">${n}</div><div class="k-sub">${todas.filter(r => r.origem === o && r.urg === 'alta' && !ad[r.k]).length} alta(s)</div></div>`; }).join('')}</div>
-      <div class="toolbar card" style="margin-top:12px"><label>Urgência<select id="dc-urg"><option value="">Todas</option>${Object.entries(URG_TXT).map(([k, v]) => `<option value="${k}" ${ui.urg === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-        <label class="chk"><input type="checkbox" id="dc-ad" ${ui.adiadas ? 'checked' : ''}> Ver as adiadas (${Object.keys(ad).length})</label>
-        ${ui.origem ? `<button class="btn ghost small" id="dc-lim">Mostrar todas as origens</button>` : ''}</div>
-      <div class="dc-lista">${vis.map(r => `<div class="card dc-rec">
-        <div class="dc-cab"><span class="badge ${r.urg === 'alta' ? 'vencido' : r.urg === 'media' ? 'aberto' : ''}">${URG_TXT[r.urg]}</span><span class="badge">${esc(r.origem)}</span><span class="dc-imp">${esc(r.impactoTxt)}</span></div>
-        <h3 style="margin:6px 0 4px">${esc(r.titulo)}</h3><p style="margin:0 0 8px">${esc(r.desc)}</p>
-        <details class="small muted"><summary>Como foi calculado</summary>${esc(r.regra)}</details>
-        <div class="dc-acoes"><button class="btn primary small" data-ir="${r.rota}">${esc(r.acao)}</button>
-          ${ad[r.k] ? `<button class="btn ghost small" data-vol="${r.k}">Trazer de volta</button>` : `<button class="btn ghost small" data-adia="${r.k}">Adiar 7 dias</button>`}</div></div>`).join('')
-        || `<div class="card"><div class="empty">${ui.adiadas ? 'Nenhuma recomendação adiada.' : 'Nenhuma recomendação com esses filtros.'}</div></div>`}</div>`;
-    $('#dc-at', root).onclick = () => render(root);
-    $$('[data-o]', root).forEach(el => el.onclick = () => { ui.origem = ui.origem === el.dataset.o ? '' : el.dataset.o; pintar(); });
-    $('#dc-lim', root) && ($('#dc-lim', root).onclick = () => { ui.origem = ''; pintar(); });
-    $('#dc-urg', root).onchange = (e) => { ui.urg = e.target.value; pintar(); };
-    $('#dc-ad', root).onchange = (e) => { ui.adiadas = e.target.checked; pintar(); };
-    $$('[data-ir]', root).forEach(b => b.onclick = () => { location.hash = '#/' + b.dataset.ir; });
-    $$('[data-adia]', root).forEach(b => b.onclick = () => { const a = adiadas(); a[b.dataset.adia] = addDias(today(), 7); ls.set('dc-adiadas', a); pintar(); });
-    $$('[data-vol]', root).forEach(b => b.onclick = () => { const a = adiadas(); delete a[b.dataset.vol]; ls.set('dc-adiadas', a); pintar(); });
+  if (!temArea('fin') || ['compras', 'vendas', 'producao'].includes(state.papel)) { root.innerHTML = '<div class="card"><p>A Central de Decisões usa os dados do Financeiro.</p></div>'; return; }
+  const prm = new URLSearchParams(location.hash.split('?')[1] || '');
+  ui.aba = ABAS.some(([k]) => k === prm.get('aba')) ? prm.get('aba') : 'alertas';
+  if (prm.get('minhas')) ui.ver = 'minhas';
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Central de Decisões</h2><div class="muted small">Os alertas da plataforma, a decisão de pagamentos do dia, a saúde da empresa por área e o histórico do que foi decidido.</div></div>
+      <div style="display:flex;gap:8px">${podeParam() ? '<button class="btn small" id="dc-par">Parâmetros</button>' : ''}<button class="btn ghost small" id="dc-at">Recalcular</button></div></div>
+    <div class="card toolbar"><div class="chips" id="dc-abas">${ABAS.map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-aba="${k}">${t}</span>`).join('')}</div></div>
+    <div id="dc-corpo" style="margin-top:12px"><div class="loading">Calculando…</div></div>`;
+  $('#dc-abas', root).onclick = (e) => { const k = e.target.closest('[data-aba]')?.dataset.aba; if (k && k !== ui.aba) { history.replaceState(null, '', '#/decisoes?aba=' + k); render(root); } };
+  $('#dc-at', root).onclick = () => { cache = null; render(root); };
+  $('#dc-par', root) && ($('#dc-par', root).onclick = () => parametros(() => { cache = null; render(root); }));
+  const corpo = $('#dc-corpo', root);
+  if (ui.aba === 'pagamentos') { const m = await import(`./decisao-dia.js?v=${Date.now()}`); return m.render(corpo); }
+  try { cache ||= await base(); } catch (e) { fail(e); corpo.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; return; }
+  const re = () => render(root);
+  if (ui.aba === 'alertas') return abaAlertas(corpo, re);
+  if (ui.aba === 'saude') return abaSaude(corpo, re);
+  return abaHistorico(corpo);
+}
+
+async function base() {
+  const e = state.empresa.id, D = await carregar(), todas = regras(D);
+  const [S, cfg, inds] = await Promise.all([
+    q(sb.rpc('decisoes_situacao', { p_empresa: e, p_dias: 90 })).catch(() => ({ atual: {}, historico: [], pessoas: [], semSQL: true })),
+    q(sb.from('decisoes_config').select('*').eq('empresa_id', e).maybeSingle()).catch(() => null),
+    import(`./diretoria.js?v=${Date.now()}`).then(async m => (await m.carregarPainel(m.mesAnterior())).inds).catch(() => []),
+  ]);
+  const hoje = today();
+  for (const r of todas) { r.est = estado(r, S.atual[r.k], hoje); r.ass = assinatura(r); }
+  return { todas, S, cfg: cfg || {}, inds, decs: await q(sb.from('decisoes_dia').select('numero,data,status,saldo_fim,criado_em,decidido_em,motivo').eq('empresa_id', e).order('criado_em', { ascending: false }).limit(30)).catch(() => []) };
+}
+
+// ---------------------------------------------------------------- Alertas
+function abaAlertas(corpo, re) {
+  const { todas, S } = cache, eu = state.user?.id;
+  const filtroVer = { abertos: (r) => r.est.aberto, minhas: (r) => r.est.k === 'delegado' && r.est.para === eu, resolvidos: (r) => r.est.k === 'resolvido', adiados: (r) => r.est.k === 'adiado' };
+  const conta = (k) => todas.filter(filtroVer[k]).length;
+  const abertas = todas.filter(r => r.est.aberto), origens = [...new Set(todas.map(r => r.origem))];
+  const vis = todas.filter(filtroVer[ui.ver]).filter(r => (!ui.origem || r.origem === ui.origem) && (!ui.urg || r.urg === ui.urg));
+  const marca = (r) => r.est.k === 'aberto' ? '' : `<div class="small" style="margin:4px 0;padding:4px 8px;border-radius:6px;background:var(--surface-2)"><b>${esc(r.est.txt)}</b>${S.atual[r.k]?.nota ? ` — ${esc(S.atual[r.k].nota)}` : ''}</div>`;
+  corpo.innerHTML = `
+    ${S.semSQL ? '<div class="card small" style="background:var(--warn-soft);margin-bottom:12px">Resolver, adiar e delegar precisam do SQL 103. Enquanto isso, os alertas aparecem sem as tratativas.</div>' : ''}
+    <div class="kpis">${origens.map(o => { const n = abertas.filter(r => r.origem === o).length;
+      return `<div class="kpi clickable ${ui.origem === o ? 'on' : ''}" data-o="${esc(o)}"><div class="k-label">${esc(o)}</div><div class="k-value">${n}</div><div class="k-sub">${abertas.filter(r => r.origem === o && r.urg === 'alta').length} alta(s)</div></div>`; }).join('')}</div>
+    <div class="toolbar card" style="margin-top:12px"><div class="chips" id="dc-ver">${[['abertos', 'Abertos'], ['minhas', 'Delegados a mim'], ['adiados', 'Adiados'], ['resolvidos', 'Resolvidos']].map(([k, t]) => `<span class="chip ${ui.ver === k ? 'on' : ''}" data-ver="${k}">${t} (${conta(k)})</span>`).join('')}</div>
+      <span class="spacer"></span><label>Urgência<select id="dc-urg"><option value="">Todas</option>${Object.entries(URG_TXT).map(([k, v]) => `<option value="${k}" ${ui.urg === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      ${ui.origem ? '<button class="btn ghost small" id="dc-lim">Todas as origens</button>' : ''}</div>
+    <div class="dc-lista">${vis.map(r => `<div class="card dc-rec" data-k="${esc(r.k)}">
+      <div class="dc-cab"><span class="badge ${r.urg === 'alta' ? 'vencido' : r.urg === 'media' ? 'aberto' : ''}">${URG_TXT[r.urg]}</span><span class="badge">${esc(r.origem)}</span>${r.est.k === 'delegado' ? '<span class="badge negoc">delegado</span>' : r.est.k === 'voltou' || r.est.k === 'venceu' ? '<span class="badge vencido">voltou</span>' : ''}<span class="dc-imp">${esc(r.impactoTxt || '')}</span></div>
+      <h3 style="margin:6px 0 4px">${esc(r.titulo)}</h3><p style="margin:0 0 8px">${esc(r.desc)}</p>${marca(r)}
+      <details class="small muted"><summary>Como foi calculado</summary>${esc(r.regra)}</details>
+      <div class="dc-acoes"><button class="btn primary small" data-ir="${r.rota}">${esc(r.acao)}</button>
+        ${podeTratar() && !S.semSQL ? (r.est.aberto ? `<button class="btn ghost small" data-t="resolvido">Resolver</button><button class="btn ghost small" data-t="adiado">Adiar</button><button class="btn ghost small" data-t="delegado">Delegar</button>`
+          : '<button class="btn ghost small" data-t="reaberto">Reabrir</button>') : ''}</div></div>`).join('')
+      || `<div class="card"><div class="empty">${ui.ver === 'abertos' ? 'Nenhum alerta aberto com esses filtros. 👏' : 'Nada aqui.'}</div></div>`}</div>`;
+  $$('[data-o]', corpo).forEach(el => el.onclick = () => { ui.origem = ui.origem === el.dataset.o ? '' : el.dataset.o; abaAlertas(corpo, re); });
+  $('#dc-lim', corpo) && ($('#dc-lim', corpo).onclick = () => { ui.origem = ''; abaAlertas(corpo, re); });
+  $('#dc-urg', corpo).onchange = (e) => { ui.urg = e.target.value; abaAlertas(corpo, re); };
+  $('#dc-ver', corpo).onclick = (e) => { const k = e.target.closest('[data-ver]')?.dataset.ver; if (k) { ui.ver = k; abaAlertas(corpo, re); } };
+  $$('[data-ir]', corpo).forEach(b => b.onclick = () => { location.hash = '#/' + b.dataset.ir; });
+  $$('[data-t]', corpo).forEach(b => b.onclick = () => tratar(todas.find(r => r.k === b.closest('[data-k]').dataset.k), b.dataset.t, re));
+}
+
+function tratar(r, sit, re) {
+  const dias = cache.cfg.adiar_dias || 7, d = new Date(); d.setDate(d.getDate() + dias); const ate = d.toISOString().slice(0, 10);
+  const T = { resolvido: ['Resolver o alerta', 'O que foi feito', 'Ex.: borderô aprovado e caixa recomposto', 'Resolver'], adiado: ['Adiar o alerta', 'Motivo (opcional)', 'Ex.: aguardando a resposta do banco', 'Adiar'],
+    delegado: ['Delegar o alerta', 'Instrução (opcional)', 'Ex.: importar o extrato do Itaú até amanhã', 'Delegar'], reaberto: ['Reabrir o alerta', 'Motivo (opcional)', '', 'Reabrir'] }[sit];
+  const m = modal({ title: T[0], body: `<div class="small muted" style="margin-bottom:8px"><b>${esc(r.titulo)}</b><br>${esc(r.desc)}</div>
+      ${sit === 'adiado' ? `<label>Adiar até<input type="date" id="tr-ate" value="${ate}" min="${today()}"></label>` : ''}
+      ${sit === 'delegado' ? `<label>Para quem<select id="tr-p">${cache.S.pessoas.filter(p => p.user_id !== state.user?.id).map(p => `<option value="${p.user_id}">${esc(p.nome)} (${esc(p.papel)})</option>`).join('')}</select></label>` : ''}
+      <label style="margin-top:8px">${T[1]}<textarea id="tr-n" rows="3" placeholder="${esc(T[2])}"></textarea></label>
+      ${sit === 'resolvido' ? '<p class="small muted">O alerta some enquanto o conteúdo for o mesmo. Se mudar (outro valor, mais itens), ele volta marcado.</p>' : ''}
+      ${sit === 'delegado' ? '<p class="small muted">A pessoa recebe um aviso e o alerta mostra o responsável. Ele continua aberto até ser resolvido.</p>' : ''}`,
+    foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="tr-ok">${T[3]}</button>` });
+  $('#tr-ok', m.el).onclick = async () => {
+    try { await q(sb.rpc('decisoes_tratar', { p_empresa: state.empresa.id, p_chave: r.k, p_origem: r.origem, p_titulo: r.titulo, p_situacao: sit,
+        p_ate: sit === 'adiado' ? $('#tr-ate', m.el).value : null, p_delegado: sit === 'delegado' ? $('#tr-p', m.el).value : null, p_nota: $('#tr-n', m.el).value, p_assinatura: r.ass }));
+      m.close(); toast({ resolvido: 'Alerta resolvido', adiado: 'Alerta adiado', delegado: 'Alerta delegado', reaberto: 'Alerta reaberto' }[sit]); cache = null; re(); }
+    catch (e) { fail(e); }
   };
-  pintar();
+}
+
+// ---------------------------------------------------------------- Saúde da empresa
+async function abaSaude(corpo) {
+  const { todas, cfg, inds } = cache, S = saude(todas.filter(r => r.est.aberto), inds, cfg.pesos || {}, cfg.pesos_areas || {});
+  const fx = (n) => FAIXA[faixa(n, cfg)];
+  // foto do dia (tendência)
+  if (podeTratar()) q(sb.from('saude_historico').upsert({ empresa_id: state.empresa.id, dia: today(), geral: S.geral, areas: Object.fromEntries(S.areas.map(a => [a.k, a.nota])), alertas: todas.filter(r => r.est.aberto).length })).catch(() => {});
+  const hist = await q(sb.from('saude_historico').select('dia,geral,areas').eq('empresa_id', state.empresa.id).order('dia').limit(120)).catch(() => []);
+  const g = fx(S.geral), ang = S.geral / 100 * 180;
+  const linha = (vals) => { if (vals.length < 2) return '<div class="small muted">A tendência aparece a partir do 2º dia.</div>'; const W = 600, H = 70, x = (i) => 4 + i * (W - 8) / (vals.length - 1), y = (v) => H - 4 - v / 100 * (H - 8);
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:70px"><line x1="0" x2="${W}" y1="${y(cfg.faixa_boa ?? 80)}" y2="${y(cfg.faixa_boa ?? 80)}" stroke="var(--pos)" stroke-dasharray="3 3" stroke-width="1"/><line x1="0" x2="${W}" y1="${y(cfg.faixa_atencao ?? 60)}" y2="${y(cfg.faixa_atencao ?? 60)}" stroke="var(--neg)" stroke-dasharray="3 3" stroke-width="1"/><polyline points="${vals.map((v, i) => `${x(i)},${y(v)}`).join(' ')}" fill="none" stroke="var(--primary)" stroke-width="2"/></svg>`; };
+  corpo.innerHTML = `<div style="display:grid;grid-template-columns:minmax(260px,320px) 1fr;gap:12px;align-items:stretch">
+      <div class="card" style="text-align:center"><div class="small muted">Saúde da empresa</div>
+        <svg viewBox="0 0 200 115" style="width:220px;max-width:100%"><path d="M10 105 A90 90 0 0 1 190 105" fill="none" stroke="var(--border)" stroke-width="16" stroke-linecap="round"/>
+          <path d="M10 105 A90 90 0 0 1 190 105" fill="none" stroke="${g.cor}" stroke-width="16" stroke-linecap="round" stroke-dasharray="${(ang / 180 * 282.7).toFixed(1)} 400"/>
+          <text x="100" y="98" text-anchor="middle" style="font-size:38px;font-weight:700;fill:var(--text)">${S.geral}</text></svg>
+        <div><span class="badge ${g.cls}">${g.txt}</span></div><p class="small muted">Média das áreas${Object.keys(cfg.pesos_areas || {}).length ? ' (com os pesos dos Parâmetros)' : ''}. ${todas.filter(r => r.est.aberto).length} alerta(s) aberto(s).</p></div>
+      <div class="card"><div class="small muted">Evolução (uma foto por dia)</div>${linha(hist.map(h => h.geral))}
+        ${hist.length ? `<div class="small muted" style="display:flex;justify-content:space-between"><span>${dateBR(hist[0].dia)}</span><span>${dateBR(hist[hist.length - 1].dia)}</span></div>` : ''}
+        <p class="small muted" style="margin-bottom:0">Linhas tracejadas: ${cfg.faixa_boa ?? 80} (saudável) e ${cfg.faixa_atencao ?? 60} (crítica abaixo).</p></div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:12px">${S.areas.map(a => { const f = fx(a.nota), h = hist.map(x => x.areas?.[a.k]).filter(v => v != null);
+      return `<div class="card" style="border-top:3px solid ${f.cor}"><div style="display:flex;justify-content:space-between;align-items:baseline"><b>${esc(a.nome)}</b><span class="badge ${f.cls}">${f.txt}</span></div>
+        <div style="font-size:2em;font-weight:700;margin:4px 0">${a.nota}<span class="small muted" style="font-weight:400"> /100</span>${h.length > 1 ? `<span class="small ${h[h.length - 1] >= h[0] ? 'pos' : 'neg'}" style="font-weight:400;margin-left:8px">${h[h.length - 1] >= h[0] ? '+' : ''}${h[h.length - 1] - h[0]} no período</span>` : ''}</div>
+        ${a.motivos.length ? `<div class="small">${a.motivos.slice(0, 5).map(m => `<div style="display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--border);padding:3px 0"><span>${esc(m.txt)}</span><span class="neg nowrap">−${m.pontos}</span></div>`).join('')}${a.motivos.length > 5 ? `<div class="muted">+ ${a.motivos.length - 5} motivo(s)</div>` : ''}</div>` : '<div class="small muted">Sem alertas abertos nem indicadores fora da meta.</div>'}</div>`; }).join('')}</div>
+    <details class="small muted" style="margin-top:10px"><summary>Como a saúde é calculada</summary>Cada área começa com 100 e perde pontos por alerta aberto (alta ${{ ...PESOS_PADRAO, ...cfg.pesos }.alta}, média ${{ ...PESOS_PADRAO, ...cfg.pesos }.media}, baixa ${{ ...PESOS_PADRAO, ...cfg.pesos }.baixa}) e por indicador do Painel da Diretoria do mês anterior fora da meta (${{ ...PESOS_PADRAO, ...cfg.pesos }.fora_meta}) ou em atenção (${{ ...PESOS_PADRAO, ...cfg.pesos }.atencao}). Alertas resolvidos ou adiados não contam; delegados contam até serem resolvidos. Nunca fica abaixo de 0. O índice geral é a média das áreas (com peso, se definido). Áreas: ${AREAS.map(a => `${a.nome} (${[...a.origens, ...a.inds].join(', ') || '—'})`).join('; ')}.</details>`;
+}
+
+// ---------------------------------------------------------------- Histórico
+function abaHistorico(corpo) {
+  const H = cache.S.historico || [], D = cache.decs || [];
+  const SIT = { resolvido: ['Resolveu', 'pago'], adiado: ['Adiou', 'aberto'], delegado: ['Delegou', 'negoc'], reaberto: ['Reabriu', ''] };
+  corpo.innerHTML = `<h3 style="margin:0 0 6px">Alertas tratados (90 dias)</h3>
+    <div class="card flush"><div class="table-wrap"><table><thead><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Alerta</th><th>Observação</th></tr></thead><tbody>
+      ${H.map(h => `<tr><td class="nowrap small">${new Date(h.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</td><td class="small">${esc(String(h.por_email || '').split('@')[0])}</td>
+        <td><span class="badge ${SIT[h.situacao][1]}">${SIT[h.situacao][0]}</span>${h.situacao === 'adiado' ? `<div class="small muted">até ${dateBR(h.ate)}</div>` : h.situacao === 'delegado' ? `<div class="small muted">para ${esc(h.delegado_nome || '')}</div>` : ''}</td>
+        <td class="wrap"><b>${esc(h.titulo || '')}</b><div class="small muted">${esc(h.origem || '')}</div></td><td class="wrap small">${esc(h.nota || '')}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum alerta tratado ainda.</td></tr>'}</tbody></table></div></div>
+    <h3 style="margin:18px 0 6px">Decisões de pagamentos do dia</h3>
+    <div class="card flush"><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Dia</th><th>Situação</th><th class="num">Saldo final previsto</th><th>Registrada</th><th></th></tr></thead><tbody>
+      ${D.map(d => `<tr><td>${d.numero}</td><td>${dateBR(d.data)}</td><td><span class="badge ${d.status === 'Aprovada' ? 'pago' : d.status === 'Rejeitada' ? 'vencido' : 'aberto'}">${esc(d.status)}</span>${d.motivo ? `<div class="small muted">${esc(d.motivo)}</div>` : ''}</td>
+        <td class="num">${d.saldo_fim != null ? money0(d.saldo_fim) : '—'}</td><td class="small">${new Date(d.criado_em).toLocaleDateString('pt-BR')}</td><td><a class="btn ghost small" href="#/decisoes?aba=pagamentos&dia=${d.data}">Abrir</a></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma decisão registrada.</td></tr>'}</tbody></table></div></div>`;
+}
+
+// ---------------------------------------------------------------- Parâmetros
+function parametros(depois) {
+  const c = cache?.cfg || {}, P = { ...PESOS_PADRAO, ...(c.pesos || {}) }, PA = c.pesos_areas || {};
+  const n = (id, v, min, max, rot) => `<label>${rot}<input type="number" id="${id}" min="${min}" max="${max}" value="${v}"></label>`;
+  const m = modal({ title: 'Parâmetros da Central de Decisões', wide: true, body: `<h3 style="margin:0 0 6px">Pontos que cada item tira da saúde da área</h3>
+      <div class="grid-form">${n('pp-alta', P.alta, 0, 100, 'Alerta de urgência alta')}${n('pp-media', P.media, 0, 100, 'Alerta de urgência média')}${n('pp-baixa', P.baixa, 0, 100, 'Alerta de urgência baixa')}
+        ${n('pp-fora', P.fora_meta, 0, 100, 'Indicador fora da meta')}${n('pp-at', P.atencao, 0, 100, 'Indicador em atenção')}</div>
+      <h3 style="margin:14px 0 6px">Faixas e adiamento</h3>
+      <div class="grid-form">${n('pp-boa', c.faixa_boa ?? 80, 1, 100, 'Saudável a partir de')}${n('pp-crit', c.faixa_atencao ?? 60, 0, 99, 'Crítica abaixo de')}${n('pp-adia', c.adiar_dias ?? 7, 1, 90, 'Adiar, por padrão (dias)')}</div>
+      <h3 style="margin:14px 0 6px">Peso de cada área no índice geral</h3>
+      <div class="grid-form">${AREAS.map(a => n('pa-' + a.k, PA[a.k] ?? 1, 0, 10, a.nome)).join('')}</div>
+      <p class="small muted">Peso 0 tira a área do índice geral (ela continua aparecendo). Os pesos valem para os cálculos a partir de agora; as fotos dos dias anteriores não mudam.</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pp-ok">Salvar</button>' });
+  $('#pp-ok', m.el).onclick = async () => {
+    const v = (id) => +$('#' + id, m.el).value;
+    const row = { empresa_id: state.empresa.id, pesos: { alta: v('pp-alta'), media: v('pp-media'), baixa: v('pp-baixa'), fora_meta: v('pp-fora'), atencao: v('pp-at') },
+      faixa_boa: v('pp-boa'), faixa_atencao: v('pp-crit'), adiar_dias: v('pp-adia'), pesos_areas: Object.fromEntries(AREAS.map(a => [a.k, v('pa-' + a.k)])), atualizado_por: state.user?.email, atualizado_em: new Date().toISOString() };
+    if (!(row.faixa_atencao < row.faixa_boa)) return toast('A faixa crítica precisa ser menor que a saudável', true);
+    if (!AREAS.some(a => row.pesos_areas[a.k] > 0)) return toast('Deixe ao menos uma área com peso', true);
+    try { await q(sb.from('decisoes_config').upsert(row)); m.close(); toast('Parâmetros salvos'); depois(); } catch (e) { fail(e); }
+  };
 }

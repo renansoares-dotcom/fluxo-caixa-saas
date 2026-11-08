@@ -1,8 +1,8 @@
 ---
 titulo: Contratos
 tela: Cadastros › Contratos (CAD006)
-versao: 1.4
-atualizado: 2026-11-06
+versao: 1.5
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -35,7 +35,7 @@ Só os **administradores** da empresa. Os outros perfis não veem o menu, os con
 | Venceu / renovado automaticamente | O prazo terminou: renove, atualize a vigência ou encerre. |
 | Sem o contrato assinado | Nenhum PDF do tipo "Contrato assinado" foi anexado. |
 
-Os mesmos alertas aparecem no **Decision Center** para os administradores.
+Os mesmos alertas aparecem na **Central de Decisões** para os administradores.
 
 ## 4. Cadastrar um contrato
 
@@ -129,3 +129,4 @@ Os dados da empresa vêm de **Empresa e Usuários** (CNPJ, endereço e represent
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.3 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.4 | 06/11/2026 | Dois modelos novos, consolidados com as minutas do jurídico: locação de veículos para transporte de cargas e prestação de serviços de transporte rodoviário de cargas (com anexos de veículos e de fretes). |
+| 1.5 | 07/11/2026 | O Decision Center e a Decisão do Dia passaram a ser a Central de Decisões. |
