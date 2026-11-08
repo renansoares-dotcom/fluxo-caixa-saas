@@ -1148,3 +1148,10 @@ table.metas-grade td.sticky{min-width:150px;white-space:normal}
 .badge.conc-baixa{background:color-mix(in srgb,var(--neg) 14%,transparent);color:var(--neg)}
 .conc-alerta{display:flex;justify-content:space-between;align-items:center;gap:12px;border-left:4px solid var(--warn);margin-bottom:12px;font-size:13px}
 .modal label.conc-f{flex-direction:row;align-items:center;gap:8px;font-weight:400}.modal label.conc-f input{width:auto;min-height:0}
+
+/* Necessidade de Caixa: cenários (3.9) */
+.nc-cens{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.nc-chip i,.nc-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.nc-sem{margin-top:14px;border-top:1px solid var(--border)}
+.nc-cens .ch-chip.on{background:color-mix(in srgb,var(--primary) 14%,var(--surface));color:var(--primary)}
+.nc-h{margin:20px 0 8px;font-size:14px}

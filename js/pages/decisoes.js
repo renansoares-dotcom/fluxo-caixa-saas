@@ -66,8 +66,8 @@ function regras(D) {
 
   // 1. caixa abaixo do mínimo nas próximas semanas
   if (D.nec?.primeira) out.push({ k: 'caixa-minimo', origem: 'Caixa', urg: 'alta', titulo: 'Cobrir a falta de caixa prevista',
-    desc: `A projeção fica abaixo do mínimo de ${money0(D.nec.minimo)} a partir da semana de ${dateBR(D.nec.primeira.ini)}; o menor saldo previsto é ${money0(D.nec.pior.saldo)}.`,
-    impacto: D.nec.primeira.falta, impactoTxt: `${money0(D.nec.primeira.falta)} na 1ª semana`, regra: 'Necessidade de caixa (13 semanas) com as contas e o mínimo escolhidos na tela.',
+    desc: `No cenário ${D.nec.cenario || 'Base'}, a projeção fica abaixo do mínimo de ${money0(D.nec.minimo)} a partir da semana de ${dateBR(D.nec.primeira.ini)}; o menor saldo previsto é ${money0(D.nec.pior.saldo)}.`,
+    impacto: D.nec.primeira.falta, impactoTxt: `${money0(D.nec.primeira.falta)} na 1ª semana`, regra: 'Necessidade de caixa com o cenário do alerta, as contas, o mínimo e o horizonte dos Parâmetros da tela.',
     acao: 'Abrir necessidade de caixa', rota: 'necessidade-caixa' });
 
   // 2. recebimentos pagos sem conta

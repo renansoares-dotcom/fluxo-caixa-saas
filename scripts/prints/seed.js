@@ -1145,3 +1145,16 @@ DB.paineis = [
     { t: 'graf_composicao', tam: 1 }, { t: 'tab_saldos', tam: 2 }, { t: 'tab_vencimentos', tam: 3 }] },
   { id: 'pn3', empresa_id: E, dono: 'u4', dono_nome: 'carlos', nome: 'Fábrica', ordem: 1, compartilhado: true, cartoes: [{ t: 'graf_producao', tam: 2 }, { t: 'graf_qualidade', tam: 1 }, { t: 'graf_entregas', tam: 3 }] },
 ];
+
+// Cenários de caixa (SQL 106) — FICTÍCIOS
+DB.caixa_config = [{ empresa_id: E, caixa_minimo: 700000, horizonte_semanas: 13, contas: null, cenario_alerta: null, avisar: true, avisar_papeis: ['admin', 'diretor', 'financeiro'], avisar_semanas: 4 }];
+DB.caixa_cenarios = [
+  { id: 'cc0', empresa_id: E, nome: 'Otimista', tipo: 'otimista', cor: '#16a34a', ordem: 2, ativo: true, descricao: 'Recebe tudo no prazo e alonga os pagamentos a fornecedores em 7 dias.',
+    premissas: { pagar_atraso_dias: 7, forecast_receitas_pct: 105, forecast_despesas_pct: 97 } },
+  { id: 'cc1', empresa_id: E, nome: 'Pessimista', tipo: 'pessimista', cor: '#dc2626', ordem: 3, ativo: true, descricao: 'Inadimplência de 10%, atraso de 20 dias e receitas do forecast 15% abaixo.',
+    premissas: { receber_pct: 90, receber_atraso_dias: 20, vencidos_receber_pct: 50, forecast_receitas_pct: 85, forecast_despesas_pct: 103 } },
+  { id: 'cc2', empresa_id: E, nome: 'RJ homologada em dezembro', tipo: 'personalizado', cor: '#9333ea', ordem: 10, ativo: true, descricao: 'Base + parcelas do plano a partir de dezembro e venda do terreno em janeiro.',
+    premissas: { rj: { ativo: true, passivo: 4800000, desagio_pct: 50, carencia_meses: 0, parcelas: 120, juros_aa_pct: 6, inicio: '2026-12', dia: 15 },
+      eventos: [{ data: '2027-01-20', descricao: 'Venda do terreno (fictício)', valor: 350000 }] } },
+];
+window.RPC.caixa_registrar_alerta = () => false;

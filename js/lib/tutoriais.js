@@ -27,7 +27,7 @@ export const MANUAIS = [
   { id: 'conferencia-fechamento', titulo: 'Conferência do dia e Fechamento do mês', area: 'Financeiro', rotas: ['conferencia', 'fechamento'],
     resumo: 'Mapa conta × dia com o visto, checklist do fechamento, resumo para a direção e trava das contas.' },
   { id: 'fluxo-caixa', titulo: 'Fluxo de caixa e necessidade de caixa', area: 'Financeiro', rotas: ['fluxo-mensal', 'fluxo-diario', 'necessidade-caixa'],
-    resumo: 'Fluxo mensal e diário, projeção de 13 semanas com caixa mínimo e compromissos programados.' },
+    resumo: 'Fluxo mensal e diário, projeção semanal por cenário (base, otimista, pessimista e personalizados) com caixa mínimo, simulação da RJ e aviso.' },
   { id: 'orcamento', titulo: 'Orçamento — budget, forecast e controle orçamentário', area: 'Financeiro', rotas: ['orcamento', 'orcado-realizado', 'controle-orcamento'],
     resumo: 'Lançar o budget e o forecast, comparar com o realizado, semáforo, justificativas e rateio por centro de custo.' },
   { id: 'fidc', titulo: 'FIDC — propostas de borderô e análise', area: 'Financeiro', rotas: ['fidc', 'fidc-propostas'],

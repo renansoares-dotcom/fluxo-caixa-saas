@@ -9,6 +9,8 @@ export const FIGS = [
   ['pagamentos-antecipados', 'paraquedas', '## 3.', 'Pagamentos Antecipados aguardando aprovação'],
   ['conferencia-fechamento', 'conferencia', '## 3.', 'Mapa da conferência do mês'], ['conferencia-fechamento', 'fechamento', '## 4.', 'Checklist do fechamento do mês'],
   ['fluxo-caixa', 'fluxo-mensal', '## 3.', 'Fluxo de Caixa Mensal'], ['fluxo-caixa', 'necessidade-caixa', '## 4.', 'Necessidade de Caixa por semana'],
+  ['fluxo-caixa', 'necessidade-caixa', '### 4.2', 'Comparação dos cenários: base, otimista, pessimista e um cenário com a simulação da RJ', 'click:#nc-comp-cen'],
+  ['fluxo-caixa', 'necessidade-caixa', '### 4.3', 'Premissas de um cenário com a simulação da RJ e um evento pontual', 'click:#nc-cen-btn|click:tr[data-i="3"] [data-ed]'],
   ['orcamento', 'orcado-realizado', '## 4.', 'Orçado x Realizado'], ['orcamento', 'controle-orcamento', '## 5.', 'Controle Orçamentário'],
   ['fidc', 'fidc-propostas', '## 3.', 'Propostas de Borderô: títulos disponíveis'],
   ['fidc-carteira', 'fidc-carteira', '## 3.', 'Carteira Cedida por fundo, com os títulos vencidos sem liquidação'],
