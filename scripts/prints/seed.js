@@ -180,7 +180,9 @@ DB.comercial_metas = [];
 DB.creditos = [{ id: id('cr'), empresa_id: E, favorecido_id: FV('ATACADO'), natureza: 'cliente', tipo: 'adiantamento', data: '2026-10-08', valor: 15000, descricao: 'Adiantamento do pedido 7781', cancelado: false, criado_em: '2026-10-08T10:00:00Z' },
   { id: id('cr'), empresa_id: E, favorecido_id: FV('RESINAS'), natureza: 'fornecedor', tipo: 'devolucao', data: '2026-10-14', valor: 3420, descricao: 'Devolução de resina fora de especificação', cancelado: false, criado_em: '2026-10-14T10:00:00Z' }];
 DB.creditos_usos = [];
-DB.fidc_fundos = [{ id: 'fd1', empresa_id: E, nome: 'FUNDO EXEMPLO FIDC', ativo: true }];
+DB.fidc_fundos = [{ id: 'fd1', empresa_id: E, nome: 'FUNDO EXEMPLO FIDC', ativo: true, taxa_am: 2.4, tarifa_operacao: 20, tarifa_titulo: 4.5, custo_assinatura: 70, metodo_desagio: 'fator', dias_compensacao: 3, limite_credito: 600000 },
+  { id: 'fd2', empresa_id: E, nome: 'FUNDO ALFA', ativo: true, taxa_am: 2.1, tarifa_operacao: 35, tarifa_titulo: 5, custo_assinatura: 0, metodo_desagio: 'fator', dias_compensacao: 1, limite_credito: 250000, prazo_max: 75 },
+  { id: 'fd3', empresa_id: E, nome: 'FUNDO BETA', ativo: true, taxa_am: 2.25, tarifa_operacao: 15, tarifa_titulo: 3.5, custo_assinatura: 0, metodo_desagio: 'simples', dias_compensacao: 2, prazo_max: 120 }];
 DB.fidc_propostas = [[12, 'Pendente', 9, 186400, 34, 2.4], [11, 'Aprovada', 7, 142300, 31, 2.4]].map(([numero, status, qtd, face, prazo, taxa]) => ({ id: id('fp'), empresa_id: E, numero, fundo_id: 'fd1', data_operacao: '2026-10-2' + (numero - 4), status, qtd_titulos: qtd, valor_face: face, prazo_medio: prazo, prazo_cobrado: prazo + 3,
   taxa_am: taxa, desagio: Math.round(face * taxa / 100 * (prazo + 3) / 30), ad_valorem: 0, tarifas: 180, iof: Math.round(face * 0.0041 * 100) / 100, liquido: Math.round(face * 0.965), criado_em: '2026-10-20T10:00:00Z' }));
 // Auditoria
@@ -1271,3 +1273,18 @@ DB.fechamento_config = [{ empresa_id: E, meta_dia_util: 5, papeis_fechar: ['admi
 }
 window.RPC.pag_remessa_criar = () => ({ id: 'prx', nsa: 7 });
 window.RPC.pag_remessa_gravar = () => null;
+
+// Comparador de fundos (SQL 110) — borderôs FICTÍCIOS de jan a jul/2026 para a série mensal
+{
+  const tx = { 'FUNDO ALFA': [2.15, 2.12, 2.18, 2.1, 2.08, 2.14, 2.11], 'FUNDO BETA': [2.5, 2.46, 2.52, 2.44, 2.47, 2.41, 2.43], 'FUNDO EXEMPLO FIDC': [2.62, 2.6, 2.55, 2.58, 2.49, 2.53, 2.5] };
+  let k = 0;
+  for (const [fundo, t] of Object.entries(tx)) t.forEach((taxa, i) => {
+    for (const [pm, face] of [[28 + (i % 3) * 6, 61000 + i * 4300], [52 + (i % 2) * 14, 38000 + i * 2100]]) {
+      const custo = Math.round(face * (taxa / 100) * pm / 30 / (1 + (taxa / 100) * pm / 30) * 100) / 100 + 60;
+      DB.fidc_operacoes.push({ id: 'fox' + (++k), empresa_id: E, fundo, data: `2026-0${i + 1}-1${k % 9}`, bordero: 'X' + k, qtd_titulos: 6, valor_face: face, desagio: custo - 60, ad_valorem: 0, tarifas: 60, iof: 0, encargos: 0,
+        recompra: 0, desc_sacado: 0, liquido: face - custo, prazo_medio: pm, custo_total: custo });
+    }
+  });
+  for (const o of DB.fidc_operacoes) if (o.custo_total == null) o.custo_total = +o.desagio + +o.ad_valorem + +o.tarifas + +o.iof + +o.encargos;
+  DB.fidc_comparador_config = [{ empresa_id: E, cdi_aa: 13.65, cdi_data: '2026-11-03', periodo_meses: 12, faixas_prazo: [30, 45, 60, 90], respeitar_limites: true, economia_minima: 100 }];
+}

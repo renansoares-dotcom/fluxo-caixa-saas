@@ -31,7 +31,7 @@ export const MANUAIS = [
   { id: 'orcamento', titulo: 'Orçamento — budget, forecast e controle orçamentário', area: 'Financeiro', rotas: ['orcamento', 'orcado-realizado', 'controle-orcamento', 'orcamento-cc'],
     resumo: 'Budget e forecast contínuo (atualizar pelo realizado, versões), aprovação do orçamento por centro de custo, orçado x realizado, semáforo e justificativas com prazo.' },
   { id: 'fidc', titulo: 'FIDC — propostas de borderô e análise', area: 'Financeiro', rotas: ['fidc', 'fidc-propostas'],
-    resumo: 'Simular o borderô, comparar fundos, enviar ao diretor, comparar com o original e analisar custos.' },
+    resumo: 'Simular o borderô, dividir o lote entre fundos, comparar taxas e CET com o CDI, enviar ao diretor e analisar custos.' },
   { id: 'fidc-carteira', titulo: 'Carteira cedida — liquidação dos títulos nos fundos', area: 'Financeiro', rotas: ['fidc-carteira'],
     resumo: 'Acompanhar os títulos cedidos até o cliente pagar o fundo, importar o relatório de pagos e ver o risco de recompra.' },
   { id: 'lanc-automacao', titulo: 'Regras de classificação, rateio e lançamentos recorrentes', area: 'Financeiro', rotas: ['lanc-regras', 'lanc-recorrentes'],

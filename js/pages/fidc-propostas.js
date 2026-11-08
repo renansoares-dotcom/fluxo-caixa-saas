@@ -7,11 +7,12 @@ import { $, esc, money, money0, pct, dateBR, options, fail, toast, modal, formDa
 import { condicaoDe, condicaoDoFundo, prazos, desagioTitulo } from '../lib/fidc-condicoes.js';
 import { padronizarPDF, pdfCabecalho, pdfRodapes, PRETO } from '../lib/relatorio.js';
 import { conversaNoModal } from '../lib/mini-chat.js';
+import * as CMP from '../lib/fidc-comparador.js';
 
 export const title = 'Propostas de Borderô';
 
 const ui = { soSel: false, aba: 'titulos', sel: new Set(), fundoId: '', dataOp: '', recompras: '', obs: '', busca: '', venDe: '', venAte: '', campoData: 'emissao', propostaEdit: null, vencAj: {}, pf: { status: '', fundo: '', mes: '', busca: '' } };
-let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [], condicoes = [];
+let fundos = [], titulos = [], propostas = [], emProposta = {}, carteira = [], historico = [], condicoes = [], cmpCfg = null;
 // sacado: raiz do CNPJ (8 dígitos) quando houver; senão o nome normalizado (os borderôs cortam o nome em ~40 letras)
 const chaveSac = (cnpj, nome) => { const d = String(cnpj || '').replace(/\D/g, ''); return d.length >= 8 ? 'c' + d.slice(0, 8) : 'n' + String(nome || '').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 25); };
 
@@ -44,7 +45,7 @@ export async function render(root) {
     ui.sel = new Set(vindos); ui.soSel = true; ui.aba = 'titulos'; ui.propostaEdit = null; ui.busca = ''; ui.venDe = ''; ui.venAte = '';
   }
   root.innerHTML = `<div class="card"><div class="toolbar tabs" id="tabs">
-      ${[['titulos', 'Títulos em aberto'], ['propostas', 'Propostas'], ['fundos', 'Condições dos fundos']].map(([k, n]) => `<button class="chip${ui.aba === k ? ' on' : ''}" data-aba="${k}">${n}</button>`).join('')}
+      ${[['titulos', 'Títulos em aberto'], ['propostas', 'Propostas'], ['comparador', 'Comparador de fundos'], ['fundos', 'Condições dos fundos']].map(([k, n]) => `<button class="chip${ui.aba === k ? ' on' : ''}" data-aba="${k}">${n}</button>`).join('')}
       <span class="spacer"></span>
       ${podeEditar() ? '<button class="btn" id="lanc-nf">+ Lançar NFs</button><button class="btn" id="imp-nf">Importar XML das NFs</button>' : ''}</div></div>
     <div id="corpo"></div>`;
@@ -73,6 +74,8 @@ async function carregar() {
   ]);
   // condições por grupo de sacados (SQL 050); sem a tabela, cada fundo usa os próprios campos
   try { condicoes = await q(sb.from('fidc_fundo_condicoes').select('*').eq('empresa_id', e).order('nome')); } catch { condicoes = []; }
+  cmpCfg = { cdi_aa: 13.65, cdi_data: null, periodo_meses: 12, faixas_prazo: [30, 45, 60, 90], respeitar_limites: true, economia_minima: 200, banco: false };
+  try { const c = await q(sb.from('fidc_comparador_config').select('*').eq('empresa_id', e).maybeSingle()); cmpCfg.banco = true; if (c) Object.assign(cmpCfg, c, { cdi_aa: +c.cdi_aa, economia_minima: +c.economia_minima }); } catch { /* sem o SQL 110 */ }
   const hj = hojeISO(); carteira = historico.filter(t => t.vencimento > hj);
   emProposta = {};
   for (const i of itensAbertos || []) emProposta[i.lancamento_id] = i.fidc_propostas;
@@ -83,6 +86,7 @@ function desenhar(root) {
   const c = $('#corpo', root);
   if (ui.aba === 'titulos') return abaTitulos(c, root);
   if (ui.aba === 'propostas') return abaPropostas(c, root);
+  if (ui.aba === 'comparador') return abaComparador(c, root);
   return abaFundos(c, root);
 }
 
@@ -134,6 +138,39 @@ function simular(fu, tits, dataOp, recompras = 0) {
     taxaEf: face && prazoC && face - custo ? custo / (face - custo) / prazoC * 30 : 0, liquido: soma('liquido'), itens: grupos.flatMap(g => g.itens), n: tits.length, grupos, tits };
 }
 const taxasTxt = (s) => (s.grupos?.length ? s.grupos.map(g => g.cond) : [condicaoDoFundo(s.fu)]).map(c => pct(+c.taxa_am / 100, 2)).join(' / ');
+
+// Melhor divisão do lote (3.11): cada título no fundo mais barato que o aceita e tem limite; depois junta borderôs
+// quando a tarifa fixa compensa. O custo de cada fundo é o da simulação completa (condições, tarifas, IOF).
+function disponivelNoFundo(fu) {
+  if (!cmpCfg?.respeitar_limites || !fu.limite_credito) return Infinity;
+  const cart = carteira.filter(t => t.fundo === fu.nome).reduce((s, t) => s + +t.valor, 0);
+  return Math.max(0, +fu.limite_credito - cart);
+}
+function melhorDivisao(ativos, tits) {
+  if (ativos.length < 2 || tits.length < 2) return null;
+  const aceita = (fu, t) => { const p = Math.max(1, dias(ui.dataOp, t.data)); return !((fu.prazo_min && p < fu.prazo_min) || (fu.prazo_max && p > fu.prazo_max)); };
+  return CMP.distribuir({ fundos: ativos, titulos: tits, disponivel: disponivelNoFundo,
+    custoTit: (fu, t) => { if (!aceita(fu, t)) return null; const c = condTit(fu, t, ui.dataOp); const s = simGrupo(fu, c, [t], ui.dataOp); return s.desagio + s.ad + s.iof + (+c.tarifa_titulo || 0); },
+    custoLote: (fu, ts) => simular(fu, ts, ui.dataOp).custo });
+}
+function blocoDivisao(D, melhor) {
+  if (!D || !D.grupos.length) return '';
+  const ref = D.unico || (melhor ? { fu: melhor.fu, custo: melhor.custo } : null);
+  const eco = ref ? ref.custo - D.custo : 0;
+  const vale = D.grupos.length > 1 && eco >= (cmpCfg?.economia_minima ?? 200);
+  if (!vale && !D.semFundo.length && D.unico) {
+    const limitado = melhor && melhor.fu.id !== D.unico.fu.id;
+    return `<p class="small muted" style="margin:8px 0 0">Dividir os títulos entre fundos não compensa neste lote${eco > 0 ? ` (economia de só ${money0(eco)}, abaixo do mínimo de ${money0(cmpCfg?.economia_minima ?? 200)} dos Parâmetros do comparador)` : ''}: o melhor é um borderô só no <strong>${esc(D.unico.fu.nome)}</strong>${limitado ? `. O ${esc(melhor.fu.nome)} sai mais barato na tabela, mas ${disponivelNoFundo(melhor.fu) < melhor.face ? 'não tem limite livre para o lote inteiro' : 'não aceita todos os prazos'}` : ''}.</p>`;
+  }
+  return `<div class="card" id="div-lote" style="margin:12px 0 0;background:var(--surface-2)"><h3 style="margin:0 0 6px">💡 Melhor divisão do lote entre os fundos</h3>
+    <p class="small muted" style="margin:0 0 8px">Cada título no fundo mais barato que o aceita (prazo) ${cmpCfg?.respeitar_limites ? 'e ainda tem limite (limite de crédito − carteira a vencer)' : ''}; borderôs pequenos são juntados quando a tarifa fixa não compensa.
+      ${ref ? `Comparado com tudo no ${esc(ref.fu.nome)} (${money0(ref.custo)}): <strong class="${eco > 0 ? 'pos' : ''}">${eco > 0 ? `economia de ${money0(eco)}` : 'sem economia'}</strong>.` : '<strong class="neg">Nenhum fundo sozinho aceita o lote inteiro (prazo ou limite).</strong>'}</p>
+    <div class="table-wrap"><table><thead><tr><th>Fundo</th><th class="num">Títulos</th><th class="num">Face</th><th class="num">Custo</th><th class="num">Taxa a.m.</th><th class="num">Limite livre</th><th></th></tr></thead><tbody>
+    ${D.grupos.map(g => { const s = simular(g.fu, g.tits, ui.dataOp), lv = disponivelNoFundo(g.fu); return `<tr><td><strong>${esc(g.fu.nome)}</strong></td><td class="num">${g.tits.length}</td><td class="num">${money0(g.face)}</td><td class="num">${money0(g.custo)}</td>
+      <td class="num">${pct(s.taxaEf, 2)}</td><td class="num">${lv === Infinity ? '—' : money0(lv)}</td><td>${podeEditar() && !ui.propostaEdit ? `<button class="btn small" data-div="${g.fu.id}" title="Deixar marcados só os títulos deste fundo, com o fundo escolhido">Montar</button>` : ''}</td></tr>`; }).join('')}
+    ${D.semFundo.length ? `<tr><td colspan="7" class="small neg">${D.semFundo.length} título(s) sem fundo que aceite (prazo fora da faixa ou sem limite): ${D.semFundo.slice(0, 6).map(t => esc(t.documento || sacadoDe(t))).join(', ')}</td></tr>` : ''}
+    </tbody><tfoot><tr class="row-total"><td>Total</td><td class="num">${D.grupos.reduce((s, g) => s + g.tits.length, 0)}</td><td class="num">${money0(D.grupos.reduce((s, g) => s + g.face, 0))}</td><td class="num">${money0(D.custo)}</td><td colspan="3"></td></tr></tfoot></table></div></div>`;
+}
 
 // Verificações de limite e concentração para um fundo
 function checagens(sim, tits, dataOp) {
@@ -224,20 +261,15 @@ function painel(el, root) {
   const sims = ativos.map(fu => simular(fu, tits, ui.dataOp, parseNum(ui.recompras) || 0));
   const S = sims.find(s => s.fu.id === ui.fundoId) || null; // o fundo é sempre escolhido pelo usuário
   const melhor = sims.slice().sort((a, b) => a.custo - b.custo)[0];
-  // melhor fundo por título (distribuição ótima)
-  let otimo = 0; const porFundoOt = {};
-  for (const t of tits) {
-    const best = ativos.map(fu => { const c = condTit(fu, t, ui.dataOp); return { fu, c: simular(fu, [t], ui.dataOp).desagio + t.valor * (+c.ad_valorem_pct || 0) / 100 + (+c.tarifa_titulo || 0) }; }).sort((a, b) => a.c - b.c)[0];
-    otimo += best.c; porFundoOt[best.fu.nome] = (porFundoOt[best.fu.nome] || 0) + +t.valor;
-  }
-  const fixosOt = Object.keys(porFundoOt).reduce((s, n) => { const f = ativos.find(x => x.nome === n); return s + (+f.tarifa_operacao || 0) + (+f.custo_assinatura || 0); }, 0); otimo += fixosOt;
+  // melhor divisão do lote entre os fundos (3.11): custo exato por fundo, limite disponível e prazo aceito
+  const D = melhorDivisao(ativos, tits);
   const face = sims[0]?.face || 0;
   const ROT = { atencao: ['⚠', 'Atenção'], info: ['ℹ', 'Info'], ok: ['✓', 'OK'] };
   const comparacao = `<h3 style="margin-top:16px">Comparação entre fundos para estes títulos</h3>
     <div class="table-wrap"><table class="cmp-fundos"><thead><tr><th>Fundo</th><th class="num">Taxa cad.</th><th class="num">Deságio</th><th class="num">Tarifas / IOF</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Taxa efetiva</th><th class="num">Dif. vs. + barato</th></tr></thead><tbody>
       ${sims.map(s => `<tr class="clickable ${S && s.fu.id === S.fu.id ? 'row-sel' : ''}" data-fu="${s.fu.id}" title="Usar ${esc(s.fu.nome)} nesta proposta"><td><strong>${esc(s.fu.nome)}</strong>${s.grupos.length > 1 ? ` <span class="badge aberto" title="Condições diferentes: vira ${s.grupos.length} borderôs">${s.grupos.length} borderôs</span>` : ''}</td><td class="num">${taxasTxt(s)}</td><td class="num">${money0(s.desagio)}</td><td class="num">${money0(s.ad + s.tar + s.iof)}</td><td class="num"><strong>${money0(s.custo)}</strong></td><td class="num">${money0(s.liquido)}</td><td class="num">${pct(s.taxaEf, 2)}</td><td class="num">${s === melhor ? '<span class="badge pago">menor custo</span>' : '+' + money0(s.custo - melhor.custo)}</td></tr>`).join('')}
     </tbody></table></div>
-    ${Object.keys(porFundoOt).length > 1 && otimo < melhor.custo - 1 ? `<p class="small" style="margin:8px 0 0">💡 Dividindo os títulos entre fundos (cada título no mais barato) o custo seria <strong>${money0(otimo)}</strong>, ${money0(melhor.custo - otimo)} a menos: ${Object.entries(porFundoOt).map(([n, v]) => `${esc(n)} ${money0(v)}`).join(' · ')}.</p>` : ''}`;
+    ${blocoDivisao(D, melhor)}`;
   const escolha = `<div class="fundo-pick" id="fpick" role="radiogroup" aria-label="Fundo da operação">
       ${sims.map(s => `<button type="button" class="fundo-op${S && s.fu.id === S.fu.id ? ' on' : ''}" data-fu="${s.fu.id}" role="radio" aria-checked="${S && s.fu.id === S.fu.id}">
         <span class="fo-nome">${esc(s.fu.nome)}${s === melhor ? ' <span class="badge pago">menor custo</span>' : ''}</span>
@@ -299,6 +331,12 @@ function painel(el, root) {
   const escolher = (e) => { const b = e.target.closest('[data-fu]'); if (!b) return; ui.fundoId = b.dataset.fu; painel(el, root); };
   $('#fpick', el).onclick = escolher;
   $('table.cmp-fundos', el).onclick = escolher;
+  el.querySelectorAll('[data-div]').forEach(b => b.onclick = () => {
+    const g = D.grupos.find(x => x.fu.id === b.dataset.div); if (!g) return;
+    ui.sel = new Set(g.tits.map(x => x.id)); ui.fundoId = g.fu.id; ui.soSel = true;
+    toast(`${g.tits.length} título(s) separados para o ${g.fu.nome}. Envie esta proposta e volte para os demais.`);
+    abaTitulos($('#corpo', root), root);
+  });
   $('#pf', el).addEventListener('change', (e) => { ui[e.target.name] = e.target.value; if (e.target.name === 'dataOp') return abaTitulos($('#corpo', root), root); painel(el, root); });
   if (!S) return;
   $('#obs', el).oninput = (e) => { ui.obs = e.target.value; };
@@ -775,4 +813,90 @@ async function pdfProposta(p, fu, itens) {
   doc.text('Elaborado por (financeiro)', 20, y + 5); doc.text('Diretor - aprovo a operação', W - 90, y + 5);
   pdfRodapes(doc, 'Fonte: proposta de borderô e títulos selecionados na plataforma', { M: 14 });
   doc.save(`proposta_fidc_${p.numero}_${fu.nome}.pdf`);
+}
+
+// ======================================================================
+// Aba: comparador de fundos (3.11) — custo efetivo realizado, curva por prazo, CDI e tabela de preço atual
+// ======================================================================
+async function abaComparador(c, root) {
+  c.innerHTML = '<div class="loading">Calculando…</div>';
+  let ops;
+  try { ops = await fetchAll(() => sb.from('fidc_operacoes').select('fundo,data,valor_face,custo_total,prazo_medio,qtd_titulos').eq('empresa_id', state.empresa.id).order('data')); }
+  catch (e) { fail(e); c.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar os borderôs.</div></div>'; return; }
+  const cfg = cmpCfg, hoje = hojeISO();
+  const H = CMP.historico(ops, { meses: cfg.periodo_meses, hoje });
+  const ini = H.meses[0] + '-01';
+  const C = CMP.curvaPrazo(ops, cfg.faixas_prazo, { de: ini });
+  const cdiM = CMP.mensal(cfg.cdi_aa / 100);
+  // CDI de cada mês (Análise FIDC › índices mensais); sem o mês, vale o CDI de referência dos parâmetros
+  const anos = [...new Set(H.meses.map(m => +m.slice(0, 4)))];
+  const idx = await q(sb.from('indices_mensais').select('ano,mes,cdi').eq('empresa_id', state.empresa.id).in('ano', anos)).catch(() => []);
+  const cdiMes = Object.fromEntries(idx.filter(x => x.cdi != null).map(x => [`${x.ano}-${String(x.mes).padStart(2, '0')}`, +x.cdi / 100]));
+  const cdiSerie = H.meses.map(m => cdiMes[m] ?? cdiM);
+  const comCdi = H.meses.filter(m => cdiMes[m] != null).length;
+  const cdiPer = cdiSerie.reduce((s, x) => s + x, 0) / cdiSerie.length;   // CDI médio do período, a.m.
+  const mesTxt = (m) => `${MESES_CURTO[+m.slice(5) - 1]}/${m.slice(2, 4)}`;
+  // tabela de preço atual: um título de R$ 10.000 de um sacado "demais" em cada prazo, pelas condições cadastradas
+  const ativos = fundos.filter(f => f.ativo);
+  const prazosTab = [...cfg.faixas_prazo];
+  const tabela = ativos.map(fu => ({ fu, v: prazosTab.map(p => { const venc = new Date(Date.parse(hoje + 'T12:00:00Z') + p * 864e5).toISOString().slice(0, 10);
+    if ((fu.prazo_min && p < fu.prazo_min) || (fu.prazo_max && p > fu.prazo_max)) return null;
+    const s = simular(fu, [{ id: 'x', valor: 10000, data: venc, favorecido_id: null, descricao: 'título padrão' }], hoje); return { custo: s.custo, taxa: s.taxaEf }; }) }));
+  const minCol = prazosTab.map((_, k) => Math.min(...tabela.map(r => r.v[k]?.custo ?? Infinity)));
+  const barato = H.fundos[0];
+  c.innerHTML = `<div class="card"><div class="toolbar"><span class="small muted">Período: ${mesTxt(H.meses[0])} a ${mesTxt(H.meses.at(-1))} · ${H.fundos.reduce((s, f) => s + f.n, 0)} borderôs realizados · CDI médio do período ${pct(cdiPer, 2)} a.m. (${comCdi} de ${H.meses.length} meses pelos índices mensais; os demais pelo CDI de referência de ${String(cfg.cdi_aa).replace('.', ',')}% a.a.${cfg.cdi_data ? `, de ${dateBR(cfg.cdi_data)}` : ''})</span>
+      <span class="spacer"></span>${podeEditar() ? '<button class="btn small" id="cmp-par">Parâmetros do comparador</button>' : ''}<button class="btn small" id="cmp-exp">Exportar Excel</button></div>
+      ${!cfg.banco ? '<p class="small warn" style="margin:6px 0 0">Os parâmetros do comparador (CDI, período, faixas) precisam do SQL 110. Até lá valem os padrões.</p>' : ''}
+      ${cfg.cdi_data && (Date.parse(hoje) - Date.parse(cfg.cdi_data)) / 864e5 > 45 ? '<p class="small warn" style="margin:6px 0 0">O CDI de referência tem mais de 45 dias: confira o valor atual nos Parâmetros do comparador.</p>' : ''}</div>
+    <div class="kpis">
+      <div class="kpi"><div class="k-label">Mais barato no período</div><div class="k-value">${barato ? esc(barato.fundo) : '—'}</div><div class="k-sub">${barato ? `${pct(barato.taxa, 2)} a.m. · CET ${pct(barato.cet, 1)} a.a.` : 'sem borderôs no período'}</div></div>
+      <div class="kpi"><div class="k-label">Custo médio de todos os fundos</div><div class="k-value">${pct(H.taxa, 2)} a.m.</div><div class="k-sub">CET ${pct(CMP.anual(H.taxa), 1)} a.a. · ${H.taxa && cdiPer ? `${(H.taxa / cdiPer * 100).toFixed(0)}% do CDI` : ''}</div></div>
+      <div class="kpi"><div class="k-label">Antecipado no período</div><div class="k-value">${money0(H.face)}</div><div class="k-sub">custo ${money0(H.custo)}</div></div>
+      <div class="kpi"><div class="k-label">Diferença entre o mais caro e o mais barato</div><div class="k-value">${H.fundos.length > 1 ? `${pct(H.fundos.at(-1).taxa - H.fundos[0].taxa, 2)} a.m.` : '—'}</div><div class="k-sub">${H.fundos.length > 1 ? `≈ ${money0((H.fundos.at(-1).taxa - H.fundos[0].taxa) * 100000)} por R$ 100 mil em 30 dias` : '&nbsp;'}</div></div></div>
+    <div class="card flush"><div style="padding:12px 12px 0"><h2 style="margin:0">Custo efetivo realizado por fundo</h2><p class="small muted" style="margin:4px 0 0">Borderôs importados no período. Taxa a.m. = custo total (deságio, ad valorem, tarifas, IOF e encargos) ÷ valor antecipado, proporcional a 30 dias; ponderada pelo valor e pelo prazo. CET a.a. = taxa composta em 12 meses. × CDI = quantas vezes o CDI médio do período o fundo custou.</p></div>
+      <div class="table-wrap"><table id="cmp-t"><thead><tr><th>Fundo</th><th class="num">Borderôs</th><th class="num">Face</th><th class="num">Custo</th><th class="num">Prazo médio</th><th class="num">Taxa a.m.</th><th class="num">CET a.a.</th><th class="num" title="Taxa a.m. do fundo ÷ CDI médio do período, a.m.">× CDI</th><th>Último borderô</th></tr></thead><tbody>
+      ${H.fundos.map((f, i) => `<tr><td><strong>${esc(f.fundo)}</strong>${i === 0 && H.fundos.length > 1 ? ' <span class="badge pago">mais barato</span>' : ''}</td><td class="num">${f.n}</td><td class="num">${money0(f.face)}</td><td class="num">${money0(f.custo)}</td>
+        <td class="num">${num1(f.prazo)} d</td><td class="num"><strong>${pct(f.taxa, 2)}</strong></td><td class="num">${pct(f.cet, 1)}</td><td class="num">${cdiPer ? `${(f.taxa / cdiPer * 100).toFixed(0)}%` : '—'}</td><td>${dateBR(f.ultima)}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">Nenhum borderô realizado no período. Importe os borderôs na Análise FIDC.</td></tr>'}
+      </tbody></table></div></div>
+    <div class="card"><h2 style="margin:0 0 8px">Taxa a.m. realizada, mês a mês</h2><canvas id="cmp-ch" height="90"></canvas></div>
+    <div class="grid2">
+      <div class="card flush"><div style="padding:12px 12px 0"><h2 style="margin:0">Curva por prazo (realizado)</h2><p class="small muted" style="margin:4px 0 0">Taxa a.m. pela faixa do prazo médio do borderô. Em destaque, o mais barato em cada faixa.</p></div>
+        <div class="table-wrap"><table><thead><tr><th>Prazo</th>${C.fundos.map(f => `<th class="num">${esc(f)}</th>`).join('')}</tr></thead><tbody>
+        ${C.linhas.map(l => `<tr><td>${esc(l.faixa)}</td>${l.valores.map((v, i) => `<td class="num ${C.fundos[i] === l.melhor ? 'pos' : ''}">${v ? `${C.fundos[i] === l.melhor ? '<strong>' : ''}${pct(v.taxa, 2)}${C.fundos[i] === l.melhor ? '</strong>' : ''} <span class="muted small">(${v.n})</span>` : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
+      <div class="card flush"><div style="padding:12px 12px 0"><h2 style="margin:0">Tabela de preço atual</h2><p class="small muted" style="margin:4px 0 0">Custo de um título de R$ 10.000 (sacado sem condição especial) operado hoje, pelas condições cadastradas, com as tarifas de um borderô de um título só.</p></div>
+        <div class="table-wrap"><table><thead><tr><th>Fundo</th>${prazosTab.map(p => `<th class="num">${p} dias</th>`).join('')}</tr></thead><tbody>
+        ${tabela.map(r => `<tr><td><strong>${esc(r.fu.nome)}</strong></td>${r.v.map((v, k) => `<td class="num ${v && v.custo === minCol[k] ? 'pos' : ''}">${v ? `${money0(v.custo)}<div class="small muted">${pct(v.taxa, 2)} a.m.</div>` : '<span class="muted">não aceita</span>'}</td>`).join('')}</tr>`).join('') || '<tr><td class="empty">Nenhum fundo ativo.</td></tr>'}
+        </tbody></table></div></div></div>`;
+  const cores = ['#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c', '#0891b2'];
+  const { chart, moneyTick } = await import('../lib/ui.js');
+  chart($('#cmp-ch', c), { type: 'line', data: { labels: H.meses.map(mesTxt), datasets: [
+    ...H.fundos.map((f, i) => ({ label: f.fundo, data: f.serie.map(x => (x == null ? null : +(x * 100).toFixed(3))), borderColor: cores[i % cores.length], backgroundColor: cores[i % cores.length], spanGaps: true, tension: .25, pointRadius: 3 })),
+    { label: 'CDI', data: cdiSerie.map(x => +(x * 100).toFixed(3)), borderColor: '#98a2b3', borderDash: [5, 4], pointRadius: 0 },
+  ] }, options: { plugins: { tooltip: { callbacks: { label: (x) => `${x.dataset.label}: ${String(x.raw).replace('.', ',')}% a.m.` } } }, scales: { y: { ticks: { callback: (v) => `${String(v).replace('.', ',')}%` } } } } });
+  $('#cmp-exp', c).onclick = () => exportXLSX([['Fundo', 'Borderôs', 'Face', 'Custo', 'Prazo médio', 'Taxa a.m.', 'CET a.a.', ...H.meses.map(mesTxt)],
+    ...H.fundos.map(f => [f.fundo, f.n, f.face, f.custo, +f.prazo.toFixed(1), +(f.taxa * 100).toFixed(4), +(f.cet * 100).toFixed(2), ...f.serie.map(x => (x == null ? '' : +(x * 100).toFixed(4)))])], `comparador_fundos_${hoje}`);
+  $('#cmp-par', c) && ($('#cmp-par', c).onclick = () => parametrosComparador(() => abaComparador(c, root)));
+}
+
+function parametrosComparador(depois) {
+  const g = cmpCfg;
+  const m = modal({ title: 'Parâmetros do comparador de fundos', body: `<div class="grid-form">
+      <label>CDI de referência (% a.a.)<input id="pc-cdi" inputmode="decimal" value="${String(g.cdi_aa).replace('.', ',')}"></label>
+      <label>Atualizado em<input id="pc-dt" type="date" value="${g.cdi_data || hojeISO()}"></label>
+      <label>Período de análise (meses)<input id="pc-per" type="number" min="3" max="36" value="${g.periodo_meses}"></label>
+      <label>Faixas de prazo (dias)<input id="pc-fx" value="${g.faixas_prazo.join(', ')}" placeholder="30, 45, 60, 90"></label>
+      <label class="chk span2"><input type="checkbox" id="pc-lim" ${g.respeitar_limites ? 'checked' : ''}> A divisão sugerida respeita o limite livre de cada fundo (limite de crédito − carteira a vencer)</label>
+      <label>Economia mínima para sugerir dividir o lote (R$)<input id="pc-eco" inputmode="decimal" value="${money(g.economia_minima)}"></label></div>
+      <p class="small muted">Confira o CDI (taxa DI anual) no site do Banco Central ou da B3 e atualize aqui; a tela avisa quando o valor tem mais de 45 dias.</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pc-ok">Salvar</button>' });
+  $('#pc-ok', m.el).onclick = async () => {
+    const fx = $('#pc-fx', m.el).value.split(/[;,\s]+/).map(Number).filter(n => n > 0).sort((a, b) => a - b);
+    const reg = { empresa_id: state.empresa.id, cdi_aa: parseNum($('#pc-cdi', m.el).value), cdi_data: $('#pc-dt', m.el).value || null, periodo_meses: +$('#pc-per', m.el).value,
+      faixas_prazo: [...new Set(fx)], respeitar_limites: $('#pc-lim', m.el).checked, economia_minima: parseNum($('#pc-eco', m.el).value) || 0 };
+    if (!(reg.cdi_aa >= 0 && reg.cdi_aa < 100)) return toast('Confira o CDI', true);
+    if (!(reg.periodo_meses >= 3 && reg.periodo_meses <= 36)) return toast('O período vai de 3 a 36 meses', true);
+    if (!reg.faixas_prazo.length) return toast('Informe as faixas de prazo', true);
+    try { await q(sb.from('fidc_comparador_config').upsert(reg, { onConflict: 'empresa_id' })); Object.assign(cmpCfg, reg, { banco: true }); toast('Parâmetros salvos'); m.close(); depois(); }
+    catch (e) { fail(/fidc_comparador_config/.test(e.message || '') ? new Error('Os parâmetros do comparador precisam do SQL 110.') : e); }
+  };
 }

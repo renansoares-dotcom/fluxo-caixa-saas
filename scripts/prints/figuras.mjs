@@ -20,6 +20,8 @@ export const FIGS = [
   ['orcamento', 'orcamento-cc', '### 3.6', 'Orçamento do meu centro: o responsável aprova ou devolve'],
   ['orcamento', 'orcado-realizado', '## 4.', 'Orçado x Realizado'], ['orcamento', 'controle-orcamento', '## 5.', 'Controle Orçamentário'],
   ['fidc', 'fidc-propostas', '## 3.', 'Propostas de Borderô: títulos disponíveis'],
+  ['fidc', 'fidc-propostas', '### 3.2', 'Melhor divisão do lote entre os fundos, respeitando o limite livre de cada um', 'click:#sel-todos|scroll:#div-lote'],
+  ['fidc', 'fidc-propostas', '### 3.7', 'Comparador de fundos: custo efetivo realizado, série mensal contra o CDI, curva por prazo e tabela de preço atual', 'click:[data-aba=comparador]'],
   ['fidc-carteira', 'fidc-carteira', '## 3.', 'Carteira Cedida por fundo, com os títulos vencidos sem liquidação'],
   ['duplicatas', 'duplicatas', '## 3.', 'Duplicatas para Endosso'],
   ['comercial', 'comercial', '## 3.', 'Painel Comercial'], ['comercial', 'comercial/carteira', '## 4.', 'Carteira e Agenda: a situação de cada cliente'], ['comercial', 'comercial/funil', '## 5.', 'Funil e Propostas: as oportunidades por etapa'],

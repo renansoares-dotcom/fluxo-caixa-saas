@@ -1,8 +1,8 @@
 ---
 titulo: FIDC — propostas de borderô e análise
 tela: Financeiro › Análise FIDC (FIN017) e Propostas de Borderô (FIN018)
-versao: 1.4
-atualizado: 2026-11-05
+versao: 1.5
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -35,9 +35,23 @@ Também dá para chegar aqui marcando os títulos em **Contas a Pagar / Receber 
 
 1. Informe a **data da operação**.
 2. A **Comparação entre fundos** mostra, para os títulos marcados e para cada fundo: o deságio, as tarifas e o IOF, o custo, o líquido, a taxa efetiva e a diferença para o mais barato.
-3. Escolha o fundo. A plataforma avisa quando seria mais barato dividir os títulos entre os fundos, cada título no mais barato.
+3. Escolha o fundo. Logo abaixo da comparação, a plataforma calcula a **melhor divisão do lote** entre os fundos (seção 3.2.1).
 4. Confira as **Verificações**: limite de crédito, limite por sacado, títulos de prazo muito curto, títulos vencidos. Confira também os sacados, os prazos e os vencimentos.
 5. Escreva uma **observação para o diretor**, se quiser, e clique em **Salvar rascunho** ou **Enviar**.
+
+#### 3.2.1 Melhor divisão do lote entre os fundos
+
+Com dois ou mais títulos e dois ou mais fundos ativos, a plataforma monta a divisão mais barata:
+
+1. Cada título vai para o fundo de **menor custo** que o aceita (prazo mínimo e máximo do fundo) e que ainda tem **limite livre** (limite de crédito − carteira a vencer no fundo). Os maiores títulos são alocados primeiro.
+2. Depois, ela tenta **juntar borderôs**: se levar todos os títulos de um fundo para outro já usado sai mais barato (as tarifas fixas de TED e assinatura pesam), junta.
+3. O custo de cada fundo é o da **simulação completa** (condições por grupo de sacados, tarifas, IOF).
+
+A divisão é comparada com o lote inteiro no **melhor fundo que aceita tudo e tem limite**. Ela só é sugerida quando a economia passa do mínimo dos **Parâmetros do comparador** (padrão R$ 200). Caso contrário, a tela diz qual fundo é o melhor para o lote inteiro e por que o mais barato da tabela não serve, quando for o caso (sem limite livre ou prazo fora da faixa).
+
+Em cada linha, **Montar** deixa marcados só os títulos daquele fundo, com o fundo já escolhido. Envie a proposta e volte para os demais títulos. Títulos que nenhum fundo aceita aparecem em vermelho.
+
+![Figura 2 — Melhor divisão do lote entre os fundos, respeitando o limite livre de cada um (dados fictícios)](img/fidc-2.jpg)
 
 > **Condições por grupo de sacados:** quando o fundo cobra taxas diferentes por sacado (por exemplo, a FS com o Grupo Total e com os demais), cada título usa a condição do seu sacado. Títulos de condições diferentes **nunca vão no mesmo borderô**: a proposta é dividida em uma por condição.
 
@@ -74,9 +88,39 @@ Em **Condições por grupo de sacados**, cadastre as taxas diferentes por grupo 
 
 **Prazo cobrado** = prazo real + dias de compensação, rolando para o próximo dia útil.
 
+### 3.7 Comparador de fundos
+
+A aba **Comparador de fundos** mostra quanto cada fundo **realmente custou**, a partir dos borderôs da base FIDC no período (padrão: 12 meses).
+
+- **Indicadores:**
+  - o fundo mais barato no período;
+  - o custo médio de todos os fundos, em vezes o CDI;
+  - o total antecipado;
+  - a diferença entre o mais caro e o mais barato. Ex.: 0,40% a.m. ≈ R$ 400 a cada R$ 100 mil por 30 dias.
+- **Custo efetivo realizado por fundo:**
+  - borderôs, face, custo e prazo médio;
+  - **taxa a.m.**: o custo total (deságio, ad valorem, tarifas, IOF e encargos) dividido pelo valor antecipado (face − custo), proporcional a 30 dias e ponderado pelo valor e pelo prazo de cada borderô;
+  - **CET a.a.**: a taxa composta em 12 meses;
+  - **× CDI**: quantas vezes o CDI médio do período o fundo custou.
+- **Taxa a.m. realizada, mês a mês:** uma linha por fundo e a linha do CDI. O CDI de cada mês vem dos **índices mensais** da Análise FIDC; o mês sem índice usa o CDI de referência dos parâmetros.
+- **Curva por prazo:** a taxa realizada por faixa do prazo médio do borderô, com o mais barato de cada faixa em destaque. Ela mostra, por exemplo, que um fundo é melhor para prazos curtos e outro para longos.
+- **Tabela de preço atual:** o custo, hoje, de um título de R$ 10.000 em cada prazo, pelas condições cadastradas. Fundo que não aceita o prazo aparece como "não aceita".
+
+**Parâmetros do comparador** (administrador e financeiro):
+
+- o **CDI de referência** (% a.a.) e a data em que foi atualizado. A tela avisa quando o valor tem mais de 45 dias;
+- o período de análise (3 a 36 meses);
+- as faixas de prazo;
+- se a divisão respeita o limite livre dos fundos;
+- a economia mínima para sugerir dividir o lote.
+
+**Exportar Excel** baixa o resumo por fundo com a série mensal.
+
+![Figura 3 — Comparador de fundos: custo efetivo realizado, série mensal contra o CDI, curva por prazo e tabela de preço atual (dados fictícios)](img/fidc-3.jpg)
+
 ## 4. Análise FIDC
 
-![Figura 2 — Análise FIDC: custo e prazo por fundo (dados fictícios)](img/fidc-2.jpg)
+![Figura 4 — Análise FIDC: custo e prazo por fundo (dados fictícios)](img/fidc-4.jpg)
 
 1. Escolha o **mês** e o **fundo**.
 2. O **Resumo executivo** mostra o valor de face antecipado, o custo total, a taxa do fundo a.m., o prazo cobrado, a coobrigação a vencer, as recompras, o maior sacado e a concentração (HHI).
@@ -106,6 +150,10 @@ Em **Condições por grupo de sacados**, cadastre as taxas diferentes por grupo 
 
 **A mensagem diz "não pode virar …: deixe só títulos de uma condição".** Na edição, a proposta tem títulos de grupos de sacados diferentes. Separe em duas propostas.
 
+**O fundo mais barato da tabela não aparece na divisão sugerida.** Ele não tem limite livre (limite de crédito − carteira a vencer) para os títulos, ou não aceita o prazo deles. Confira em Condições dos fundos.
+
+**O comparador não mostra um fundo.** Ele não tem borderô realizado no período. Aumente o período nos Parâmetros do comparador ou importe os borderôs na Análise FIDC.
+
 **A taxa simulada não bate com o borderô do fundo.** Confira as condições do fundo (taxa, dias de compensação e tarifas) na aba Condições dos fundos e compare usando **Comparar com borderô original**.
 
 ## 7. Conversa sobre o registro
@@ -126,3 +174,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 31/10/2026 | Nova figura: análise fidc: custo e prazo por fundo. |
 | 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Títulos disponíveis com a emissão e a NF / parcela na 2ª linha. Figuras refeitas. |
+| 1.5 | 08/11/2026 | Melhor divisão do lote entre os fundos com limite livre, prazo aceito e junção de borderôs (Montar). Aba Comparador de fundos: custo efetivo realizado, CET, × CDI, série mensal, curva por prazo, tabela de preço atual e parâmetros. |
