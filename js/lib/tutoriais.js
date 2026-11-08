@@ -56,6 +56,8 @@ export const MANUAIS = [
     resumo: 'Busca por bobina (QR), OP, lote ou NF-e; caminho materiais → produção → clientes; recolhimento; expedição das bobinas na NF-e.' },
   { id: 'custo-op', titulo: 'Custo das OPs — custo real, orçado e margem', area: 'Produção', rotas: ['producao/custos'],
     resumo: 'Custo real de cada OP (material, tinta, máquina, manutenção) contra o orçado pela estrutura, e a margem pelo preço de venda.' },
+  { id: 'modo-sem-internet', titulo: 'Modo sem internet — app instalável no chão de fábrica', area: 'Produção', rotas: [],
+    resumo: 'Terminal do Setor, Manutenção no Celular e pesagem da Casa de Tintas funcionam sem sinal: o registro fica no aparelho e sobe quando a internet volta.' },
   { id: 'programacao-inteligente', titulo: 'Programação Inteligente — impedimentos e sequência por troca de cor', area: 'Produção', rotas: ['producao/sequenciamento'],
     resumo: 'O que impede cada OP de começar (arte, clichê, tinta, material) e a ordem por máquina que menos troca de cor sem perder a entrega, com aplicação da fila.' },
   { id: 'oee', titulo: 'OEE e Perdas — disponibilidade, desempenho e qualidade por máquina', area: 'Produção', rotas: ['producao/oee'],

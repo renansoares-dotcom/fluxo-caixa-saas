@@ -1,7 +1,7 @@
 ---
 titulo: Manutenção industrial — OS, preventivas, peças e indicadores
 tela: Produção › Manutenção › Painel de Manutenção (PRD008), Ordens de Serviço (PRD009), Equipamentos e Planos (PRD010), Manutenção no Celular (PRD011) e Preventivas e Peças (PRD022)
-versao: 1.1
+versao: 1.2
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -339,6 +339,8 @@ O **catálogo de falhas** fica na aba de mesmo nome. Cada falha tem código, des
 
 ## 13. Perguntas frequentes
 
+**A internet caiu.** No celular, pedir manutenção, iniciar, aguardando peça e horas funcionam sem internet: o registro fica no aparelho e sobe sozinho quando o sinal voltar (veja o manual **Modo sem internet**).
+
 **A máquina parou de madrugada e ninguém abriu OS.** Se o operador apontou a parada como manutenção no Terminal do Setor, a OS já está na fila. Se não apontou, abra a OS e informe em **Parada desde** a hora real em que a máquina parou.
 
 **Por que a disponibilidade não bate com o OEE da produção?** A disponibilidade da manutenção considera só as paradas por manutenção. O OEE considera todas as paradas não planejadas: setup, falta de material, falta de operador e as demais.
@@ -355,3 +357,4 @@ O **catálogo de falhas** fica na aba de mesmo nome. Cada falha tem código, des
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão. Inclui equipamentos ligados às máquinas, ao imobilizado e ao centro de custo; OS com checklist, horas, peças do estoque, terceiros no contas a pagar, fotos e impressão; planos por dias e horas de máquina; parada automática com a produção; indicadores; celular; parâmetros e Decision Center. |
 | 1.1 | 08/11/2026 | Nova tela Preventivas e Peças (PRD022): horas de máquina pelo horímetro mais os apontamentos depois da leitura; uso do intervalo, ritmo e data prevista de cada plano por horas; percentual que gera a OS ajustável; peças críticas com mínimo, ponto de pedido, previsto nos planos, consumo, requisição de compra e aviso diário. |
+| 1.2 | 08/11/2026 | Modo sem internet: no celular, pedir manutenção, iniciar, aguardando peça e horas funcionam sem internet, com envio automático quando o sinal voltar. |

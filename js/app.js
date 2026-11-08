@@ -15,6 +15,7 @@ import { montarMenu, marcarTela, modoPainel, cliqueArea, fecharPainel } from './
 import { codigoDa } from './lib/telas.js';
 import { iniciarUso, pararUso, telaUso } from './lib/uso.js';
 import { exigirTermo } from './lib/lgpd-termo.js';
+import { iniciarOffline, guardarEntrada, lerEntrada } from './lib/offline.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -298,6 +299,7 @@ async function entrarEmpresa(emp, papel, areas) {
   iniciarBusca();
   iniciarSelectBusca();
   try { localStorage.setItem('fc-empresa', emp.id); } catch {}
+  guardarEntrada(state.user.id, emp, papel, areas);
   $('#empresa-switch').textContent = emp.nome + ' ▾';
   $('#user-email').textContent = state.user.email;
   anosSelect($('#ano-global'));
@@ -350,6 +352,7 @@ async function render() {
   lerCores();
   chatFechado(null);            // a tela Conversas diz qual conversa está aberta
   let route = location.hash.replace(/^#\//, '').split('?')[0] || 'hoje';
+  state.rota = route;   // o modo sem internet guarda as leituras só das telas de chão de fábrica
   // Decisão do Dia virou uma aba da Central de Decisões (melhoria 2.3): os links antigos continuam funcionando
   if (route === 'decisao-dia') { const qs = location.hash.split('?')[1]; history.replaceState(null, '', '#/decisoes?aba=pagamentos' + (qs ? '&' + qs : '')); route = 'decisoes'; }
   // link direto para um registro (cartão das Conversas): #/<tela>?abrir=<id> abre o registro na tela
@@ -412,6 +415,7 @@ function marcarRolagem(w) {
   window.addEventListener('resize', todas);
   document.addEventListener('scroll', (e) => { if (e.target?.classList?.contains('table-wrap')) marcarRolagem(e.target); }, true); }
 window.addEventListener('hashchange', render);
+iniciarOffline(V);   // modo sem internet: service worker, selo no topo e envio da fila quando o sinal voltar
 export const rerender = render;
 
 // ---------- Inicialização ----------
@@ -446,5 +450,7 @@ async function boot() {
       if (r) return entrarEmpresa(r.empresas, r.papel, r.areas);
     } catch {}
   }
+  // sem internet: entra com a última empresa e o último perfil guardados neste aparelho (modo sem internet, melhoria 1.5)
+  if (navigator.onLine === false) { const g = lerEntrada(state.user.id); if (g?.emp) return entrarEmpresa(g.emp, g.papel, g.areas); }
   escolherEmpresa();
 }

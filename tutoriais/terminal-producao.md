@@ -1,8 +1,8 @@
 ---
 titulo: Terminal de produção
 tela: Produção › Terminal do Setor (PRD001)
-versao: 1.4
-atualizado: 2026-11-07
+versao: 1.5
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -69,6 +69,8 @@ Parada com motivo do tipo **manutenção** abre sozinha uma ordem de serviço pa
 
 ## 6. Perguntas frequentes e erros comuns
 
+**A internet caiu.** Iniciar, parada, retomar e encerrar funcionam sem internet: o registro fica no aparelho e sobe sozinho quando o sinal voltar (veja o manual **Modo sem internet**).
+
 **A mensagem diz "Nenhuma OP liberada para esta máquina/setor".** Peça ao PCP para liberar ou programar a OP.
 
 **A mensagem diz "Bobina mãe não encontrada".** Confira o código na etiqueta da bobina de origem.
@@ -86,3 +88,4 @@ Parada com motivo do tipo **manutenção** abre sozinha uma ordem de serviço pa
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.3 | 07/11/2026 | A parada de manutenção abre a ordem de serviço da manutenção. |
 | 1.4 | 07/11/2026 | Bobina bloqueada até a liberação do primeiro material pela Qualidade. |
+| 1.5 | 08/11/2026 | Modo sem internet: iniciar, parada, retomar e encerrar funcionam sem internet, com envio automático quando o sinal voltar. |

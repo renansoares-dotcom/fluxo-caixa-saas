@@ -1,7 +1,7 @@
 ---
 titulo: Casa de Tintas — receitas versionadas, preparação e pesagem
 tela: Produção › Casa de Tintas › Painel da Casa de Tintas (PRD016), Ordens de Preparação (PRD017), Cores e Receitas (PRD018) e Previsão de Tinta (PRD023)
-versao: 1.1
+versao: 1.2
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -301,6 +301,8 @@ Em **Parâmetros**:
 
 ## 11. Perguntas frequentes
 
+**A internet caiu.** A pesagem dos itens da receita funciona sem internet: o registro fica no aparelho e sobe sozinho quando o sinal voltar (veja o manual **Modo sem internet**).
+
 **Errei o peso.** Antes da aprovação, use **Estornar** no histórico das pesagens e pese de novo. O insumo volta ao estoque.
 
 **O pigmento passou do previsto.** Use **Corrigir proporção**: a ordem cresce na mesma proporção e a cor fica no tom. Jogar tinta fora ou "compensar no olho" sai mais caro.
@@ -323,3 +325,4 @@ Se ainda não ler, digite o peso: a pesagem vale do mesmo jeito.
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão. Inclui cores com L* a* b*, receitas com versões e aprovação, ordem de preparação com pesagem na ordem de adição, tolerância, leitura da balança, correção de proporção, ajustes e aproveitamento de sobra, medições com ΔE CIEDE2000, aprovação com concessão, lote com etiqueta e QR, entrega e retorno da sobra, ordem impressa, estoque oficial e Decision Center. |
 | 1.1 | 08/11/2026 | Nova tela Previsão de Tinta (PRD023): necessidade por cor pela programação, sobras para reaproveitar, o que preparar, insumos da receita contra o saldo, sobras paradas e a ficha de cores dos produtos com o consumo real das OPs. |
+| 1.2 | 08/11/2026 | Modo sem internet: a pesagem dos itens da receita funciona sem internet, com envio automático quando o sinal voltar. |

@@ -4,6 +4,10 @@ import { sb, state, q } from '../lib/data.js';
 import { $, $$, esc, dateBR, fail, toast, modal } from '../lib/ui.js';
 import { cadProducao, imprimirEtiquetas } from '../lib/producao.js';
 import { qtd, num } from '../lib/compras.js';
+import { gravar, novoId } from '../lib/offline.js';
+
+// modo sem internet (melhoria 1.5): iniciar, parar, retomar e encerrar ficam no aparelho e sobem quando o sinal voltar
+const salvo = (r, msg) => toast(r.pendente ? `${msg} — sem internet: guardado no aparelho` : msg);
 
 export const title = 'Terminal do Setor';
 let C = null, timer = null;
@@ -69,16 +73,18 @@ async function acao(act, m, X) {
       const md = modal({ title: `Iniciar produção — ${m.codigo}`, body: `<div class="tm-lista">${fila.map(x => { const o = X.opById[x.ordem_id];
         return `<button class="btn tm-item" data-e="${x.id}"><b>OP ${o.numero}</b> · ${esc(o.codigo_produto || '')} ${esc(o.descricao || '')}<br><span class="small muted">${esc(o.cliente || '')} · ${qtd(o.quantidade)} ${esc(o.unidade)} · feito ${qtd(x.qtd_boa)}${o.entrega ? ` · entrega ${dateBR(o.entrega)}` : ''}</span></button>`; }).join('')}</div>` });
       $$('[data-e]', md.el).forEach(b => b.onclick = async () => { const x = fila.find(f => f.id === b.dataset.e);
-        try { await q(sb.from('prod_apontamentos').insert({ empresa_id: e, ordem_id: x.ordem_id, etapa_id: x.id, setor_id: X.setorId, maquina_id: m.id, operador_id: X.meu?.id || null, operador_nome: X.meu?.nome || state.user?.email || null }));
-          md.close(); toast('Produção iniciada'); recarregar(); } catch (err) { fail(err); } });
+        try { const r = await gravar(`Início OP ${X.opById[x.ordem_id]?.numero} em ${m.codigo}`, [{ t: 'insert', tabela: 'prod_apontamentos', valores: { id: novoId(), empresa_id: e, ordem_id: x.ordem_id, etapa_id: x.id, setor_id: X.setorId, maquina_id: m.id,
+            operador_id: X.meu?.id || null, operador_nome: X.meu?.nome || state.user?.email || null, inicio: new Date().toISOString(), fim: null } }]);
+          md.close(); salvo(r, 'Produção iniciada'); recarregar(); } catch (err) { fail(err); } });
     }
     if (act === 'parar') {
       const mots = C.motivos.filter(x => x.tipo === 'parada' && x.ativo);
       const md = modal({ title: `Parada — ${m.codigo}`, body: `<div class="tm-lista">${mots.map(x => `<button class="btn tm-item" data-mt="${x.id}">${esc(x.nome)}${x.planejada ? ' <span class="small muted">(planejada)</span>' : ''}</button>`).join('') || '<p class="muted">Cadastre os motivos de parada em Produção › Cadastros.</p>'}</div>` });
-      $$('[data-mt]', md.el).forEach(b => b.onclick = async () => { try { await q(sb.from('prod_paradas').insert({ empresa_id: e, maquina_id: m.id, ordem_id: ap?.ordem_id || null, motivo_id: b.dataset.mt, operador_id: X.meu?.id || null }));
-        md.close(); toast('Parada registrada'); recarregar(); } catch (err) { fail(err); } });
+      $$('[data-mt]', md.el).forEach(b => b.onclick = async () => { try { const r = await gravar(`Parada de ${m.codigo}`, [{ t: 'insert', tabela: 'prod_paradas', valores: { id: novoId(), empresa_id: e, maquina_id: m.id, ordem_id: ap?.ordem_id || null, motivo_id: b.dataset.mt, operador_id: X.meu?.id || null, inicio: new Date().toISOString(), fim: null } }]);
+        md.close(); salvo(r, 'Parada registrada'); recarregar(); } catch (err) { fail(err); } });
     }
-    if (act === 'retomar') { await q(sb.from('prod_paradas').update({ fim: new Date().toISOString() }).eq('id', pa.id)); toast('Máquina retomada'); recarregar(); }
+    if (act === 'retomar') { const r = await gravar(`Retomada de ${m.codigo}`, [{ t: 'update', tabela: 'prod_paradas', id: pa.id, valores: { fim: new Date().toISOString() } }]); salvo(r, 'Máquina retomada'); recarregar(); }
+    if (act === 'bobina' && navigator.onLine === false) return toast('A etiqueta da bobina precisa de internet (o número da bobina vem da plataforma). Anote o peso e registre quando o sinal voltar.', true);
     if (act === 'bobina') {
       const op = X.opById[ap.ordem_id];
       const md = modal({ title: `Bobina — OP ${op.numero}`, body: `<div class="grid-form tm-form"><label>Peso (kg) *<input id="bb-p" inputmode="decimal"></label><label>Metros<input id="bb-m" inputmode="decimal"></label>
@@ -116,9 +122,10 @@ async function acao(act, m, X) {
         if (!(boa >= 0) || $('#en-b', md.el).value.trim() === '') return toast('Informe a quantidade boa', true);
         if (ref > 0 && !$('#en-m', md.el).value && mots.length) return toast('Escolha o motivo do refugo', true);
         ev.target.disabled = true;
-        try { await q(sb.from('prod_apontamentos').update({ fim: new Date().toISOString(), qtd_boa: boa, refugo: ref, refugo_motivo_id: $('#en-m', md.el).value || null, turno: $('#en-t', md.el).value || null, observacao: $('#en-o', md.el).value.trim() || null }).eq('id', ap.id));
-          if (pa) await q(sb.from('prod_paradas').update({ fim: new Date().toISOString() }).eq('id', pa.id));
-          md.close(); toast('Apontamento encerrado'); recarregar(); } catch (err) { fail(err); ev.target.disabled = false; }
+        try { const agora = new Date().toISOString();
+          const r = await gravar(`Encerramento OP ${op.numero} em ${m.codigo}`, [{ t: 'update', tabela: 'prod_apontamentos', id: ap.id, valores: { fim: agora, qtd_boa: boa, refugo: ref, refugo_motivo_id: $('#en-m', md.el).value || null, turno: $('#en-t', md.el).value || null, observacao: $('#en-o', md.el).value.trim() || null } },
+            ...(pa ? [{ t: 'update', tabela: 'prod_paradas', id: pa.id, valores: { fim: agora } }] : [])]);
+          md.close(); salvo(r, 'Apontamento encerrado'); recarregar(); } catch (err) { fail(err); ev.target.disabled = false; }
       };
     }
   } catch (err) { fail(err); }

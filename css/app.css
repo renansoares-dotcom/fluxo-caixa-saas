@@ -846,6 +846,8 @@ select.sb-nativo{position:absolute!important;opacity:0!important;width:1px!impor
 .ch-part-topo{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
 .ch-check{flex-direction:row!important;align-items:center;gap:8px!important;color:var(--text)!important}
 .ch-opcoes{display:flex;flex-direction:column;gap:6px}.ch-opcao{flex-direction:row!important;gap:8px!important;align-items:center;color:var(--text)!important;font-size:14px!important}
+/* modo sem internet (melhoria 1.5): selo no topo com a fila do aparelho */
+.off-ind{border-radius:999px;font-weight:600;white-space:nowrap}.off-ind.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn);border-color:var(--warn)}.off-ind.neg{background:color-mix(in srgb,var(--neg) 14%,transparent);color:var(--neg);border-color:var(--neg)}
 .chat-topo{position:relative}
 :root[data-theme="dark"] .cm-texto a{color:#53bdeb}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cm-texto a{color:#53bdeb}}

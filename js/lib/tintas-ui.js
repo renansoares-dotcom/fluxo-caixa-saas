@@ -7,6 +7,7 @@ import { carregarProdutos } from './produtos.js';
 import { temBalanca, lerBalanca } from './balanca.js';
 import * as T from './tintas.js';
 import { conversaNoModal } from './mini-chat.js';
+import { gravar, novoId } from './offline.js';
 
 export const podeGerir = () => ['admin', 'financeiro', 'diretor'].includes(state.papel);
 export const podeTintas = () => ['admin', 'financeiro', 'diretor', 'producao'].includes(state.papel);
@@ -172,8 +173,12 @@ export async function fichaOrdem(D, o, { onMudou } = {}) {
       just = prompt(`${nf(qtd)} kg deixa o item ${nf(desv, 2)}% acima do previsto (tolerância ±${nf(l.tol, 2)}%).\nJustifique para pesar assim — ou cancele e use "Corrigir proporção" depois de pesar.`);
       if (!just?.trim()) return;
     }
-    const res = await q(sb.rpc('tin_pesar', { p_ordem: o.id, p_item: itemId, p_produto: null, p_qtd: qtd, p_lote: null, p_justificativa: just, p_balanca: balanca }));
-    toast(`Pesado ${nf(qtd)} kg${res?.estoque ? ' — saiu do estoque' : ''}`); re();
+    // modo sem internet (melhoria 1.5): a pesagem fica no aparelho e vai uma vez só (sync_rpc com chave) quando o sinal voltar
+    const chave = novoId();
+    const r = await gravar(`Pesagem da tinta ${o.numero}: ${nf(qtd)} kg`, [{ t: 'rpc', nome: 'tin_pesar', chave, args: { p_ordem: o.id, p_item: itemId, p_produto: null, p_qtd: qtd, p_lote: null, p_justificativa: just, p_balanca: balanca },
+      sombra: { tabela: 'tin_pesagens', valores: { id: chave, empresa_id: o.empresa_id, ordem_id: o.id, item_id: itemId, produto_id: l.item.produto_id, prevista: l.prevista, pesada: qtd, ajuste: false, situacao: 'pesada', justificativa: just, balanca, custo: 0, criado_em: new Date().toISOString() } } }]);
+    const res = r.resultados?.[0];
+    toast(r.pendente ? `Pesado ${nf(qtd)} kg — sem internet: guardado no aparelho` : `Pesado ${nf(qtd)} kg${res?.estoque ? ' — saiu do estoque' : ''}`); re();
   };
   $$('[data-pesar]', el).forEach(x => x.onclick = async () => { try { await pesar(x.dataset.pesar, parseNum($(`[data-peso="${x.dataset.pesar}"]`, el).value)); } catch (e) { fail(e); } });
   $$('[data-peso]', el).forEach(x => x.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); $(`[data-pesar="${x.dataset.peso}"]`, el).click(); } });
@@ -218,7 +223,7 @@ export async function fichaOrdem(D, o, { onMudou } = {}) {
   b('#fo-etq', async () => etiqueta(D, o, ult));
 }
 async function fichaOrdemAtualizada(D, id, onMudou) {
-  const [o] = await q(sb.from('tin_ordens').select('*').eq('id', id));
+  const o = (await q(sb.from('tin_ordens').select('*').eq('id', id)))[0] || D.O.find(x => x.id === id);   // sem internet: a ordem que já está na tela
   const i = D.O.findIndex(x => x.id === id); if (i >= 0) D.O[i] = o; else D.O.unshift(o);
   onMudou?.({ silencioso: true }); fichaOrdem(D, o, { onMudou });
 }

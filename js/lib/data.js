@@ -23,9 +23,15 @@ export const temArea = (a) => state.papel === 'admin' || !state.areas || state.a
 // RH é exceção: só administrador ou quem tem "rh" marcado (sem marcação NÃO dá acesso — salário é sigiloso; SQL 052)
 export const temRH = () => state.papel === 'admin' || (state.areas || []).includes('rh');
 
+// gancho do modo sem internet (js/lib/offline.js): guarda as leituras das telas de chão de fábrica e responde sem sinal
+export const ganchoQ = { ler: false, ehRede: null, guardar: null, offline: null };
 export async function q(promise) {
-  const { data, error } = await promise;
-  if (error) throw error;
+  const g = ganchoQ.ler && promise && promise.method === 'GET' && promise.url ? ganchoQ : null;
+  let res;
+  try { res = await promise; } catch (e) { if (g && g.ehRede(e)) { const c = await g.offline(promise); if (c !== undefined) return c; } throw e; }
+  const { data, error } = res;
+  if (error) { if (g && g.ehRede(error, res.status)) { const c = await g.offline(promise); if (c !== undefined) return c; } throw error; }
+  if (g) g.guardar(promise, data);
   return data;
 }
 
@@ -51,6 +57,11 @@ export async function loadCadastros(force = false) {
 }
 async function carregarCadastros() {
   const e = state.empresa.id;
+  // sem internet: as telas de chão de fábrica não usam os cadastros financeiros; seguem com a lista vazia
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    state.cad = { plano: [], classes: [], contasPlano: [], contas: [], favorecidos: [], cc: [], grupos: [], planoById: {}, contaById: {}, favById: {}, ccById: {}, grupoById: {}, _offline: true };
+    return state.cad;
+  }
   const [plano, contas, favorecidos, cc, grupos] = await Promise.all([
     fetchAll(() => sb.from('plano_contas').select('*').eq('empresa_id', e).order('codigo')),
     q(sb.from('contas').select('*').eq('empresa_id', e).order('codigo', { nullsFirst: false }).order('nome')),

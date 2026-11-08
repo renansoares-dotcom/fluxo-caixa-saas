@@ -11,13 +11,18 @@ const cont = {};
 for (const [m, rota, , leg, aba] of FIGS) {
   const n = cont[m] = (cont[m] || 0) + 1; if (so && !so.includes(m)) continue;
   await p.evaluate((r) => { document.querySelectorAll('.modal-back, .cp-drawer-back').forEach(m => m.remove()); location.hash = '#/x'; setTimeout(() => { location.hash = '#/' + r; }, 50); }, rota); await p.waitForTimeout(2000);
-  // passos separados por "|": aba (data-a), click:<seletor> ou scroll:<seletor>, na ordem
+  // passos separados por "|": aba (data-a), click:<seletor>, scroll:<seletor>, fill:<seletor>=<valor>, offline ou online, na ordem
   if (aba) for (const passo of aba.split('|')) {
-    if (passo.startsWith('scroll:')) { await p.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'start' }), passo.slice(7)); await p.waitForTimeout(300); }
+    if (passo === 'offline' || passo === 'online') { await p.context().setOffline(passo === 'offline'); await p.evaluate((o) => window.dispatchEvent(new Event(o)), passo); await p.waitForTimeout(500); }
+    else if (passo.startsWith('fill:')) { const [sel, val] = passo.slice(5).split('='); await p.fill(sel, val); }
+    else if (passo.startsWith('scroll:')) { await p.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'start' }), passo.slice(7)); await p.waitForTimeout(300); }
     else { await p.click(passo.startsWith('click:') ? passo.slice(6) : `[data-a="${passo}"]`); await p.waitForTimeout(800); }
   }
   await p.evaluate((rolou) => { document.querySelectorAll('#toast-root > *').forEach(t => t.remove()); if (!rolou) scrollTo(0, 0); }, !!aba?.includes('scroll:'));
   await p.screenshot({ path: `${OUT}${m}-${n}.jpg`, type: 'jpeg', quality: 80 });
+  // depois de uma figura sem internet: esvazia a fila do aparelho e volta o sinal
+  if (aba?.includes('offline')) { await p.evaluate(() => new Promise(r => { const o = indexedDB.open('iplamm-offline'); o.onsuccess = () => { try { const t = o.result.transaction('fila', 'readwrite'); t.objectStore('fila').clear(); t.oncomplete = () => r(); } catch { r(); } }; o.onerror = () => r(); }));
+    await p.context().setOffline(false); await p.waitForTimeout(300); }
   console.log(`${m}-${n}.jpg  ${leg}`);
 }
 await b.close();

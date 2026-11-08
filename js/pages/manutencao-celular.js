@@ -3,6 +3,7 @@
 import { sb, state, q } from '../lib/data.js';
 import { $, $$, esc, toast, fail, parseNum, today } from '../lib/ui.js';
 import * as M from '../lib/manutencao.js';
+import { gravar, novoId } from '../lib/offline.js';
 import { carregarManutencao, fichaOS, nomeEq, selo, clsSit, clsPrio, CSS, BUCKET } from '../lib/manutencao-ui.js';
 
 export const title = 'Manutenção no Celular';
@@ -41,12 +42,16 @@ function pedir(root) {
     if (!sel) return toast('Escolha o equipamento', true); if (!desc) return toast('Diga o que está acontecendo', true);
     const eq = D.eById[sel], btn = $('#mc-ok', c); btn.disabled = true;
     try {
-      const [o] = await q(sb.from('man_ordens').insert({ empresa_id: state.empresa.id, equipamento_id: sel, tipo: 'corretiva', origem: 'solicitacao', situacao: 'solicitada', descricao: desc,
-        prioridade: parou ? (eq.criticidade === 'A' ? 'emergencia' : 'alta') : 'media', maquina_parou: parou, parada_inicio: parou ? new Date().toISOString() : null, solicitante: state.user?.email || null }).select());
-      const f = $('#mc-f', c).files[0];
-      if (f) { const cam = `${state.empresa.id}/os/${o.id}/${Date.now()}-foto.${(f.name.split('.').pop() || 'jpg').toLowerCase()}`; const { error } = await sb.storage.from(BUCKET).upload(cam, f);
-        if (!error) await q(sb.from('man_anexos').insert({ empresa_id: state.empresa.id, ordem_id: o.id, caminho: cam, nome: f.name, tipo: 'foto' })); }
-      c.innerHTML = `<div class="card" style="text-align:center;padding:30px"><div style="font-size:48px">✔</div><h2>Pedido enviado</h2><p>OS <b>${o.numero}</b> — ${esc(eq.codigo)} · ${esc(eq.nome)}</p>${selo(M.PRIORIDADES[o.prioridade], clsPrio(o.prioridade))}
+      // modo sem internet (melhoria 1.5): o pedido e a foto ficam no aparelho e sobem quando o sinal voltar
+      const o = { id: novoId(), empresa_id: state.empresa.id, equipamento_id: sel, tipo: 'corretiva', origem: 'solicitacao', situacao: 'solicitada', descricao: desc,
+        prioridade: parou ? (eq.criticidade === 'A' ? 'emergencia' : 'alta') : 'media', maquina_parou: parou, parada_inicio: parou ? new Date().toISOString() : null, solicitante: state.user?.email || null, solicitada_em: new Date().toISOString() };
+      const f = $('#mc-f', c).files[0], ops = [{ t: 'insert', tabela: 'man_ordens', valores: o }];
+      if (f) { const cam = `${state.empresa.id}/os/${o.id}/${Date.now()}-foto.${(f.name.split('.').pop() || 'jpg').toLowerCase()}`;
+        ops.push({ t: 'upload', bucket: BUCKET, caminho: cam, arquivo: f }, { t: 'insert', tabela: 'man_anexos', valores: { id: novoId(), empresa_id: state.empresa.id, ordem_id: o.id, caminho: cam, nome: f.name, tipo: 'foto' } }); }
+      const r = await gravar(`Pedido de manutenção: ${eq.codigo}`, ops);
+      if (!r.pendente) { try { o.numero = (await q(sb.from('man_ordens').select('numero').eq('id', o.id)))[0]?.numero; } catch {} }
+      c.innerHTML = `<div class="card" style="text-align:center;padding:30px"><div style="font-size:48px">${r.pendente ? '⏳' : '✔'}</div><h2>${r.pendente ? 'Pedido guardado no aparelho' : 'Pedido enviado'}</h2>
+        <p>${r.pendente ? '' : `OS <b>${o.numero ?? ''}</b> — `}${esc(eq.codigo)} · ${esc(eq.nome)}</p>${r.pendente ? '<p class="small muted">Sem internet agora. O pedido vai para a manutenção assim que o sinal voltar; o número da OS sai nessa hora.</p>' : ''}${selo(M.PRIORIDADES[o.prioridade], clsPrio(o.prioridade))}
         <button class="btn grande" id="mc-mais">Fazer outro pedido</button></div>`;
       $('#mc-mais', c).onclick = () => render(root);
     } catch (err) { btn.disabled = false; fail(err); }
@@ -65,12 +70,14 @@ function fila(root) {
   c.onclick = async (ev) => {
     const card = ev.target.closest('[data-os]'); if (!card) return; const o = D.O.find(x => x.id === card.dataset.os), re = () => render(root);
     try {
-      if (ev.target.closest('[data-ini]')) { await q(sb.from('man_ordens').update({ situacao: 'em_execucao', inicio: o.inicio || new Date().toISOString(), responsavel: o.responsavel || state.user?.user_metadata?.nome || state.user?.email }).eq('id', o.id)); toast(`OS ${o.numero} iniciada`); re(); }
-      else if (ev.target.closest('[data-ag]')) { await q(sb.from('man_ordens').update({ situacao: 'aguardando_peca' }).eq('id', o.id)); toast('Marcada como aguardando peça'); re(); }
+      const ok = (r, msg) => toast(r.pendente ? `${msg} — sem internet: guardado no aparelho` : msg);
+      if (ev.target.closest('[data-ini]')) { ok(await gravar(`Início da OS ${o.numero ?? ''}`, [{ t: 'update', tabela: 'man_ordens', id: o.id, valores: { situacao: 'em_execucao', inicio: o.inicio || new Date().toISOString(), responsavel: o.responsavel || state.user?.user_metadata?.nome || state.user?.email } }]), `OS ${o.numero ?? ''} iniciada`); re(); }
+      else if (ev.target.closest('[data-ag]')) { ok(await gravar(`OS ${o.numero ?? ''} aguardando peça`, [{ t: 'update', tabela: 'man_ordens', id: o.id, valores: { situacao: 'aguardando_peca' } }]), 'Marcada como aguardando peça'); re(); }
       else if (ev.target.closest('[data-h]')) {
         const v = prompt('Quantas horas você trabalhou nesta OS? (ex.: 1,5)'); const h = parseNum(v || ''); if (!(h > 0)) return;
-        await q(sb.from('man_os_horas').insert({ empresa_id: state.empresa.id, ordem_id: o.id, tecnico: state.user?.user_metadata?.nome || state.user?.email || 'Técnico', data: today(), horas: h, custo_hora: +D.P.custo_hora || 0 })); toast('Horas lançadas');
+        ok(await gravar(`Horas na OS ${o.numero ?? ''}`, [{ t: 'insert', tabela: 'man_os_horas', conflito: 'sync_id', valores: { sync_id: novoId(), empresa_id: state.empresa.id, ordem_id: o.id, tecnico: state.user?.user_metadata?.nome || state.user?.email || 'Técnico', data: today(), horas: h, custo_hora: +D.P.custo_hora || 0 } }]), 'Horas lançadas');
       }
+      else if (navigator.onLine === false) toast('Concluir e abrir a ficha precisam de internet. Iniciar, aguardando peça e horas funcionam sem sinal.', true);
       else fichaOS(D, o, { onMudou: re }); // concluir e abrir usam a ficha completa (falha, causa, solução, checklist, peças, foto)
     } catch (err) { fail(err); }
   };
