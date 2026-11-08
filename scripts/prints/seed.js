@@ -1580,3 +1580,13 @@ window.RPC.pag_remessa_gravar = () => null;
   });
   window.RPC.prod_prontidao = () => window.__progRows;
 }
+
+// Desempenho (SQL 123) — tempos de abertura FICTÍCIOS
+{
+  DB.uso_config = [{ empresa_id: E, ativo: true, guardar_dias: 180, rejeicao_segundos: 10, limite_ms: 2000, cache_cadastros: true }];
+  const T = (rota, cargas, usuarios, p50, p90, pior, pct) => ({ rota, cargas, usuarios, p50, p90, pior, pct_acima: pct });
+  window.RPC.desempenho_resumo = () => ({ limite_ms: 2000, total: 4870, acima: 312, p50: 640, p90: 1580,
+    telas: [T('fluxo-mensal', 210, 4, 1900, 3400, 7200, 38.1), T('lancamentos', 1320, 6, 820, 2350, 5100, 14.2), T('estoque/kardex', 180, 3, 1100, 2100, 3900, 11.7),
+      T('dashboard', 640, 7, 700, 1500, 2600, 4.1), T('producao/terminal', 1450, 9, 380, 900, 1800, 0), T('hoje', 760, 8, 420, 880, 1500, 0), T('producao/ordens', 310, 5, 510, 1100, 2200, 1.3)],
+    dias: [] });
+}

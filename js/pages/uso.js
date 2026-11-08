@@ -8,7 +8,7 @@ import { fmtTempo, perfisResumo, telasSemUso, taxaDesistencia, periodo } from '.
 
 export const title = 'Uso da Plataforma';
 const PAPEIS = { admin: 'Administrador', diretor: 'Diretor', financeiro: 'Financeiro', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção' };
-const ABAS = [['telas', 'Telas'], ['perfis', 'Perfis'], ['pessoas', 'Pessoas'], ['forms', 'Onde desistem'], ['erros', 'Erros'], ['sem', 'Telas sem uso']];
+const ABAS = [['telas', 'Telas'], ['perfis', 'Perfis'], ['pessoas', 'Pessoas'], ['forms', 'Onde desistem'], ['erros', 'Erros'], ['sem', 'Telas sem uso'], ['desempenho', 'Desempenho']];
 const ui = { dias: 30, de: null, ate: null, papel: '', aba: 'telas' };
 
 // nome e área da tela pelo menu (o mesmo nome que aparece para quem usa)
@@ -38,6 +38,8 @@ export async function render(root) {
   let R;
   try { R = await q(sb.rpc('uso_resumo', { p_empresa: state.empresa.id, p_de: p.de, p_ate: p.ate, p_papel: ui.papel || null })); }
   catch (err) { fail(err); $('#us-corpo', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Confira se o SQL 099 já foi executado.</div></div>'; return; }
+  // tempo de abertura das telas (melhoria 1.9, SQL 123)
+  try { R.desempenho = await q(sb.rpc('desempenho_resumo', { p_empresa: state.empresa.id, p_de: p.de, p_ate: p.ate })); } catch { R.desempenho = null; }
   const M = menuTelas(), k = R.kpis || {};
   const pctAb = k.forms ? Math.round(100 * k.abandonos / k.forms) : 0;
   const dias = R.dias || [], maxU = Math.max(1, ...dias.map(d => +d.usuarios));
@@ -59,7 +61,22 @@ export async function render(root) {
 const tabela = (cab, linhas, vazio, cols) => `<div class="card flush" style="margin-top:12px"><div class="table-wrap"><table><thead><tr>${cab}</tr></thead><tbody>${linhas || `<tr><td colspan="${cols}" class="empty">${vazio}</td></tr>`}</tbody></table></div></div>`;
 const telaCel = (r, M) => `<b>${esc(nomeTela(r, M))}</b>${codigoDa(r) ? ` <span class="small muted">${codigoDa(r)}</span>` : ''}`;
 
+const seg = (ms) => (ms == null ? '—' : (ms / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' s');
 const pintar = {
+  desempenho: (R, M) => {
+    const D = R.desempenho;
+    if (!D) return '<div class="card" style="margin-top:12px"><div class="empty">O tempo de abertura das telas começa a ser medido depois do SQL 123.</div></div>';
+    const lim = +D.limite_ms || 2000, pct = D.total ? Math.round(100 * D.acima / D.total) : 0;
+    return `<div class="kpis" style="margin-top:12px"><div class="kpi"><div class="k-label">Aberturas medidas</div><div class="k-value">${(D.total || 0).toLocaleString('pt-BR')}</div></div>
+        <div class="kpi"><div class="k-label">Mediana</div><div class="k-value">${seg(D.p50)}</div><div class="k-sub">metade abre mais rápido que isso</div></div>
+        <div class="kpi"><div class="k-label">p90</div><div class="k-value ${D.p90 > lim ? 'neg' : ''}">${seg(D.p90)}</div><div class="k-sub">9 em cada 10 aberturas</div></div>
+        <div class="kpi"><div class="k-label">Acima de ${seg(lim)}</div><div class="k-value ${pct >= 10 ? 'neg' : ''}">${pct}%</div><div class="k-sub">${D.acima || 0} abertura(s)</div></div></div>`
+      + tabela(`<th>Tela</th><th class="num">Aberturas</th><th class="num">Pessoas</th><th class="num">Mediana</th><th class="num">p90</th><th class="num">Pior</th><th>Acima de ${seg(lim)}</th>`,
+        (D.telas || []).map(t => `<tr><td class="wrap">${telaCel(t.rota, M)}${t.p90 > lim ? ' <span class="badge vencido">lenta</span>' : ''}</td><td class="num">${t.cargas}</td><td class="num">${t.usuarios}</td>
+          <td class="num">${seg(t.p50)}</td><td class="num ${t.p90 > lim ? 'neg' : ''}">${seg(t.p90)}</td><td class="num">${seg(t.pior)}</td><td style="min-width:110px">${barra(+t.pct_acima, +t.pct_acima >= 10 ? 'var(--neg)' : 'var(--muted)')}</td></tr>`).join(''),
+        'Nenhuma abertura medida no período.', 7)
+      + `<p class="small muted">Tempo do clique no menu até a tela desenhada, no aparelho de quem usou (inclui a internet). A tela fica marcada como <b>lenta</b> quando o p90 passa do limite (Parâmetros). Comece pelas lentas mais abertas.</p>`;
+  },
   telas: (R, M) => {
     const rej = R.rejeicao_segundos || 10, max = Math.max(1, ...(R.telas || []).map(t => +t.segundos));
     return tabela(`<th>Tela</th><th class="num">Aberturas</th><th class="num">Pessoas</th><th>Tempo total</th><th class="num">Média por visita</th><th title="Visitas de menos de ${rej} s">Saiu logo</th>`,
@@ -102,13 +119,17 @@ async function parametros(depois) {
       <label class="chk" style="flex-direction:row;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="up-at" style="width:auto;min-height:0" ${c.ativo !== false ? 'checked' : ''}> Registrar o uso da plataforma</label>
       <label>Guardar os registros por (dias)<input type="number" id="up-dias" min="30" max="730" value="${c.guardar_dias || 180}"><span class="small muted">De 30 a 730. Depois disso são apagados, todo dia de manhã.</span></label>
       <label>"Saiu logo" = visita de menos de (segundos)<input type="number" id="up-rej" min="3" max="120" value="${c.rejeicao_segundos || 10}"></label>
+      ${'limite_ms' in c || !Object.keys(c).length ? `<label>Tela lenta: abre em mais de (segundos)<input type="number" id="up-lim" min="0.3" max="30" step="0.1" value="${(c.limite_ms || 2000) / 1000}"></label>
+      <label class="chk" style="flex-direction:row;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="up-cache" style="width:auto;min-height:0" ${c.cache_cadastros !== false ? 'checked' : ''}> Guardar os cadastros financeiros no navegador (abre as telas mais rápido)</label>` : ''}
       <div class="small muted">Desligado, nada mais é gravado; o que já foi registrado continua no relatório até o prazo de guarda.</div></div>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="up-ok">Salvar</button>' });
   $('#up-ok', m.el).onclick = async () => {
     const dias = +$('#up-dias', m.el).value, rej = +$('#up-rej', m.el).value;
     if (!(dias >= 30 && dias <= 730)) return toast('Guarda: de 30 a 730 dias', true);
     if (!(rej >= 3 && rej <= 120)) return toast('"Saiu logo": de 3 a 120 segundos', true);
-    try { await q(sb.from('uso_config').upsert({ empresa_id: state.empresa.id, ativo: $('#up-at', m.el).checked, guardar_dias: dias, rejeicao_segundos: rej, atualizado_por: state.user?.email, atualizado_em: new Date().toISOString() })); toast('Parâmetros salvos'); m.close(); depois(); }
+    const reg = { empresa_id: state.empresa.id, ativo: $('#up-at', m.el).checked, guardar_dias: dias, rejeicao_segundos: rej, atualizado_por: state.user?.email, atualizado_em: new Date().toISOString() };
+    if ($('#up-lim', m.el)) { const l = Math.round(parseFloat($('#up-lim', m.el).value) * 1000); if (!(l >= 300 && l <= 30000)) return toast('Tela lenta: de 0,3 a 30 segundos', true); reg.limite_ms = l; reg.cache_cadastros = $('#up-cache', m.el).checked; }
+    try { await q(sb.from('uso_config').upsert(reg)); toast('Parâmetros salvos'); m.close(); depois(); }
     catch (e) { fail(e); }
   };
 }

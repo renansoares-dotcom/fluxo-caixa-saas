@@ -1,8 +1,8 @@
 ---
 titulo: Uso da Plataforma
 tela: Cadastros › Uso da Plataforma (CAD010)
-versao: 1.0
-atualizado: 2026-11-07
+versao: 1.1
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -28,7 +28,8 @@ A própria plataforma registra, sem você fazer nada:
 
 - **a tela aberta** e o **tempo com ela à frente**. Não contam o tempo com a aba escondida (outra aba ou janela à frente) nem o tempo parado: depois de 5 minutos sem mexer o mouse ou o teclado, o relógio para;
 - **os formulários** (janelas com campos e botão de salvar): se foram **concluídos** (salvos) ou **abandonados** (fechados pelo ✕ ou clicando fora);
-- **as mensagens de erro** e de aviso em vermelho, com os números trocados por # para agrupar mensagens iguais.
+- **as mensagens de erro** e de aviso em vermelho, com os números trocados por # para agrupar mensagens iguais;
+- **o tempo de abertura de cada tela**, do clique no menu até a tela desenhada, em milésimos de segundo.
 
 **Não é gravado o que foi digitado.** Os registros são guardados por 180 dias (ajustável) e apagados depois, todo dia de manhã.
 
@@ -110,9 +111,27 @@ As telas do menu que **ninguém abriu** no período (ou o perfil escolhido). Pod
 - falta de treinamento;
 - tela que não faz falta para aquele perfil.
 
+### 5.7 Desempenho
+
+![Figura 4 — Desempenho: quanto cada tela demora para abrir, do pior p90 para o melhor (dados fictícios)](img/uso-plataforma-4.jpg)
+
+Mostra quanto as telas demoram para abrir no aparelho de quem usa (inclui a internet):
+
+- **Mediana**: metade das aberturas foi mais rápida que isso;
+- **p90**: 9 em cada 10 aberturas foram mais rápidas que isso. É o número que mostra a lentidão que as pessoas sentem;
+- **Pior**: a abertura mais demorada no período;
+- **Acima do limite**: a fatia das aberturas que passou do limite (padrão 2 segundos).
+
+A tela fica marcada como **lenta** quando o p90 passa do limite. A lista vem da mais lenta para a mais rápida: comece pelas lentas mais abertas e avise o suporte da plataforma.
+
+Para as telas abrirem mais rápido, a plataforma:
+
+- guarda no navegador os cadastros financeiros (plano de contas, contas, favorecidos, centros de custo e grupos) e só baixa de novo quando algum muda. Ao sair da plataforma, a cópia é apagada;
+- soma no banco os totais do topo da tela Lançamentos, em vez de baixar todas as linhas.
+
 ## 6. Parâmetros
 
-![Figura 4 — Parâmetros do uso da plataforma (dados fictícios)](img/uso-plataforma-4.jpg)
+![Figura 5 — Parâmetros do uso da plataforma (dados fictícios)](img/uso-plataforma-5.jpg)
 
 Em **Parâmetros**:
 
@@ -121,6 +140,8 @@ Em **Parâmetros**:
 | Registrar o uso da plataforma | Ligado | Desligado, nada mais é gravado. O que já foi registrado continua até o prazo de guarda. |
 | Guardar os registros por | 180 dias | De 30 a 730 dias. Depois são apagados. |
 | "Saiu logo" | 10 segundos | De 3 a 120. Visitas mais curtas que isso contam como "saiu logo". |
+| Tela lenta | 2 segundos | De 0,3 a 30. Tela com p90 acima disso fica marcada como lenta na aba Desempenho. |
+| Guardar os cadastros financeiros no navegador | Ligado | Abre as telas mais rápido. Desligado, os cadastros são baixados a cada entrada. |
 
 ## 7. Privacidade (LGPD)
 
@@ -136,6 +157,8 @@ Em **Parâmetros**:
 
 **O tempo parece baixo.** Só conta o tempo com a tela à frente e com alguém mexendo. Aba escondida e mais de 5 minutos parado não contam.
 
+**Uma tela aparece como lenta só para uma pessoa.** Veja o aparelho e a internet dela: o tempo medido é o do aparelho de quem usou.
+
 **Um formulário salvo apareceu como abandonado.** Acontece quando a pessoa salva e depois fecha outra janela pelo ✕. Olhe a taxa, não um caso isolado.
 
 ## 9. Histórico de alterações
@@ -143,3 +166,4 @@ Em **Parâmetros**:
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão: telas, perfis, pessoas, onde desistem, erros, telas sem uso, parâmetros e privacidade. |
+| 1.1 | 08/11/2026 | Nova aba Desempenho: tempo de abertura de cada tela (mediana, p90, pior e acima do limite), tela lenta, limite e cache dos cadastros nos parâmetros. Totais dos Lançamentos somados no banco. |

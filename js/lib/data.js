@@ -55,13 +55,34 @@ export async function loadCadastros(force = false) {
   cadPendente = carregarCadastros().finally(() => { cadPendente = null; });
   return cadPendente;
 }
+// cache dos cadastros no navegador (melhoria 1.9): guardados no IndexedDB com a impressão digital do banco
+// (cadastros_assinatura, SQL 123); só baixa de novo quando algum cadastro mudou
+const IDB = 'iplamm-cadastros';
+function cadIdb(modo, chave, valor) {
+  return new Promise((ok) => {
+    try {
+      const r = indexedDB.open(IDB, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('c');
+      r.onsuccess = () => { try { const t = r.result.transaction('c', modo), st = t.objectStore('c'), g = modo === 'readonly' ? st.get(chave) : st.put(valor, chave);
+        t.oncomplete = () => { ok(g.result); r.result.close(); }; t.onerror = () => ok(null); } catch { ok(null); } };
+      r.onerror = () => ok(null);
+    } catch { ok(null); }
+  });
+}
+/** ao sair: apaga os cadastros guardados neste navegador (dados de favorecidos não ficam no aparelho) */
+export function limparCacheCadastros() { try { indexedDB.deleteDatabase(IDB); } catch {} }
 async function carregarCadastros() {
-  const e = state.empresa.id;
-  // sem internet: as telas de chão de fábrica não usam os cadastros financeiros; seguem com a lista vazia
+  const e = state.empresa.id, chave = 'cad-' + e;
+  // sem internet: os últimos cadastros guardados (ou a lista vazia — as telas de chão de fábrica não precisam deles)
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    const c = await cadIdb('readonly', chave);
+    if (c?.dados) return montarCad(c.dados, true);
     state.cad = { plano: [], classes: [], contasPlano: [], contas: [], favorecidos: [], cc: [], grupos: [], planoById: {}, contaById: {}, favById: {}, ccById: {}, grupoById: {}, _offline: true };
     return state.cad;
   }
+  let ass = null;
+  try { const r = await sb.rpc('cadastros_assinatura', { p_empresa: e }); ass = r.error ? null : r.data; } catch { /* sem o SQL 123: baixa tudo */ }
+  if (ass) { const c = await cadIdb('readonly', chave); if (c?.ass === ass && c.dados) return montarCad(c.dados); }
   const [plano, contas, favorecidos, cc, grupos] = await Promise.all([
     fetchAll(() => sb.from('plano_contas').select('*').eq('empresa_id', e).order('codigo')),
     q(sb.from('contas').select('*').eq('empresa_id', e).order('codigo', { nullsFirst: false }).order('nome')),
@@ -69,6 +90,11 @@ async function carregarCadastros() {
     q(sb.from('centros_custo').select('*').eq('empresa_id', e).order('nome')),
     q(sb.from('grupos').select('*').eq('empresa_id', e).order('nome')),
   ]);
+  const dados = { plano, contas, favorecidos, cc, grupos };
+  if (ass) cadIdb('readwrite', chave, { ass, dados, em: Date.now() });
+  return montarCad(dados);
+}
+function montarCad({ plano, contas, favorecidos, cc, grupos }, offline = false) {
   const byId = (arr) => Object.fromEntries(arr.map(x => [x.id, x]));
   plano.forEach(p => p.label = `${p.codigo} - ${p.nome}`);
   favorecidos.forEach(f => f.label = `${f.sigla ? f.sigla + ' - ' : ''}${f.nome}`);
@@ -77,6 +103,7 @@ async function carregarCadastros() {
   state.cad = {
     plano, classes, contasPlano, contas, favorecidos, cc, grupos,
     planoById: byId(plano), contaById: byId(contas), favById: byId(favorecidos), ccById: byId(cc), grupoById: byId(grupos),
+    ...(offline ? { _offline: true } : {}),
   };
   return state.cad;
 }

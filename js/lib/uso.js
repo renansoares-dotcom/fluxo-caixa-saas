@@ -6,7 +6,7 @@ import { ganchos } from './ui.js';
 import { normalizarTexto, rotaLimpa } from './uso-calc.js';
 
 const OCIOSO = 5 * 60e3, ENVIO = 30e3;
-let fila = [], atual = null, ligado = false, relogio = null, envio = null, ultimoGesto = Date.now(), ultimoErro = '';
+let fila = [], atual = null, ligado = false, medir = false, relogio = null, envio = null, ultimoGesto = Date.now(), ultimoErro = '';
 
 const gesto = () => { ultimoGesto = Date.now(); };
 const ativoAgora = () => document.visibilityState === 'visible' && Date.now() - ultimoGesto < OCIOSO;
@@ -28,7 +28,13 @@ export async function enviarUso() {
 export async function iniciarUso() {
   pararUso();
   ligado = true;
-  try { const { data } = await sb.from('uso_config').select('ativo').eq('empresa_id', state.empresa.id).maybeSingle(); if (data && !data.ativo) ligado = false; } catch { /* sem a tabela: o insert desliga */ }
+  medir = false;
+  try {
+    let r = await sb.from('uso_config').select('ativo,limite_ms').eq('empresa_id', state.empresa.id).maybeSingle();
+    if (r.error) r = await sb.from('uso_config').select('ativo').eq('empresa_id', state.empresa.id).maybeSingle();   // sem o SQL 123: não mede a carga
+    else medir = true;
+    if (r.data && !r.data.ativo) ligado = false;
+  } catch { /* sem a tabela: o insert desliga */ }
   if (!ligado) return;
   ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => document.addEventListener(ev, gesto, { passive: true, capture: true }));
   relogio = setInterval(() => { if (atual && ativoAgora()) atual.seg++; }, 1000);
@@ -42,6 +48,8 @@ export function pararUso() {
   ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => document.removeEventListener(ev, gesto, { capture: true }));
   ganchos.form = ganchos.erro = null; ligado = false;
 }
+/** tempo de abertura da tela, em ms (melhoria 1.9, SQL 123): do clique até a tela desenhada */
+export function cargaUso(rota, ms) { if (medir && ms >= 0 && ms < 600000) evento('carga', rota, { ms: Math.round(ms) }); }
 // chamada a cada troca de tela (js/app.js › render)
 export function telaUso(rota) {
   if (!ligado) return;

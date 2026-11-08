@@ -1,4 +1,4 @@
-import { sb, state, q, loadCadastros, anosSelect, temArea, temRH } from './lib/data.js';
+import { sb, state, q, loadCadastros, anosSelect, temArea, temRH, limparCacheCadastros } from './lib/data.js';
 import { $, $$, esc, toast, fail, formData, loading, lerCores, modal } from './lib/ui.js';
 import { SUPABASE_URL } from './config.js';
 import { iniciarNotificacoes, pararNotificacoes } from './lib/notif.js';
@@ -13,7 +13,7 @@ import { esquecerRegimes } from './lib/regime.js';
 import { abrirLancamento } from './lib/lanc-form.js';
 import { montarMenu, marcarTela, modoPainel, cliqueArea, fecharPainel } from './lib/menu.js';
 import { codigoDa } from './lib/telas.js';
-import { iniciarUso, pararUso, telaUso } from './lib/uso.js';
+import { iniciarUso, pararUso, telaUso, cargaUso } from './lib/uso.js';
 import { exigirTermo } from './lib/lgpd-termo.js';
 import { iniciarOffline, guardarEntrada, lerEntrada } from './lib/offline.js';
 
@@ -217,7 +217,7 @@ function trocarSenha(recuperacao = false) {
 }
 $('#trocar-senha').onclick = () => trocarSenha(false);
 
-const logout = async () => { pararUso(); pararNotificacoes(); fecharMini(); pararChat(); await sb.auth.signOut(); location.hash = ''; };
+const logout = async () => { limparCacheCadastros(); pararUso(); pararNotificacoes(); fecharMini(); pararChat(); await sb.auth.signOut(); location.hash = ''; };
 $('#logout').onclick = logout; $('#logout-2').onclick = logout;
 $('#mfa-btn') && ($('#mfa-btn').onclick = () => gerenciarMFA());
 // balão do topo: no computador abre o mini-chat por cima da tela; no celular vai para a tela Conversas
@@ -373,7 +373,7 @@ async function render() {
   }
   $('#sidebar').classList.remove('open'); $('#sidebar-backdrop').hidden = true; document.body.classList.remove('menu-aberto');
   const old = $('#page'); const page = old.cloneNode(false); old.replaceWith(page); loading(page);
-  const seq = ++renderSeq;
+  const seq = ++renderSeq, t0 = performance.now();   // tempo de abertura da tela (melhoria 1.9)
   try {
     const mod = await loader();
     if (seq !== renderSeq) return;
@@ -394,6 +394,7 @@ async function render() {
     if (seq !== renderSeq) return;
     page.innerHTML = '';
     await mod.render(page);
+    if (seq === renderSeq) cargaUso(route, performance.now() - t0);
     if (state.abrir?.tipo === 'lancamento') { const id = state.abrir.id; delete state.abrir; abrirLancamentoPorId(id); }
   } catch (e) { fail(e); page.innerHTML = `<div class="card empty">Não foi possível carregar esta tela.<br><span class="small">${esc(e.message || e)}</span></div>`; }
 }

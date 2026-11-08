@@ -156,6 +156,7 @@ export const FIGS = [
   ['uso-plataforma', 'uso', '## 4.', 'Uso da Plataforma: indicadores, pessoas por dia e as telas mais usadas'],
   ['uso-plataforma', 'uso', '### 5.2', 'Perfis: a fatia do tempo de cada perfil nas telas em que ele mais trabalha', 'click:[data-a="perfis"]|scroll:#us-abas'],
   ['uso-plataforma', 'uso', '### 5.4', 'Onde desistem: os formulários abertos, concluídos e abandonados, com a taxa de desistência', 'click:[data-a="forms"]'],
+  ['uso-plataforma', 'uso', '### 5.7', 'Desempenho: quanto cada tela demora para abrir, do pior p90 para o melhor', 'click:[data-a="desempenho"]|scroll:#us-abas'],
   ['uso-plataforma', 'uso', '## 6.', 'Parâmetros do uso da plataforma', 'click:#us-par'],
   // Privacidade e Acessos (07/11/2026)
   ['lgpd-acessos', 'lgpd', '## 3.', 'Acessos: último acesso de cada pessoa, quem vai ser suspenso e os acessos suspensos'],

@@ -99,7 +99,7 @@ function base(sel = '*', opts) {
     const ini = `${state.ano}-${String(f.mes).padStart(2, '0')}-01`;
     const fim = new Date(state.ano, f.mes, 0).getDate();
     qy = qy.gte('data', ini).lte('data', `${state.ano}-${String(f.mes).padStart(2, '0')}-${fim}`);
-  } else qy = qy.eq('ano', state.ano);
+  } else qy = qy.gte('data', `${state.ano}-01-01`).lte('data', `${state.ano}-12-31`);   // pela data (usa o índice), não pelo ano calculado
   if (f.status) qy = qy.eq('status', f.status);
   if (f.classe) qy = qy.eq('classe_id', f.classe);
   // transferência única aparece nas duas contas: na origem (conta_id) e no destino (conta_destino_id)
@@ -112,17 +112,27 @@ function base(sel = '*', opts) {
   return qy;
 }
 
+// totais do topo: somados no banco (SQL 123, melhoria 1.9); sem a função, soma no navegador como antes
+async function totais() {
+  let de = f.de || null, ate = f.ate || null;
+  if (!periodo() && f.mes) { const mm = String(f.mes).padStart(2, '0'); de = `${state.ano}-${mm}-01`; ate = `${state.ano}-${mm}-${new Date(state.ano, f.mes, 0).getDate()}`; }
+  const { data, error } = await sb.rpc('lancamentos_totais', { p_empresa: state.empresa.id, p_ano: state.ano, p_de: de, p_ate: ate, p_status: f.status || null, p_classe: f.classe || null,
+    p_conta: f.conta || null, p_cc: f.cc || null, p_busca: f.busca ? f.busca.replace(/[%,()]/g, ' ').trim() : null });
+  if (!error && data) return { ent: +data.ent, sai: +data.sai, trf: +data.trf };
+  const tot = await fetchAll(() => base('tipo,valor_sinal,valor,status,conta_id,conta_destino_id'));
+  return { ent: tot.filter(t => t.tipo === 'E').reduce((x, t) => x + +t.valor_sinal, 0), sai: tot.filter(t => t.tipo === 'S').reduce((x, t) => x + +t.valor_sinal, 0),
+    trf: tot.filter(t => t.tipo === 'T').reduce((x, t) => x + vS(t), 0) };
+}
+
 async function load(root) {
   const tbl = $('#tbl', root);
   try {
-    const [{ data, count, error }, tot] = await Promise.all([
+    const [{ data, count, error }, T] = await Promise.all([
       base('*', { count: 'exact' }).order('data').order('created_at').range(f.page * PAGE, f.page * PAGE + PAGE - 1),
-      fetchAll(() => base('tipo,valor_sinal,valor,status,conta_id,conta_destino_id')),
+      totais(),
     ]);
     if (error) throw error;
-    const ent = tot.filter(t => t.tipo === 'E').reduce((s, t) => s + +t.valor_sinal, 0);
-    const sai = tot.filter(t => t.tipo === 'S').reduce((s, t) => s + +t.valor_sinal, 0);
-    const trf = tot.filter(t => t.tipo === 'T').reduce((s, t) => s + vS(t), 0);
+    const { ent, sai, trf } = T;
     $('#tot', root).innerHTML = `
       <div class="kpi"><div class="k-label">Lançamentos</div><div class="k-value">${count.toLocaleString('pt-BR')}</div></div>
       <div class="kpi"><div class="k-label">Entradas</div><div class="k-value pos">${money(ent)}</div></div>
