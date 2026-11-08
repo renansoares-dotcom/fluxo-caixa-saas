@@ -91,6 +91,7 @@ const routes = {
   'contab/depara': () => import(`./pages/contab-depara.js?v=${V}`),
   'contab/balanco': () => import(`./pages/contab-balanco.js?v=${V}`),
   'contab/indices': () => import(`./pages/contab-indices.js?v=${V}`),
+  'estoque/implantacao': () => import(`./pages/estoque-implantacao.js?v=${V}`),
   'contab/dre': () => import(`./pages/contab-dre.js?v=${V}`),
   'contab/dfc': () => import(`./pages/contab-dfc.js?v=${V}`),
   'estoque/cadastro-notas': () => import(`./pages/cadastro-notas.js?v=${V}`),
@@ -333,7 +334,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil producao (operador no terminal do setor)
 const rotaDeProducao = (r) => ['hoje', 'orcamento-cc', 'producao/terminal', 'producao/ordens', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
 const rotaDeVendas = (r) => r === 'comercial' || ['hoje', 'orcamento-cc', 'comercial/carteira', 'comercial/funil', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
-const rotaDeCompras = (r) => ['hoje', 'orcamento-cc', 'paraquedas', 'compras', 'estoque', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
+const rotaDeCompras = (r) => ['hoje', 'orcamento-cc', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;

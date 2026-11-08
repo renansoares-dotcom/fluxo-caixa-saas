@@ -1333,3 +1333,31 @@ window.RPC.pag_remessa_gravar = () => null;
       return { conta_id: A[c], saldo_anterior: Math.round((ini[c] || 0) * 100) / 100, debito: Math.round(db * 100) / 100, credito: Math.round(cr * 100) / 100, saldo_atual: Math.round(fim[c] * 100) / 100 }; });
   };
 }
+
+// Implantação do estoque (SQL 112) — situação FICTÍCIA no meio da implantação
+{
+  DB.est_implantacao_config = [];
+  DB.est_implantacao_etapas = [
+    { empresa_id: E, etapa: 'espelho', responsavel: 'Controladoria', prevista: '2026-11-04', observacao: 'Saldo de 31/10 exportado do Iniflex' },
+    { empresa_id: E, etapa: 'cadastro', responsavel: 'Compras', prevista: '2026-11-13' },
+    { empresa_id: E, etapa: 'depara', responsavel: 'Compras', prevista: '2026-11-06' },
+    { empresa_id: E, etapa: 'cfop', responsavel: 'Fiscal', prevista: '2026-11-12' },
+    { empresa_id: E, etapa: 'saldo', responsavel: 'Controladoria', prevista: '2026-11-20' },
+  ];
+  window.RPC.est_implantacao_situacao = (a) => ({
+    desde: a.p_desde || '2025-11-08',
+    espelho: { qtd: 1, data_ref: '2026-10-31', linhas: 1284, valor: 3864210.55, depositos: 6 },
+    locais: { ativos: 14, setores: 3, setores_sem_local: 0 },
+    cadastro: { produtos: 1655, nao_acabados: 767, esp_linhas: 1284, esp_ligadas: 1037, esp_valor: 3864210.55, esp_valor_ligado: 3520114.9, sem_familia: 4 },
+    depara: { qtd: 1102 },
+    prontidao: { resumo: [
+      { sentido: 'entrada', resultado: 'ok', itens: 4120, valor: 21450300 }, { sentido: 'entrada', resultado: 'nao_movimenta', itens: 610, valor: 1880400 },
+      { sentido: 'entrada', resultado: 'sem_produto', itens: 362, valor: 1715200 }, { sentido: 'entrada', resultado: 'sem_regra', itens: 48, valor: 96400 },
+      { sentido: 'saida', resultado: 'ok', itens: 9210, valor: 30875000 }, { sentido: 'saida', resultado: 'nao_movimenta', itens: 130, valor: 412000 },
+      { sentido: 'saida', resultado: 'sem_regra', itens: 21, valor: 58300 } ],
+      cfops_sem_regra: [{ sentido: 'entrada', cfop: '1949', itens: 41, valor: 82100, exemplo: 'PALETE DE MADEIRA (RETORNO)' }, { sentido: 'saida', cfop: '5915', itens: 21, valor: 58300, exemplo: 'CILINDRO PARA CONSERTO' }, { sentido: 'entrada', cfop: '1916', itens: 7, valor: 14300, exemplo: 'RETORNO DE CONSERTO' }] },
+    saldo: { implantado_em: null, movimentos: 0, valor: 0 },
+    automatico: { ligado: false, pendencias: 0 },
+    fechamento: { qtd: 0, ultimo: null },
+  });
+}

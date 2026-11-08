@@ -1,8 +1,8 @@
 ---
 titulo: Estoque e produtos
-tela: Estoque › Posição de Estoque (EST001), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
-versao: 1.5
-atualizado: 2026-11-07
+tela: Estoque › Implantação do Estoque (EST007), Posição de Estoque (EST001), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
+versao: 1.6
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -117,7 +117,52 @@ Use esta tela para cadastrar de uma vez os produtos e os de-paras de todos os it
 
 > A família **Imobilizado** é uma sugestão para máquinas e móveis de valor unitário a partir de R$ 1.200. Confira se é bem do ativo (vai para Contabilidade › Ativo Imobilizado › A imobilizar) ou peça de reposição.
 
-## 6. Regras e travas
+## 6. Implantação do Estoque
+
+![Figura 5 — Implantação do Estoque: quanto falta, o próximo passo e a situação de cada passo (dados fictícios)](img/estoque-5.jpg)
+
+A tela **Implantação do Estoque** acompanha os passos até o estoque da plataforma virar o oficial e andar sozinho pelas notas fiscais. A situação de cada passo é calculada com os números do banco, na hora em que a tela abre (ou em **Atualizar**).
+
+No alto ficam:
+
+- o **percentual concluído** da empresa;
+- o **próximo passo**, com o que fazer;
+- quanto das **entradas** e das **saídas** dos últimos meses já está pronto para movimentar o estoque.
+
+Os nove passos:
+
+| Passo | Concluído quando | Onde fazer |
+|---|---|---|
+| 1. Saldo do Iniflex importado | Há um espelho importado. | Posição de Estoque (EST001) |
+| 2. Locais e setores | Há locais ativos e todo setor da produção tem um local "em processo". | Parâmetros do Estoque (EST005) |
+| 3. Materiais cadastrados | O valor do espelho ligado a produtos atinge a meta (padrão 95%). | Cadastro pelas Notas de Entrada (EST006) |
+| 4. De-para das compras | O valor das entradas com produto atinge a meta (padrão 90%). | Cadastro pelas Notas de Entrada (EST006) |
+| 5. Regras dos CFOPs | Nenhum CFOP das notas fica sem regra. | Cadastro pelas Notas de Entrada (EST006) |
+| 6. Vendas prontas | O valor das saídas prontas atinge a meta (padrão 98%). | Produtos (EST003) |
+| 7. Saldo inicial implantado | O saldo foi implantado no Kardex. Fica liberado quando os passos 1, 3, 4 e 5 estão concluídos. | Kardex (EST002) |
+| 8. Automático e pendências | O automático está ligado e não há pendência aberta. | Kardex (EST002) |
+| 9. Primeiro mês fechado | Há ao menos um mês do estoque fechado. | Kardex (EST002) |
+
+Cada passo mostra:
+
+- a **situação**: concluído, em andamento, a fazer ou aguardando o passo anterior;
+- a **barra** de quanto falta;
+- os **números**: linhas do espelho ligadas, itens sem produto, CFOPs sem regra, pendências;
+- **o que fazer**, enquanto não estiver concluído;
+- o botão para a **tela onde fazer** (o do próximo passo fica destacado).
+
+Em **Responsável e prazo** (administrador e financeiro), informe quem faz o passo, a data prevista e uma observação. Passo com data vencida e não concluído aparece como **atrasado**. Marque **Este passo não se aplica** quando a empresa não precisar dele (por exemplo, uma transportadora sem estoque de materiais).
+
+Os **CFOPs sem regra** aparecem numa tabela no fim da tela, com o número de itens, o valor e um exemplo de produto.
+
+Em **Metas**, ajuste:
+
+- o percentual do valor do espelho que precisa estar cadastrado;
+- o percentual do valor das entradas com produto (de-para);
+- o percentual do valor das saídas prontas;
+- quantos meses de notas entram na análise (padrão 12).
+
+## 7. Regras e travas
 
 - O código e a descrição são obrigatórios no produto.
 - O custo de reposição só existe para itens com de-para.
@@ -126,7 +171,7 @@ Use esta tela para cadastrar de uma vez os produtos e os de-paras de todos os it
 - Trocar o código de um produto para o do Iniflex liga na hora as linhas do espelho com esse código.
 - A prontidão das notas não grava nada: é uma simulação com as regras de hoje.
 
-## 7. Perguntas frequentes e erros comuns
+## 8. Perguntas frequentes e erros comuns
 
 **O valor do estoque está zerado num item.** O item não tem de-para nem custo no Iniflex. Faça o de-para.
 
@@ -134,7 +179,7 @@ Use esta tela para cadastrar de uma vez os produtos e os de-paras de todos os it
 
 **Importei o espelho errado.** Exclua em **Espelhos** e importe de novo.
 
-## 8. Histórico de alterações
+## 9. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
@@ -144,3 +189,4 @@ Use esta tela para cadastrar de uma vez os produtos e os de-paras de todos os it
 | 1.3 | 31/10/2026 | Estoque oficial na plataforma (Kardex). Produto com família, tipo do item no SPED, local padrão e controle de lote; o cadastro pelas notas de saída já entra classificado. |
 | 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Novo produto em quatro seções; o rótulo "Fator (1 un. de compra = ? un.)" passou a **Fator de compra**. Figuras refeitas. |
 | 1.5 | 07/11/2026 | Nova tela Cadastro pelas Notas de Entrada: prontidão das notas para o estoque, produtos propostos por família com curva ABC, o mesmo material de fornecedores diferentes num produto só, fator pela embalagem, código do Iniflex pelo espelho, regras de classificação editáveis e criação de regra de CFOP. |
+| 1.6 | 08/11/2026 | Nova tela Implantação do Estoque (EST007): os nove passos até o estoque oficial, com a situação calculada, o próximo passo, responsável, prazo, metas ajustáveis e os CFOPs sem regra. |

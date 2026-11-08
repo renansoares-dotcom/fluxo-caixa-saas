@@ -15,7 +15,7 @@ export const TELAS = {
   // Compras
   'compras': 'CMP001', 'compras/requisicoes': 'CMP002', 'compras/pedidos': 'CMP003', 'compras/recebimentos': 'CMP004',
   // Estoque
-  'estoque': 'EST001', 'estoque/kardex': 'EST002', 'estoque/produtos': 'EST003', 'estoque/depara': 'EST004', 'estoque/parametros': 'EST005', 'estoque/cadastro-notas': 'EST006',
+  'estoque': 'EST001', 'estoque/kardex': 'EST002', 'estoque/produtos': 'EST003', 'estoque/depara': 'EST004', 'estoque/parametros': 'EST005', 'estoque/cadastro-notas': 'EST006', 'estoque/implantacao': 'EST007',
   // Produção
   'producao/terminal': 'PRD001', 'producao': 'PRD002', 'producao/planta': 'PRD003', 'producao/ordens': 'PRD004', 'producao/programacao': 'PRD005',
   'producao/cadastros': 'PRD006', 'producao/importar': 'PRD007',
