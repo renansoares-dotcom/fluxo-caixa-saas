@@ -62,7 +62,7 @@ export const MANUAIS = [
     resumo: 'Cadastros, OPs com material e rastreabilidade, programação, OEE, planta da fábrica e importação do Iniflex.' },
   { id: 'qualidade', titulo: 'Qualidade — inspeção com bloqueio de estoque e não conformidades', area: 'Produção', rotas: ['qualidade', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'qualidade/planos'],
     resumo: 'Planos de inspeção, quarentena no recebimento pela nota, liberação do primeiro material na produção, decisão com laudo, RNC com disposição no estoque, bloqueio de lote e bobina, IQF dos fornecedores.' },
-  { id: 'casa-tintas', titulo: 'Casa de Tintas — receitas versionadas, preparação e pesagem', area: 'Produção', rotas: ['tintas', 'tintas/ordens', 'tintas/receitas'],
+  { id: 'casa-tintas', titulo: 'Casa de Tintas — receitas versionadas, preparação e pesagem', area: 'Produção', rotas: ['tintas', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao'],
     resumo: 'Cores e receitas com versões aprovadas, ordem de preparação com pesagem conferida e balança, correção de proporção, medição de viscosidade e ΔE, lote com etiqueta, entrega à máquina e sobras.' },
   { id: 'manutencao', titulo: 'Manutenção industrial — OS, preventivas, peças e indicadores', area: 'Produção', rotas: ['manutencao', 'manutencao/ordens', 'manutencao/equipamentos', 'manutencao/celular', 'manutencao/preventivas'],
     resumo: 'Equipamentos ligados às máquinas, OS corretiva e preventiva, parada automática, peças do estoque, terceiros no contas a pagar, MTBF, MTTR e disponibilidade.' },

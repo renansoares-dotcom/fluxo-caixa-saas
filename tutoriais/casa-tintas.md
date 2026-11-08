@@ -1,8 +1,8 @@
 ---
 titulo: Casa de Tintas — receitas versionadas, preparação e pesagem
-tela: Produção › Casa de Tintas › Painel da Casa de Tintas (PRD016), Ordens de Preparação (PRD017) e Cores e Receitas (PRD018)
-versao: 1.0
-atualizado: 2026-11-07
+tela: Produção › Casa de Tintas › Painel da Casa de Tintas (PRD016), Ordens de Preparação (PRD017), Cores e Receitas (PRD018) e Previsão de Tinta (PRD023)
+versao: 1.1
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -207,9 +207,47 @@ O produto **tinta pronta** da cor (TP-código) é criado na primeira aprovação
 
 ![Figura 12 — Versão em teste: composição, custo teórico e comparação com a aprovada (dados fictícios)](img/casa-tintas-9.jpg)
 
+### 6.3 Previsão de Tinta
+
+![Figura 13 — Previsão de Tinta: necessidade por cor pela programação, sobras para reaproveitar, o que preparar e os insumos (dados fictícios)](img/casa-tintas-11.jpg)
+
+A tela **Previsão de Tinta** calcula quanto de cada cor a impressão vai precisar nos próximos dias (padrão: 14). Entram as OPs abertas com a etapa de impressão prevista no período, pela quantidade que falta imprimir.
+
+| Coluna | O que é |
+|---|---|
+| Necessidade | Kg de produto × consumo (g/kg) ÷ 1.000, somando as OPs. |
+| Sobras na validade | O que voltou da máquina na mesma cor, ainda na validade, menos o que já foi usado como ingrediente "sobra". |
+| A preparar | Necessidade − sobras. |
+| Primeira OP | A data da primeira impressão com a cor. Clique na linha para ver as OPs. |
+| Reaproveitar | Os lotes de sobra da cor, do que vence primeiro para o último. |
+
+Abaixo ficam:
+
+- **Insumos para preparar**: bases, pigmentos e solventes da versão aprovada da receita de cada cor, para o que falta preparar. O saldo vem do estoque oficial; em vermelho quando falta.
+- **Sobras sem uso previsto**: sobras de cores que não aparecem na programação. Use como ingrediente "sobra" antes de vencer. Em vermelho, as que vencem em até 7 dias.
+
+Uma OP só entra na previsão quando o produto tem a **ficha de cores**. A tela avisa quais OPs ficaram de fora.
+
+![Figura 14 — Cores dos produtos: a ficha de cores de cada embalagem com o consumo cadastrado e o real das últimas OPs (dados fictícios)](img/casa-tintas-12.jpg)
+
+Na aba **Cores dos produtos**, cadastre para cada embalagem:
+
+- as **cores**;
+- a **receita**, se não for a aprovada da cor;
+- o **consumo** em gramas de tinta por kg de produto.
+
+Sem consumo, vale a **média real** das últimas 10 OPs concluídas: tinta entregue menos o retorno, dividida pelos kg bons na impressão. A coluna **Real** mostra essa média ao lado da ficha. Fica em amarelo quando a diferença passa de 15%.
+
+Em **Parâmetros**:
+
+- o horizonte em dias;
+- o setor da impressão (padrão: o setor com "impress" no nome);
+- quantas OPs entram na média;
+- um consumo padrão para produtos sem ficha nem histórico.
+
 ## 7. Parâmetros
 
-![Figura 13 — Parâmetros da casa de tintas (dados fictícios)](img/casa-tintas-10.jpg)
+![Figura 15 — Parâmetros da casa de tintas (dados fictícios)](img/casa-tintas-10.jpg)
 
 | Parâmetro | O que faz | Padrão |
 |---|---|---|
@@ -284,3 +322,4 @@ Se ainda não ler, digite o peso: a pesagem vale do mesmo jeito.
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão. Inclui cores com L* a* b*, receitas com versões e aprovação, ordem de preparação com pesagem na ordem de adição, tolerância, leitura da balança, correção de proporção, ajustes e aproveitamento de sobra, medições com ΔE CIEDE2000, aprovação com concessão, lote com etiqueta e QR, entrega e retorno da sobra, ordem impressa, estoque oficial e Decision Center. |
+| 1.1 | 08/11/2026 | Nova tela Previsão de Tinta (PRD023): necessidade por cor pela programação, sobras para reaproveitar, o que preparar, insumos da receita contra o saldo, sobras paradas e a ficha de cores dos produtos com o consumo real das OPs. |

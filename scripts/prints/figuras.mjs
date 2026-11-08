@@ -122,6 +122,8 @@ export const FIGS = [
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Receitas com a versão em uso, o custo teórico e o que está em desenvolvimento', 're'],
   ['casa-tintas', 'tintas/receitas', '### 6.2', 'Versão em teste: composição, custo teórico e comparação com a aprovada', 're|click:#tr-corpo tr[data-r="tr-1"]'],
   ['casa-tintas', 'tintas/receitas', '## 7.', 'Parâmetros da casa de tintas', 'pa'],
+  ['casa-tintas', 'tintas/previsao', '### 6.3', 'Previsão de Tinta: necessidade por cor pela programação, sobras para reaproveitar, o que preparar e os insumos'],
+  ['casa-tintas', 'tintas/previsao', '### 6.3', 'Cores dos produtos: a ficha de cores de cada embalagem com o consumo cadastrado e o real das últimas OPs', 'click:[data-aba=cores]'],
   // Auditoria por registro e alertas (07/11/2026)
   ['empresa-usuarios', 'auditoria?aba=registro&q=RESINAS', '### 7.1', 'Auditoria › Por registro: o registro procurado e quantas mudanças teve'],
   ['empresa-usuarios', 'auditoria?aba=registro&q=RESINAS', '### 7.1', 'Linha do tempo do registro e a comparação de duas versões', 'click:#pr-res tr[data-i="0"]'],

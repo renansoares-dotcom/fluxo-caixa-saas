@@ -96,6 +96,7 @@ const routes = {
   'producao/custos': () => import(`./pages/producao-custos.js?v=${V}`),
   'producao/rastreio': () => import(`./pages/producao-rastreio.js?v=${V}`),
   'manutencao/preventivas': () => import(`./pages/manutencao-preventivas.js?v=${V}`),
+  'tintas/previsao': () => import(`./pages/tintas-previsao.js?v=${V}`),
   'contab/dre': () => import(`./pages/contab-dre.js?v=${V}`),
   'contab/dfc': () => import(`./pages/contab-dfc.js?v=${V}`),
   'estoque/cadastro-notas': () => import(`./pages/cadastro-notas.js?v=${V}`),
@@ -336,7 +337,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil compras: Pagamentos Antecipados e o módulo Compras
 // perfil vendas (representante): só a área Comercial
 // perfil producao (operador no terminal do setor)
-const rotaDeProducao = (r) => ['hoje', 'orcamento-cc', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
+const rotaDeProducao = (r) => ['hoje', 'orcamento-cc', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
 const rotaDeVendas = (r) => r === 'comercial' || ['hoje', 'orcamento-cc', 'comercial/carteira', 'comercial/funil', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
 const rotaDeCompras = (r) => ['hoje', 'orcamento-cc', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;

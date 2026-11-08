@@ -1457,3 +1457,27 @@ window.RPC.pag_remessa_gravar = () => null;
     { id: 'pc5', produto_id: 'pp5', codigo: 'PC-COR-B68', descricao: 'CORREIA B-68', unidade: 'UN', equipamento: 'IMP-01 IMPRESSORA FLEXO', minimo: 2, ponto_pedido: 3, saldo: 5, consumo_12m: 4, previsto_planos: 0, situacao: 'ok', ultimo_preco: 75.3 }];
   DB.man_parametros = (DB.man_parametros || []).map(p => ({ ...p, gerar_horas_pct: 90, dias_ritmo: 30, horizonte_pecas_dias: 30, avisar_pecas: true, avisar_pecas_dias: 7 }));
 }
+
+// Previsão de tinta (SQL 117) — programação e fichas FICTÍCIAS
+{
+  const d = (n) => { const x = new Date('2026-11-08T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+  const CO = [['tpc1', 'AZ-286', 'AZUL PROCESSO 286', '#0033a0'], ['tpc2', 'VM-485', 'VERMELHO 485', '#da291c'], ['tpc3', 'AM-109', 'AMARELO 109', '#ffd100'], ['tpc4', 'BR-OP', 'BRANCO OPACO', '#f4f4f4'], ['tpc5', 'VD-354', 'VERDE 354', '#00b140']];
+  const P = [['tpp1', 'PA-100', 'SACO PEBD 40X60 0,10 IMPRESSO'], ['tpp2', 'PA-305', 'SACOLA ALÇA CAMISETA'], ['tpp3', 'PA-410', 'SACO PADARIA 30X45']];
+  DB.tin_previsao_config = [{ empresa_id: E, horizonte_dias: 14, ops_media: 10, consumo_padrao_g_kg: 0, setor_impressao_id: null }];
+  DB.tin_produto_cores = [['tpp1', 'tpc1', 9.5], ['tpp1', 'tpc4', 14], ['tpp2', 'tpc2', null], ['tpp2', 'tpc3', 6.2], ['tpp3', 'tpc5', 7.8]].map(([produto_id, cor_id, consumo_g_kg], i) => ({ id: 'tpf' + i, empresa_id: E, produto_id, cor_id, consumo_g_kg }));
+  DB.produtos = DB.produtos.concat(P.filter(([id]) => !DB.produtos.some(x => x.id === id)).map(([id, codigo, descricao]) => ({ id, empresa_id: E, codigo, descricao, unidade: 'KG', tipo_sped: '04', ativo: true })));
+  DB.tin_cores = (DB.tin_cores || []).concat(CO.filter(([id]) => !(DB.tin_cores || []).some(c => c.id === id)).map(([id, codigo, nome, hex]) => ({ id, empresa_id: E, codigo, nome, hex, ativo: true })));
+  window.RPC.tin_consumo_real = () => [{ produto_id: 'tpp1', cor_id: 'tpc1', ops: 8, g_kg: 10.4 }, { produto_id: 'tpp1', cor_id: 'tpc4', ops: 8, g_kg: 13.1 }, { produto_id: 'tpp2', cor_id: 'tpc2', ops: 5, g_kg: 8.9 }, { produto_id: 'tpp2', cor_id: 'tpc3', ops: 5, g_kg: 7.6 }];
+  const op = (n, prod, cli, dd, kgp, gkg, fonte) => ({ op: n, numero_iniflex: String(81000 + n), produto: prod, cliente: cli, data: d(dd), kg_produto: kgp, g_kg: gkg, fonte, kg_tinta: Math.round(kgp * gkg) / 1000 });
+  window.RPC.tin_previsao = () => ({ horizonte: 14, ate: d(14), cores: [
+    { cor_id: 'tpc1', codigo: 'AZ-286', nome: 'AZUL PROCESSO 286', hex: '#0033a0', necessidade: 68.4, sobra: 12.5, preparar: 55.9, primeira: d(1), tem_receita: true, sobras: [{ ordem: 298, lote: 'TI-298', kg: 7.5, validade: d(9) }, { ordem: 305, lote: 'TI-305', kg: 5.0, validade: d(21) }],
+      ops: [op(1206, 'PA-100 SACO PEBD 40X60 0,10 IMPRESSO', 'ATACADO', 1, 3200, 9.5, 'ficha'), op(1211, 'PA-100 SACO PEBD 40X60 0,10 IMPRESSO', 'SUPERMERCADOS', 6, 4000, 9.5, 'ficha')] },
+    { cor_id: 'tpc4', codigo: 'BR-OP', nome: 'BRANCO OPACO', hex: '#f4f4f4', necessidade: 100.8, sobra: 0, preparar: 100.8, primeira: d(1), tem_receita: true, sobras: [], ops: [op(1206, 'PA-100 SACO PEBD 40X60 0,10 IMPRESSO', 'ATACADO', 1, 3200, 14, 'ficha'), op(1211, 'PA-100 SACO PEBD 40X60 0,10 IMPRESSO', 'SUPERMERCADOS', 6, 4000, 14, 'ficha')] },
+    { cor_id: 'tpc2', codigo: 'VM-485', nome: 'VERMELHO 485', hex: '#da291c', necessidade: 22.3, sobra: 9.2, preparar: 13.1, primeira: d(3), tem_receita: true, sobras: [{ ordem: 301, lote: 'TI-301', kg: 9.2, validade: d(15) }], ops: [op(1208, 'PA-305 SACOLA ALÇA CAMISETA', 'FARMÁCIAS', 3, 2500, 8.9, 'média de 5 OP(s)')] },
+    { cor_id: 'tpc3', codigo: 'AM-109', nome: 'AMARELO 109', hex: '#ffd100', necessidade: 15.5, sobra: 0, preparar: 15.5, primeira: d(3), tem_receita: false, sobras: [], ops: [op(1208, 'PA-305 SACOLA ALÇA CAMISETA', 'FARMÁCIAS', 3, 2500, 6.2, 'ficha')] }],
+    insumos: [{ codigo: 'TN-BASE-BR', descricao: 'BASE BRANCA NC', unidade: 'KG', necessidade: 78.6, saldo: 64 }, { codigo: 'TN-BASE-AZ', descricao: 'CONCENTRADO AZUL FTALO', unidade: 'KG', necessidade: 31.3, saldo: 58 },
+      { codigo: 'SOLV-ACET', descricao: 'ACETATO DE ETILA', unidade: 'KG', necessidade: 42.5, saldo: 180 }, { codigo: 'TN-BASE-VM', descricao: 'CONCENTRADO VERMELHO RUBI', unidade: 'KG', necessidade: 7.9, saldo: 12 }],
+    sem_ficha: [{ op: 1213, produto: 'PA-512 SACO FRUTAS 25X35', produto_id: null, data: d(9), kg: 1800 }], sem_consumo: [],
+    sobras_paradas: [{ ordem: 288, cor: 'LJ-151 LARANJA 151', hex: '#ff8200', lote: 'TI-288', kg: 6.3, validade: d(4) }, { ordem: 292, cor: 'PT-PRETO PRETO', hex: '#111', lote: 'TI-292', kg: 11.8, validade: d(26) }] });
+  DB.tin_receitas = DB.tin_receitas || [];
+}
