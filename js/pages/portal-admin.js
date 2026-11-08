@@ -36,7 +36,7 @@ async function pedidos(root) {
     const resp = ap ? (prompt('Mensagem para o cliente (opcional):') ?? null) : prompt('Motivo da recusa (o cliente vê):');
     if (resp === null || (!ap && !resp.trim())) return;
     if (ap && !await confirmDialog(`Aprovar: o vencimento do título ${p.documento || ''} passa de ${dateBR(p.vencimento_atual)} para ${dateBR(p.nova_data)} no contas a receber.`)) return;
-    try { await q(sb.rpc('portal_decidir_prorrogacao', { p_id: id, p_aprovar: ap, p_resposta: resp })); toast(ap ? 'Prorrogação aprovada' : 'Pedido recusado'); sb.functions.invoke('email', { body: {} }).catch(() => {}); render(root); } catch (err) { fail(err); }
+    try { await q(sb.rpc('portal_decidir_prorrogacao', { p_id: id, p_aprovar: ap, p_resposta: resp })); toast(ap ? 'Prorrogação aprovada' : 'Pedido recusado'); sb.functions.invoke('email', { body: {} }).catch(() => {}); sb.functions.invoke('whatsapp', { body: {} }).catch(() => {}); render(root); } catch (err) { fail(err); }
   };
   $$('[data-ap]', root).forEach(b => b.onclick = () => decidir(b.dataset.ap, true));
   $$('[data-rc]', root).forEach(b => b.onclick = () => decidir(b.dataset.rc, false));
@@ -71,7 +71,7 @@ function convidar(root) {
     ev.target.disabled = true;
     try { const tk = await q(sb.rpc('portal_criar_convite', { p_empresa: state.empresa.id, p_favorecido: f.id, p_email: $('#cv-e', m.el).value }));
       const link = linkPortal(tk);
-      sb.functions.invoke('email', { body: {} }).catch(() => {});
+      sb.functions.invoke('email', { body: {} }).catch(() => {}); sb.functions.invoke('whatsapp', { body: {} }).catch(() => {});
       $('#cv-res', m.el).innerHTML = `<p class="pos small">Convite criado para ${esc(f.nome)}. Se o e-mail da plataforma estiver ligado, o convite chega sozinho na caixa do cliente; o link abaixo serve para mandar também por WhatsApp.</p><input readonly value="${esc(link)}" style="width:100%"><button class="btn small" id="cv-cp" style="margin-top:6px">Copiar link</button>`;
       $('#cv-cp', m.el).onclick = () => copiar(link); ev.target.hidden = true;
     } catch (err) { fail(err); ev.target.disabled = false; }

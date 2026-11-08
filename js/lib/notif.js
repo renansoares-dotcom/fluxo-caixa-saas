@@ -12,7 +12,7 @@ const suportaPush = () => 'serviceWorker' in navigator && 'PushManager' in windo
 // pede ao servidor para mandar os avisos pendentes (chamar depois de ações que geram notificação)
 export async function dispararAvisos() {
   try { await sb.functions.invoke('notificar', { body: {} }); } catch (e) { console.warn('aviso não enviado', e); }
-  sb.functions.invoke('email', { body: {} }).catch(() => {});   // e-mails da fila (convite, arte, prorrogação, avisos)
+  sb.functions.invoke('email', { body: {} }).catch(() => {}); sb.functions.invoke('whatsapp', { body: {} }).catch(() => {});   // e-mails da fila (convite, arte, prorrogação, avisos)
 }
 
 export function iniciarNotificacoes() {

@@ -1,8 +1,8 @@
 ---
 titulo: Meus avisos — celular, horário de silêncio e tipos de aviso
 tela: Comunicação › Meus avisos (AJU003)
-versao: 1.1
-atualizado: 2026-11-07
+versao: 1.2
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -84,6 +84,11 @@ Quem faz a ação não recebe o aviso dela.
 - desligado por você;
 - aguardando o fim do silêncio.
 
+
+### 3.4 WhatsApp
+
+Cadastre o celular com DDD, aceite receber e marque a coluna **WhatsApp** nos avisos que quer receber também pelo WhatsApp. Veja o manual **WhatsApp da Plataforma**.
+
 ## 4. Regras e travas
 
 - O envio para o celular é feito logo depois da ação. O banco também confere a fila **a cada minuto**, para os avisos que nascem fora da plataforma (Portal do Cliente).
@@ -108,3 +113,4 @@ Quem faz a ação não recebe o aviso dela.
 |---|---|---|
 | 1.1 | 07/11/2026 | Coluna E-mail ligada ao envio de e-mail da plataforma. |
 | 1.0 | 07/11/2026 | Primeira versão: ativar e testar por aparelho, horário de silêncio, tipos de aviso com o celular ligado ou desligado, urgente passando pelo silêncio, avisos novos (prorrogação, arte, borderô, máquina parada), envio a cada minuto e histórico dos últimos avisos. |
+| 1.2 | 08/11/2026 | Coluna WhatsApp e cadastro do celular com aceite. |

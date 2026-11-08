@@ -1625,3 +1625,21 @@ window.RPC.pag_remessa_gravar = () => null;
       uf: 'PE', cmun: null, xmun: e.cidade || 'CARUARU', bairro: e.bairro, cep: e.cep, logradouro: e.logradouro, nro: e.nro, peso_kg: cn.peso_kg, volume_m3: cn.volume_m3, v_nf: n.v_nf };
   });
 }
+
+// WhatsApp (SQL 125) — configuração e fila FICTÍCIAS
+{
+  DB.wa_config = [{ empresa_id: E, ativo: true, phone_number_id: '104857392018475', numero_exibicao: '(81) 3721-0000', idioma: 'pt_BR', url_base: 'https://exemplo.github.io/fluxo-caixa-saas/' }];
+  DB.wa_modelos = [{ empresa_id: E, codigo: 'aviso', template: 'aviso_plataforma_v2', parametros: ['titulo', 'texto'], botao_campo: 'caminho', ativo: true }];
+  DB.wa_contatos = [{ user_id: 'u1', numero: '5581998765432', optin_em: '2026-11-08T09:00:00Z' }];
+  window.RPC.wa_padrao = () => [
+    ['arte_aprovacao', 'Arte aguardando a aprovação do cliente', 'arte_para_aprovar', ['empresa', 'arte', 'versao', 'prazo'], 'caminho', 'Olá! {{1}} enviou a versão {{3}} da arte {{2}} para a sua aprovação. Responda até {{4}} pelo Portal do Cliente.'],
+    ['prorrogacao_resposta', 'Resposta do pedido de prorrogação', 'resposta_prorrogacao', ['empresa', 'documento', 'decisao', 'vencimento'], 'caminho', 'Olá! {{1}} respondeu o seu pedido de prorrogação do título {{2}}: {{3}}. O vencimento é {{4}}.'],
+    ['entrega_saiu', 'Pedido saiu para entrega', 'pedido_saiu_entrega', ['empresa', 'notas', 'veiculo'], 'caminho', 'Olá! A mercadoria das notas {{2}} de {{1}} saiu para entrega hoje, no veículo {{3}}. Acompanhe pelo Portal do Cliente.'],
+    ['entrega_feita', 'Pedido entregue', 'pedido_entregue', ['empresa', 'nota', 'quando', 'recebedor'], 'caminho', 'Olá! A nota {{2}} de {{1}} foi entregue em {{3}} e recebida por {{4}}. O canhoto está no Portal do Cliente.'],
+    ['aviso', 'Avisos da plataforma (Meus avisos)', 'aviso_plataforma', ['empresa', 'titulo', 'texto'], 'caminho', 'Aviso da plataforma {{1}}: {{2}}. {{3}}'],
+    ['teste', 'Mensagem de teste', 'teste_plataforma', ['empresa', 'nome'], null, 'Olá {{2}}! Esta é uma mensagem de teste da plataforma {{1}}. O WhatsApp está funcionando.'],
+  ].map(([codigo, nome, template, parametros, botao_campo, texto]) => ({ codigo, nome, template, parametros, botao_campo, texto }));
+  const F = (min, cod, para, sit, erro) => ({ id: 'wf' + min, empresa_id: E, codigo: cod, para, situacao: sit, erro: erro || null, campos: {}, criado_em: new Date(Date.parse('2026-11-08T14:00:00Z') - min * 60000).toISOString() });
+  DB.wa_fila = [F(3, 'entrega_feita', '5581991234567', 'enviado'), F(25, 'entrega_saiu', '5581991234567', 'enviado'), F(26, 'entrega_saiu', '5587988776655', 'enviado'),
+    F(70, 'aviso', '5581998765432', 'enviado'), F(130, 'arte_aprovacao', '5581977665544', 'erro', '132001: Template name does not exist in the translation'), F(200, 'teste', '5581998765432', 'enviado')];
+}

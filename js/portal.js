@@ -10,7 +10,7 @@ import { viewer, prepararArquivo, subirArquivos, linksArte, conferirArquivo, ACE
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
-const avisar = () => { sb.functions.invoke('notificar', { body: {} }).catch(() => {}); sb.functions.invoke('email', { body: {} }).catch(() => {}); };   // manda já o aviso à equipe (o agendamento também manda)
+const avisar = () => { sb.functions.invoke('notificar', { body: {} }).catch(() => {}); sb.functions.invoke('email', { body: {} }).catch(() => {}); sb.functions.invoke('whatsapp', { body: {} }).catch(() => {}); };   // manda já o aviso à equipe (o agendamento também manda)
 const main = $('#pt-main');
 const token = new URLSearchParams(location.search).get('convite');
 const S = { clientes: [], fav: null, aba: new URLSearchParams(location.search).get('arte') ? 'artes' : (new URLSearchParams(location.search).get('aba') === 'entregas' ? 'entregas' : 'titulos'), pend: 0, arte: new URLSearchParams(location.search).get('arte') };
@@ -80,11 +80,12 @@ async function pintar() {
   if (S.pend && S.aba === 'titulos' && !S.vistoArtes) { S.vistoArtes = true; }
   main.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">${esc(c.cliente)}</h2><div class="muted small">${esc(c.documento || '')} · fornecedor: ${esc(c.empresa)}</div></div></div>
     <div class="card toolbar"><div class="chips" id="pt-abas">${[['titulos', 'Títulos'], ['notas', 'Notas fiscais'], ['entregas', 'Entregas'], ['compras', 'O que comprei'], ['pedidos', 'Pedidos de prorrogação'], ...(S.lista.length ? [['artes', 'Artes para aprovar']] : [])]
-      .map(([k, t]) => `<span class="chip ${S.aba === k ? 'on' : ''}" data-a="${k}">${t}${k === 'artes' && S.pend ? ` <b class="pt-n">${S.pend}</b>` : ''}</span>`).join('')}</div></div>
+      .map(([k, t]) => `<span class="chip ${S.aba === k ? 'on' : ''}" data-a="${k}">${t}${k === 'artes' && S.pend ? ` <b class="pt-n">${S.pend}</b>` : ''}</span>`).join('')}<span class="chip" id="pt-wa" title="Receber os avisos pelo WhatsApp">📱 WhatsApp</span></div></div>
     ${S.pend && S.aba !== 'artes' ? `<div class="pt-aviso" style="margin-top:12px;cursor:pointer" id="pt-ir-artes">🎨 <b>${S.pend} arte(s) aguardando a sua aprovação.</b> Clique para conferir e aprovar.</div>` : ''}
     <div id="pt-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#pt-abas').onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { S.aba = a; S.arte = null; pintar(); } };
   $('#pt-ir-artes') && ($('#pt-ir-artes').onclick = () => { S.aba = 'artes'; pintar(); });
+  $('#pt-wa').onclick = () => whatsapp();
   ({ titulos, notas, entregas, compras, pedidos, artes })[S.aba]().catch(err => { fail(err); $('#pt-corpo').innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; });
 }
 
@@ -143,6 +144,19 @@ async function entregas() {
       <td>${e.canhoto_path ? `<button class="btn ghost small" data-can="${esc(e.canhoto_path)}">Canhoto</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">Nenhuma entrega da nossa frota nos últimos 4 meses.</td></tr>'}</tbody></table></div></div>
     <p class="small muted">Mostra as entregas feitas pelos nossos caminhões. Entregas por transportadora não aparecem aqui.</p>`;
   $$('[data-can]').forEach(b => b.onclick = async () => { const { data, error } = await sb.storage.from('logistica').createSignedUrl(b.dataset.can, 600); if (error || !data) return toast('Canhoto indisponível', true); window.open(data.signedUrl, '_blank', 'noopener'); });
+}
+
+// WhatsApp (melhoria 1.1b, SQL 125): o cliente cadastra o celular e aceita (ou deixa de aceitar) receber os avisos
+async function whatsapp() {
+  let w = {}; try { w = (await q(sb.rpc('portal_whatsapp_meu')))[0] || {}; } catch { return toast('WhatsApp ainda não disponível', true); }
+  const m = modal({ title: 'Avisos pelo WhatsApp', body: `<p class="small">Receba no WhatsApp a arte para aprovar, a resposta da prorrogação, quando o pedido sair para entrega e quando for entregue.</p>
+    <label>Celular com DDD<input id="wa-n" inputmode="tel" value="${esc(w.numero ? w.numero.replace(/^55(\d\d)(\d+)(\d{4})$/, '($1) $2-$3') : '')}" placeholder="(81) 99999-9999"></label>
+    <label style="flex-direction:row;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="wa-ok" style="width:auto" ${w.aceito ? 'checked' : ''}> Aceito receber esses avisos pelo WhatsApp</label>
+    <p class="small muted">Você pode desmarcar a qualquer momento. O número é usado só para esses avisos.</p>`,
+    foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="wa-s">Salvar</button>' });
+  $('#wa-s', m.el).onclick = async () => {
+    try { await q(sb.rpc('portal_whatsapp', { p_numero: $('#wa-n', m.el).value, p_aceito: $('#wa-ok', m.el).checked })); m.close(); toast($('#wa-ok', m.el).checked ? 'Pronto: os avisos vão também pelo WhatsApp' : 'Você não recebe mais avisos pelo WhatsApp'); } catch (err) { fail(err); }
+  };
 }
 
 async function compras() {

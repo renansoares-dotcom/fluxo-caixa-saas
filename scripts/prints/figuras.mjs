@@ -195,6 +195,10 @@ export const FIGS = [
   ['fidc-recompras', 'fidc-recompras', '## 4.', 'Motivos da recompra: o que acontece com o título, a linha na DRE e a contrapartida contábil', 'click:#rc-mtv'],
   ['fidc-recompras', 'dre', '### 4.1', 'DRE Gerencial com as recompras na linha do motivo, dentro das deduções da receita bruta', 'scroll:#tbl'],
   // E-mails da Plataforma (07/11/2026)
+  ['whatsapp', 'config/whatsapp', '## 3.', 'WhatsApp da Plataforma: número, como ligar e os modelos aprovados'],
+  ['whatsapp', 'config/whatsapp', '### 3.2', 'Modelo: nome na Meta, campos na ordem, texto sugerido e prévia', 'click:[data-m="entrega_saiu"]'],
+  ['whatsapp', 'config/whatsapp', '### 3.4', 'Últimas mensagens e a situação de cada uma', 'scroll:#wa-corpo .card.flush:last-child'],
+  ['whatsapp', 'meus-avisos', '## 4.', 'Meus avisos: o celular, o aceite e a coluna WhatsApp', 'scroll:.ma-grid'],
   ['email', 'config/email', '## 3.', 'E-mails da Plataforma: remetente, como ligar o envio e os modelos'],
   ['email', 'config/email', '### 3.3', 'Editar um modelo, com a prévia do e-mail', 'click:[data-m="arte_aprovacao"]'],
   ['email', 'config/email', '### 3.4', 'Últimos e-mails e a situação de cada um', 'scroll:#ce-corpo .card.flush:last-child'],
