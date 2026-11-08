@@ -132,6 +132,7 @@ async function abrir(o, root) {
         <td class="num">${l.saldo == null ? '–' : qtd(Math.round(l.saldo * 100) / 100)}</td><td class="num ${l.falta ? 'neg' : ''}">${l.falta == null ? '–' : qtd(Math.round(l.falta * 100) / 100)}</td><td class="num">${qtd(Math.round((consPorProd[l.produto.id] || 0) * 100) / 100)}</td></tr>`).join('')}</tbody></table></div>
       ${pcp && nec.linhas.some(l => l.falta > 0) ? '<button class="btn small" id="on-req" style="margin-top:6px">Gerar requisição dos materiais em falta</button>' : ''}`}
     ${custoTeo || custoReal ? `<p class="small" style="margin:8px 0 0">Custo de material pelo produzido: teórico (estrutura) <b>${money(custoTeo)}</b> · real (consumos apontados) <b>${money(custoReal)}</b>${custoTeo ? ` · diferença ${((custoReal / custoTeo - 1) * 100).toFixed(1).replace('.', ',')}%` : ''} <span class="muted">(último custo líquido de compra)</span></p>` : ''}
+    ${['admin', 'financeiro', 'diretor', 'leitura'].includes(state.papel) && ap.length ? '<p style="margin:6px 0 0"><button class="btn ghost small" id="op-custo">Custo completo da OP (material, tinta, máquina, manutenção e margem)</button></p>' : ''}
     <h3 style="margin:14px 0 6px">Apontamentos (${ap.length})</h3>
     <div class="table-wrap" style="max-height:220px"><table><thead><tr><th>Início</th><th>Fim</th><th>Máquina</th><th>Operador</th><th class="num">Bom</th><th class="num">Refugo</th><th>Motivo</th><th>Origem</th></tr></thead><tbody>
       ${ap.map(a => `<tr><td>${new Date(a.inicio).toLocaleString('pt-BR').slice(0, 17)}</td><td>${a.fim ? new Date(a.fim).toLocaleString('pt-BR').slice(0, 17) : '<span class="warn">em curso</span>'}</td>
@@ -146,6 +147,7 @@ async function abrir(o, root) {
       <div class="grid-form" style="margin-top:6px"><label class="c4">Material<input id="oc-p" list="oc-dl">${datalistProdutos('oc-dl', PRODS.filter(p => p.tipo !== 'produto_acabado'))}</label>
         <label class="xs">Quantidade<input id="oc-q" inputmode="decimal"></label><label>Lote / NF<input id="oc-l"></label><div class="xs" style="align-self:end"><button class="btn small" id="oc-ok" style="min-height:38px">+ Consumo</button></div></div>` : ''}`,
     foot: '<div id="op-ac" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%"></div>' });
+  $('#op-custo', m.el) && ($('#op-custo', m.el).onclick = async () => { try { const [j, cfg] = await Promise.all([q(sb.rpc('prod_custo_op', { p_ordem: o.id })), q(sb.from('prod_custo_config').select('*').eq('empresa_id', state.empresa.id).maybeSingle()).catch(() => null)]); (await import('./producao-custos.js')).detalhe(o.id, j, cfg || {}); } catch (err) { fail(err); } });
   conversaNoModal(m, 'prod_ordem', o.id);
   const ac = $('#op-ac', m.el), btn = (t, cls, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = t; b.onclick = fn; ac.appendChild(b); };
   const reabrir = async () => { m.close(); await carregar(root); abrir(OPS.find(x => x.id === o.id), root); };

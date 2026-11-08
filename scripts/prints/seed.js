@@ -1391,3 +1391,31 @@ window.RPC.pag_remessa_gravar = () => null;
     return { de, ate, grupo: g, linhas, paradas, refugos };
   };
 }
+
+// Custo das OPs (SQL 114) — composição FICTÍCIA de algumas OPs (a função do banco é simulada aqui)
+{
+  DB.prod_custo_config = [{ empresa_id: E, custo_hora_padrao: 180, ratear_manutencao: true, dias_preco: 90, tolerancia_pct: 10, margem_minima_pct: 15 }];
+  const OPS = [
+    [1203, 'PA-210 BOBINA PEAD 30CM 0,05', 'FARMÁCIAS', 1800, 1760, 74, 8.42, 8.31, 0, 12.6, 260, 14.4, 9.6, 'concluida', '2026-11-03'],
+    [1198, 'PA-100 SACO PEBD 40X60 0,10', 'SUPERMERCADOS', 5200, 5060, 310, 8.37, 8.31, 2950, 18.5, 380, 13.9, 11.2, 'concluida', '2026-10-28'],
+    [1195, 'PA-100 SACO PEBD 40X60 0,10', 'ATACADO', 3000, 2810, 290, 9.25, 8.31, 1840, 15.2, 650, 13.9, 10.4, 'concluida', '2026-10-22'],
+    [1191, 'PA-210 BOBINA PEAD 30CM 0,05', 'DISTRIBUIDORA', 2400, 2390, 61, 8.25, 8.31, 0, 13.0, 0, 14.6, 9.7, 'concluida', '2026-10-15'],
+    [1187, 'PA-305 SACOLA ALÇA CAMISETA', 'SUPERMERCADOS', 1500, 1430, 95, 9.10, 8.85, 1120, 11.4, 210, 13.4, 11.8, 'concluida', '2026-10-09'],
+    [1204, 'PA-100 SACO PEBD 40X60 0,10', 'SUPERMERCADOS', 4800, 2160, 140, 8.33, 8.31, 0, 7.1, 0, null, 10.1, 'em_producao', '2026-11-07'],
+  ];
+  const bruto = ([numero, produto, cliente, qtd, bom, ref, cMat, cMatOrc, tinta, horas, manut, preco, horasOrc, status, ref_dt], i) => ({
+    ordem: { id: 'opc' + i, numero, numero_iniflex: String(81000 + numero), produto, quantidade: qtd, unidade: 'KG', status, cliente, referencia: ref_dt },
+    producao: { bom, refugo: ref },
+    material: [{ codigo: 'MP-001', descricao: 'RESINA PEBD LINEAR', qtd: Math.round((bom + ref) * 0.93), custo: cMat, fonte: 'custo médio', valor: Math.round((bom + ref) * 0.93 * cMat * 100) / 100 },
+      { codigo: 'MP-002', descricao: 'MASTERBATCH BRANCO', qtd: Math.round((bom + ref) * 0.07), custo: 14.2, fonte: i === 4 ? 'última compra' : 'custo médio', valor: Math.round((bom + ref) * 0.07 * 14.2 * 100) / 100 }],
+    tinta: tinta ? [{ numero: 300 + i, cor: 'AZUL PROCESSO', kg: Math.round(tinta / 38), valor: tinta }] : [],
+    maquina: [{ codigo: 'EXT-01', nome: 'EXTRUSORA 1', setor: 'Extrusão', horas: Math.round(horas * 0.6 * 10) / 10, custo_hora: 180, valor: Math.round(horas * 0.6 * 180) },
+      { codigo: 'CS-01', nome: 'CORTE E SOLDA 1', setor: 'Corte e solda', horas: Math.round(horas * 0.4 * 10) / 10, custo_hora: 120, valor: Math.round(horas * 0.4 * 120) }],
+    manutencao: manut ? [{ maquina_id: 'm', mes: ref_dt.slice(0, 8) + '01', horas_op: Math.round(horas * 0.6), horas_mes: 410, custo_mes: Math.round(manut * 410 / (horas * 0.6)), valor: manut }] : [],
+    orcado: { material: [{ codigo: 'MP-001', valor: Math.round(qtd * 1.02 * 0.93 * cMatOrc) }, { codigo: 'MP-002', valor: Math.round(qtd * 1.02 * 0.07 * 14.2) }], maquina: [{ setor: 'Extrusão', horas: horasOrc, custo_hora: 180, valor: horasOrc * 180 * qtd / 1000 }], tem_estrutura: true },
+    venda: { preco, valor: preco ? preco * 20000 : null, qtd: preco ? 20000 : null, notas: preco ? 9 : 0, dias: 90 },
+  });
+  const LISTA = OPS.map(bruto);
+  window.RPC.prod_custo_ops = () => LISTA;
+  window.RPC.prod_custo_op = (a) => LISTA.find(x => x.ordem.id === a.p_ordem) || LISTA[0];
+}
