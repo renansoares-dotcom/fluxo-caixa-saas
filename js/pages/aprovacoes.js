@@ -17,6 +17,7 @@ const TIPOS = {
   receita: { nome: 'Receita de tinta em teste', grupo: 'Casa de Tintas', recusa: false, aprovar: 'Aprovar a versão' },
   arte: { nome: 'Arte para liberar', grupo: 'Pré-impressão', recusa: false, aprovar: 'Liberar para produção' },
   inspecao: { nome: 'Inspeção para decidir', grupo: 'Qualidade', recusa: false },
+  orcamento_cc: { nome: 'Orçamento do centro de custo', grupo: 'Orçamento', recusa: false },
 };
 /** executa a decisão pela regra do módulo de origem */
 async function decidir(it, aprovar, motivo) {

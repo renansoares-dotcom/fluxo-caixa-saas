@@ -23,6 +23,11 @@ export async function render(root) {
 async function carregar() {
   await loadCadastros();
   const e = state.empresa.id, ano = state.ano;
+  if (!ui.cfgLida) {   // tolerância e base dos Parâmetros do orçamento (SQL 108), uma vez por sessão; a tela ainda pode mudar na hora
+    ui.cfgLida = true;
+    const cfg = await q(sb.from('orcamento_config').select('tol_pct,tol_valor,base_comparacao,prazo_justificar').eq('empresa_id', e).maybeSingle()).catch(() => null);
+    if (cfg) { ui.tolPct = +cfg.tol_pct; ui.tolVal = +cfg.tol_valor; ui.comp = cfg.base_comparacao; ui.prazo = cfg.prazo_justificar; }
+  }
   const [mov, orc, rat, just] = await Promise.all([
     q(sb.rpc('orcamento_movimento', { p_empresa: e, p_ano: ano })),
     fetchAll(() => sb.from('orcamentos').select('plano_id,centro_custo_id,mes,valor,cenario').eq('empresa_id', e).eq('ano', ano)),

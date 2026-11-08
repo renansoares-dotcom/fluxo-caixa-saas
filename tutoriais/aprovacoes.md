@@ -1,8 +1,8 @@
 ---
 titulo: Minhas aprovações — tudo o que espera a sua decisão
 tela: Painéis › Minhas aprovações (PAI006)
-versao: 1.1
-atualizado: 2026-11-07
+versao: 1.2
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -19,6 +19,7 @@ Juntar numa lista só **tudo o que espera a sua decisão**, de todos os módulos
 | Receita de tinta em teste | Casa de Tintas › Cores e Receitas | Quem aprova receita (Parâmetros da casa de tintas) |
 | Arte para liberar | Pré-impressão › Artes e Aprovações | Quem libera (Parâmetros da pré-impressão) |
 | Inspeção para decidir | Qualidade › Inspeções | Quem decide a qualidade (Planos e Parâmetros) |
+| Orçamento do centro de custo | Financeiro › Budget / Forecast › Centros de custo e aprovação | O responsável pelo centro de custo, de qualquer perfil |
 
 Cada pessoa vê só o que **ela** pode decidir. A decisão segue as mesmas regras da tela de origem: o que lá exige motivo ou classificação também exige aqui.
 
@@ -55,6 +56,7 @@ A janela de confirmação lista tudo o que vai ser decidido. Se algum item não 
 **Itens que só se decidem na tela de origem** (aparecem sem caixa de marcar):
 
 - **inspeção da qualidade**: a decisão depende dos resultados;
+- **orçamento do centro de custo**: abra **Orçamento do meu centro** para conferir as contas e os meses antes de aprovar ou devolver;
 - **pedido de compra sem classificação** (plano de contas): classifique na tela de compras;
 - **receita de tinta e arte**: não têm "recusar" aqui. Para mudar, abra na tela de origem.
 
@@ -76,3 +78,4 @@ A janela de confirmação lista tudo o que vai ser decidido. Se algum item não 
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão: nove tipos de aprovação numa lista só, ordem por urgência e prazo, decisão individual e em lote, número de pendências no menu. |
 | 1.1 | 07/11/2026 | O Decision Center e a Decisão do Dia passaram a ser a Central de Decisões. |
+| 1.2 | 08/11/2026 | Novo tipo: orçamento do centro de custo enviado ao responsável para aprovar. |

@@ -53,7 +53,7 @@ async function conferir(mes) {
     fetchAll(() => sb.from('nfe_notas').select('id,numero,situacao,finalidade,v_nf,eventos,p:nfe_parcelas(id),v:nfe_vinculos(id),f:nfe_fidc_vinculos(id)').eq('empresa_id', e).eq('tipo', 'saida').gte('emissao', ini).lte('emissao', fim).order('numero')).catch(() => null),
     q(sb.from('fidc_propostas').select('id,numero,status,data_operacao,valor_face').eq('empresa_id', e).eq('status', 'Pendente').gte('data_operacao', ini).lte('data_operacao', fim)).catch(() => []),
     q(sb.rpc('orcamento_movimento', { p_empresa: e, p_ano: ano })).catch(() => null),
-    fetchAll(() => sb.from('orcamentos').select('plano_id,mes,valor,cenario').eq('empresa_id', e).eq('ano', ano).eq('cenario', 'budget').eq('mes', m).order('plano_id')).catch(() => []),
+    fetchAll(() => sb.from('orcamentos').select('plano_id,mes,valor,cenario').eq('empresa_id', e).eq('ano', ano).in('cenario', ['budget', 'forecast']).eq('mes', m).order('plano_id')).catch(() => []),
     q(sb.from('orcamento_justificativas').select('plano_id,mes,origem').eq('empresa_id', e).eq('ano', ano).eq('mes', m)).catch(() => []),
     q(sb.rpc('saldos_contas', { p_empresa: e, p_ate: fim })),
     // sem os filtros globais da barra (conta, grupo…): o fechamento é sempre da empresa toda
@@ -61,6 +61,9 @@ async function conferir(mes) {
     fetchAll(() => sb.from('lancamentos').select('id,conta_id,conta_destino_id,valor,plano_id').eq('empresa_id', e).eq('status', 'Pago').not('conta_id', 'is', null).gte('data', ini).lte('data', fim).order('id')),
     q(sb.from('contas_travas').select('*').eq('empresa_id', e).eq('ativo', true)).catch(() => null), // null = trava ainda não instalada no banco
   ]);
+  // tolerância dos desvios: Parâmetros do orçamento (SQL 108); sem eles, o padrão 10% ou R$ 5.000
+  const ocfg = await q(sb.from('orcamento_config').select('tol_pct,tol_valor,base_comparacao,exigir_justificativa').eq('empresa_id', e).maybeSingle()).catch(() => null);
+  const tolPct = ocfg ? +ocfg.tol_pct : TOL_PCT, tolVal = ocfg ? +ocfg.tol_valor : TOL_VAL, baseOrc = ocfg?.base_comparacao || 'budget';
 
   const etapas = [];
   // 1) Extratos: contas com OFX (as que têm extrato importado) — todos os movimentos do mês conciliados ou ignorados
@@ -103,17 +106,17 @@ async function conferir(mes) {
   // 6) Desvios do orçamento no mês justificados (mesma regra padrão do Controle orçamentário: 10% ou R$ 5.000)
   if (mov) {
     const real = new Map(); for (const r of mov) if (r.status === 'Pago' && r.mes === m) real.set(r.plano_id, (real.get(r.plano_id) || 0) + +r.total);
-    const orcM = new Map(); for (const o of orc) orcM.set(o.plano_id, (orcM.get(o.plano_id) || 0) + +o.valor);
+    const orcM = new Map(); for (const o of orc.filter(o => (o.cenario || 'budget') === baseOrc)) orcM.set(o.plano_id, (orcM.get(o.plano_id) || 0) + +o.valor);
     const justif = new Set(just.map(j => j.plano_id));
     const desv = [];
     for (const pid of new Set([...real.keys(), ...orcM.keys()])) {
       const p = cad.planoById[pid]; if (!p || p.nivel !== 2 || !'ES'.includes(p.tipo)) continue;
       const r = real.get(pid) || 0, o = orcM.get(pid) || 0, dv = p.tipo === 'S' ? r - o : o - r;
-      if (dv > Math.max(TOL_VAL, TOL_PCT / 100 * Math.abs(o))) desv.push({ p, dv, j: justif.has(pid) });
+      if (dv > Math.max(tolVal, tolPct / 100 * Math.abs(o))) desv.push({ p, dv, j: justif.has(pid) });
     }
     const falta = desv.filter(d => !d.j).sort((a, b) => b.dv - a.dv);
-    etapas.push({ k: 'orc', titulo: 'Desvios do orçamento justificados', ok: !falta.length, link: '#/controle-orcamento', acao: 'Abrir Controle orçamentário',
-      resumo: !desv.length ? 'Nenhuma conta fora da tolerância (10% ou R$ 5.000) no mês.' : `${desv.length} conta(s) fora da tolerância${falta.length ? `, <strong>${falta.length} sem justificativa</strong>: ${falta.slice(0, 6).map(d => `${esc(d.p.codigo)} ${esc(d.p.nome)} (${money0(d.dv)})`).join('; ')}${falta.length > 6 ? '…' : ''}` : ', todas justificadas'}.`,
+    etapas.push({ k: 'orc', titulo: 'Desvios do orçamento justificados', ok: !falta.length || ocfg?.exigir_justificativa === false, link: '#/controle-orcamento', acao: 'Abrir Controle orçamentário',
+      resumo: !desv.length ? `Nenhuma conta fora da tolerância (${tolPct}% ou ${money0(tolVal)}, comparado com o ${baseOrc}) no mês.` : `${desv.length} conta(s) fora da tolerância${falta.length ? `, <strong>${falta.length} sem justificativa</strong>: ${falta.slice(0, 6).map(d => `${esc(d.p.codigo)} ${esc(d.p.nome)} (${money0(d.dv)})`).join('; ')}${falta.length > 6 ? '…' : ''}` : ', todas justificadas'}.`,
       obs: 'Usa os lançamentos pagos do mês: o resultado muda conforme a conciliação avança.' });
   }
 

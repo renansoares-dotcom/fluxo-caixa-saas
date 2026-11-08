@@ -1190,3 +1190,41 @@ DB.fechamento_config = [{ empresa_id: E, meta_dia_util: 5, papeis_fechar: ['admi
   ];
   window.RPC.fechamento_gerar = () => 0;
 }
+
+// Forecast contínuo (SQL 108) — FICTÍCIOS: budget e forecast 2026 a partir da média dos lançamentos, versões e centros de custo
+{
+  const planos = DB.plano_contas.filter(p => p.nivel === 2 && ['E', 'S'].includes(p.tipo));
+  const media = {};
+  for (const l of DB.lancamentos.filter(l => l.data.startsWith('2026') && l.status === 'Pago')) media[l.plano_id] = (media[l.plano_id] || 0) + +l.valor;
+  let k = 0; DB.orcamentos = [];
+  for (const p of planos) {
+    const base = (media[p.id] || 0) / 10; if (base < 500) continue;
+    for (let m = 1; m <= 12; m++) {
+      const b = Math.round(base * (0.92 + ((k + m) % 5) * 0.03) / 100) * 100;
+      DB.orcamentos.push({ id: 'ob' + (++k) + '-' + m, empresa_id: E, cenario: 'budget', ano: 2026, mes: m, plano_id: p.id, centro_custo_id: null, valor: b });
+      DB.orcamentos.push({ id: 'of' + k + '-' + m, empresa_id: E, cenario: 'forecast', ano: 2026, mes: m, plano_id: p.id, centro_custo_id: null, valor: Math.round(b * (p.tipo === 'S' ? 1.04 : 0.97) / 100) * 100 });
+    }
+  }
+  const dados = (f) => DB.orcamentos.filter(o => o.cenario === 'forecast').map(o => ({ p: o.plano_id, m: o.mes, v: Math.round(o.valor * f(o)) }));
+  const tot = (d, t) => d.filter(x => DB.plano_contas.find(p => p.id === x.p).tipo === t).reduce((s, x) => s + x.v, 0);
+  const V = [[0, null, 'inicial', '2026-08-04T12:00:00Z', () => 1.0], [8, 'tendencia', 'fechamento', '2026-09-05T13:10:00Z', (o) => o.mes > 8 ? 1.02 : 0.99], [9, 'tendencia', 'fechamento', '2026-10-06T13:10:00Z', (o) => o.mes > 9 ? 1.05 : 1.01], [9, 'media', 'manual', '2026-10-20T15:30:00Z', (o) => o.mes > 9 ? 0.98 : 1.01]];
+  DB.forecast_versoes = V.map(([ref_mes, metodo, motivo, criado_em, f], i) => { const d = dados(f); return { id: 'fv' + i, empresa_id: E, ano: 2026, ref_mes, metodo, motivo, criado_em, dados: d, entradas: tot(d, 'E'), saidas: tot(d, 'S') }; });
+  DB.orcamento_config = [{ empresa_id: E, tol_pct: 10, tol_valor: 5000, base_comparacao: 'budget', exigir_justificativa: true, prazo_justificar: 4, avisar: true, avisar_papeis: ['financeiro'], rolar_ao_fechar: true, metodo: 'tendencia', media_meses: 3, tendencia_limite: 30 }];
+  const resp = { 'EXTRUSÃO': 'u1', 'CORTE E SOLDA': 'u3', 'ADMINISTRATIVO': 'u2', 'COMERCIAL': null };
+  DB.centros_custo.forEach(c => { c.responsavel = resp[c.nome] ?? null; });
+  const cc = (n) => DB.centros_custo.find(c => c.nome === n).id;
+  DB.orcamento_cc_aprovacoes = [
+    { empresa_id: E, ano: 2026, cenario: 'budget', centro_custo_id: cc('EXTRUSÃO'), situacao: 'enviado', total: 0, enviado_por: 'u2', enviado_em: '2026-11-06T14:00:00Z' },
+    { empresa_id: E, ano: 2026, cenario: 'budget', centro_custo_id: cc('CORTE E SOLDA'), situacao: 'aprovado', total: 0, enviado_por: 'u2', enviado_em: '2026-11-03T10:00:00Z', decidido_em: '2026-11-04T09:00:00Z' },
+    { empresa_id: E, ano: 2026, cenario: 'budget', centro_custo_id: cc('ADMINISTRATIVO'), situacao: 'devolvido', total: 0, enviado_por: 'u2', enviado_em: '2026-11-03T10:00:00Z', decidido_em: '2026-11-05T16:00:00Z', comentario: 'Faltou o reajuste do aluguel a partir de agosto.' },
+  ];
+  const PCT = { 'EXTRUSÃO': 0.45, 'CORTE E SOLDA': 0.25, 'ADMINISTRATIVO': 0.2, 'COMERCIAL': 0.1 };
+  const valoresCC = (ccId, cen) => { const n = DB.centros_custo.find(c => c.id === ccId)?.nome; const f = PCT[n] || 0;
+    return DB.orcamentos.filter(o => o.cenario === (cen || 'budget')).map(o => { const p = DB.plano_contas.find(x => x.id === o.plano_id);
+      return p.tipo === 'S' ? { plano_id: o.plano_id, codigo: p.codigo, nome: p.nome, tipo: p.tipo, mes: o.mes, valor: Math.round(o.valor * f) } : null; }).filter(x => x && x.valor); };
+  for (const a of DB.orcamento_cc_aprovacoes) a.total = valoresCC(a.centro_custo_id).reduce((s, x) => s + x.valor, 0) - (a.situacao === 'aprovado' ? 0 : 0);
+  window.RPC.orcamento_cc_valores = (a) => valoresCC(a.p_cc, a.p_cenario);
+  window.RPC.orcamento_cc_meus = () => DB.centros_custo.filter(c => c.responsavel === 'u1').map(c => { const a = DB.orcamento_cc_aprovacoes.find(x => x.centro_custo_id === c.id) || {};
+    const tot = valoresCC(c.id).reduce((s, x) => s + x.valor, 0); return { centro_custo_id: c.id, nome: c.nome, cenario: a.cenario || 'budget', situacao: a.situacao || null, total: a.total, enviado_em: a.enviado_em, decidido_em: a.decidido_em, comentario: a.comentario, atual: tot }; });
+  window.RPC.forecast_rolar = () => ({ realizado: 0, projetado: 0 });
+}
