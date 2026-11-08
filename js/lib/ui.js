@@ -33,7 +33,10 @@ export function options(list, { value = 'id', label = 'nome', selected = null, e
   return out;
 }
 
+// ganchos do registro de uso (js/lib/uso.js): formulário fechado e erro mostrado
+export const ganchos = { form: null, erro: null };
 export function toast(msg, err = false) {
+  if (err) try { ganchos.erro?.(msg); } catch {}
   const el = h(`<div class="toast ${err ? 'err' : ''}">${esc(msg)}</div>`);
   $('#toast-root').appendChild(el);
   setTimeout(() => el.remove(), err ? 6000 : 3000);
@@ -50,9 +53,16 @@ export function modal({ title, body, foot = '', wide = false, narrow = false, on
   const b = $('.modal-body', back); typeof body === 'string' ? b.innerHTML = body : b.appendChild(body);
   const f = $('.modal-foot', back); typeof foot === 'string' ? f.innerHTML = foot : f.appendChild(foot);
   if (!foot) f.remove();
-  const close = () => back.remove();
+  // uso da plataforma: formulário (tem campo e botão principal) fechado pelo ✕ ou fora dele = desistência; fechado pela tela = concluído
+  const t0 = Date.now(); let peloUsuario = false;
+  const close = () => {
+    if (!back.isConnected) return;
+    const form = ganchos.form && back.querySelector('.btn.primary') && back.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea');
+    back.remove();
+    if (form) try { ganchos.form(title, Math.round((Date.now() - t0) / 1000), !peloUsuario); } catch {}
+  };
   // fixo: só fecha pelo próprio código (telas obrigatórias, como a verificação em duas etapas)
-  if (!fixo) back.addEventListener('click', e => { if (e.target === back || e.target.closest('[data-close]')) close(); });
+  if (!fixo) back.addEventListener('click', e => { if (e.target === back || e.target.closest('[data-close]')) { peloUsuario = true; close(); } });
   $('#modal-root').appendChild(back);
   onMount && onMount(back, close);
   return { el: back, close };

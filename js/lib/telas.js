@@ -33,7 +33,7 @@ export const TELAS = {
   'contab/imobilizado': 'CTB007', 'contab/inventario': 'CTB008', 'contab/imobilizado-parametros': 'CTB009',
   // Cadastros
   'cadastros/plano': 'CAD001', 'cadastros/contas': 'CAD002', 'cadastros/favorecidos': 'CAD003', 'cadastros/centros': 'CAD004', 'cadastros/empresa': 'CAD005',
-  'contratos': 'CAD006', 'config': 'CAD007', 'auditoria': 'CAD008', 'config/email': 'CAD009',
+  'contratos': 'CAD006', 'config': 'CAD007', 'auditoria': 'CAD008', 'config/email': 'CAD009', 'uso': 'CAD010',
   // Ajuda e Comunicação
   'tutoriais': 'AJU001', 'conversas': 'AJU002', 'meus-avisos': 'AJU003',
 };

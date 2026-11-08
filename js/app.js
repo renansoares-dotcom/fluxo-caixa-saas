@@ -13,6 +13,7 @@ import { esquecerRegimes } from './lib/regime.js';
 import { abrirLancamento } from './lib/lanc-form.js';
 import { montarMenu, marcarTela, modoPainel, cliqueArea, fecharPainel } from './lib/menu.js';
 import { codigoDa } from './lib/telas.js';
+import { iniciarUso, pararUso, telaUso } from './lib/uso.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -112,6 +113,7 @@ const routes = {
   'contratos': () => import(`./pages/contratos.js?v=${V}`),
   'config': () => import(`./pages/config.js?v=${V}`),
   'auditoria': () => import(`./pages/auditoria.js?v=${V}`),
+  'uso': () => import(`./pages/uso.js?v=${V}`),
 };
 
 // ---------- Tema ----------
@@ -200,7 +202,7 @@ function trocarSenha(recuperacao = false) {
 }
 $('#trocar-senha').onclick = () => trocarSenha(false);
 
-const logout = async () => { pararNotificacoes(); fecharMini(); pararChat(); await sb.auth.signOut(); location.hash = ''; };
+const logout = async () => { pararUso(); pararNotificacoes(); fecharMini(); pararChat(); await sb.auth.signOut(); location.hash = ''; };
 $('#logout').onclick = logout; $('#logout-2').onclick = logout;
 $('#mfa-btn') && ($('#mfa-btn').onclick = () => gerenciarMFA());
 // balão do topo: no computador abre o mini-chat por cima da tela; no celular vai para a tela Conversas
@@ -275,6 +277,7 @@ async function entrarEmpresa(emp, papel, areas) {
   state.areas = Array.isArray(areas) && areas.length ? areas : null;
   aplicarAreas();
   iniciarNotificacoes();
+  iniciarUso().catch(() => {});
   contarAprovacoesMenu();
   iniciarChat();
   iniciarBusca();
@@ -358,7 +361,7 @@ async function render() {
     const nomeTela = $(`#nav a[data-route="${CSS.escape(route)}"]`)?.dataset.nome || mod.title;
     $('#page-title').textContent = nomeTela;
     // código da tela (js/lib/telas.js), como no Iniflex
-    { const cod = codigoDa(route), pc = $('#page-cod'); if (pc) { pc.textContent = cod; pc.hidden = !cod; } marcarTela(route); }
+    { const cod = codigoDa(route), pc = $('#page-cod'); if (pc) { pc.textContent = cod; pc.hidden = !cod; } marcarTela(route); telaUso(route); }
     // botão "?": manual de uso desta tela (Ajuda › Tutoriais)
     { const man = manualDaRota(route), b = $('#ajuda-btn'); if (b) { b.hidden = !man || (man.rh && !temRH()); if (man) b.href = `#/tutoriais?m=${man.id}`; } }
     // trilha: Área › Seção (de onde a página fica no menu)

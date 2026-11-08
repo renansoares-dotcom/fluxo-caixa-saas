@@ -1011,3 +1011,33 @@ window.FN = {
   ].map(([regra, titulo, detalhe, u, d, visto], i) => ({ id: 500 + i, empresa_id: E, auditoria_id: regra === 'banco_beneficiario' ? 9002 : null, regra, titulo, detalhe, user_email: u + '@exemplo.com.br', criado_em: H(d, 1), visto_por: visto, visto_em: visto ? H(d - 1, 0) : null }));
   DB.audit_alertas_config = [];
 }
+
+// Uso da plataforma (SQL 099) — FICTÍCIOS
+{
+  DB.uso_config = []; DB.uso_eventos = [];
+  const H = (d) => new Date(Date.now() - d * 864e5).toISOString();
+  const telas = [['lancamentos', 214, 6, 61200, 286, 8.4], ['conciliacao', 132, 3, 47800, 362, 4.5], ['hoje', 410, 9, 22100, 54, 41.2], ['dashboard', 188, 7, 18400, 98, 22.3],
+    ['paraquedas', 96, 4, 15800, 165, 12.5], ['compras/pedidos', 71, 3, 14100, 199, 9.9], ['fluxo-mensal', 64, 5, 11200, 175, 14.1], ['dre', 38, 4, 6900, 182, 18.4],
+    ['fidc-recompras', 22, 2, 5300, 241, 9.1], ['cadastros/favorecidos', 57, 5, 4100, 72, 35.1], ['relatorio', 19, 3, 2600, 137, 57.9], ['decisoes', 31, 3, 2200, 71, 29.0]]
+    .map(([rota, acessos, usuarios, segundos, media, rejeicao]) => ({ rota, acessos, usuarios, segundos, media, rejeicao }));
+  const perfis = [['financeiro', 'lancamentos', 160, 48000], ['financeiro', 'conciliacao', 120, 44000], ['financeiro', 'fluxo-mensal', 40, 8000], ['financeiro', 'hoje', 180, 9000], ['financeiro', 'cadastros/favorecidos', 40, 3000],
+    ['diretor', 'dashboard', 120, 12000], ['diretor', 'dre', 30, 6000], ['diretor', 'decisoes', 25, 2000], ['diretor', 'hoje', 90, 5000],
+    ['compras', 'paraquedas', 90, 15000], ['compras', 'compras/pedidos', 70, 14000], ['compras', 'hoje', 60, 3000],
+    ['admin', 'lancamentos', 50, 13000], ['admin', 'dashboard', 60, 6000], ['admin', 'fidc-recompras', 22, 5300], ['admin', 'hoje', 80, 5100]]
+    .map(([papel, rota, acessos, segundos]) => ({ papel, rota, acessos, segundos }));
+  const pessoas = [['Ana Souza', 'financeiro', 22, 241, 78400, 'lancamentos', 0], ['Beatriz Rocha', 'financeiro', 20, 198, 56300, 'conciliacao', 0], ['Renata Alves', 'admin', 18, 212, 29400, 'lancamentos', 0],
+    ['Carlos Lima', 'diretor', 14, 265, 25000, 'dashboard', 1], ['Diego Martins', 'compras', 19, 220, 32000, 'paraquedas', 0], ['Fernanda Costa', 'financeiro', 6, 61, 8200, 'lancamentos', 4]]
+    .map(([nome, papel, dias, acessos, segundos, tela_mais, d], i) => ({ user_id: 'u' + (i + 1), nome, email: nome.toLowerCase().split(' ')[0] + '@exemplo.com.br', papel, dias, acessos, segundos, tela_mais, ultimo: H(d) }));
+  const forms = [['paraquedas', 'Novo pagamento antecipado', 41, 24, 17, 212], ['lancamentos', 'Novo lançamento', 186, 171, 15, 48], ['cadastros/favorecidos', 'Novo beneficiário', 23, 12, 11, 165],
+    ['conciliacao', 'Criar lançamento a partir do extrato', 64, 57, 7, 31], ['fidc-recompras', 'Registrar recompra', 14, 9, 5, 274], ['compras/pedidos', 'Novo pedido de compra', 29, 26, 3, 120]]
+    .map(([rota, titulo, abertos, concluidos, abandonos, seg_ate_desistir]) => ({ rota, titulo, abertos, concluidos, abandonos, seg_ate_desistir }));
+  const erros = [['paraquedas', 'Informe o CNPJ ou CPF do fornecedor', 19, 3, 0], ['lancamentos', 'Informe o plano de contas', 14, 4, 1], ['cadastros/favorecidos', 'Já existe beneficiário com o documento #', 7, 2, 2],
+    ['conciliacao', 'Período travado até #: peça ao administrador', 4, 2, 5], ['fidc-recompras', 'Escolha o motivo da recompra', 3, 1, 3]]
+    .map(([rota, titulo, vezes, usuarios, d]) => ({ rota, titulo, vezes, usuarios, ultimo: H(d) }));
+  const dias = Array.from({ length: 30 }, (_, i) => { const d = new Date(Date.now() - (29 - i) * 864e5), fds = [0, 6].includes(d.getDay());
+    return { dia: d.toISOString().slice(0, 10), usuarios: fds ? (i % 3 ? 0 : 1) : 4 + ((i * 7) % 3), horas: fds ? 0.4 : 7 + ((i * 5) % 4) }; });
+  window.RPC.uso_resumo = () => ({ rejeicao_segundos: 10, guardar_dias: 180,
+    kpis: { usuarios: 6, membros: 8, acessos: 1342, horas: 63.4, dias_pessoa: 99, forms: 357, abandonos: 58, erros: 47 },
+    telas, perfis, pessoas, forms, erros, dias,
+    sem_acesso: [{ user_id: 'u7', nome: 'Gustavo Pereira', email: 'gustavo@exemplo.com.br', papel: 'leitura', ultimo: H(52) }, { user_id: 'u8', nome: 'Helena Dias', email: 'helena@exemplo.com.br', papel: 'vendas', ultimo: null }] });
+}

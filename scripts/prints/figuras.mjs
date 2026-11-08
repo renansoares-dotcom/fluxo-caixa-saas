@@ -113,6 +113,11 @@ export const FIGS = [
   ['lanc-automacao', 'lanc-recorrentes', '### 5.1', 'Cadastrar o recorrente, com a prévia dos próximos vencimentos', 'click:tbody tr:nth-child(1) [data-ed]'],
   ['lancamentos', 'lancamentos', '### 3.5', 'Editar selecionados: plano, centro de custo, conta e favorecido de vários lançamentos', 'click:tbody tr:nth-child(3) .sel|click:tbody tr:nth-child(4) .sel|click:#lote'],
   ['lancamentos', 'lancamentos', '### 3.6', 'Dividir o lançamento por centro de custo, com o modelo de rateio', 'click:tbody tr:nth-child(5) td:nth-child(4)|click:#lf-div|scroll:#dv-m'],
+  // Uso da plataforma (07/11/2026)
+  ['uso-plataforma', 'uso', '## 4.', 'Uso da Plataforma: indicadores, pessoas por dia e as telas mais usadas'],
+  ['uso-plataforma', 'uso', '### 5.2', 'Perfis: a fatia do tempo de cada perfil nas telas em que ele mais trabalha', 'click:[data-a="perfis"]|scroll:#us-abas'],
+  ['uso-plataforma', 'uso', '### 5.4', 'Onde desistem: os formulários abertos, concluídos e abandonados, com a taxa de desistência', 'click:[data-a="forms"]'],
+  ['uso-plataforma', 'uso', '## 6.', 'Parâmetros do uso da plataforma', 'click:#us-par'],
   // Recompras FIDC (07/11/2026)
   ['fidc-recompras', 'fidc-recompras', '## 3.', 'Recompras: as pendências sem registro, os indicadores e os títulos recomprados'],
   ['fidc-recompras', 'fidc-recompras', '### 3.1', 'Registrar a recompra: o título, o motivo (aqui, devolução de mercadoria), a nota de devolução e o que volta para a carteira', 'click:#rc-novo|click:.rc-res [data-i]|click:[data-mo="mo-devolucao"]'],
