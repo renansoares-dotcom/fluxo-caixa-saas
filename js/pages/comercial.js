@@ -64,7 +64,7 @@ export async function render(root) {
     tk: { label: 'Ticket médio por nota', valor: money0(noMes.length ? fatMes / noMes.length : 0), sub: `${noMes.length} nota(s) no mês`, abrir: () => drawer({ titulo: 'Ticket médio', corpo: '<p class="small">Valor faturado no mês ÷ número de notas de venda.</p>' }) },
     at: { label: 'Clientes ativos (90 dias)', valor: String(ativos.length), sub: `${novos.length} novo(s)`, abrir: () => drawer({ titulo: 'Clientes que compraram nos últimos 90 dias', corpo: listaCli(ativos) }) },
     es: { label: 'Clientes esfriando', valor: String(esfr.length), tom: esfr.length ? 'warn' : '', sub: money0(esfr.reduce((t, c) => t + c.v12, 0)) + ' em 12 meses',
-      abrir: () => drawer({ titulo: 'Clientes esfriando', subtitulo: 'sem comprar há mais de 1,5× o intervalo normal deles', corpo: listaCli(esfr) }) },
+      abrir: () => drawer({ titulo: 'Clientes esfriando', subtitulo: `sem comprar há mais de ${String(B.cfg?.esfriando_fator ?? 1.5).replace('.', ',')}× o intervalo normal deles`, corpo: listaCli(esfr) }) },
     in: { label: 'Inativos (180+ dias)', valor: String(inat.length), tom: inat.length ? 'neg' : '', sub: 'compraram nos últimos 2 anos', abrir: () => drawer({ titulo: 'Clientes inativos', corpo: listaCli(inat) }) },
     fu: { label: 'Funil ponderado', valor: money0(pipe), sub: `${opAb.length} oportunidade(s) abertas`, abrir: () => { location.hash = '#/comercial/funil'; } },
   };

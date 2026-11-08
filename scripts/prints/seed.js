@@ -1738,3 +1738,35 @@ window.RPC.pag_remessa_gravar = () => null;
         inspecoes: [{ numero: 205, etapa: 'processo', situacao: 'aprovada', data: dd(-9), inspetor: 'Paulo', plano: 'Liberação da extrusão', caracteristicas: [{ nome: 'Tratamento corona', tipo: 'medida', min: 38, unidade: 'dyn' }], resultados: [{ nome: 'Tratamento corona', valores: [40, 41, 40] }] }] }] };
   window.RPC.portal_certificado = () => CERT; window.RPC.qual_certificado = () => CERT;
 }
+
+// Curva ABC, mapa e rotas (SQL 129) — cidades e visitas FICTÍCIAS
+{
+  const CID = [[2611606, 'Recife', 'PE', -8.0467, -34.8771], [2604106, 'Caruaru', 'PE', -8.2845, -35.9699], [2504009, 'Campina Grande', 'PB', -7.222, -35.8731], [2607901, 'Jaboatão dos Guararapes', 'PE', -8.113, -35.015],
+    [2507507, 'João Pessoa', 'PB', -7.1151, -34.8641], [2606002, 'Garanhuns', 'PE', -8.8824, -36.4966], [2704302, 'Maceió', 'AL', -9.666, -35.735], [2609600, 'Olinda', 'PE', -8.0102, -34.8545],
+    [2927408, 'Salvador', 'BA', -12.9718, -38.5011], [2408102, 'Natal', 'RN', -5.7936, -35.1986], [2604007, 'Carpina', 'PE', -7.8457, -35.2514], [2304400, 'Fortaleza', 'CE', -3.7166, -38.5423],
+    [2613107, 'São Caetano', 'PE', -8.3376, -36.2869], [3550308, 'São Paulo', 'SP', -23.5329, -46.6395], [2602902, 'Cabo de Santo Agostinho', 'PE', -8.2822, -35.0253], [2610707, 'Paulista', 'PE', -7.934, -34.8684]];
+  DB.geo_municipios = CID.map(([codigo_ibge, nome, uf, lat, lng]) => ({ codigo_ibge, nome, uf, lat, lng }));
+  // mais clientes fictícios, com histórico de notas de 24 meses (perfis: frequente, esfriando, inativo, novo)
+  const NOMES = ['MERCADINHO SOL NASCENTE', 'PADARIA TRIGO BOM', 'DISTRIBUIDORA AGRESTE', 'SUPERMERCADO BOA VIZINHANÇA', 'ATACAREJO DO POVO', 'FRIGORÍFICO SERTANEJO', 'LATICÍNIOS VALE VERDE',
+    'CAFÉ SERRA ALTA', 'DOCES DA VOVÓ', 'BISCOITOS PRIMAVERA', 'SORVETES POLAR', 'TEMPEROS DO NORDESTE', 'AÇAÍ DA PRAIA', 'RAÇÕES CAMPEÃ', 'POLPAS TROPICAL', 'ÁGUA MINERAL FONTE CLARA',
+    'MASSAS DONA BENTA FICTÍCIA', 'GRANJA OVO FELIZ', 'CASA DO PÃO', 'EMPÓRIO NATURAL'];
+  const PERF = [[22, 9], [14, 5], [20, 5], [26, 3], [30, 3], [40, 4], [35, 2.4], [28, 2], [21, 1.2], [45, 1], [60, 0.9], [30, 0.7], [18, 0.5], [70, 0.45], [25, 0.35], [90, 0.3], [35, 0.25], [50, 0.15], [40, 0.1], [30, 0.08]];
+  const PARADO = { 2: 70, 5: 95, 9: 210, 13: 260, 16: 75 }, NOVO = { 11: 60, 18: 40 };
+  const hoje0 = new Date(), dd0 = (n) => new Date(hoje0.getTime() - n * 864e5).toISOString().slice(0, 10);
+  const extra = NOMES.map((nome, i) => ({ id: 'fv-x' + i, empresa_id: E, tipo: 'CLIENTES', nome: nome + ' LTDA', documento: String(10000000000100 + i * 1013), ativo: true }));
+  const notasX = [];
+  extra.forEach((f, i) => { const [cada, mil] = PERF[i], fim = PARADO[i] || (i % 3), ini = NOVO[i] || 720; let n = 0;
+    for (let d = ini; d >= fim; d -= cada) notasX.push({ nota_id: f.id + '-' + n, numero: 5000 + notasX.length, emissao: dd0(d), favorecido_id: f.id, dest_doc: f.documento, dest_nome: f.nome, dest_uf: 'PE', valor: Math.round(mil * 1000 * cada / 30 * (0.85 + ((n++ * 37) % 30) / 100)), representante_id: i % 2 ? 'rp1' : 'rp2' }); });
+  const cc0 = window.RPC.comercial_clientes, cn0 = window.RPC.comercial_notas;
+  window.RPC.comercial_clientes = (a) => cc0(a).concat(extra.map((f, i) => ({ id: f.id, nome: f.nome, nome_fantasia: null, documento: f.documento, segmento: 'VAREJO', representante_id: i % 2 ? 'rp1' : 'rp2', representante: i % 2 ? 'MARCOS VENDAS' : 'JULIANA REPRESENTAÇÕES', limite_credito: 50000, prazo_padrao: '28', email: null, telefone: null, ativo: true })));
+  window.RPC.comercial_notas = (a) => cn0(a).concat(notasX);
+  const cli = DB.favorecidos.filter(f => f.tipo === 'CLIENTES').concat(extra);
+  window.RPC.comercial_geo_clientes = () => cli.map((f, i) => { if (i === cli.length - 1) return { id: f.id, cod_municipio: null, municipio: null, uf: null, lat: null, lng: null };
+    const [cod_municipio, municipio, uf, lat, lng] = CID[i % CID.length]; return { id: f.id, cod_municipio, municipio, uf, lat, lng }; });
+  window.RPC.comercial_origem = () => [{ codigo_ibge: 2604106, nome: 'Caruaru', uf: 'PE', lat: -8.2845, lng: -35.9699 }];
+  window.RPC.comercial_geo_preencher = () => 0;
+  DB.comercial_config = [{ empresa_id: E, abc_a_pct: 80, abc_b_pct: 95, abc_meses: 12, esfriando_fator: 1.5, esfriando_min_dias: 20, inativo_dias: 180, novo_dias: 90, visita_dias_a: 30, visita_dias_b: 60, visita_dias_c: 120,
+    acao_a: 'visita', acao_b: 'ligacao', acao_c: 'whatsapp', prazo_acao_dias: 7, origem_cod_municipio: 2604106, visitas_por_dia: 4, km_por_dia: 350, fator_estrada: 1.25, raio_km: 250 }];
+  const H0 = (d) => new Date(Date.now() - d * 864e5).toISOString();
+  DB.comercial_interacoes = (DB.comercial_interacoes || []).concat(cli.slice(0, 6).map((f, i) => ({ id: 'civ' + i, empresa_id: E, favorecido_id: f.id, tipo: 'visita', data: H0([12, 75, 20, 140, 45, 95][i]), resumo: 'Visita de relacionamento', concluido: true })));
+}

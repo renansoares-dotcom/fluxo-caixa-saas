@@ -1169,3 +1169,17 @@ table.metas-grade td.sticky{min-width:150px;white-space:normal}
 .fc-barra{height:6px;background:var(--border);border-radius:99px;margin:8px 0 2px;overflow:hidden}.fc-barra i{display:block;height:100%;background:var(--primary)}
 .fc-resp{display:flex;gap:14px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--border)}
 .fc-chks{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+/* curva ABC e mapa dos clientes (melhoria 4.1) */
+.abc{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;font-weight:700;font-size:12px;color:#fff}
+.abc-A{background:#1f6f43}.abc-B{background:#b7791f}.abc-C{background:#8a94a6}
+.mp-wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px}
+@media (max-width:900px){.mp-wrap{grid-template-columns:1fr}}
+.mp-svg{width:100%;height:auto;max-height:72vh;background:var(--surface,#fff);border-radius:8px}
+.mp-svg path.uf{stroke:var(--card,#fff);stroke-width:1.2;cursor:pointer;vector-effect:non-scaling-stroke}
+.mp-svg path.uf:hover{opacity:.85}
+.mp-svg circle.cid{stroke:#fff;stroke-width:1;opacity:.85;cursor:pointer;vector-effect:non-scaling-stroke}
+.mp-svg circle.cid:hover,.mp-svg circle.cid.on{stroke:#111;stroke-width:2;opacity:1}
+.mp-svg text.uf-sig{font-size:11px;fill:#334155;pointer-events:none;font-weight:600}
+.mp-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;align-items:center}
+.mp-leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.rt-dia{border-left:3px solid var(--primary);padding:6px 10px;margin-bottom:10px}

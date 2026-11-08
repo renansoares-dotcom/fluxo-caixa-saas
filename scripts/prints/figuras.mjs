@@ -82,6 +82,10 @@ export const FIGS = [
   ['compras', 'compras/pedidos', '### 4.4', 'Novo pedido de compra: Pedido e Itens', 'click:#pc-novo'],
   ['comercial', 'comercial/funil', '### 5.1', 'Nova oportunidade: Cliente e Oportunidade', 'click:#fu-nova'],
   ['comercial', 'comercial/vendedores', '## 6.', 'Representantes e Metas, com o seletor de meses aberto', 'click:#rv-tb .col-sel button'],
+  ['comercial', 'comercial/mapa', '## 7.', 'Curva ABC: as classes, a curva de Pareto e a ação sugerida', 'abc'],
+  ['comercial', 'comercial/mapa', '### 7.2', 'Mapa dos clientes: faturamento por estado e por cidade, com a situação', 'mapa'],
+  ['comercial', 'comercial/mapa', '### 7.3', 'Visitas por rota: quem visitar, os dias de visita e os clientes longe demais', 'rotas|click:#rt-montar'],
+  ['comercial', 'comercial/mapa', '### 7.4', 'Parâmetros comerciais', 'par'],
   ['lancamentos', 'lancamentos', '### 3.1', 'Seletor Colunas da lista de lançamentos', 'click:#bulk .col-sel button'],
   // Ativo Imobilizado (07/11/2026)
   ['imobilizado', 'contab/imobilizado', '## 3.', 'Painel do imobilizado: valor líquido, depreciação prevista e grau de depreciação'],

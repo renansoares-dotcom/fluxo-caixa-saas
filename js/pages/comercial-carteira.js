@@ -4,13 +4,14 @@ import { sb, state, q } from '../lib/data.js';
 import { $, $$, esc, money, money0, dateBR, today, fail, toast, modal, exportXLSX, pct } from '../lib/ui.js';
 import { baseComercial, limparBaseComercial, ST_CLI, TIPOS_INT, podeEditarCom, interno, addDias } from '../lib/comercial.js';
 import { badge, qtd, unit } from '../lib/compras.js';
+import { acaoSugerida, ACOES } from '../lib/comercial-geo.js';
 
 export const title = 'Carteira e Agenda';
 const ui = { aba: 'carteira', st: '', busca: '', rep: '' };
 let B = null, AG = [];
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Carteira de clientes</h2><div class="muted small">Situação pelo histórico de notas: esfriando = sem comprar há mais de 1,5× o intervalo normal do cliente; inativo = 180+ dias.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Carteira de clientes</h2><div class="muted small" id="cc-regra">Situação pelo histórico de notas: esfriando = sem comprar há mais de 1,5× o intervalo normal do cliente; inativo = 180+ dias.</div></div>
       <button class="btn ghost" id="cc-xls">Excel</button></div>
     <div class="card toolbar"><div class="chips" id="cc-aba"><span class="chip ${ui.aba === 'carteira' ? 'on' : ''}" data-a="carteira">Carteira</span><span class="chip ${ui.aba === 'agenda' ? 'on' : ''}" data-a="agenda">Agenda de contatos</span></div></div>
     <div id="cc-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
@@ -52,15 +53,31 @@ function pintar(root) {
   corpo.innerHTML = `<div class="card toolbar"><div class="chips" id="cc-st"><span class="chip ${!ui.st ? 'on' : ''}" data-s="">Todos · ${L.length}</span>${Object.entries(ST_CLI).filter(([k]) => cnt[k]).map(([k, [t]]) => `<span class="chip ${ui.st === k ? 'on' : ''}" data-s="${k}">${t} · ${cnt[k]}</span>`).join('')}</div>
       ${interno() && reps.length ? `<label>Representante<select id="cc-rep"><option value="">Todos</option>${reps.map(([id, n]) => `<option value="${id}" ${ui.rep === id ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}
       <input id="cc-b" placeholder="Procurar cliente ou CNPJ" value="${esc(ui.busca)}" style="min-width:220px"></div>
-    <div class="card flush" style="margin-top:12px"><div class="table-wrap" style="max-height:66vh"><table><thead><tr><th>Cliente</th><th>Representante</th><th>Situação</th><th>Última compra</th><th class="num">Intervalo médio</th><th class="num">12 meses</th><th class="num">Variação</th><th>Próximo contato</th></tr></thead><tbody>
-    ${vis.map(({ c, i, prox }) => `<tr class="clickable" data-id="${c.id}"><td class="wrap">${esc(c.nome)}${c.nome_fantasia ? ` <span class="muted small">${esc(c.nome_fantasia)}</span>` : ''}</td><td>${esc(c.representante || '')}</td>
-      <td>${badge(ST_CLI, i.st)}</td><td>${i.ultima ? `${dateBR(i.ultima)} <span class="muted small">${i.desde} d</span>` : ''}</td><td class="num">${i.intervalo ? Math.round(i.intervalo) + ' d' : ''}</td>
+    <div class="card flush" style="margin-top:12px"><div class="table-wrap" style="max-height:66vh"><table><thead><tr><th>Cliente</th><th>Representante</th><th title="Curva ABC pelo faturamento">ABC</th><th>Situação</th><th>Última compra</th><th class="num">Intervalo médio</th><th class="num">12 meses</th><th class="num">Variação</th><th>Próximo contato</th></tr></thead><tbody>
+    ${vis.map(({ c, i, prox }) => `<tr class="clickable" data-id="${c.id}"><td class="wrap">${esc(c.nome)}${c.nome_fantasia ? ` <span class="muted small">${esc(c.nome_fantasia)}</span>` : ''}</td><td>${esc(c.representante || '')}</td><td>${i.classe ? `<span class="abc abc-${i.classe}">${i.classe}</span>` : ''}</td>
+      <td>${badge(ST_CLI, i.st)}${(() => { const a = !prox && acaoSugerida(i, today(), B.cfg); return a ? `<div class="small" style="margin-top:3px">💡 ${esc(a.texto)}${podeEditarCom() ? ` <button class="btn ghost small" data-ag="${c.id}">Agendar</button>` : ''}</div>` : ''; })()}</td><td>${i.ultima ? `${dateBR(i.ultima)} <span class="muted small">${i.desde} d</span>` : ''}</td><td class="num">${i.intervalo ? Math.round(i.intervalo) + ' d' : ''}</td>
       <td class="num">${i.v12 ? money0(i.v12) : ''}</td><td class="num ${i.v12a && i.v12 < i.v12a ? 'neg' : 'pos'}">${i.v12a ? pct(i.v12 / i.v12a - 1, 0) : ''}</td><td class="${prox && prox < today() ? 'neg' : ''}">${dateBR(prox) || ''}</td></tr>`).join('')
-    || '<tr><td colspan="8" class="empty">Nenhum cliente neste filtro.</td></tr>'}</tbody></table></div></div>`;
+    || '<tr><td colspan="9" class="empty">Nenhum cliente neste filtro.</td></tr>'}</tbody></table></div></div>`;
   $('#cc-st', corpo).onclick = (e) => { const s = e.target.closest('[data-s]'); if (s) { ui.st = s.dataset.s; pintar(root); } };
   $('#cc-rep', corpo) && ($('#cc-rep', corpo).onchange = (e) => { ui.rep = e.target.value; pintar(root); });
   $('#cc-b', corpo).oninput = (e) => { ui.busca = e.target.value; clearTimeout(pintar._t); pintar._t = setTimeout(() => { pintar(root); const i = $('#cc-b', root); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
   $$('tr[data-id]', corpo).forEach(tr => tr.onclick = () => ficha(tr.dataset.id, root));
+  $$('[data-ag]', corpo).forEach(b => b.onclick = (e) => { e.stopPropagation(); agendarAcao(b.dataset.ag, root); });
+  const cf = B.cfg; $('#cc-regra', root).textContent = `Situação pelo histórico de notas: esfriando = sem comprar há mais de ${String(cf.esfriando_fator).replace('.', ',')}× o intervalo normal do cliente; inativo = ${cf.inativo_dias}+ dias. ABC pelo faturamento de ${cf.abc_meses} meses (A até ${String(cf.abc_a_pct).replace('.', ',')}%, B até ${String(cf.abc_b_pct).replace('.', ',')}%).`;
+}
+
+// ação sugerida para o cliente esfriando ou inativo (melhoria 4.1): agenda o próximo contato com o tipo e o prazo da classe
+function agendarAcao(id, root) {
+  const c = B.clientes.find(x => x.id === id), i = B.info[id], a = acaoSugerida(i, today(), B.cfg); if (!a) return;
+  const m = modal({ title: `Agendar — ${esc(c.nome)}`, narrow: true, body: `<p class="small">${esc(a.texto)}</p>
+    <label>Tipo<select id="ag-t">${Object.entries(ACOES).map(([k, v]) => `<option value="${k}" ${k === a.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <label style="margin-top:8px">Quando<input type="date" id="ag-d" value="${a.ate}"></label>
+    <label style="margin-top:8px">Assunto<input id="ag-a" value="Retomar as compras: ${esc(i.desde)} dias sem pedido"></label>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ag-ok">Agendar</button>' });
+  $('#ag-ok', m.el).onclick = async (ev) => { ev.target.disabled = true;
+    try { await q(sb.from('comercial_interacoes').insert({ empresa_id: state.empresa.id, favorecido_id: id, tipo: 'anotacao', resumo: `Ação sugerida: ${a.texto}`,
+        proximo_contato: $('#ag-d', m.el).value || a.ate, proximo_assunto: `${ACOES[$('#ag-t', m.el).value]}: ${$('#ag-a', m.el).value.trim()}` }));
+      toast('Agendado na Agenda de contatos'); m.close(); limparBaseComercial(); await carregar(root); } catch (err) { fail(err); ev.target.disabled = false; } };
 }
 
 // ------------------------------------------------------------ ficha do cliente

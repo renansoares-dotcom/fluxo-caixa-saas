@@ -40,7 +40,7 @@ export const MANUAIS = [
     resumo: 'Registrar a recompra com o motivo (inadimplência, devolução, substituição, abatimento…): saída, encargos, o que acontece com o título, a linha na DRE e a contrapartida contábil; taxa de recompra por cliente e fundo.' },
   { id: 'duplicatas', titulo: 'Duplicatas para endosso', area: 'Financeiro', rotas: ['duplicatas'],
     resumo: 'Montar as duplicatas e o endosso, gerar o PDF para assinatura digital e cancelar com termo.' },
-  { id: 'comercial', titulo: 'Comercial — painel, carteira, funil e metas', area: 'Comercial', rotas: ['comercial', 'comercial/carteira', 'comercial/funil', 'comercial/vendedores'],
+  { id: 'comercial', titulo: 'Comercial — painel, carteira, funil e metas', area: 'Comercial', rotas: ['comercial', 'comercial/carteira', 'comercial/funil', 'comercial/vendedores', 'comercial/mapa'],
     resumo: 'Faturado × meta, situação dos clientes, contatos, oportunidades, propostas com calculadora e metas.' },
   { id: 'preimpressao', titulo: 'Pré-impressão — artes, aprovação do cliente no Portal e clicheria', area: 'Comercial', rotas: ['preimpressao', 'preimpressao/artes'],
     resumo: 'Ficha técnica da embalagem, versões com SHA-256, checklist, pinos, comparação e diferença entre versões, aprovação do cliente no Portal com prova e certificado, clicheria, liberação e trava da OP.' },

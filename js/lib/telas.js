@@ -11,7 +11,7 @@ export const TELAS = {
   'orcamento': 'FIN014', 'orcado-realizado': 'FIN015', 'controle-orcamento': 'FIN016',
   'fidc': 'FIN017', 'fidc-propostas': 'FIN018', 'fidc-carteira': 'FIN019', 'fidc-recompras': 'FIN021', 'duplicatas': 'FIN020', 'lanc-regras': 'FIN022', 'lanc-recorrentes': 'FIN023', 'cobranca': 'FIN024',
   // Comercial
-  'comercial': 'COM001', 'comercial/carteira': 'COM002', 'comercial/funil': 'COM003', 'comercial/vendedores': 'COM004', 'preimpressao': 'COM005', 'preimpressao/artes': 'COM006',
+  'comercial': 'COM001', 'comercial/carteira': 'COM002', 'comercial/funil': 'COM003', 'comercial/vendedores': 'COM004', 'comercial/mapa': 'COM007', 'preimpressao': 'COM005', 'preimpressao/artes': 'COM006',
   // Compras
   'compras': 'CMP001', 'compras/requisicoes': 'CMP002', 'compras/pedidos': 'CMP003', 'compras/recebimentos': 'CMP004',
   // Estoque
