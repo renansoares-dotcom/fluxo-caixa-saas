@@ -1,6 +1,7 @@
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, $$, esc, money, cls, dateBR, today, options, fail, toast, parseNum, loading, logoPNG, modal, MESES_CURTO } from '../lib/ui.js';
 import { padronizarPDF, pdfCabecalho, pdfTitulo, pdfRodapes } from '../lib/relatorio.js';
+import { detalheAlcadas, modalAlcadas, modalRemessa, listaRemessas } from '../lib/pag-alcadas-ui.js';
 
 export const title = 'Autorização de Pagamentos';
 const f = { de: '', ate: '', conta: '', grupo: '', cc: '', favorecido: '', situacao: '', prioridade: '' };
@@ -58,7 +59,10 @@ export async function render(root) {
       </div>
       <div class="table-wrap" id="tbl"></div>
     </div>
-    <div class="card flush"><div style="padding:16px 16px 0"><h2>Autorizações emitidas</h2></div><div class="table-wrap" id="hist"></div></div>`;
+    <div class="card flush"><div class="card-head" style="padding:16px 16px 0;margin:0"><h2 style="margin:0">Autorizações emitidas</h2>
+      <div class="toolbar" style="margin:0">${state.papel === 'admin' ? '<button class="btn small" id="alc">Alçadas</button>' : ''}<button class="btn small" id="rems">Remessas</button></div></div><div class="table-wrap" id="hist"></div></div>`;
+  $('#alc', root) && ($('#alc', root).onclick = () => modalAlcadas(() => historico(root)));
+  $('#rems', root).onclick = () => listaRemessas();
   $('#flt', root).addEventListener('change', (e) => { f[e.target.name] = e.target.value; load(root); });
   if (podeEditar()) {
     const marcar = (fn) => { for (const it of itens) marc[it.id] = { ...marc[it.id], autoriza: fn(it), valor: marc[it.id]?.valor ?? Math.abs(+it.valor_sinal) }; desenhar(root); };
@@ -185,6 +189,9 @@ async function gerar(root) {
       observacao: [justDoItem(it) ? `Acima do orçado: ${justDoItem(it)}` : '', marc[it.id]?.obs || ''].filter(Boolean).join(' · ') || null,
     }));
     for (let i = 0; i < rows.length; i += 500) await q(sb.from('autorizacao_itens').insert(rows.slice(i, i + 500)));
+    // alçadas (SQL 109): cada título marcado vai para a sua alçada e os aprovadores são avisados
+    const prep = await q(sb.rpc('pag_preparar', { p_autorizacao: aut.id })).catch(() => null);
+    if (prep?.alcadas && prep.sem_alcada) toast(`${prep.sem_alcada} título(s) sem alçada que cubra o valor: cadastre a faixa em Alçadas.`, true);
     if (justs.length) await q(sb.from('orcamento_justificativas').insert(justs.map(g => ({ empresa_id: state.empresa.id, ano: g.o.ano, mes: g.o.mes, plano_id: g.it.plano_id, origem: 'autorizacao',
       orcado: +g.o.orcAc.toFixed(2), realizado: +g.o.usado.toFixed(2), desvio: +(g.o.usado - g.o.orcAc).toFixed(2), justificativa: g.texto,
       acao: `Autorização nº ${aut.numero}: ${g.itens.length} título(s), ${money(g.itens.reduce((s, x) => s + +(marc[x.id]?.valor ?? Math.abs(+x.valor_sinal)), 0))}`, autorizacao_id: aut.id }))));
@@ -234,16 +241,20 @@ async function historico(root) {
     const rows = await q(sb.from('autorizacoes').select('*').eq('empresa_id', state.empresa.id).order('numero', { ascending: false }).limit(50));
     if (!rows.length) { el.innerHTML = '<div class="empty">Nenhuma autorização emitida ainda.</div>'; return; }
     const podeAprovar = ['admin', 'diretor'].includes(state.papel);
+    const alc = await q(sb.from('pag_alcadas').select('id').eq('empresa_id', state.empresa.id).eq('ativo', true).limit(1)).then(r => r.length > 0).catch(() => false);
     el.innerHTML = `<table><thead><tr><th>Nº</th><th>Emissão</th><th>Elaborado por</th><th class="num">Listado</th><th class="num">Autorizado</th><th>Status</th><th></th></tr></thead><tbody>
       ${rows.map(a => `<tr data-id="${a.id}"><td>${a.numero}</td><td>${dateBR(a.emissao)}</td><td>${esc(a.elaborado_por || '')}</td>
         <td class="num">${money(a.total_listado)}</td><td class="num">${money(a.total_autorizado)}</td>
         <td><span class="badge ${a.status === 'Aprovada' ? 'pago' : a.status === 'Rejeitada' ? 'vencido' : 'aberto'}">${a.status}</span></td>
-        <td><button class="btn small" data-a="pdf">PDF</button>
-          ${podeAprovar && a.status === 'Pendente' ? '<button class="btn small" data-a="Aprovada">Aprovar</button><button class="btn small danger" data-a="Rejeitada">Rejeitar</button>' : ''}</td></tr>`).join('')}</tbody></table>`;
+        <td class="nowrap"><button class="btn small" data-a="pdf">PDF</button>
+          ${alc ? `<button class="btn small" data-a="alcadas">${a.status === 'Pendente' ? 'Aprovações' : 'Detalhe'}</button>` : podeAprovar && a.status === 'Pendente' ? '<button class="btn small" data-a="Aprovada">Aprovar</button><button class="btn small danger" data-a="Rejeitada">Rejeitar</button>' : ''}
+          ${a.status === 'Aprovada' && podeEditar() ? '<button class="btn small primary" data-a="remessa">Remessa CNAB</button>' : ''}</td></tr>`).join('')}</tbody></table>`;
     el.onclick = async (e) => {
       const a = e.target.dataset.a; if (!a) return;
       const aut = rows.find(r => r.id === e.target.closest('tr').dataset.id);
       try {
+        if (a === 'alcadas') return detalheAlcadas(aut, () => historico(root));
+        if (a === 'remessa') return modalRemessa(aut, () => historico(root));
         if (a === 'pdf') { const its = await q(sb.from('autorizacao_itens').select('*').eq('autorizacao_id', aut.id).order('vencimento')); pdf(aut, its); }
         else { await q(sb.from('autorizacoes').update({ status: a, aprovado_por: state.user.id, aprovado_em: new Date().toISOString() }).eq('id', aut.id)); toast(`Autorização ${a.toLowerCase()}`); historico(root); }
       } catch (err) { fail(err); }

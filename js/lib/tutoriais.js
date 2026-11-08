@@ -21,7 +21,7 @@ export const MANUAIS = [
   { id: 'portal-cliente', titulo: 'Portal do Cliente', area: 'Financeiro', rotas: ['portal-clientes'],
     resumo: 'Convidar clientes, decidir pedidos de prorrogação, gerenciar os acessos e o que o cliente faz para aprovar as artes.' },
   { id: 'autorizacao', titulo: 'Autorização de pagamentos', area: 'Financeiro', rotas: ['autorizacao'],
-    resumo: 'Marcar o que será pago, justificar o que passa do orçamento e gerar o PDF para o diretor.' },
+    resumo: 'Marcar o que será pago, justificar o que passa do orçamento, aprovar por alçada e gerar o PDF e a remessa CNAB 240 para o banco.' },
   { id: 'pagamentos-antecipados', titulo: 'Pagamentos Antecipados', area: 'Financeiro', rotas: ['paraquedas'],
     resumo: 'Pedir, aprovar, programar e pagar antes da nota fiscal; vários pagamentos e comprovantes; ligar a nota.' },
   { id: 'conferencia-fechamento', titulo: 'Conferência do dia e Fechamento do mês', area: 'Financeiro', rotas: ['conferencia', 'fechamento'],

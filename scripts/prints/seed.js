@@ -857,6 +857,7 @@ window.FN = {
     ['receita', 'ap8', 2, 'R-VM485 — Vermelho 485 — superfície PE', 'Versão 2 em teste · pigmento 57:1 de outro fornecedor', null, 96, null, false, '#/tintas/receitas', true],
     ['arte', 'ap9', 39, 'Suco Pomar do Vale Laranja 1 L', 'POMAR DO VALE SUCOS LTDA · aprovada pelo cliente', null, 52, null, false, '#/preimpressao/artes', true],
     ['inspecao', 'ap10', 127, 'Inspeção recebimento — RESINA PEBD LINEAR', 'lote RB-2611-07', null, 8, 0, false, '#/qualidade/inspecoes', false],
+    ['pagamento', 'au2', 42, 'Autorização nº 42 — 2 título(s) na sua alçada', 'De R$ 5 mil a R$ 50 mil · ENERGIA REGIONAL S.A., IMÓVEIS CENTRO LTDA', 21250, 40, 4, false, '#/autorizacao', true],
   ].map(([tipo, id, numero, titulo, detalhe, valor, h, pz, urgente, link, lote]) => ({ tipo, id, numero, titulo, detalhe, valor, desde: H(h), prazo: pz == null ? null : D0(pz), urgente, link, lote }));
 }
 
@@ -1228,3 +1229,45 @@ DB.fechamento_config = [{ empresa_id: E, meta_dia_util: 5, papeis_fechar: ['admi
     const tot = valoresCC(c.id).reduce((s, x) => s + x.valor, 0); return { centro_custo_id: c.id, nome: c.nome, cenario: a.cenario || 'budget', situacao: a.situacao || null, total: a.total, enviado_em: a.enviado_em, decidido_em: a.decidido_em, comentario: a.comentario, atual: tot }; });
   window.RPC.forecast_rolar = () => ({ realizado: 0, projetado: 0 });
 }
+
+// Alçadas e remessa CNAB (SQL 109) — FICTÍCIOS
+{
+  DB.pag_alcadas = [
+    { id: 'pa1', empresa_id: E, nome: 'Até R$ 5 mil', valor_min: 0, valor_max: 5000, centro_custo_id: null, papeis: ['financeiro'], usuarios: [], aprovacoes: 1, ordem: 1, ativo: true },
+    { id: 'pa2', empresa_id: E, nome: 'De R$ 5 mil a R$ 50 mil', valor_min: 5000.01, valor_max: 50000, centro_custo_id: null, papeis: ['diretor'], usuarios: [], aprovacoes: 1, ordem: 2, ativo: true },
+    { id: 'pa3', empresa_id: E, nome: 'Acima de R$ 50 mil', valor_min: 50000.01, valor_max: null, centro_custo_id: null, papeis: ['diretor', 'admin'], usuarios: [], aprovacoes: 2, ordem: 3, ativo: true },
+  ];
+  DB.pag_config = [{ empresa_id: E, quem_elabora_nao_aprova: true, avisar_aprovadores: true }];
+  const c0 = DB.contas[0]; Object.assign(c0, { banco_codigo: '341', agencia: '0123', agencia_dv: '', numero: '45678', conta_dv: '9', cnab_convenio: '', cnab_nsa: 6, cnab_layout: {} });
+  const forn = DB.favorecidos.filter(f => f.tipo === 'FORNECEDORES').slice(0, 6);
+  const bancos = [['237', '1234', '5', '56789', '0'], ['001', '3456', 'X', '112233', '4'], ['341', '0123', '', '99887', '1']];
+  forn.forEach((f, i) => { f.documento = f.documento || `1234567800${String(i).padStart(2, '0')}95`.slice(0, 14);
+    if (i % 3 === 2) Object.assign(f, { pix: 'financeiro@' + f.nome.toLowerCase().split(' ')[0] + '.com.br', pix_tipo: 'email' });
+    else { const b = bancos[i % 3]; Object.assign(f, { banco_codigo: b[0], agencia: b[1], agencia_dv: b[2], conta_numero: b[3], conta_dv: b[4], conta_tipo: 'CC' }); } });
+  const abertos = DB.lancamentos.filter(l => l.status === 'Em aberto' && DB.plano_contas.find(p => p.id === l.plano_id)?.tipo === 'S').slice(0, 7);
+  abertos.forEach((l, i) => { if (!l.favorecido_id && forn[i % forn.length]) l.favorecido_id = forn[i % forn.length].id; });
+  const vals = [1850, 3420, 12800, 27600, 64300, 980, 8450];
+  DB.autorizacoes = [
+    { id: 'au2', empresa_id: E, numero: 42, emissao: '2026-11-06', elaborado_por: 'Ana Souza', status: 'Pendente', total_listado: 186400, total_autorizado: vals.reduce((a, b) => a + b, 0), created_by: 'u2', created_at: '2026-11-06T15:00:00Z' },
+    { id: 'au1', empresa_id: E, numero: 41, emissao: '2026-10-30', elaborado_por: 'Ana Souza', status: 'Aprovada', total_listado: 98000, total_autorizado: 41250, created_by: 'u2', created_at: '2026-10-30T15:00:00Z' },
+  ];
+  const fav = (l) => DB.favorecidos.find(f => f.id === l.favorecido_id)?.nome || 'Fornecedor';
+  const alc = (v) => v <= 5000 ? 'pa1' : v <= 50000 ? 'pa2' : 'pa3';
+  const sit2 = ['aprovado', 'aprovado', 'pendente', 'aprovado', 'pendente', 'aprovado', 'recusado'];
+  DB.autorizacao_itens = [
+    ...abertos.map((l, i) => ({ id: 'ai2' + i, autorizacao_id: 'au2', empresa_id: E, lancamento_id: l.id, vencimento: '2026-11-1' + (i % 9), favorecido: fav(l), descricao: l.descricao, valor: vals[i], autoriza: true, valor_autorizado: vals[i], alcada_id: alc(vals[i]), situacao: sit2[i] })),
+    ...abertos.slice(0, 4).map((l, i) => ({ id: 'ai1' + i, autorizacao_id: 'au1', empresa_id: E, lancamento_id: l.id, vencimento: '2026-11-0' + (i + 3), favorecido: fav(l), descricao: l.descricao, valor: [9800, 12450, 7600, 11400][i], autoriza: true, valor_autorizado: [9800, 12450, 7600, 11400][i], alcada_id: 'pa2', situacao: 'aprovado' })),
+  ];
+  DB.pag_aprovacoes = [
+    { id: 1, empresa_id: E, item_id: 'ai20', user_id: 'u2', email: 'ana@exemplo.com.br', aprovado: true, em: '2026-11-06T16:00:00Z' },
+    { id: 2, empresa_id: E, item_id: 'ai23', user_id: 'u3', email: 'carlos@exemplo.com.br', aprovado: true, em: '2026-11-07T09:10:00Z' },
+    { id: 3, empresa_id: E, item_id: 'ai24', user_id: 'u3', email: 'carlos@exemplo.com.br', aprovado: true, em: '2026-11-07T09:12:00Z' },
+    { id: 4, empresa_id: E, item_id: 'ai26', user_id: 'u3', email: 'carlos@exemplo.com.br', aprovado: false, motivo: 'negociar o prazo com o fornecedor', em: '2026-11-07T09:13:00Z' },
+  ];
+  // um título com boleto
+  if (abertos[1]) abertos[1].codigo_barras = '23797162800000124503456789012345678901234567';
+  DB.pag_remessas = [{ id: 'pr6', empresa_id: E, conta_id: c0.id, autorizacao_id: 'au0', nsa: 6, data_pagamento: '2026-10-23', qtd: 5, total: 38720.4, arquivo: 'ARQUIVO FICTICIO', nome_arquivo: 'PAG_341_20261023_000006.REM', situacao: 'gerada', gerado_em: '2026-10-22T17:40:00Z' }];
+  DB.pag_remessa_itens = [];
+}
+window.RPC.pag_remessa_criar = () => ({ id: 'prx', nsa: 7 });
+window.RPC.pag_remessa_gravar = () => null;

@@ -1,8 +1,8 @@
 ---
 titulo: Cadastros — plano de contas, contas, beneficiários e centros de custo
 tela: Cadastros › Plano de Contas (CAD001), Contas Bancárias (CAD002), Beneficiários (CAD003) e Centros de Custo e Grupos (CAD004)
-versao: 1.2
-atualizado: 2026-11-05
+versao: 1.3
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -55,6 +55,7 @@ Para cada conta, informe:
 - a **disponibilidade**: conta com recursos **disponíveis** ou **bloqueados** (por exemplo, bloqueio judicial);
 - a instituição, a agência e o número;
 - o **banco e a conta no OFX** (BANKID e ACCTID), que ligam o extrato importado à conta;
+- para pagar por **remessa CNAB**, o código do banco, o convênio e os dígitos da agência e da conta. Eles ficam em **Autorização de Pagamentos › Remessa CNAB › Dados da conta para a remessa**;
 - os **saldos iniciais**: real, em aberto, de budget e de forecast. O saldo inicial é o saldo de abertura no início do controle.
 
 As contas bloqueadas podem ser separadas nos relatórios pelo filtro de **disponibilidade**. Conta sem uso deve ser **inativada**.
@@ -81,7 +82,8 @@ Clique em **+ Novo** e preencha:
 - o **prazo padrão**, os **planos de contas padrão** (receita e despesa), o centro de custo padrão e a prioridade de pagamento;
 - as **retenções** (IRRF, PIS/COFINS/CSLL, INSS, ISS);
 - o representante;
-- a forma de pagamento, a periodicidade, a **chave PIX** e os dados bancários;
+- a forma de pagamento, a periodicidade, a **chave PIX com o tipo** (CPF/CNPJ, e-mail, telefone ou aleatória) e os dados bancários;
+- nos fornecedores, a **conta para pagamento**: banco (código), agência e conta com os dígitos e o tipo (corrente ou poupança). Ela é usada na remessa CNAB da Autorização de Pagamentos;
 - uma observação.
 
 Clique em **Salvar**. Se o CNPJ/CPF parecer inválido, a plataforma pergunta antes de salvar.
@@ -130,3 +132,4 @@ Inative o que não estiver mais em uso.
 | 1.0 | 28/10/2026 | Primeira versão do manual: plano de contas, contas bancárias, beneficiários por aba (inclusive pelas NF-e e fundos FIDC) e centros de custo e grupos. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.3 | 08/11/2026 | Beneficiário com a conta para pagamento e o tipo da chave Pix; conta bancária com os dados para a remessa CNAB. |

@@ -17,6 +17,7 @@ const TIPOS = {
   receita: { nome: 'Receita de tinta em teste', grupo: 'Casa de Tintas', recusa: false, aprovar: 'Aprovar a versão' },
   arte: { nome: 'Arte para liberar', grupo: 'Pré-impressão', recusa: false, aprovar: 'Liberar para produção' },
   inspecao: { nome: 'Inspeção para decidir', grupo: 'Qualidade', recusa: false },
+  pagamento: { nome: 'Pagamentos na sua alçada', grupo: 'Pagamentos', recusa: true },
   orcamento_cc: { nome: 'Orçamento do centro de custo', grupo: 'Orçamento', recusa: false },
 };
 /** executa a decisão pela regra do módulo de origem */
@@ -32,6 +33,7 @@ async function decidir(it, aprovar, motivo) {
     case 'reajuste': return r('contrato_decidir_reajuste', { p_reajuste: it.id, p_aprovar: aprovar, p_obs: motivo || null });
     case 'receita': return r('tin_aprovar_versao', { p_versao: it.id });
     case 'arte': return r('pre_liberar', { p_projeto: it.id });
+    case 'pagamento': return r('pag_decidir', { p_autorizacao: it.id, p_itens: null, p_aprovar: aprovar, p_motivo: motivo || null });
     default: throw new Error('Decida na tela de origem.');
   }
 }

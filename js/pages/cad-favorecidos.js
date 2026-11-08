@@ -149,8 +149,15 @@ function editar(f, root) {
         <label>Forma de pagamento / recebimento<input name="forma_pagamento" value="${v('forma_pagamento')}"></label>
         <label>Periodicidade<input name="periodicidade" value="${v('periodicidade')}"></label>
         <label>Chave PIX<input name="pix" value="${v('pix')}"></label>
-        <label class="span2">Dados bancários<input name="dados_bancarios" value="${v('dados_bancarios')}"></label>
+        <label>Tipo da chave PIX<select name="pix_tipo"><option value="">—</option>${[['cpf_cnpj', 'CPF/CNPJ'], ['email', 'E-mail'], ['telefone', 'Telefone'], ['aleatoria', 'Aleatória']].map(([k, n]) => `<option value="${k}" ${k === f.pix_tipo ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <label class="span2">Dados bancários (texto livre)<input name="dados_bancarios" value="${v('dados_bancarios')}"></label>
         <label class="span2">Observação<input name="observacao" value="${v('observacao')}"></label>
+      </div></fieldset>
+      <fieldset class="so-for"><legend>Conta para pagamento (remessa CNAB)</legend><div class="grid-form">
+        <label>Banco (código)<input name="banco_codigo" maxlength="3" value="${v('banco_codigo')}" placeholder="ex.: 237"></label>
+        <label>Agência<input name="agencia" value="${v('agencia')}"></label><label class="xs">Dígito<input name="agencia_dv" maxlength="1" value="${v('agencia_dv')}"></label>
+        <label>Conta<input name="conta_numero" value="${v('conta_numero')}"></label><label class="xs">Dígito<input name="conta_dv" maxlength="1" value="${v('conta_dv')}"></label>
+        <label>Tipo<select name="conta_tipo"><option value="CC" ${f.conta_tipo !== 'PP' ? 'selected' : ''}>Corrente</option><option value="PP" ${f.conta_tipo === 'PP' ? 'selected' : ''}>Poupança</option></select></label>
       </div></fieldset></form>`,
     foot: ed ? `${f.id ? '<button class="btn danger" id="b-inat" style="margin-right:auto">' + (f.ativo === false ? 'Reativar' : 'Inativar') + '</button>' : ''}${f.id && ['admin', 'diretor'].includes(state.papel) ? '<button class="btn ghost" id="b-hist">Histórico</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="b-ok">Salvar</button>` : '<button class="btn" data-close>Fechar</button>',
   });
@@ -195,7 +202,13 @@ function editar(f, root) {
     if (ehFor(t)) Object.assign(row, { prazo_padrao: txt('prazo_padrao'), plano_padrao_id: txt('plano_for'), centro_custo_padrao_id: txt('centro_custo_padrao_id'), prioridade_padrao: txt('prioridade_padrao'),
       retencoes: Object.fromEntries(RET.filter(([k]) => F('ret_' + k).checked).map(([k]) => [k, parseNum(F('aliq_' + k).value) || 0])) });
     try {
-      if (f.id) await q(sb.from('favorecidos').update(row).eq('id', f.id)); else await q(sb.from('favorecidos').insert(row));
+      let salvo;
+      if (f.id) { await q(sb.from('favorecidos').update(row).eq('id', f.id)); salvo = f.id; } else salvo = (await q(sb.from('favorecidos').insert(row).select('id').single())).id;
+      // conta para pagamento (SQL 109): gravada à parte; sem o SQL, o resto do cadastro continua salvando
+      const banco = txt('banco_codigo');
+      if (banco && !/^\d{3}$/.test(banco)) toast('O código do banco tem 3 números: a conta para pagamento não foi salva.', true);
+      else await q(sb.from('favorecidos').update({ banco_codigo: banco, agencia: txt('agencia'), agencia_dv: txt('agencia_dv'), conta_numero: txt('conta_numero'), conta_dv: txt('conta_dv'),
+        conta_tipo: txt('conta_tipo'), pix_tipo: txt('pix_tipo') }).eq('id', salvo)).catch(err => { if (!/column|banco_codigo|pix_tipo/.test(err.message || '')) throw err; });
       toast('Cadastro salvo'); m.close(); render(root);
     } catch (e) { fail(String(e.message || e).includes('duplicate') ? new Error('Já existe um cadastro com esse tipo e nome') : e); }
   };
