@@ -5,6 +5,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { $, $$, esc, money, dateBR, today, toast, fail, modal } from './lib/ui.js';
 import * as PI from './lib/preimpressao.js';
 import { CSS as CSS_ARTE } from './lib/preimpressao-css.js';
+import { exigirTermo } from './lib/lgpd-termo.js';
 import { viewer, prepararArquivo, subirArquivos, linksArte, conferirArquivo, ACEITOS } from './lib/arte-viewer.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -60,6 +61,7 @@ async function iniciar() {
   $('#pt-cli').hidden = S.clientes.length < 2;
   $('#pt-cli').onchange = (e) => { S.fav = S.clientes[+e.target.value]; pintar(); };
   S.fav = S.clientes[0]; pintar();
+  exigirTermo(sb, 'portal_termo_pendente', {}, { sair: () => $('#pt-sair').click() });
 }
 $('#pt-sair').onclick = async () => { await sb.auth.signOut(); location.href = base(); };
 $('#pt-senha').onclick = () => {

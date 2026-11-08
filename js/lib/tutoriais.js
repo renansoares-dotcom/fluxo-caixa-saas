@@ -86,6 +86,8 @@ export const MANUAIS = [
     resumo: 'Dados da empresa, convites, papéis e áreas, importação por planilha e auditoria com desfazer.' },
   { id: 'uso-plataforma', titulo: 'Uso da Plataforma', area: 'Cadastros', rotas: ['uso'],
     resumo: 'Quais telas cada perfil usa, por quanto tempo, quem não entrou, os formulários abandonados e os erros mais vistos. Só administradores.' },
+  { id: 'lgpd-acessos', titulo: 'Privacidade e Acessos (LGPD)', area: 'Cadastros', rotas: ['lgpd'],
+    resumo: 'Termo de uso no primeiro acesso, suspensão de quem não entra, revisão periódica dos acessos, dados pessoais por titular, anonimização e as solicitações dos titulares. Só administradores.' },
 ];
 export const manualDaRota = (rota) => MANUAIS.find(m => m.rotas.includes(rota)) || null;
 export const manualPorId = (id) => MANUAIS.find(m => m.id === id) || null;

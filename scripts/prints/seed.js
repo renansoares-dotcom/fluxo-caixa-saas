@@ -1041,3 +1041,40 @@ window.FN = {
     telas, perfis, pessoas, forms, erros, dias,
     sem_acesso: [{ user_id: 'u7', nome: 'Gustavo Pereira', email: 'gustavo@exemplo.com.br', papel: 'leitura', ultimo: H(52) }, { user_id: 'u8', nome: 'Helena Dias', email: 'helena@exemplo.com.br', papel: 'vendas', ultimo: null }] });
 }
+
+// Privacidade e Acessos (SQL 100) — FICTÍCIOS
+{
+  const H = (d) => new Date(Date.now() - d * 864e5).toISOString(), D = (d) => H(d).slice(0, 10);
+  const cfg = { empresa_id: E, inativos_dias: 60, inativos_acao: 'suspender', aviso_dias: 7, incluir_admin: false, incluir_portal: true, revisao_meses: 6, prazo_resposta_dias: 15, encarregado_nome: 'Renata Alves', encarregado_email: 'privacidade@exemplo.com.br' };
+  DB.lgpd_config = [cfg];
+  const mem = [['u3', 'Renata Alves', 'admin', 0, true, false], ['u1', 'Ana Souza', 'financeiro', 0], ['u2', 'Beatriz Rocha', 'financeiro', 1], ['u4', 'Carlos Lima', 'diretor', 3],
+    ['u5', 'Diego Martins', 'compras', 2], ['u6', 'Fernanda Costa', 'financeiro', 12], ['u7', 'Gustavo Pereira', 'leitura', 56, false, false, 2], ['u8', 'Helena Dias', 'vendas', 41]]
+    .map(([user_id, nome, papel, dias, eu, protegido, av]) => ({ user_id, nome, email: nome.toLowerCase().split(' ')[0] + '@exemplo.com.br', papel, areas: papel === 'leitura' ? ['cont'] : null, desde: '2026-01-05T10:00:00Z',
+      ultimo: H(dias), dias, avisado_em: av ? H(av) : null, protegido: papel === 'admin', eu: !!eu }));
+  window.RPC.acessos_situacao = () => ({ config: cfg, membros: mem,
+    suspensos: [{ id: 'sx1', nome: 'Igor Nunes', email: 'igor@exemplo.com.br', papel: 'financeiro', motivo: 'Sem acesso há 61 dias (automático)', automatico: true, suspenso_em: H(9), suspenso_por: 'automático', reativado_em: null },
+      { id: 'sx2', nome: 'Júlia Ramos', email: 'julia@exemplo.com.br', papel: 'compras', motivo: 'Saiu da empresa', automatico: false, suspenso_em: H(40), suspenso_por: 'renata@exemplo.com.br', reativado_em: null },
+      { id: 'sx3', nome: 'Diego Martins', email: 'diego@exemplo.com.br', papel: 'compras', motivo: 'Férias de 70 dias', automatico: true, suspenso_em: H(120), suspenso_por: 'automático', reativado_em: H(100) }],
+    portal: [{ id: 'p1', cliente: 'SUPERMERCADO BOA COMPRA LTDA', email: 'compras@boacompra.com.br', ativo: true, ultimo: H(3), dias: 3 },
+      { id: 'p2', cliente: 'PADARIA PÃO DOURADO LTDA', email: 'financeiro@paodourado.com.br', ativo: true, ultimo: H(57), dias: 57 },
+      { id: 'p3', cliente: 'DISTRIBUIDORA NORDESTE S.A.', email: 'contas@nordeste.com.br', ativo: false, ultimo: H(75), dias: 75, nunca: true }],
+    revisoes: [{ revisado_em: H(190), revisado_por: 'renata@exemplo.com.br', mantidos: 8, suspensos: 1, observacao: 'Revisão semestral com a diretoria' }],
+    ultima_revisao: H(190), proxima_revisao: D(7) });
+  const pes = (pub) => (pub === 'equipe' ? mem.map(m => ({ nome: m.nome, email: m.email, aceito_em: ['u7', 'u8'].includes(m.user_id) ? null : H(m.dias + 1) }))
+    : [{ nome: 'SUPERMERCADO BOA COMPRA LTDA', email: 'compras@boacompra.com.br', aceito_em: H(20) }, { nome: 'PADARIA PÃO DOURADO LTDA', email: 'financeiro@paodourado.com.br', aceito_em: null }]);
+  window.RPC.lgpd_termos_situacao = () => ({
+    equipe: { id: 't1', versao: 2, titulo: 'Termo de uso e aviso de privacidade', texto: '', publicado_em: H(30), publicado_por: 'renata@exemplo.com.br', pessoas: pes('equipe') },
+    portal: { id: 't2', versao: 1, titulo: 'Aviso de privacidade do Portal do Cliente', texto: '', publicado_em: H(25), publicado_por: 'renata@exemplo.com.br', pessoas: pes('portal') } });
+  window.RPC.lgpd_dados_titular = () => [
+    { origem: 'colaborador', id: 'cx1', nome: 'MARIA APARECIDA SILVA', ativo: false, base_legal: 'Obrigação legal trabalhista e previdenciária (guarda mínima de 5 anos após o desligamento)',
+      campos: { CPF: '123.456.789-09', 'Matrícula': '0458', Cargo: 'AUXILIAR DE PRODUÇÃO', Setor: 'EXTRUSÃO', 'Vínculo': 'clt', 'Situação': 'desligado', 'Admissão': '03/02/2022', 'Desligamento': '30/09/2026', Foto: 'sim', 'Histórico salarial': 4 } },
+    { origem: 'favorecido', id: 'fx1', nome: 'MARIA APARECIDA SILVA', ativo: true, base_legal: 'Execução de contrato e obrigação legal (fiscal e contábil: os lançamentos e as notas ficam guardados)',
+      campos: { Tipo: 'FORNECEDORES', CPF: '123.456.789-09', 'E-mail': 'maria.silva@exemplo.com.br', Pix: '123.456.789-09', 'Lançamentos ligados': 7 } },
+    { origem: 'motorista', id: 'mx1', nome: 'MARIA APARECIDA SILVA', ativo: false, base_legal: 'Obrigação legal (Código de Trânsito e Lei 13.103/2015) e execução de contrato', campos: { CPF: '123.456.789-09', 'Vínculo': 'empregado', CNH: '0412****** · D · validade 12/03/2028' } }];
+  DB.lgpd_solicitacoes = [
+    ['Maria Aparecida Silva', '12345678909', 'maria.silva@exemplo.com.br', 'acesso', 'Pediu por e-mail a cópia dos dados após o desligamento', 4, 'aberta'],
+    ['Paulo Henrique Souza', null, '(81) 99999-0000', 'anonimizacao', 'Ex-representante pediu a eliminação do cadastro', 16, 'aberta'],
+    ['Joana Freitas', '98765432100', 'joana@exemplo.com.br', 'correcao', 'Endereço desatualizado', 30, 'atendida']]
+    .map(([titular_nome, titular_documento, titular_contato, tipo, descricao, d, status], i) => ({ id: 'sl' + i, empresa_id: E, titular_nome, titular_documento, titular_contato, tipo, descricao,
+      recebida_em: D(d), prazo: D(d - 15), status, resposta: status === 'atendida' ? 'Endereço corrigido no cadastro e confirmado por e-mail.' : null, atendida_em: status === 'atendida' ? H(d - 3) : null, registros: [] }));
+}

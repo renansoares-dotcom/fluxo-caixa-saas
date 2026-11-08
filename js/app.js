@@ -14,6 +14,7 @@ import { abrirLancamento } from './lib/lanc-form.js';
 import { montarMenu, marcarTela, modoPainel, cliqueArea, fecharPainel } from './lib/menu.js';
 import { codigoDa } from './lib/telas.js';
 import { iniciarUso, pararUso, telaUso } from './lib/uso.js';
+import { exigirTermo } from './lib/lgpd-termo.js';
 
 // cada abertura da plataforma busca as telas atualizadas (evita ficar com uma versão antiga em cache)
 const V = Date.now();
@@ -114,6 +115,7 @@ const routes = {
   'config': () => import(`./pages/config.js?v=${V}`),
   'auditoria': () => import(`./pages/auditoria.js?v=${V}`),
   'uso': () => import(`./pages/uso.js?v=${V}`),
+  'lgpd': () => import(`./pages/lgpd.js?v=${V}`),
 };
 
 // ---------- Tema ----------
@@ -278,6 +280,7 @@ async function entrarEmpresa(emp, papel, areas) {
   aplicarAreas();
   iniciarNotificacoes();
   iniciarUso().catch(() => {});
+  exigirTermo(sb, 'lgpd_entrar', { p_empresa: emp.id }, { sair: logout }).catch(() => {});   // grava o último acesso e pede o termo (SQL 100)
   contarAprovacoesMenu();
   iniciarChat();
   iniciarBusca();

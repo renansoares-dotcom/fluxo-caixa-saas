@@ -118,6 +118,15 @@ export const FIGS = [
   ['uso-plataforma', 'uso', '### 5.2', 'Perfis: a fatia do tempo de cada perfil nas telas em que ele mais trabalha', 'click:[data-a="perfis"]|scroll:#us-abas'],
   ['uso-plataforma', 'uso', '### 5.4', 'Onde desistem: os formulários abertos, concluídos e abandonados, com a taxa de desistência', 'click:[data-a="forms"]'],
   ['uso-plataforma', 'uso', '## 6.', 'Parâmetros do uso da plataforma', 'click:#us-par'],
+  // Privacidade e Acessos (07/11/2026)
+  ['lgpd-acessos', 'lgpd', '## 3.', 'Acessos: último acesso de cada pessoa, quem vai ser suspenso e os acessos suspensos'],
+  ['lgpd-acessos', 'lgpd', '### 3.3', 'Revisão periódica de acessos: manter ou suspender pessoa por pessoa', 'click:#ac-rev'],
+  ['lgpd-acessos', 'lgpd', '## 4.', 'Termos de uso: versão vigente e quem já aceitou', 'click:[data-a="termos"]'],
+  ['lgpd-acessos', 'lgpd', '### 4.1', 'Editar o termo com a prévia, a partir do modelo', 'click:[data-a="termos"]|click:[data-ed="equipe"]'],
+  ['lgpd-acessos', 'lgpd?aba=titular&q=123.456.789-09', '## 5.', 'Dados pessoais de um titular: onde estão, com a base legal de cada cadastro'],
+  ['lgpd-acessos', 'lgpd?aba=titular&q=123.456.789-09', '### 5.2', 'Anonimizar o cadastro, ligado à solicitação do titular', 'click:[data-an="1"]'],
+  ['lgpd-acessos', 'lgpd', '## 6.', 'Solicitações dos titulares com o prazo de resposta', 'click:[data-a="solic"]'],
+  ['lgpd-acessos', 'lgpd', '## 7.', 'Parâmetros de privacidade e acessos', 'click:#lg-par'],
   // Recompras FIDC (07/11/2026)
   ['fidc-recompras', 'fidc-recompras', '## 3.', 'Recompras: as pendências sem registro, os indicadores e os títulos recomprados'],
   ['fidc-recompras', 'fidc-recompras', '### 3.1', 'Registrar a recompra: o título, o motivo (aqui, devolução de mercadoria), a nota de devolução e o que volta para a carteira', 'click:#rc-novo|click:.rc-res [data-i]|click:[data-mo="mo-devolucao"]'],

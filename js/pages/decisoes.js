@@ -51,9 +51,10 @@ async function carregar() {
   const recomp = temArea('fin') ? await import(`./fidc-recompras.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const paPrest = temArea('fin') ? await import(`../lib/pa-prestacao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const audAl = await import(`./auditoria.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
+  const lgpd = await import(`./lgpd.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const arte = temArea('com') || temArea('prd') ? await import(`./preimpressao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd };
 }
 
 // ---------------------------------------------------------------- regras
@@ -243,6 +244,12 @@ function regras(D) {
     desc: aa.map(a => `${a.titulo}: ${a.detalhe}`).join(' · '), impacto: 0, impactoTxt: aa[0].titulo,
     regra: 'Alertas da Auditoria ainda não marcados como vistos (as regras ficam em Auditoria › Alertas › Parâmetros). Alta para dados bancários de beneficiário e usuários. Só para administrador e diretor.',
     acao: 'Abrir os alertas', rota: 'auditoria?aba=alertas' });
+
+  // 25. LGPD e acessos: solicitações de titular com prazo, revisão de acessos vencida e acessos sem uso
+  for (const a of D.lgpd || []) out.push({ k: 'lgpd-' + a.aba + a.nivel, origem: 'Privacidade e Acessos', urg: a.nivel === 'alto' ? 'alta' : a.nivel === 'medio' ? 'media' : 'baixa', titulo: a.titulo,
+    desc: a.detalhe, impacto: 0, impactoTxt: null,
+    regra: 'Solicitações de titulares com o prazo de resposta em até 3 dias ou vencido (LGPD, art. 19), revisão periódica de acessos vencida e pessoas sem entrar perto do prazo de suspensão. Só para o administrador.',
+    acao: a.aba === 'solic' ? 'Abrir as solicitações' : 'Abrir a revisão de acessos', rota: `lgpd?aba=${a.aba}` });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

@@ -135,6 +135,7 @@ async function membros(root) {
         <td>${adm && r.user_id !== state.user.id ? '<button class="btn small danger rm">Remover</button>' : ''}</td></tr>`).join('')}</tbody></table>
       <p class="muted small" style="margin-top:8px">Áreas: o que a pessoa enxerga no menu (Financeiro inclui o Dashboard; Cadastros aparecem para todos).
       <strong>RH (salários)</strong> só vale para quem for marcado — o administrador sempre vê. O que ela pode <strong>alterar</strong> continua definido pelo papel — para um contador só consultar, use papel <em>leitura</em> + área Contabilidade.
+      ${adm ? '<br>Último acesso de cada pessoa, suspensão de quem não entra e a revisão periódica: <a href="#/lgpd">Privacidade e Acessos</a>.' : ''}
       </p>`;
     el.onchange = async (ev) => {
       const tr = ev.target.closest('tr');
