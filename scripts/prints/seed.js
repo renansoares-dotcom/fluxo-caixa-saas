@@ -1796,3 +1796,16 @@ window.RPC.pag_remessa_gravar = () => null;
     F('cf3', '2026-08-01', 'MARCOS VENDAS', itM.slice(0, 4), true, '2026-09-10'), F('cf4', '2026-08-01', 'JULIANA REPRESENTAÇÕES', itJ.slice(0, 3), true, '2026-09-10')];
   window.RPC.comissao_fechar = () => 'cf-x'; window.RPC.comissao_cancelar = () => null;
 }
+
+// Prova de cor, lembretes e biblioteca de artes (SQL 131) — tintas e eventos FICTÍCIOS
+{
+  Object.assign(DB.pre_parametros[0], { lembrete_ativo: true, lembrete_apos_dias: 2, lembrete_intervalo_dias: 2, lembrete_max: 3, lembrete_avisar_equipe: true, prova_de_ok: 2, prova_de_atencao: 3.5 });
+  const TC = [['tcp-186', 'VM186', 'VERMELHO 186', 'Pantone 186 C', 48.5, 64.0, 47.0, '#d9452c'], ['tcp-7406', 'AM7406', 'AMARELO 7406', 'Pantone 7406 C', 79.9, 7.6, 83.1, '#efc000'],
+    ['tcp-1395', 'MR1395', 'MARROM 1395', 'Pantone 1395 C', 46.5, 21.4, 50.6, '#9a6418'], ['tcp-pr', 'PR01', 'PRETO', 'Preto', 18.9, 0.6, 1.2, '#2b2b29']];
+  DB.tin_cores = DB.tin_cores.concat(TC.map(([id, codigo, nome, referencia, lab_l, lab_a, lab_b, hex]) => ({ id, empresa_id: E, codigo, nome, padrao: 'pantone', referencia, lab_l, lab_a, lab_b, hex, ativo: true })));
+  const pj = DB.pre_projetos.find(p => p.id === 'pa-1');
+  if (pj) pj.cores = pj.cores.map(c => ({ ...c, tin_cor_id: { 'Pantone 186 C': 'tcp-186', 'Pantone 7406 C': 'tcp-7406', 'Pantone 1395 C': 'tcp-1395', 'Preto': 'tcp-pr' }[c.pantone] || null }));
+  const v1 = DB.pre_versoes.filter(v => v.projeto_id === 'pa-1' && v.enviada_em).at(-1);
+  if (v1) DB.pre_eventos = (DB.pre_eventos || []).concat([{ id: 9901, empresa_id: E, projeto_id: 'pa-1', tipo: 'lembrete', texto: 'Lembrete 1 de 3 enviado ao cliente (versão ' + v1.numero + ')', publico: false, autor: 'plataforma', criado_em: new Date(Date.parse(v1.enviada_em) + 2 * 864e5).toISOString() }]);
+  window.RPC.pre_lembrar_agora = () => 2;
+}

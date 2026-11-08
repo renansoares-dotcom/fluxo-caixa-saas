@@ -234,4 +234,8 @@ export const FIGS = [
   ['preimpressao', 'preimpressao/artes', '### 5.6', 'Aprovação: decisões, prova e certificado', 'click:[data-f=todas]|click:#pa-lista tr[data-p="pa-3"]|click:[data-a=aprovacao]'],
   ['preimpressao', 'preimpressao/artes', '### 5.7', 'Clicheria e produção', 'click:[data-f=todas]|click:#pa-lista tr[data-p="pa-4"]|click:[data-a=clicheria]'],
   ['preimpressao', 'preimpressao/artes', '## 6.', 'Parâmetros da pré-impressão', 'click:#pa-par'],
+  ['preimpressao', 'preimpressao/artes', '### 5.9', 'Biblioteca de artes por cliente', 'click:[data-f=biblioteca]'],
+  ['preimpressao', 'preimpressao/artes', '### 5.9', 'Busca pelo código de barras na biblioteca', 'click:[data-f=biblioteca]|fill:#pa-b=7899123450365|scroll:#pa-lista'],
+  ['preimpressao', 'preimpressao/artes', '### 5.10', 'Prova de cor: a arte com as tintas reais e o ΔE2000 de cada cor', 'fill:#pa-b=|scroll:#pa-lista|click:[data-f=todas]|click:#pa-lista tr[data-p="pa-1"]|click:#pi-prova'],
+  ['preimpressao', 'preimpressao/artes', '### 5.11', 'Arte aguardando o cliente: os lembretes enviados e Lembrar agora', 'click:[data-f=todas]|click:#pa-lista tr[data-p="pa-1"]|scroll:#pi-lemb'],
 ];

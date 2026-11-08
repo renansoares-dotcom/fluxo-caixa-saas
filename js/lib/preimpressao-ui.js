@@ -35,7 +35,7 @@ export async function carregarArtes({ arquivadas = false } = {}) {
     fetchAll(() => sb.from('pre_decisoes').select('*').eq('empresa_id', e).order('criado_em')),
     seg(carregarProdutos()),
     seg(q(sb.from('prod_ordens').select('id,numero,numero_iniflex,produto_id,descricao,cliente,status,entrega').eq('empresa_id', e).in('status', ['planejada', 'liberada', 'em_producao']).order('numero', { ascending: false }).limit(500))),
-    seg(q(sb.from('tin_cores').select('id,codigo,nome,hex,referencia').eq('empresa_id', e).eq('ativo', true).order('codigo'))),
+    seg(q(sb.from('tin_cores').select('id,codigo,nome,hex,referencia,lab_l,lab_a,lab_b').eq('empresa_id', e).eq('ativo', true).order('codigo'))),
   ]);
   const byId = (L) => Object.fromEntries(L.map(x => [x.id, x]));
   const Pp = Pm[0] || { checklist: [], exigir_checklist: true, prazo_cliente_dias: 3, bloquear_op: false, papeis_liberacao: ['admin', 'diretor', 'financeiro'], termo: '' };
@@ -250,7 +250,9 @@ export async function fichaArte(D, p0, { onMudou, aba = 'arte', versao = null } 
           ${v.observacao ? `<div class="small" style="margin-top:4px">“${esc(v.observacao)}”</div>` : ''}
           ${v.mm_largura ? `<div class="small" style="margin-top:4px">PDF ${nf(v.mm_largura)} × ${nf(v.mm_altura)} mm ${med ? (med.ok ? selo('medidas conferem', 'pos') : selo(`ficha ${nf(p.largura_mm)} × ${nf(p.altura_mm)}`, 'warn')) : ''}</div>` : ''}
           <div class="pi-hash" style="margin-top:4px" title="${v.hash}">SHA-256 ${P.hashCurto(v.hash)}</div>
-          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost small" id="pi-baixar">Baixar original</button><button class="btn ghost small" id="pi-conf" title="Baixa o arquivo e recalcula o SHA-256">Conferir integridade</button></div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost small" id="pi-baixar">Baixar original</button><button class="btn ghost small" id="pi-conf" title="Baixa o arquivo e recalcula o SHA-256">Conferir integridade</button>
+            ${v.previa && (p.cores || []).length ? '<button class="btn ghost small" id="pi-prova" title="Simula a arte com as tintas reais da Casa de Tintas">🎨 Prova de cor</button>' : ''}</div>
+          ${p.situacao === 'aguardando_cliente' && v.enviada_em ? (() => { const lb = Ev.filter(e => e.tipo === 'lembrete' && e.criado_em >= v.enviada_em); return `<div class="small" style="margin-top:8px">🔔 ${lb.length ? `${lb.length} lembrete(s) enviado(s), o último em ${hora(lb.at(-1).criado_em)}` : 'Nenhum lembrete enviado ainda'}${pode() ? ' <button class="btn ghost small" id="pi-lemb">Lembrar agora</button>' : ''}</div>`; })() : ''}
           ${decV.map(d => `<div class="small" style="margin-top:6px">${selo(P.DECISOES[d.decisao], d.decisao === 'aprovada' ? 'pos' : 'neg')} ${esc(d.nome || '')} · ${hora(d.criado_em)}</div>`).join('')}</div>
         ${podeEnviar ? `<div class="pi-bloco"><h3>Checklist de pré-impressão ${falta ? selo(`faltam ${falta}`, 'warn') : selo('completo', 'pos')}</h3>
           <div id="pi-ck">${checklist.map((c, i) => `<label class="chk"><input type="checkbox" data-ck="${i}" ${c.ok ? 'checked' : ''}> ${esc(c.item)}</label>`).join('') || '<div class="small muted">Sem itens (configure nos parâmetros).</div>'}</div>
@@ -268,6 +270,10 @@ export async function fichaArte(D, p0, { onMudou, aba = 'arte', versao = null } 
     $('#pi-cmp', el) && ($('#pi-cmp', el).onchange = (e) => { comp = e.target.value; pintar(); });
     $('#pi-nv', el) && ($('#pi-nv', el).onclick = () => novaVersao(D, p, { onSalvo: (nv) => { sel = nv.id; comp = v.id; atualizar(); } }));
     $('#pi-baixar', el).onclick = async () => { try { const { data, error } = await sb.storage.from('artes').createSignedUrl(v.caminho, 300, { download: v.nome }); if (error) throw error; window.open(data.signedUrl, '_blank'); } catch (e) { fail(e); } };
+    $('#pi-prova', el) && ($('#pi-prova', el).onclick = () => provaDeCor(D, p, v));
+    $('#pi-lemb', el) && ($('#pi-lemb', el).onclick = acao(async () => { const n = await q(sb.rpc('pre_lembrar_agora', { p_projeto: p.id }));
+      sb.functions.invoke('email', { body: {} }).catch(() => {}); sb.functions.invoke('whatsapp', { body: {} }).catch(() => {});
+      if (!n) toast('O cliente não tem usuário ativo no Portal: o lembrete ficou registrado, mas não saiu mensagem', true); }, 'Lembrete enviado ao cliente'));
     $('#pi-conf', el).onclick = async (ev) => { ev.target.disabled = true; ev.target.textContent = 'Conferindo…';
       try { const r = await conferirArquivo(sb, v.caminho, v.hash); r.ok ? toast('✓ Arquivo íntegro: o SHA-256 é o mesmo registrado na versão.') : toast('ATENÇÃO: o arquivo armazenado não confere com o registrado.', true); } catch (e) { fail(e); }
       ev.target.disabled = false; ev.target.textContent = 'Conferir integridade'; };
@@ -425,6 +431,46 @@ export async function certificado(D, p, d) {
 }
 
 // ---------------------------------------------------------------- parâmetros
+// prova de cor (melhoria 4.4): a prévia da arte recolorida com as tintas reais da Casa de Tintas (Lab medido) e o ΔE2000 de cada cor
+export async function provaDeCor(D, p, v) {
+  const { paresProva, recolorFactory, classificaDE } = await import('./cor.js');
+  const tintas = D.coById, pares = paresProva(p.cores || [], tintas), lim = { ok: +D.Pm.prova_de_ok || 2, atencao: +D.Pm.prova_de_atencao || 3.5 };
+  const semTinta = pares.filter(x => !x.para_lab).length;
+  const m = modal({ title: `Prova de cor — arte nº ${p.numero}, V${v.numero}`, wide: true, body: `
+    <div class="small muted" style="margin-bottom:8px">Simulação na tela: cada cor da arte é trocada pela tinta real da Casa de Tintas (pelo Lab medido do padrão; sem Lab, pela cor de tela da tinta). Serve para conversar com o cliente e decidir ajuste de tinta; não substitui a prova impressa nem a leitura no espectrofotômetro.</div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><label class="small">Alcance da troca <input type="range" id="pc-tol" min="6" max="40" value="22"> <span id="pc-tv">22</span></label>
+      <label class="chk small"><input type="checkbox" id="pc-dif"> Destacar o que mudou</label><span class="spacer"></span><button class="btn ghost small" id="pc-png">Baixar a prova (PNG)</button></div>
+    <div class="grid2"><div><div class="small"><b>Arte como enviada</b> (cores da especificação)</div><canvas id="pc-a" style="width:100%;border:1px solid var(--border);border-radius:6px"></canvas></div>
+      <div><div class="small"><b>Com as tintas reais</b></div><canvas id="pc-b" style="width:100%;border:1px solid var(--border);border-radius:6px"></canvas></div></div>
+    <div class="table-wrap" style="margin-top:12px"><table class="small"><thead><tr><th>Cor da arte</th><th>Especificação</th><th>Tinta da Casa de Tintas</th><th class="num">ΔE2000</th><th>Leitura</th></tr></thead><tbody>
+      ${pares.map(x => { const c = classificaDE(x.de, lim); return `<tr><td>${esc(x.nome)}${x.pantone && x.pantone !== x.nome ? ` <span class="muted">${esc(x.pantone)}</span>` : ''}</td>
+        <td>${x.hex ? `<span class="pi-chip-cor"><i style="background:${esc(x.hex)}"></i>${esc(x.hex)}</span>` : '<span class="muted">sem cor</span>'}</td>
+        <td>${x.tinta ? `<span class="pi-chip-cor"><i style="background:${x.para_hex}"></i>${esc(x.tinta)}</span>${x.medido ? '' : ' <span class="muted">(sem Lab medido)</span>'}` : '<span class="muted">cor sem tinta ligada (aba Ficha)</span>'}</td>
+        <td class="num">${x.de != null ? String(x.de.toFixed(2)).replace('.', ',') : '–'}</td><td>${x.de != null ? selo(c.txt, c.cls) : ''}</td></tr>`; }).join('')}</tbody></table></div>
+    ${semTinta ? `<p class="small muted">${semTinta} cor(es) sem tinta ligada ficam como estão na simulação. Ligue a cor à tinta na aba Ficha da arte.</p>` : ''}
+    <p class="small muted">Faixas do ΔE: até ${String(lim.ok).replace('.', ',')} aceitável, até ${String(lim.atencao).replace('.', ',')} perceptível, acima fora do padrão (parâmetros da pré-impressão).</p>`,
+    foot: '<button class="btn" data-close>Fechar</button>' });
+  const U = await linksArte(sb, [v.previa]).catch(() => ({})), img = new Image(); img.crossOrigin = 'anonymous';
+  img.onerror = () => toast('Não foi possível abrir a prévia da arte', true);
+  img.onload = () => {
+    const k = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight)), w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+    const A = $('#pc-a', m.el), B = $('#pc-b', m.el); [A, B].forEach(c => { c.width = w; c.height = h; });
+    const ga = A.getContext('2d', { willReadFrequently: true }); ga.fillStyle = '#fff'; ga.fillRect(0, 0, w, h); ga.drawImage(img, 0, 0, w, h);
+    const orig = ga.getImageData(0, 0, w, h);
+    const desenhar = () => {
+      const tol = +$('#pc-tol', m.el).value, dif = $('#pc-dif', m.el).checked, rec = recolorFactory(pares, tol), out = new ImageData(new Uint8ClampedArray(orig.data), w, h), d = out.data;
+      for (let i = 0; i < d.length; i += 4) { const [r, g, b] = rec(d[i], d[i + 1], d[i + 2]);
+        if (dif) { const mud = Math.abs(r - d[i]) + Math.abs(g - d[i + 1]) + Math.abs(b - d[i + 2]) > 6; if (!mud) { const y = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]; d[i] = d[i + 1] = d[i + 2] = 200 + y * 0.2; continue; } }
+        d[i] = r; d[i + 1] = g; d[i + 2] = b; }
+      B.getContext('2d').putImageData(out, 0, 0); $('#pc-tv', m.el).textContent = tol;
+    };
+    desenhar();
+    $('#pc-tol', m.el).onchange = desenhar; $('#pc-dif', m.el).onchange = desenhar;
+    $('#pc-png', m.el).onclick = () => { const a = document.createElement('a'); a.href = B.toDataURL('image/png'); a.download = `prova-de-cor-arte-${p.numero}-V${v.numero}.png`; a.click(); };
+  };
+  img.src = U[v.previa] || '';
+}
+
 export function parametros(D, { onSalvo } = {}) {
   const P0 = D.Pm, papeis = [['admin', 'Administrador'], ['diretor', 'Diretor'], ['financeiro', 'Financeiro'], ['producao', 'Produção'], ['vendas', 'Vendas']];
   const m = modal({ title: 'Parâmetros da pré-impressão', body: `
@@ -435,12 +481,25 @@ export function parametros(D, { onSalvo } = {}) {
       <label>Termo que o cliente aceita ao aprovar<textarea id="pp-tm" rows="4" maxlength="2000">${esc(P0.termo || '')}</textarea></label>
       <div class="small muted" style="margin:10px 0 4px">Quem registra decisão recebida por e-mail e libera para a produção</div>
       <div style="display:flex;gap:14px;flex-wrap:wrap">${papeis.map(([k, t]) => `<label class="chk"><input type="checkbox" data-pp="${k}" ${k === 'admin' || (P0.papeis_liberacao || []).includes(k) ? 'checked' : ''} ${k === 'admin' ? 'disabled' : ''}> ${t}</label>`).join('')}</div>
-      <label class="chk" style="margin-top:10px"><input type="checkbox" id="pp-op" ${P0.bloquear_op ? 'checked' : ''}> Travar a OP: não libera nem inicia se a arte mais recente do produto não estiver aprovada</label></fieldset>`,
+      <label class="chk" style="margin-top:10px"><input type="checkbox" id="pp-op" ${P0.bloquear_op ? 'checked' : ''}> Travar a OP: não libera nem inicia se a arte mais recente do produto não estiver aprovada</label></fieldset>
+    <fieldset><legend>Lembrete ao cliente que não respondeu</legend>
+      <label class="chk"><input type="checkbox" id="pp-la" ${P0.lembrete_ativo !== false ? 'checked' : ''}> Mandar lembrete automático por e-mail e WhatsApp (todo dia às 9h)</label>
+      <div class="grid-form" style="margin-top:8px"><label class="xs">Primeiro lembrete depois de (dias)<input id="pp-l1" type="number" min="1" max="30" value="${P0.lembrete_apos_dias ?? 2}"></label>
+        <label class="xs">Intervalo entre lembretes (dias)<input id="pp-li" type="number" min="1" max="30" value="${P0.lembrete_intervalo_dias ?? 2}"></label>
+        <label class="xs">Máximo por versão<input id="pp-lm" type="number" min="1" max="10" value="${P0.lembrete_max ?? 3}"></label></div>
+      <label class="chk" style="margin-top:8px"><input type="checkbox" id="pp-le" ${P0.lembrete_avisar_equipe !== false ? 'checked' : ''}> Avisar quem libera quando o último lembrete sair sem resposta</label></fieldset>
+    <fieldset><legend>Prova de cor (ΔE2000 entre a cor da arte e a tinta real)</legend><div class="grid-form">
+      <label class="xs">Aceitável até<input id="pp-d1" inputmode="decimal" value="${String(P0.prova_de_ok ?? 2).replace('.', ',')}"></label>
+      <label class="xs">Perceptível até (acima: fora do padrão)<input id="pp-d2" inputmode="decimal" value="${String(P0.prova_de_atencao ?? 3.5).replace('.', ',')}"></label></div></fieldset>`,
     foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pp-ok">Salvar</button>` });
   $('#pp-ok', m.el).onclick = async (ev) => {
     const d = { empresa_id: state.empresa.id, prazo_cliente_dias: Math.max(1, parseInt($('#pp-pz', m.el).value) || 3), exigir_checklist: $('#pp-ck', m.el).checked,
       checklist: $('#pp-it', m.el).value.split('\n').map(s => s.trim()).filter(Boolean), termo: $('#pp-tm', m.el).value.trim(), bloquear_op: $('#pp-op', m.el).checked,
-      papeis_liberacao: ['admin', ...$$('[data-pp]', m.el).filter(c => c.checked && c.dataset.pp !== 'admin').map(c => c.dataset.pp)], atualizado_em: new Date().toISOString() };
+      papeis_liberacao: ['admin', ...$$('[data-pp]', m.el).filter(c => c.checked && c.dataset.pp !== 'admin').map(c => c.dataset.pp)], atualizado_em: new Date().toISOString(),
+      lembrete_ativo: $('#pp-la', m.el).checked, lembrete_apos_dias: Math.min(30, Math.max(1, +$('#pp-l1', m.el).value || 2)), lembrete_intervalo_dias: Math.min(30, Math.max(1, +$('#pp-li', m.el).value || 2)),
+      lembrete_max: Math.min(10, Math.max(1, +$('#pp-lm', m.el).value || 3)), lembrete_avisar_equipe: $('#pp-le', m.el).checked,
+      prova_de_ok: parseFloat($('#pp-d1', m.el).value.replace(',', '.')) || 2, prova_de_atencao: parseFloat($('#pp-d2', m.el).value.replace(',', '.')) || 3.5 };
+    if (!(d.prova_de_atencao > d.prova_de_ok)) return toast('O limite de "perceptível" precisa ser maior que o de "aceitável"', true);
     if (!d.termo) return toast('Escreva o termo de aprovação', true);
     ev.target.disabled = true;
     try { await q(sb.from('pre_parametros').upsert(d)); m.close(); toast('Parâmetros salvos'); onSalvo?.(); } catch (err) { fail(err); ev.target.disabled = false; }

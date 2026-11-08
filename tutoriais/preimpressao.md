@@ -1,8 +1,8 @@
 ---
 titulo: Pré-impressão — artes, aprovação do cliente no Portal e clicheria
 tela: Comercial › Pré-impressão › Painel da Pré-impressão (COM005) e Artes e Aprovações (COM006)
-versao: 1.0
-atualizado: 2026-11-07
+versao: 1.1
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -211,15 +211,65 @@ A **Linha do tempo** guarda tudo o que aconteceu. Os eventos com ponto azul tamb
 
 ![Figura 11 — Linha do tempo da arte (dados fictícios)](img/preimpressao-historico.jpg)
 
+### 5.9 Biblioteca de artes
+
+O filtro **📚 Biblioteca** mostra as artes de cada cliente, agrupadas. Cada cartão traz a prévia da versão em vigor (a aprovada ou, se ainda não houver, a última com prévia), o código da embalagem no cliente, o código de barras, as cores e a situação.
+
+![Figura 12 — Biblioteca de artes por cliente (dados fictícios)](img/preimpressao-8.jpg)
+
+Para achar a arte de uma embalagem, leia o **código de barras** com o leitor no campo de busca (ou digite os números). A tela:
+
+- confere o dígito verificador (EAN-8, UPC-A, EAN-13 ou DUN-14);
+- diz se o prefixo é do Brasil;
+- mostra as artes com esse código.
+
+![Figura 13 — Busca pelo código de barras na biblioteca (dados fictícios)](img/preimpressao-9.jpg)
+
+### 5.10 Prova de cor
+
+Na aba **Arte**, o botão **🎨 Prova de cor** simula a versão com as **tintas reais** da Casa de Tintas. Cada cor da arte ligada a uma tinta (aba Ficha técnica) é trocada pela cor medida do padrão da tinta (Lab). Se a tinta não tiver Lab, a troca usa a cor de tela da tinta.
+
+![Figura 14 — Prova de cor: a arte com as tintas reais e o ΔE2000 de cada cor (dados fictícios)](img/preimpressao-10.jpg)
+
+A tabela mostra cada cor com a especificação, a tinta e o **ΔE2000**, a diferença de cor que o olho percebe. A leitura segue as faixas dos Parâmetros:
+
+- **aceitável**: até 2;
+- **perceptível**: até 3,5;
+- **fora do padrão**: acima disso.
+
+Os controles da simulação:
+
+- **Alcance da troca** define quanto das sombras e degradês próximos da cor também mudam;
+- **Destacar o que mudou** deixa cinza o que não muda;
+- **Baixar a prova (PNG)** salva a imagem para mandar ao cliente.
+
+A prova de cor é uma simulação na tela: não substitui a prova impressa nem a leitura no espectrofotômetro. Use-a para decidir, antes da impressão, se a tinta precisa de ajuste ou se o cliente deve ser avisado da diferença.
+
+### 5.11 Lembrete ao cliente
+
+Quando a arte está aguardando o cliente, a plataforma manda **lembretes automáticos** por e-mail e WhatsApp, todo dia às 9h:
+
+- o primeiro, 2 dias depois do envio;
+- os seguintes, a cada 2 dias;
+- no máximo 3 por versão.
+
+Quando o último lembrete sai sem resposta, quem libera a produção recebe o aviso **Arte sem resposta do cliente**, para ligar para o cliente. Tudo é configurável nos Parâmetros.
+
+![Figura 15 — Arte aguardando o cliente: os lembretes enviados e Lembrar agora (dados fictícios)](img/preimpressao-11.jpg)
+
+Na aba Arte, a versão enviada mostra quantos lembretes já saíram. **Lembrar agora** manda um lembrete na hora (no máximo um a cada 12 horas), que conta no limite. Uma versão nova enviada zera a contagem. Os lembretes ficam na Linha do tempo, só para a equipe.
+
 ## 6. Parâmetros
 
-![Figura 12 — Parâmetros da pré-impressão (dados fictícios)](img/preimpressao-7.jpg)
+![Figura 16 — Parâmetros da pré-impressão (dados fictícios)](img/preimpressao-7.jpg)
 
 - **Prazo de resposta** do cliente, em dias.
 - **Exigir o checklist completo** para enviar ao cliente, e os **itens do checklist** (um por linha).
 - **Termo** que o cliente aceita ao aprovar.
 - **Quem registra a decisão recebida por fora e libera para a produção.**
 - **Trava da OP**.
+- **Lembrete ao cliente**: ligar e desligar, primeiro lembrete depois de N dias, intervalo, máximo por versão e aviso à equipe no último (padrão 2, 2, 3 e ligado).
+- **Prova de cor**: as faixas do ΔE2000 — aceitável até 2 e perceptível até 3,5.
 
 ## 7. O que o cliente vê no Portal
 
@@ -252,6 +302,7 @@ O passo a passo está no manual do Portal do Cliente.
 - Só arte aprovada vai para a clicheria. A liberação só acontece com os clichês recebidos, ou sem clicheria, pelo botão próprio.
 - Arte liberada, cancelada ou arquivada não recebe versão nova.
 - Arquivos de até 50 MB.
+- Lembrete só para arte aguardando o cliente, só para os usuários ativos do Portal daquele cliente (WhatsApp só para quem aceitou), no máximo um por dia e o limite por versão.
 
 ## 9. Perguntas frequentes e erros comuns
 
@@ -265,6 +316,10 @@ O passo a passo está no manual do Portal do Cliente.
 
 **O cliente aprovou por e-mail.** Registre na aba Aprovação, colando o e-mail como evidência. O certificado mostra que a decisão foi registrada pela equipe.
 
+**A prova de cor não troca uma cor.** A cor da arte não está ligada a uma tinta da Casa de Tintas. Ligue na aba Ficha técnica.
+
+**O cliente diz que não recebeu o lembrete.** Ele precisa estar ativo no Portal com o e-mail certo. O WhatsApp exige o aceite no Portal.
+
 **Como sei que o arquivo da gráfica é o mesmo aprovado?** Use **Conferir integridade** ou calcule o SHA-256 do arquivo (no Windows: `certutil -hashfile arquivo.pdf SHA256`) e compare com o do certificado.
 
 ## 10. Histórico de alterações
@@ -272,3 +327,4 @@ O passo a passo está no manual do Portal do Cliente.
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão. Inclui ficha técnica com cores, código de barras conferido e desbobinamento, versões com SHA-256 e prévia do PDF, conferência das medidas, checklist, pinos, comparação lado a lado, em cortina e por diferença, aprovação do cliente no Portal com termo, nome e prova, decisão registrada por e-mail, certificado com QR, clicheria com cadastro do clichê, liberação, trava da OP e Central de Decisões. |
+| 1.1 | 08/11/2026 | Biblioteca de artes por cliente com busca pelo código de barras, prova de cor com as tintas reais (ΔE2000) e lembrete automático ao cliente, com Lembrar agora. Parâmetros novos. |
