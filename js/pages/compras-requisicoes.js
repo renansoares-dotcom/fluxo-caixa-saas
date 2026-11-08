@@ -4,6 +4,7 @@ import { $, $$, esc, money, dateBR, today, fail, toast, modal, confirmDialog } f
 import { cadCompras, ST_REQ, badge, qtd, inp, unit, num, diasTxt, lerDias, podeAprovar } from '../lib/compras.js';
 import { carregarProdutos, datalistProdutos, ligarItensProduto, produtoDoItem } from '../lib/produtos.js';
 import { mapaCotacoes } from '../lib/cotacao-calc.js';
+import { selo } from '../lib/iqf.js';
 
 export const title = 'Requisições e Cotações';
 const ui = { filtro: 'abertas', busca: '' };
@@ -108,13 +109,14 @@ function editar(r, root) {
 
 // ------------------------------------------------------------ detalhe
 async function abrir(r, root) {
-  let cots = [], citens = [], peds = [], conv = [], par = null;
+  let cots = [], citens = [], peds = [], conv = [], par = null, IQF = {};
   try {
     [cots, peds, conv, par] = await Promise.all([q(sb.from('compras_cotacoes').select('*').eq('requisicao_id', r.id).order('criado_em')),
       q(sb.from('compras_pedidos').select('id,numero,status,total').eq('requisicao_id', r.id)),
       q(sb.from('compras_cotacao_convites').select('*').eq('requisicao_id', r.id).order('criado_em')).catch(() => []),
       q(sb.from('compras_parametros').select('*').eq('empresa_id', state.empresa.id)).then(x => x[0] || null).catch(() => null)]);
     if (cots.length) citens = await q(sb.from('compras_cotacao_itens').select('*').in('cotacao_id', cots.map(c => c.id)));
+    if (cots.some(c => c.favorecido_id)) IQF = Object.fromEntries((await q(sb.rpc('compras_iqf', { p_empresa: state.empresa.id })).catch(() => [])).map(f => [f.favorecido_id, f]));   // melhoria 5.6
   } catch (err) { return fail(err); }
   const m = modal({ title: `Requisição nº ${r.numero}`, wide: true, body: '<div id="rq-det"></div>', foot: '<div id="rq-acoes" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%"></div>' });
   const det = $('#rq-det', m.el), ac = $('#rq-acoes', m.el);
@@ -143,7 +145,8 @@ async function abrir(r, root) {
         return `<tr><td class="wrap">${esc(i.descricao)} <span class="muted small">${esc(i.unidade)}${i.ncm ? ' · NCM ' + esc(i.ncm) : ''}</span></td><td class="num">${qtd(i.quantidade)}</td>
           ${r.itens.some(x => x.valor_estimado) ? `<td class="num">${i.valor_estimado ? unit(i.valor_estimado) : '–'}</td>` : ''}
           ${pr.map(v => `<td class="num ${v != null && v === min && cots.length > 1 ? 'pos' : ''}" ${v != null && v === min && cots.length > 1 ? 'style="font-weight:600"' : ''}>${v == null ? '<span class="muted">sem preço</span>' : `${unit(v)}<div class="small muted">${money(v * i.quantidade)}</div>`}</td>`).join('')}</tr>`; }).join('')}
-      ${cots.length ? `<tr><td>Prazo de entrega</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num">${c.prazo_entrega_dias != null ? c.prazo_entrega_dias + ' dias' : '–'}</td>`).join('')}</tr>
+      ${cots.length ? `<tr><td title="Avaliação do fornecedor: qualidade dos lotes, pontualidade e notas que conferem com o pedido (Painel de Compras)">Avaliação (IQF)</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num">${selo(c.favorecido_id ? IQF[c.favorecido_id] : null)}</td>`).join('')}</tr>
+        <tr><td>Prazo de entrega</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num">${c.prazo_entrega_dias != null ? c.prazo_entrega_dias + ' dias' : '–'}</td>`).join('')}</tr>
         <tr><td>Frete</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num">${money(c.frete)}</td>`).join('')}</tr>
         <tr style="font-weight:600"><td>Total</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num ${c === melhor && cots.length > 1 ? 'pos' : ''}">${money(totalCot(c))}${completa(c) ? '' : '<div class="small neg">incompleta</div>'}</td>`).join('')}</tr>
         <tr><td title="Parcelas trazidas a valor presente a ${String(taxa).replace('.', ',')}% ao mês: compara prazos de pagamento diferentes">Valor presente <span class="muted small">(${String(taxa).replace('.', ',')}% a.m.)</span></td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num ${M.melhorVP && M.melhorVP.id === c.id && M.cots.filter(x => x.completa).length > 1 ? 'pos' : ''}">${money(mc(c).vp)}<div class="small muted">${esc(diasTxt(c.parcelas_dias))}</div></td>`).join('')}</tr>

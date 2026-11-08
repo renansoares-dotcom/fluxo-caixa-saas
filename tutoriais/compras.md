@@ -1,7 +1,7 @@
 ---
 titulo: Compras — requisições, pedidos e recebimentos
 tela: Compras › Painel de Compras (CMP001), Requisições e Cotações (CMP002), Pedidos de Compra (CMP003) e Recebimentos (CMP004)
-versao: 1.5
+versao: 1.6
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -40,6 +40,45 @@ O painel mostra, em indicadores que podem ser clicados para ver a lista:
 
 Embaixo ficam as entregas atrasadas e da semana e os **maiores fornecedores** dos últimos 90 dias.
 
+### 3.1 Avaliação dos fornecedores (IQF)
+
+No fim do painel fica a **Avaliação dos fornecedores (IQF)** dos últimos 12 meses. O IQF vai de 0 a 100 e junta três notas, cada uma com o seu peso:
+
+| Dimensão | Como é medida | Peso padrão |
+|---|---|---|
+| Qualidade | Lotes inspecionados no recebimento: aprovado = 100, aprovado com concessão = 50, reprovado = 0 | 40 |
+| Entrega | 1º recebimento de cada pedido: no prazo = 100; perde 10 pontos por dia de atraso além da tolerância | 35 |
+| Preço e nota | Cada nota recebida: 100 se conferiu com o pedido; 0 se teve divergência que bloqueia o pagamento (seção 4.7) | 25 |
+
+Se o fornecedor não tem dado numa dimensão (por exemplo, nenhum lote inspecionado), ela fica de fora e o IQF usa só as outras.
+
+As classes são:
+
+- **A**: a partir de 90 (fornecedor de referência);
+- **B**: da meta (80) até 90;
+- **C**: abaixo da meta. Peça ao fornecedor um plano de ação;
+- **—**: menos de 3 eventos no período, poucos dados para classificar.
+
+![Figura 2 — Avaliação dos fornecedores (IQF): qualidade, entrega, preço e nota, nota final e classe (dados fictícios)](img/compras-11.jpg)
+
+Clique no fornecedor para ver os **eventos** que formam a nota: cada inspeção, cada entrega e cada nota, com a data e os pontos.
+
+![Figura 3 — Eventos que formam o IQF de um fornecedor (dados fictícios)](img/compras-12.jpg)
+
+O IQF também aparece no **mapa comparativo** das cotações (seção 4.3), ao lado de cada fornecedor.
+
+Em **Parâmetros** (administrador e diretor) ficam:
+
+- os três pesos;
+- o período, em meses;
+- a meta e o início da classe A;
+- os pontos perdidos por dia de atraso;
+- o mínimo de eventos para classificar.
+
+A tolerância de atraso é a mesma do confronto pedido × nota.
+
+![Figura 4 — Parâmetros do IQF: pesos, período, meta, classe A, pontos por dia de atraso e mínimo de eventos (dados fictícios)](img/compras-13.jpg)
+
 ## 4. Passo a passo
 
 ### 4.1 Fazer uma requisição
@@ -68,25 +107,26 @@ Em vez de digitar, peça a cotação ao fornecedor por um **link**. Ele abre a p
 3. Escreva uma mensagem, se precisar (por exemplo: local de entrega, impostos inclusos).
 4. Clique em **Gerar links e enviar e-mails**.
 
-![Figura 2 — Convidar fornecedores por link (dados fictícios)](img/compras-6.jpg)
+![Figura 5 — Convidar fornecedores por link (dados fictícios)](img/compras-6.jpg)
 
 O fornecedor recebe o e-mail com o botão para preencher. Para mandar pelo WhatsApp, use **WhatsApp** ou **Copiar link** na lista de convites. O link vale 5 dias (parâmetro).
 
-![Figura 3 — A página que o fornecedor preenche (dados fictícios)](img/compras-cotacao-link.jpg)
+![Figura 6 — A página que o fornecedor preenche (dados fictícios)](img/compras-cotacao-link.jpg)
 
 Quando o fornecedor responde, a cotação entra no mapa com a marca **pelo link** e o comprador recebe um aviso. Até o link vencer, o fornecedor pode corrigir a resposta. Ele também pode clicar em **Não vamos cotar**, com o motivo.
 
 A lista **Cotação por link** mostra cada convite: enviado, abriu o link, respondeu, não vai cotar ou cancelado. **Cancelar** desativa o link.
 
-![Figura 4 — Convites da cotação por link: quem abriu, respondeu ou recusou (dados fictícios)](img/compras-5.jpg)
+![Figura 7 — Convites da cotação por link: quem abriu, respondeu ou recusou (dados fictícios)](img/compras-5.jpg)
 
 #### Mapa comparativo
 
-![Figura 5 — Mapa comparativo: menor preço de cada item, prazo, frete, total e valor presente (dados fictícios)](img/compras-4.jpg)
+![Figura 8 — Mapa comparativo: menor preço de cada item, IQF, prazo, frete, total e valor presente (dados fictícios)](img/compras-4.jpg)
 
 A requisição mostra o **mapa comparativo de cotações**:
 
 - o menor preço de cada item fica em verde e em negrito;
+- a **avaliação (IQF)** de cada fornecedor, quando a cotação está ligada ao cadastro (seção 3.1);
 - as linhas de **prazo de entrega**, **frete** e **total**, com o menor total em verde;
 - o **valor presente**: o total trazido a hoje pela condição de pagamento, com a taxa dos parâmetros (padrão 1,5% ao mês). Assim, 28/42/56 dias e à vista podem ser comparados. O menor valor presente fica em verde;
 - cotação sem preço em algum item aparece como **incompleta**.
@@ -102,7 +142,7 @@ Os **Parâmetros da cotação** (administrador e diretor) definem:
 
 ### 4.4 Gerar o pedido de compra
 
-![Figura 6 — Novo pedido de compra: Pedido e Itens (dados fictícios)](img/compras-3.jpg)
+![Figura 9 — Novo pedido de compra: Pedido e Itens (dados fictícios)](img/compras-3.jpg)
 
 1. No mapa, clique em **Gerar pedido** na cotação escolhida. Se não houver cotação, use **Pedido sem cotação**: os preços estimados entram no pedido e podem ser ajustados no rascunho.
 2. Confirme o **fornecedor do cadastro**. Se o fornecedor da cotação não estiver cadastrado, escolha o cadastro correspondente ou peça ao Financeiro para cadastrar.
@@ -115,7 +155,7 @@ Também dá para criar um pedido avulso, sem requisição, em **Pedidos de Compr
 
 ### 4.5 Completar e aprovar o pedido
 
-![Figura 7 — Pedidos de Compra (dados fictícios)](img/compras-2.jpg)
+![Figura 10 — Pedidos de Compra (dados fictícios)](img/compras-2.jpg)
 
 A lista mostra o **Nº** (com a data do pedido e o nº do Iniflex na 2ª linha), o **Fornecedor** (com a condição de pagamento na 2ª linha), a **Situação**, os **Itens**, a **Entrega prevista** (em vermelho se já passou) e o **Total** (com o quanto já foi recebido na 2ª linha). O botão **Colunas**, ao lado do Excel, mostra ou oculta cada uma dessas informações, e a escolha fica guardada para você. O **Excel** sai com todas as colunas.
 
@@ -143,7 +183,7 @@ A lista mostra o **Nº** (com a data do pedido e o nº do Iniflex na 2ª linha),
 6. Leia o quadro do **confronto** abaixo da tabela. Ele é a mesma conferência que o sistema faz ao registrar e diz se o pagamento da nota vai ficar **bloqueado** (veja a seção 4.7).
 7. Clique em **Registrar recebimento**.
 
-![Figura 8 — Recebimento com divergência acima da tolerância: o pagamento da nota ficará bloqueado (dados fictícios)](img/compras-7.jpg)
+![Figura 11 — Recebimento com divergência acima da tolerância: o pagamento da nota ficará bloqueado (dados fictícios)](img/compras-7.jpg)
 
 Os recebimentos ficam em **Últimos recebimentos**, com as divergências encontradas. Se faltou algo, o pedido fica como **Recebido em parte** e a previsão é refeita pelo que ainda falta.
 
@@ -176,11 +216,11 @@ A aba **Confronto pedido × nota**, em Recebimentos, lista as notas de entrada d
 - **Liberada**;
 - **Confere**.
 
-![Figura 9 — Confronto pedido × nota: notas bloqueadas, divergências, títulos e notas sem pedido (dados fictícios)](img/compras-8.jpg)
+![Figura 12 — Confronto pedido × nota: notas bloqueadas, divergências, títulos e notas sem pedido (dados fictícios)](img/compras-8.jpg)
 
 Para **liberar o pagamento**, quem tem permissão clica em **Liberar pagamento** e escreve o motivo, por exemplo "fornecedor emitiu nota de débito" ou "reajuste aprovado pela diretoria". Os títulos voltam a poder ser autorizados e pagos. A liberação fica registrada com o nome, a data e o motivo.
 
-![Figura 10 — Liberar o pagamento com o motivo (dados fictícios)](img/compras-9.jpg)
+![Figura 13 — Liberar o pagamento com o motivo (dados fictícios)](img/compras-9.jpg)
 
 **Parâmetros do confronto** (botão no topo de Recebimentos, para administrador e diretor):
 
@@ -188,7 +228,7 @@ Para **liberar o pagamento**, quem tem permissão clica em **Liberar pagamento**
 - as tolerâncias de preço, quantidade, itens fora do pedido, vencimento e entrega;
 - quem libera: diretor, financeiro e/ou compras. O administrador sempre libera.
 
-![Figura 11 — Parâmetros do confronto pedido × nota (dados fictícios)](img/compras-10.jpg)
+![Figura 14 — Parâmetros do confronto pedido × nota (dados fictícios)](img/compras-10.jpg)
 
 ## 5. Regras e travas
 
@@ -242,3 +282,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Lista de Pedidos de Compra com as informações secundárias na 2ª linha e seletor **Colunas**; formulário do novo pedido em seções. Figuras refeitas. |
 | 1.4 | 08/11/2026 | Cotação por link: convite por e-mail ou WhatsApp, página do fornecedor sem cadastro, resposta e recusa, lista de convites; mapa comparativo com o menor preço por item, prazo, valor presente e a compra dividida; parâmetros da cotação. |
 | 1.5 | 08/11/2026 | Confronto pedido × nota: o sistema confere quantidade, preço, itens fora do pedido e prazo de pagamento com tolerâncias; nota divergente tem o pagamento bloqueado até a liberação com motivo; aba **Confronto pedido × nota** com as notas sem pedido; parâmetros do confronto. |
+| 1.6 | 08/11/2026 | Avaliação dos fornecedores (IQF) no Painel de Compras: qualidade, entrega e preço e nota com pesos, classes A/B/C, eventos de cada fornecedor e parâmetros; IQF no mapa comparativo das cotações. |

@@ -1869,3 +1869,24 @@ window.RPC.pag_remessa_gravar = () => null;
       titulos: [{ id: 't9', data: dd(13), valor: 61900, status: 'Em aberto', bloqueado: false }] }];
   window.RPC.compras_liberar_pagamento = () => 3;
 }
+
+// IQF do fornecedor (SQL 134) — notas e eventos FICTÍCIOS
+{
+  const agora = Date.now(), dd = (n) => new Date(agora + n * 864e5).toISOString().slice(0, 10);
+  Object.assign(DB.compras_parametros[0], { iqf_peso_qualidade: 40, iqf_peso_entrega: 35, iqf_peso_preco: 25, iqf_meses: 12, iqf_meta: 80, iqf_faixa_a: 90, iqf_pontos_dia_atraso: 10, iqf_min_eventos: 3 });
+  const ids = { 'RESINAS DO BRASIL S.A.': 'fv-iqf1', 'POLÍMEROS NORDESTE LTDA': 'fv-iqf2', 'COLOR MASTER LTDA': 'fv-iqf3' };
+  for (const c of DB.compras_cotacoes) if (ids[c.fornecedor]) c.favorecido_id = ids[c.fornecedor];
+  const L = [
+    ['fv-iqf4', 'TRANSFILMES LTDA', 50, 4, 55, 6, 75, 4, 57.8, 'C'],
+    ['fv-iqf1', 'RESINAS DO BRASIL S.A.', 87.5, 8, 80, 10, 70, 10, 80.5, 'B'],
+    ['fv-iqf3', 'COLOR MASTER LTDA', 100, 5, 72.5, 4, 100, 3, 89.9, 'B'],
+    ['fv-iqf5', 'EMBALAGENS PRIMAVERA', null, 0, 100, 5, 100, 5, 100, 'A'],
+    ['fv-iqf2', 'POLÍMEROS NORDESTE LTDA', 100, 6, 100, 7, 85.7, 7, 96.4, 'A'],
+    ['fv-iqf6', 'TUBETES CARUARU', null, 0, 100, 2, null, 0, 100, 'N']];
+  const lista = L.map(([favorecido_id, nome, qualidade, n_qualidade, entrega, n_entrega, preco, n_preco, iqf, classe]) => ({ favorecido_id, nome, qualidade, n_qualidade, entrega, n_entrega, preco, n_preco, iqf, classe, eventos: null }));
+  const EV = [['qualidade', -6, 0, 'Inspeção 412: reprovada (espessura fora da tolerância)'], ['entrega', -6, 70, 'PC 110: entregue 5 dia(s) depois do previsto'], ['preco', -6, 0, 'PC 110: FILME STRETCH 500 MM: recebido 1.140 de 1.000 pedidos (tolerância 5%)'],
+    ['qualidade', -35, 100, 'Inspeção 377: aprovada'], ['entrega', -35, 100, 'PC 98: entregue no prazo'], ['preco', -35, 100, 'PC 98: nota conferiu com o pedido'],
+    ['qualidade', -70, 50, 'Inspeção 341: aprovada com concessão'], ['entrega', -70, 0, 'PC 87: entregue 14 dia(s) depois do previsto'], ['preco', -70, 100, 'PC 87: nota conferiu com o pedido'],
+    ['qualidade', -110, 50, 'Inspeção 298: aprovada com concessão'], ['entrega', -110, 60, 'PC 75: entregue 6 dia(s) depois do previsto'], ['preco', -110, 100, 'PC 75: nota conferiu com o pedido']];
+  window.RPC.compras_iqf = (a) => a.p_favorecido ? lista.filter(f => f.favorecido_id === a.p_favorecido).map(f => ({ ...f, eventos: EV.map(([dimensao, d, nota, texto]) => ({ dimensao, data: dd(d), nota, texto })) })) : lista;
+}
