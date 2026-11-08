@@ -1,7 +1,7 @@
 ---
 titulo: Estoque e produtos
-tela: Estoque › Implantação do Estoque (EST007), Posição de Estoque (EST001), Reposição de Estoque (EST008), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
-versao: 1.7
+tela: Estoque › Implantação do Estoque (EST007), Posição de Estoque (EST001), Reposição de Estoque (EST008), Inventário Cíclico (EST009), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
+versao: 1.8
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -22,6 +22,7 @@ atualizado: 2026-11-08
 |---|---|
 | Administrador, diretor e financeiro | Importam e excluem espelhos, definem os parâmetros de custo, cadastram produtos e fazem o de-para. |
 | Compras | Consulta a posição, gera a requisição automática e cadastra e edita produtos. |
+| Compras e produção | Geram e fazem as contagens do inventário cíclico pelo celular. Os ajustes são aprovados pelos perfis definidos nos parâmetros (padrão: administrador, diretor e financeiro). |
 
 ## 3. Posição de Estoque
 
@@ -209,7 +210,68 @@ Em **Metas**, ajuste:
 - o percentual do valor das saídas prontas;
 - quantos meses de notas entram na análise (padrão 12).
 
-## 7. Regras e travas
+## 7. Inventário Cíclico
+
+Em vez de parar a fábrica para um inventário geral, a plataforma conta poucos itens por vez, com frequência maior para os itens de maior valor. Cada contagem é feita pelo celular, lendo a etiqueta, e as diferenças só mexem no estoque depois de aprovadas.
+
+![Figura 7 — Inventário Cíclico: cumprimento da frequência por classe e as contagens (dados fictícios)](img/estoque-7.jpg)
+
+### 7.1 Gerar uma contagem
+
+1. Abra **Estoque › Inventário Cíclico** e clique em **Nova contagem**.
+2. Escolha o **local** e quantos itens no máximo.
+3. Clique em **Gerar**.
+
+A plataforma escolhe os itens com saldo no local cuja última contagem passou da frequência da classe na curva ABC do valor em estoque:
+
+- classe **A** (até 80% do valor): a cada 30 dias;
+- classe **B** (até 95%): a cada 60 dias;
+- classe **C** (o resto): a cada 120 dias.
+
+Primeiro entram a classe A e os itens há mais tempo sem contar. Os indicadores do topo mostram quantos itens de cada classe estão com a contagem em dia.
+
+> O inventário cíclico começa depois da implantação do saldo inicial (seção 6).
+
+### 7.2 Contar pelo celular
+
+![Figura 8 — Contagem pelo celular: leitura da etiqueta, quantidade e recontagem (dados fictícios)](img/estoque-8.jpg)
+
+1. Abra a contagem na lista.
+2. Leia a etiqueta com o leitor ou a câmera, ou digite o código do produto ou do lote. O item aparece em destaque.
+3. Digite a **quantidade contada** e clique em **Registrar**.
+
+Na **contagem cega** (padrão), quem conta não vê o saldo do sistema; o saldo é guardado na hora da contagem.
+
+Se a diferença passar da tolerância, o item volta como **Recontar**. Na recontagem, você pode informar uma justificativa (por exemplo, "big bag rasgado").
+
+Achou no local um produto que não estava na lista? Leia a etiqueta: a plataforma pergunta se deve incluí-lo na contagem.
+
+Com todos os itens contados, clique em **Enviar para aprovação**. Se nada passou da tolerância, a contagem é aprovada sozinha.
+
+### 7.3 Aprovar os ajustes
+
+![Figura 9 — Aprovação: sistema, contado, diferença e valor de cada item (dados fictícios)](img/estoque-9.jpg)
+
+Quem aprova vê, para cada item, o saldo do sistema, o contado, o recontado, a diferença, o valor pelo custo médio e a justificativa. O topo mostra o valor total da divergência e a acurácia (itens dentro da tolerância).
+
+- **Aprovar e ajustar**: gera no Kardex um ajuste de inventário para cada item divergente: **AJ+** para sobra e **AJ−** para falta, na data de hoje e pelo custo médio.
+- **Recusar (recontar)**: informe o motivo; os itens divergentes voltam para recontagem.
+- **Cancelar**: encerra a contagem sem ajustes, com o motivo.
+
+Quem aprova recebe um aviso quando uma contagem chega para aprovação.
+
+### 7.4 Parâmetros
+
+Em **Parâmetros** (administrador e financeiro), ajuste:
+
+- a frequência de cada classe, em dias;
+- quantos itens entram em cada contagem (1 a 200);
+- a tolerância em percentual da quantidade e em reais. O item fica OK só quando está dentro das duas;
+- se a contagem é cega;
+- se a primeira contagem fora da tolerância pede recontagem;
+- quem aprova os ajustes.
+
+## 8. Regras e travas
 
 - O código e a descrição são obrigatórios no produto.
 - O custo de reposição só existe para itens com de-para.
@@ -217,8 +279,9 @@ Em **Metas**, ajuste:
 - No cadastro em massa, um código já usado por outro produto é recusado, e o mesmo código não pode ir para dois produtos na mesma gravação. Um de-para que já existe não é duplicado.
 - Trocar o código de um produto para o do Iniflex liga na hora as linhas do espelho com esse código.
 - A prontidão das notas não grava nada: é uma simulação com as regras de hoje.
+- No inventário cíclico, os itens e as quantidades só mudam pela tela de contagem; o ajuste no Kardex só sai com a aprovação. Uma contagem aprovada ou cancelada não pode ser reaberta.
 
-## 8. Perguntas frequentes e erros comuns
+## 9. Perguntas frequentes e erros comuns
 
 **O valor do estoque está zerado num item.** O item não tem de-para nem custo no Iniflex. Faça o de-para.
 
@@ -226,7 +289,11 @@ Em **Metas**, ajuste:
 
 **Importei o espelho errado.** Exclua em **Espelhos** e importe de novo.
 
-## 9. Histórico de alterações
+**A Nova contagem não trouxe nenhum item.** Todos os itens com saldo no local estão com a contagem em dia pela frequência da classe. Escolha outro local ou reduza a frequência nos parâmetros.
+
+**A leitura diz "Código não encontrado".** A etiqueta não corresponde a nenhum produto ou lote. Digite o código do produto.
+
+## 10. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
@@ -238,3 +305,4 @@ Em **Metas**, ajuste:
 | 1.5 | 07/11/2026 | Nova tela Cadastro pelas Notas de Entrada: prontidão das notas para o estoque, produtos propostos por família com curva ABC, o mesmo material de fornecedores diferentes num produto só, fator pela embalagem, código do Iniflex pelo espelho, regras de classificação editáveis e criação de regra de CFOP. |
 | 1.6 | 08/11/2026 | Nova tela Implantação do Estoque (EST007): os nove passos até o estoque oficial, com a situação calculada, o próximo passo, responsável, prazo, metas ajustáveis e os CFOPs sem regra. |
 | 1.7 | 08/11/2026 | Nova tela Reposição de Estoque (EST008): mínimo, ponto de pedido e máximo pelo consumo real e pelo nível de serviço, prazo de entrega real, cobertura, giro, parados, aplicar no cadastro e requisição de compra. |
+| 1.8 | 08/11/2026 | Nova tela Inventário Cíclico (EST009): contagens pela curva ABC e pela frequência de cada classe, contagem cega pelo celular com leitura da etiqueta, recontagem fora da tolerância, aprovação com ajustes AJ+/AJ− no Kardex e parâmetros na tela. |

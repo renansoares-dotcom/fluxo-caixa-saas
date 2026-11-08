@@ -1524,3 +1524,31 @@ window.RPC.pag_remessa_gravar = () => null;
     R('rp6', 'MP-019', 'ADITIVO ANTIBLOQUEIO', 'KG', 'Aditivos', 0, 0, 15, 'padrão', 50, 100, 375, 0, 22.4, 143),
     R('rp7', 'IN-FITA-48', 'FITA ADESIVA 48 MM', 'UN', 'Embalagens', 18, 6, 5, 'real', 50, 120, 820, 0, 4.9, 3)];
 }
+
+// Inventário cíclico (SQL 120) — contagens FICTÍCIAS no estoque já implantado
+{
+  DB.est_config = DB.est_config && DB.est_config.length ? DB.est_config.map(c => ({ ...c, implantado_em: c.implantado_em || '2026-10-01' })) : [{ empresa_id: E, implantado_em: '2026-10-01' }];
+  DB.est_inv_config = [{ empresa_id: E, dias_a: 30, dias_b: 60, dias_c: 120, itens_por_contagem: 20, tolerancia_pct: 2, tolerancia_valor: 100, contagem_cega: true, recontar: true, papeis_aprovacao: ['admin', 'diretor', 'financeiro'] }];
+  const lc = (c) => DB.est_locais.find(l => l.codigo === c)?.id;
+  const PR = (codigo, descricao, unidade, tipo = 'materia_prima') => { let p = DB.produtos.find(x => x.codigo === codigo); if (!p) { p = { id: 'pi-' + codigo, empresa_id: E, codigo, descricao, unidade, tipo, ativo: true }; DB.produtos.push(p); } return p.id; };
+  const it = [
+    ['MP-001', 'RESINA PEBD LINEAR', 'KG', 'A', 1800, 8.4], ['MP-007', 'RESINA PEAD SOPRO', 'KG', 'A', 3950, 8.9], ['MP-002', 'MASTERBATCH BRANCO', 'KG', 'B', 1820, 14.2],
+    ['MP-019', 'ADITIVO ANTIBLOQUEIO', 'KG', 'C', 375, 22.4], ['MP-021', 'MASTERBATCH PRETO', 'KG', 'B', 640, 12.9], ['MP-030', 'ADITIVO DESLIZANTE', 'KG', 'C', 210, 19.8]].map(([c, d, u, cl, s, cu]) => ({ p: PR(c, d, u), cl, s, cu }));
+  const lt = DB.est_lotes.find(l => l.codigo === 'L-2610-01');
+  const I = (cont, k, sit, contado, recontado, quem, just, lote) => ({ id: `ii-${cont}-${k}`, empresa_id: E, contagem_id: cont, produto_id: it[k].p, lote_id: lote || null, classe: it[k].cl, saldo_sistema: it[k].s, custo: it[k].cu,
+    contado, recontado, contado_por: quem, contado_em: contado == null ? null : '2026-11-08T09:' + (10 + k) + ':00Z', situacao: sit, justificativa: just || null });
+  DB.est_inv_contagens = [
+    { id: 'ic14', empresa_id: E, numero: 14, local_id: lc('MP'), situacao: 'aberta', criada_por: 'beatriz.rocha@exemplo.com', criada_em: '2026-11-08T08:40:00Z' },
+    { id: 'ic13', empresa_id: E, numero: 13, local_id: lc('MP'), situacao: 'em_aprovacao', criada_por: 'beatriz.rocha@exemplo.com', criada_em: '2026-11-06T08:30:00Z', enviada_em: '2026-11-06T11:05:00Z' },
+    { id: 'ic12', empresa_id: E, numero: 12, local_id: lc('INS') || lc('MP'), situacao: 'aprovada', criada_por: 'beatriz.rocha@exemplo.com', criada_em: '2026-11-03T08:30:00Z', decidida_por: 'carlos.lima@exemplo.com', decidida_em: '2026-11-03T16:20:00Z' }];
+  DB.est_inv_itens = [
+    I('ic14', 0, 'ok', 1795, null, 'ana.ferreira@exemplo.com', null, lt?.id), I('ic14', 1, 'recontar', 3810, null, 'ana.ferreira@exemplo.com'), I('ic14', 2, 'pendente', null, null, null),
+    I('ic14', 3, 'pendente', null, null, null), I('ic14', 4, 'ok', 640, null, 'ana.ferreira@exemplo.com'), I('ic14', 5, 'pendente', null, null, null),
+    I('ic13', 0, 'ok', 1802, null, 'ana.ferreira@exemplo.com'), I('ic13', 1, 'divergente', 3700, 3720, 'ana.ferreira@exemplo.com', 'Big bag rasgado no fundo do corredor 3'),
+    I('ic13', 2, 'ok', 1818, null, 'ana.ferreira@exemplo.com'), I('ic13', 3, 'divergente', 402, 400, 'ana.ferreira@exemplo.com', 'Sacos achados na área de pesagem'),
+    I('ic13', 4, 'ok', 641, null, 'ana.ferreira@exemplo.com'), I('ic13', 5, 'ok', 210, null, 'ana.ferreira@exemplo.com'),
+    I('ic12', 2, 'ok', 1820, null, 'bruno.lima@exemplo.com'), I('ic12', 4, 'ajustado', 610, 612, 'bruno.lima@exemplo.com', 'Falta de 1 saco')];
+  const hoje = Date.parse('2026-11-08');
+  window.RPC.est_inv_abc = () => [...it.map((x, k) => ({ produto_id: x.p, classe: x.cl, valor: x.s * x.cu, ultima_contagem: k < 5 ? '2026-11-06T10:00:00Z' : null })),
+    ...Array.from({ length: 34 }, (_, k) => ({ produto_id: 'abc-' + k, classe: k < 4 ? 'A' : k < 12 ? 'B' : 'C', valor: 1000, ultima_contagem: k % 3 ? new Date(hoje - (k * 6) * 864e5).toISOString() : null }))];
+}

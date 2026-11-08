@@ -85,6 +85,9 @@ export const FIGS = [
   ['estoque', 'estoque/cadastro-notas', '### 5.1', 'Cadastro pelas Notas de Entrada: prontidão das notas, famílias e produtos propostos com o código do Iniflex', 'click:[data-x="1"]|scroll:#cn-corpo'],
   ['estoque', 'estoque/implantacao', '## 6.', 'Implantação do Estoque: quanto falta, o próximo passo e a situação de cada passo'],
   ['estoque', 'estoque/reposicao', '### 3.5', 'Reposição de Estoque: mínimo, ponto de pedido e máximo pelo consumo, cobertura, giro e o que comprar', 'scroll:#rp-corpo'],
+  ['estoque', 'estoque/inventario', '## 7.', 'Inventário Cíclico: cumprimento da frequência por classe e as contagens'],
+  ['estoque', 'estoque/inventario', '### 7.2', 'Contagem pelo celular: leitura da etiqueta, quantidade e recontagem', 'click:tr[data-c="ic14"]'],
+  ['estoque', 'estoque/inventario', '### 7.3', 'Aprovação: sistema, contado, diferença e valor de cada item', 'click:tr[data-c="ic13"]'],
   // Manutenção industrial (07/11/2026) — a OS impressa (manutencao-os.jpg) e as telas do celular (manutencao-cel-*.jpg) são tiradas à parte
   ['manutencao', 'manutencao', '## 4.', 'Painel de Manutenção: alertas, indicadores e backlog'],
   ['manutencao', 'manutencao', '## 4.', 'Pareto das falhas, custo por equipamento e equipamentos críticos', 'scroll:#mp-par'],
