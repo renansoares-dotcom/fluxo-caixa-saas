@@ -70,6 +70,8 @@ export const FIGS = [
   ['fidc', 'fidc', '## 4.', 'Análise FIDC: custo e prazo por fundo'],
   ['estoque', 'estoque', '## 3.', 'Posição de Estoque com o ponto de pedido'],
   ['logistica-indicadores', 'logistica/indicadores', '## 5.', 'Metas dos indicadores', 'click:#li-metas'],
+  ['logistica-indicadores', 'logistica/indicadores', '## 6.', 'Frete próprio × terceirizado por rota: R$/t de cada lado, diferença, sugestão e economia estimada', 'scroll:#li-rotas'],
+  ['logistica-indicadores', 'logistica/indicadores', '## 6.', 'Parâmetros da comparação de fretes', 'click:#li-rpar'],
   ['conciliacao', 'conciliacao', '### 4.2', 'Movimento do extrato com os lançamentos candidatos e a nota de confiança da sugestão', 'click:#ext tr[data-id]'],
   ['conciliacao', 'conciliacao', '### 4.1', 'Aceitar sugestões pela faixa de confiança', 'click:#aceitar'],
   ['conciliacao', 'conciliacao', '### 4.1.1', 'Parâmetros: janelas de dias, faixas de confiança e os pontos de cada critério', 'click:#cpar'],

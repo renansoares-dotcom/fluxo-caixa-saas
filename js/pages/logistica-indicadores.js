@@ -4,6 +4,7 @@ import { $, $$, esc, toast, fail, modal, today, money, erroTela, chart } from '.
 import { podeLogistica } from '../lib/logistica.js';
 import { indicadores, frenteMeta, mesesAte, METAS_PADRAO } from '../lib/logistica-indicadores.js';
 import { valorMensal } from '../lib/contratos.js';
+import { SUGESTOES, resumo as resumoRotas, textoSugestao } from '../lib/frete-rota.js';
 
 export const title = 'Indicadores';
 const ui = { mes: today().slice(0, 7) };
@@ -31,7 +32,9 @@ async function carregar() {
   cnotas.forEach(n => { n.nota = notas[n.nota_id] || null; });
   const locacao = {}; for (const v of veiculos) { const c = v.contrato_id && contratos.find(x => x.id === v.contrato_id); if (c && c.status === 'vigente') locacao[v.id] = valorMensal(c); }
   const P = par[0] || {};
-  B = { cargas, cnotas, veiculos, fretes, abast, manut, multas, locacao, diasAtraso: P.dias_atraso ?? 3, metas: { ...METAS_PADRAO, ...(P.metas || {}) }, temParam: !!par[0], meses };
+  const fim2 = new Date(Date.UTC(+ui.mes.slice(0, 4), +ui.mes.slice(5), 0)).toISOString().slice(0, 10);   // último dia do mês
+  const comp = await q(sb.rpc('log_frete_comparativo', { p_empresa: e, p_ate: fim2 })).catch(() => null);
+  B = { comp, par: P, cargas, cnotas, veiculos, fretes, abast, manut, multas, locacao, diasAtraso: P.dias_atraso ?? 3, metas: { ...METAS_PADRAO, ...(P.metas || {}) }, temParam: !!par[0], meses };
   return B;
 }
 
@@ -68,12 +71,56 @@ export async function render(root) {
           .map(([v, u, m, sd]) => { const st = m != null ? frenteMeta(v, m, sd) : null; return `<td class="num ${st === 'neg' ? 'neg' : st === 'warn' ? 'warn' : ''}">${v == null ? '–' : u === 'R$' ? money(v) : nf(v) + u}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div></div>
       <div class="card"><h3 style="margin:0 0 8px">Clientes com mais atraso no mês</h3>
         ${k.atrasos.map(a => `<div class="small" style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)"><span>${esc(a.nome)}</span><span>${a.qtd} entrega(s) · média ${nf(a.media)} dias</span></div>`).join('') || '<div class="muted small">Nenhuma entrega fora do prazo no mês.</div>'}</div></div>
+    <div id="li-rotas"></div>
     <p class="small muted">Prazo: dias entre a emissão da nota e a baixa da entrega (limite em Frota e Parâmetros). Ocupação: peso e volume da carga sobre a capacidade do veículo, nas cargas que saíram. Custo: frota (combustível, manutenção, multas e locação) mais fretes de terceiros, sobre o valor das notas entregues.</p>`;
+  rotas($('#li-rotas', root), root);
   const rot = B.meses.map(MES);
   chart($('#li-c1', root), { type: 'line', data: { labels: rot, datasets: [{ label: 'No prazo (%)', data: serie.map(s => s.prazo_pct), tension: .3 }, { label: 'Ocupação (%)', data: serie.map(s => s.ocupacao_pct), tension: .3 }] },
     options: { maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } } } });
   chart($('#li-c2', root), { type: 'bar', data: { labels: rot, datasets: [{ label: 'Frota', data: serie.map(s => s.custo_frota), stack: 'c' }, { label: 'Terceiros', data: serie.map(s => s.custo_terceiros), stack: 'c' }] },
     options: { maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
+}
+
+// melhoria 7.2: frete próprio × terceirizado por rota
+function rotas(el, root) {
+  const C = B.comp;
+  if (!C) { el.innerHTML = ''; return; }
+  const R = C.rotas || [], S = resumoRotas(R), t = (kg) => kg ? nf(kg / 1000, 1) + ' t' : '–';
+  const lado = (x) => x && (x.viagens || x.custo) ? `${money(x.custo)}<div class="small muted">${x.viagens} viagem(ns) · ${t(x.peso_kg)}${x.rs_t != null ? ` · <b>${money(x.rs_t)}/t</b>` : ''}</div>` : '<span class="muted">–</span>';
+  el.innerHTML = `<div class="card flush" style="margin-top:18px"><div class="card-head" style="padding:14px 16px 0"><div><h3 style="margin:0">Frete próprio × terceirizado por rota</h3>
+      <div class="small muted">${C.de.split('-').reverse().join('/')} a ${C.ate.split('-').reverse().join('/')} · rota por ${C.rota_por === 'uf' ? 'UF' : 'município'} de destino · troca sugerida a partir de ${nf(C.dif_pct, 0)}% de diferença no R$/t, com ${nf(C.min_t, 1)} t ou mais de cada lado</div></div>
+      ${podeLogistica() ? '<button class="btn small" id="li-rpar">Parâmetros da comparação</button>' : ''}</div>
+    <div class="kpis" style="padding:12px 16px 0">
+      <div class="kpi"><div class="k-label">Frota própria</div><div class="k-value">${S.rs_t_proprio != null ? money(S.rs_t_proprio) + '/t' : '–'}</div><div class="k-sub">${money(S.custo_proprio)} no período</div></div>
+      <div class="kpi"><div class="k-label">Terceiros</div><div class="k-value">${S.rs_t_terceiro != null ? money(S.rs_t_terceiro) + '/t' : '–'}</div><div class="k-sub">${money(S.custo_terceiro)} no período</div></div>
+      <div class="kpi"><div class="k-label">Rotas comparáveis</div><div class="k-value">${S.comparaveis}</div><div class="k-sub">${S.terceirizar} para terceirizar · ${S.frota} para a frota</div></div>
+      <div class="kpi"><div class="k-label">Economia estimada</div><div class="k-value ${S.economia ? 'pos' : ''}">${money(S.economia)}</div><div class="k-sub">no período, seguindo as sugestões</div></div></div>
+    <div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Rota (destino)</th><th class="num">Frota própria</th><th class="num">Terceiros</th><th>Sugestão</th><th class="num">Economia</th></tr></thead><tbody>
+    ${R.map(r => { const [rotulo, cls] = SUGESTOES[r.sugestao] || SUGESTOES.sem_base;
+      return `<tr><td>${esc(r.rota)}</td><td class="num">${lado(r.proprio)}</td><td class="num">${lado(r.terceiro)}</td>
+        <td><span class="${cls}">${rotulo}</span>${r.dif_pct != null ? ` <span class="small muted">(terceiro ${r.dif_pct > 0 ? '+' : ''}${nf(r.dif_pct)}% sobre o próprio)</span>` : ''}<div class="small muted">${esc(textoSugestao(r))}</div></td><td class="num">${r.economia ? money(r.economia) : '<span class="muted">–</span>'}</td></tr>`; }).join('')
+    || '<tr><td colspan="5" class="empty">Sem cargas da frota nem fretes de terceiros no período.</td></tr>'}</tbody></table></div>
+    <p class="small muted" style="padding:0 16px 12px">Frota própria: cargas que saíram, km real (ou previsto) × custo por km do veículo (ou consumo × diesel), rateado entre as notas pelo peso. Terceiros: fichas de Fretes e CIOT (valor + pedágio), rateadas pelas notas da carga ou pelos números de nota da ficha; sem nota, a rota é o destino escrito na ficha e não há peso. A economia move o peso da opção mais cara para a mais barata, no R$/t do período.</p></div>`;
+  $('#li-rpar', el)?.addEventListener('click', () => parRotas(root));
+}
+
+function parRotas(root) {
+  const P = B.par || {};
+  const md = modal({ title: 'Parâmetros da comparação de fretes', body: `<div class="grid2">
+      <label>Agrupar a rota por<select id="rp-por"><option value="municipio" ${P.comp_rota_por !== 'uf' ? 'selected' : ''}>Município de destino</option><option value="uf" ${P.comp_rota_por === 'uf' ? 'selected' : ''}>UF de destino</option></select></label>
+      <label>Período (meses até o mês escolhido)<input type="number" min="1" max="24" id="rp-m" value="${P.comp_meses ?? 6}"></label>
+      <label>Sugerir troca a partir de (% de diferença no R$/t)<input type="number" step="0.1" min="0" max="100" id="rp-d" value="${P.comp_dif_pct ?? 10}"></label>
+      <label>Peso mínimo de cada lado para comparar (t)<input type="number" step="0.1" min="0" id="rp-t" value="${P.comp_min_t ?? 1}"></label></div>
+    <p class="small muted">O custo por km de cada veículo fica em Frota e Parâmetros (ou use o custo do mês na Gestão da Frota).</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rp-ok">Salvar</button>' });
+  $('#rp-ok', md.el).onclick = async () => {
+    const nv = { comp_rota_por: $('#rp-por', md.el).value, comp_meses: Math.min(24, Math.max(1, +$('#rp-m', md.el).value || 6)), comp_dif_pct: Math.min(100, Math.max(0, +$('#rp-d', md.el).value || 0)), comp_min_t: Math.max(0, +$('#rp-t', md.el).value || 0) };
+    try {
+      if (B.temParam) await q(sb.from('log_parametros').update(nv).eq('empresa_id', state.empresa.id));
+      else await q(sb.from('log_parametros').insert({ empresa_id: state.empresa.id, ...nv }));
+      toast('Parâmetros salvos'); md.close(); render(root);
+    } catch (err) { fail(err); }
+  };
 }
 
 function metas(root) {

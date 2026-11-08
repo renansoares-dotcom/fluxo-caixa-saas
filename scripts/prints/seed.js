@@ -1890,3 +1890,21 @@ window.RPC.pag_remessa_gravar = () => null;
     ['qualidade', -110, 50, 'Inspeção 298: aprovada com concessão'], ['entrega', -110, 60, 'PC 75: entregue 6 dia(s) depois do previsto'], ['preco', -110, 100, 'PC 75: nota conferiu com o pedido']];
   window.RPC.compras_iqf = (a) => a.p_favorecido ? lista.filter(f => f.favorecido_id === a.p_favorecido).map(f => ({ ...f, eventos: EV.map(([dimensao, d, nota, texto]) => ({ dimensao, data: dd(d), nota, texto })) })) : lista;
 }
+
+// Frete próprio × terceirizado por rota (SQL 135) — números FICTÍCIOS
+{
+  const hoje = new Date(), fim = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+  const ini = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() - 5, 1)).toISOString().slice(0, 10);
+  Object.assign(DB.log_parametros[0], { comp_rota_por: 'municipio', comp_meses: 6, comp_dif_pct: 10, comp_min_t: 1 });
+  const L = (viagens, notas, peso_kg, custo) => ({ viagens, notas, peso_kg, custo, rs_t: peso_kg ? Math.round(custo / peso_kg * 1000 * 100) / 100 : null });
+  const r = (rota, p, t, sugestao) => { const dif = p.rs_t && t.rs_t ? Math.round((t.rs_t / p.rs_t - 1) * 1000) / 10 : null;
+    const economia = sugestao === 'terceirizar' ? Math.round((p.rs_t - t.rs_t) * p.peso_kg / 1000 * 100) / 100 : sugestao === 'frota_propria' ? Math.round((t.rs_t - p.rs_t) * t.peso_kg / 1000 * 100) / 100 : 0;
+    return { rota, proprio: p, terceiro: t, dif_pct: sugestao === 'sem_base' ? null : dif, sugestao, economia }; };
+  window.RPC.log_frete_comparativo = () => ({ de: ini, ate: fim, rota_por: 'municipio', dif_pct: 10, min_t: 1, rotas: [
+    r('RECIFE / PE', L(38, 214, 142300, 21345), L(6, 31, 21800, 3270), 'equivalente'),
+    r('JOÃO PESSOA / PB', L(9, 47, 36400, 9100), L(7, 39, 30100, 5719), 'terceirizar'),
+    r('MACEIÓ / AL', L(4, 18, 14200, 2556), L(11, 52, 48600, 11178), 'frota_propria'),
+    r('CARUARU / PE', L(26, 131, 88900, 4890), L(0, 0, 0, 0), 'sem_base'),
+    r('NATAL / RN', L(0, 0, 0, 0), L(5, 22, 19800, 6336), 'sem_base'),
+    r('FORTALEZA/CE', L(0, 0, 0, 0), L(2, 0, 0, 4800), 'sem_base')] });
+}
