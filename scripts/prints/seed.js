@@ -1834,3 +1834,38 @@ window.RPC.pag_remessa_gravar = () => null;
     mensagem: 'Entrega no galpão 2 (Caruaru). Informe o preço com ICMS e IPI.', itens: IT.map(([id, descricao, unidade, quantidade]) => ({ id, descricao, unidade, quantidade, observacao: id === 'rqi1' ? 'Índice de fluidez entre 0,8 e 1,2' : null, preco: null })), resposta: null });
   window.RPC.cotacao_link_responder = () => null; window.RPC.cotacao_link_recusar = () => null;
 }
+
+// Confronto pedido × nota (SQL 133) — notas, divergências e bloqueios FICTÍCIOS
+{
+  const agora = Date.now(), dd = (n) => new Date(agora + n * 864e5).toISOString().slice(0, 10), Hh = (h) => new Date(agora - h * 36e5).toISOString();
+  Object.assign(DB.compras_parametros[0], { conf_tol_preco_pct: 2, conf_tol_qtd_pct: 5, conf_tol_valor: 10, conf_tol_prazo_dias: 3, conf_tol_entrega_dias: 2, conf_bloquear: true, conf_papeis_liberar: ['admin', 'diretor', 'financeiro'] });
+  const p117 = DB.compras_pedidos.find(p => p.numero === 117);
+  if (p117) { p117.parcelas_dias = [28, 42, 56]; p117.entrega_prevista = dd(-6); }
+  window.RPC.compras_notas_candidatas = () => [{ id: 'nf-cf1', numero: 77310, serie: '1', emissao: dd(-2), v_nf: 87570, emit_doc: '11222333000144', ja_recebida: false,
+    itens: [{ id: 'nfi-cf1', n_item: 1, xprod: 'RESINA PEBD LINEAR', ucom: 'KG', qcom: 10000, vuncom: 8.715, cprod: 'PEBDL', ncm: '39011092' },
+      { id: 'nfi-cf2', n_item: 2, xprod: 'PALETE PBR (RETORNÁVEL)', ucom: 'UN', qcom: 12, vuncom: 35, cprod: 'PLT', ncm: '44152000' }],
+    parcelas: [[1, 26], [2, 40], [3, 54]].map(([numero, d]) => ({ numero, vencimento: dd(d), valor: 29190, vinculada: false })) }];
+  window.RPC.compras_confrontar = (a) => (a.p_nota ? [
+    { tipo: 'preco', bloqueia: true, valor: 2950, texto: 'RESINA PEBD LINEAR: preço da nota 8,7150 acima do pedido 8,4200 (+3,5%; tolerância 2%)' },
+    { tipo: 'item_fora', bloqueia: true, valor: 420, texto: 'Itens da nota fora do pedido: R$ 420,00 (tolerância R$ 10,00)' },
+    { tipo: 'entrega', bloqueia: false, texto: 'Entrega 4 dia(s) depois do previsto' }] : []);
+  const B = (id, v, divs, sit = 'bloqueada', lib = {}) => ({ id, situacao: sit, valor_divergente: v, divergencias: divs, criado_em: Hh(30), ...lib });
+  const d1 = [{ tipo: 'preco', bloqueia: true, valor: 2950, texto: 'RESINA PEBD LINEAR: preço da nota 8,7150 acima do pedido 8,4200 (+3,5%; tolerância 2%)' },
+    { tipo: 'item_fora', bloqueia: true, valor: 420, texto: 'Itens da nota fora do pedido: R$ 420,00 (tolerância R$ 10,00)' }, { tipo: 'entrega', bloqueia: false, texto: 'Entrega 4 dia(s) depois do previsto' }];
+  const d2 = [{ tipo: 'prazo_pagamento', bloqueia: true, texto: `Parcela 1 vence ${dd(6).split('-').reverse().join('/')}; pelo pedido (28 dias) seria ${dd(20).split('-').reverse().join('/')}` }, { tipo: 'parcelas', bloqueia: false, texto: 'A nota tem 2 parcela(s); o pedido, 3' }];
+  const d3 = [{ tipo: 'quantidade', bloqueia: true, valor: 980, texto: 'FILME STRETCH 500 MM: recebido 1.140 de 1.000 pedidos (tolerância 5%)' }];
+  window.RPC.compras_confronto_lista = () => [
+    { nota_id: 'n1', numero: 77310, serie: '1', emissao: dd(-2), fornecedor: 'RESINAS DO BRASIL S.A.', v_nf: 87570, pedidos: [{ id: 'x', numero: 117 }], divergencias: d1, bloqueio: B('bq1', 3370, d1),
+      titulos: [{ id: 't1', data: dd(26), valor: 29190, status: 'Em aberto', bloqueado: true }, { id: 't2', data: dd(40), valor: 29190, status: 'Em aberto', bloqueado: true }, { id: 't3', data: dd(54), valor: 29190, status: 'Em aberto', bloqueado: true }] },
+    { nota_id: 'n2', numero: 5521, serie: '2', emissao: dd(-4), fornecedor: 'COLOR MASTER LTDA', v_nf: 8400, pedidos: [{ id: 'y', numero: 114 }], divergencias: d2, bloqueio: B('bq2', 0, d2),
+      titulos: [{ id: 't4', data: dd(6), valor: 4200, status: 'Em aberto', bloqueado: true }, { id: 't5', data: dd(36), valor: 4200, status: 'Em aberto', bloqueado: true }] },
+    { nota_id: 'n3', numero: 1290, serie: '1', emissao: dd(-6), fornecedor: 'EMBALAGENS PRIMAVERA', v_nf: 2310, pedidos: [], divergencias: [], bloqueio: null, titulos: [{ id: 't6', data: dd(22), valor: 2310, status: 'Em aberto', bloqueado: false }] },
+    { nota_id: 'n4', numero: 66012, serie: '1', emissao: dd(-9), fornecedor: 'POLÍMEROS NORDESTE LTDA', v_nf: 51200, pedidos: [{ id: 'z', numero: 112 }], divergencias: [{ tipo: 'entrega', bloqueia: false, texto: 'Entrega 3 dia(s) depois do previsto' }], bloqueio: null,
+      titulos: [{ id: 't7', data: dd(19), valor: 51200, status: 'Em aberto', bloqueado: false }] },
+    { nota_id: 'n5', numero: 30455, serie: '1', emissao: dd(-12), fornecedor: 'TRANSFILMES LTDA', v_nf: 18980, pedidos: [{ id: 'w', numero: 110 }], divergencias: d3,
+      bloqueio: B('bq3', 980, d3, 'liberada', { liberado_por: 'diretoria@plasticosexemplo.com.br', liberado_em: Hh(50), liberado_motivo: 'Fornecedor emitiu nota de débito de R$ 980,00 (ND 112); excesso fica em estoque' }),
+      titulos: [{ id: 't8', data: dd(16), valor: 18980, status: 'Em aberto', bloqueado: false }] },
+    { nota_id: 'n6', numero: 9081, serie: '1', emissao: dd(-15), fornecedor: 'RESINAS DO BRASIL S.A.', v_nf: 61900, pedidos: [{ id: 'v', numero: 116 }], divergencias: [], bloqueio: null,
+      titulos: [{ id: 't9', data: dd(13), valor: 61900, status: 'Em aberto', bloqueado: false }] }];
+  window.RPC.compras_liberar_pagamento = () => 3;
+}

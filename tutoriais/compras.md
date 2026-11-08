@@ -1,8 +1,8 @@
 ---
 titulo: Compras — requisições, pedidos e recebimentos
 tela: Compras › Painel de Compras (CMP001), Requisições e Cotações (CMP002), Pedidos de Compra (CMP003) e Recebimentos (CMP004)
-versao: 1.4
-atualizado: 2026-11-05
+versao: 1.5
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -140,9 +140,55 @@ A lista mostra o **Nº** (com a data do pedido e o nº do Iniflex na 2ª linha),
    - preço diferente do pedido, com a porcentagem;
    - item que não está na nota.
 5. Confira as **parcelas da nota** e deixe marcada a opção de **lançar as parcelas no contas a pagar**, com a classificação do pedido.
-6. Clique em **Registrar recebimento**.
+6. Leia o quadro do **confronto** abaixo da tabela. Ele é a mesma conferência que o sistema faz ao registrar e diz se o pagamento da nota vai ficar **bloqueado** (veja a seção 4.7).
+7. Clique em **Registrar recebimento**.
+
+![Figura 8 — Recebimento com divergência acima da tolerância: o pagamento da nota ficará bloqueado (dados fictícios)](img/compras-7.jpg)
 
 Os recebimentos ficam em **Últimos recebimentos**, com as divergências encontradas. Se faltou algo, o pedido fica como **Recebido em parte** e a previsão é refeita pelo que ainda falta.
+
+### 4.7 Confronto pedido × nota e bloqueio do pagamento
+
+Ao registrar o recebimento, o sistema compara a nota com o pedido e aplica as **tolerâncias** dos parâmetros:
+
+| Conferência | Bloqueia o pagamento quando… |
+|---|---|
+| Quantidade | o total recebido do item passa do pedido além da tolerância (padrão 5%) |
+| Preço | o preço unitário da nota passa do pedido além da tolerância (padrão 2%) |
+| Item fora do pedido | os itens da nota que não entraram no recebimento (frete, palete, item trocado) somam mais que a tolerância em reais (padrão R$ 10,00) |
+| Prazo de pagamento | uma parcela da nota vence antes do combinado no pedido, contando da emissão da nota, além da tolerância (padrão 3 dias) |
+| Número de parcelas | só informa |
+| Entrega atrasada | só informa (alimenta a avaliação do fornecedor) |
+
+Preço **abaixo** do pedido e quantidade **menor** não bloqueiam.
+
+Quando alguma conferência bloqueia:
+
+- os títulos da nota no contas a pagar ficam com **🔒 bloqueado**: não entram na **Autorização de Pagamentos** e não podem ser baixados como pagos;
+- um título ligado depois a essa nota (por exemplo, pela conciliação) já nasce bloqueado;
+- quem libera e o comprador recebem o aviso **Pagamento bloqueado: nota diverge do pedido**.
+
+A aba **Confronto pedido × nota**, em Recebimentos, lista as notas de entrada dos fornecedores com o pedido, as divergências, os títulos e a situação:
+
+- **Pagamento bloqueado**;
+- **Divergência sem bloqueio** (dentro da tolerância, ou só informativa);
+- **Sem pedido**: nota de fornecedor que não passou por recebimento de pedido;
+- **Liberada**;
+- **Confere**.
+
+![Figura 9 — Confronto pedido × nota: notas bloqueadas, divergências, títulos e notas sem pedido (dados fictícios)](img/compras-8.jpg)
+
+Para **liberar o pagamento**, quem tem permissão clica em **Liberar pagamento** e escreve o motivo, por exemplo "fornecedor emitiu nota de débito" ou "reajuste aprovado pela diretoria". Os títulos voltam a poder ser autorizados e pagos. A liberação fica registrada com o nome, a data e o motivo.
+
+![Figura 10 — Liberar o pagamento com o motivo (dados fictícios)](img/compras-9.jpg)
+
+**Parâmetros do confronto** (botão no topo de Recebimentos, para administrador e diretor):
+
+- ligar ou desligar o bloqueio;
+- as tolerâncias de preço, quantidade, itens fora do pedido, vencimento e entrega;
+- quem libera: diretor, financeiro e/ou compras. O administrador sempre libera.
+
+![Figura 11 — Parâmetros do confronto pedido × nota (dados fictícios)](img/compras-10.jpg)
 
 ## 5. Regras e travas
 
@@ -152,6 +198,7 @@ Os recebimentos ficam em **Últimos recebimentos**, com as divergências encontr
 - Cancelar exige **motivo**. Pedido já recebido não pode ser cancelado.
 - Pedido com recebimento **não volta** para rascunho.
 - A previsão no contas a pagar é refeita sempre que o pedido muda, e sai quando ele é recebido ou cancelado.
+- Nota que diverge do pedido acima das tolerâncias tem o **pagamento bloqueado** até a liberação com motivo. Título bloqueado não é autorizado nem baixado, e o bloqueio não pode ser tirado na mão.
 - O link de cotação é único por fornecedor e só serve para aquela requisição. Ele para de funcionar quando vence, quando é cancelado, quando a requisição sai de "aprovada" ou quando a cotação é escolhida para o pedido.
 
 ## 6. Perguntas frequentes e erros comuns
@@ -163,6 +210,12 @@ Os recebimentos ficam em **Últimos recebimentos**, com as divergências encontr
 **A nota não aparece no recebimento.** Ela ainda não foi importada, ou foi emitida antes dos 30 dias anteriores ao pedido. Importe o XML em Notas Fiscais › Entradas.
 
 **A nota veio em outra unidade (por exemplo, caixa em vez de unidade).** Cadastre o **de-para do fornecedor** em **Estoque › De-para de Fornecedores**, com o fator de conversão. Os próximos recebimentos já convertem sozinhos.
+
+**O título aparece com 🔒 bloqueado na Autorização de Pagamentos.** A nota dele diverge do pedido. Veja o motivo em **Recebimentos › Confronto pedido × nota**. Cobre o fornecedor (nota de débito, carta de correção) ou peça a liberação a quem tem permissão.
+
+**A baixa do título deu "Pagamento bloqueado".** É o mesmo caso: libere no confronto antes de baixar.
+
+**A nota aparece como "Sem pedido".** A mercadoria entrou sem recebimento contra pedido de compra. Se havia pedido, registre o recebimento por ele. Se é uma compra sem pedido (serviço, despesa), não há o que fazer aqui.
 
 **O fornecedor diz que o link não abre.** O link venceu ou foi cancelado. Gere outro convite na requisição.
 
@@ -188,3 +241,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Lista de Pedidos de Compra com as informações secundárias na 2ª linha e seletor **Colunas**; formulário do novo pedido em seções. Figuras refeitas. |
 | 1.4 | 08/11/2026 | Cotação por link: convite por e-mail ou WhatsApp, página do fornecedor sem cadastro, resposta e recusa, lista de convites; mapa comparativo com o menor preço por item, prazo, valor presente e a compra dividida; parâmetros da cotação. |
+| 1.5 | 08/11/2026 | Confronto pedido × nota: o sistema confere quantidade, preço, itens fora do pedido e prazo de pagamento com tolerâncias; nota divergente tem o pagamento bloqueado até a liberação com motivo; aba **Confronto pedido × nota** com as notas sem pedido; parâmetros do confronto. |

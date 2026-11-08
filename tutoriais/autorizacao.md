@@ -1,7 +1,7 @@
 ---
 titulo: Autorização de pagamentos
 tela: Financeiro › Autorização de Pagamentos (FIN007)
-versao: 1.3
+versao: 1.4
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -133,6 +133,7 @@ Em **Remessas** ficam os arquivos gerados, que podem ser **baixados de novo**. *
 ## 4. Regras e travas
 
 - Só entram títulos **a pagar em aberto**.
+- Título marcado **🔒 bloqueado** não pode ser autorizado: a nota dele diverge do pedido de compra. Clique no selo para ir a **Compras › Recebimentos › Confronto pedido × nota**, onde quem tem permissão libera o pagamento com o motivo.
 - Pagamento acima do orçamento **não é bloqueado**, mas exige justificativa por conta.
 - A autorização não baixa os títulos: depois de pagos, eles são baixados em Contas a pagar / receber ou pela Conciliação.
 - Com alçadas ativas, a autorização não pode ser aprovada "inteira": ela só fica Aprovada quando todos os títulos marcados foram decididos nas alçadas.
@@ -161,3 +162,4 @@ Em **Remessas** ficam os arquivos gerados, que podem ser **baixados de novo**. *
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.3 | 08/11/2026 | Alçadas de aprovação por valor e centro de custo, dupla aprovação, segregação de funções e aprovação em lote em Minhas aprovações. Remessa CNAB 240 (FEBRABAN) com crédito em conta, TED, Pix e boletos, dados da conta para a remessa e histórico de remessas. |
+| 1.4 | 08/11/2026 | Títulos com **🔒 bloqueado** (nota diverge do pedido de compra) não podem ser marcados; o selo leva ao Confronto pedido × nota. |

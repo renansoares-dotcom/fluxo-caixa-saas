@@ -6,7 +6,8 @@ import { detalheAlcadas, modalAlcadas, modalRemessa, listaRemessas } from '../li
 export const title = 'Autorização de Pagamentos';
 const f = { de: '', ate: '', conta: '', grupo: '', cc: '', favorecido: '', situacao: '', prioridade: '' };
 let itens = [];      // títulos listados
-let marc = {};       // id -> {autoriza, valor, obs}
+let marc = {};
+let BLOQ = new Set();   // títulos com pagamento bloqueado (nota diverge do pedido — Compras › Recebimentos › Confronto)       // id -> {autoriza, valor, obs}
 let saldoBancos = 0;
 let orcInfo = {};    // `${plano}|${ano}|${mes}` -> { orcAc, usado } (orçado × realizado + em aberto acumulados até o mês do vencimento)
 
@@ -65,7 +66,7 @@ export async function render(root) {
   $('#rems', root).onclick = () => listaRemessas();
   $('#flt', root).addEventListener('change', (e) => { f[e.target.name] = e.target.value; load(root); });
   if (podeEditar()) {
-    const marcar = (fn) => { for (const it of itens) marc[it.id] = { ...marc[it.id], autoriza: fn(it), valor: marc[it.id]?.valor ?? Math.abs(+it.valor_sinal) }; desenhar(root); };
+    const marcar = (fn) => { for (const it of itens) marc[it.id] = { ...marc[it.id], autoriza: !BLOQ.has(it.id) && fn(it), valor: marc[it.id]?.valor ?? Math.abs(+it.valor_sinal) }; desenhar(root); };
     $('#m-obr', root).onclick = () => marcar(it => it.prioridade_efetiva === 'Obrigatório' || !!marc[it.id]?.autoriza);
     $('#m-venc', root).onclick = () => marcar(it => it.data < today() || !!marc[it.id]?.autoriza);
     $('#m-tudo', root).onclick = () => marcar(() => true);
@@ -92,6 +93,8 @@ async function load(root) {
       q(sb.rpc('saldos_contas', { p_empresa: e })),
     ]);
     itens = rows;
+    BLOQ = new Set((await q(sb.from('lancamentos').select('id').eq('empresa_id', e).eq('pagamento_bloqueado', true)).catch(() => [])).map(r => r.id));
+    for (const id of BLOQ) if (marc[id]) marc[id].autoriza = false;
     try { await carregarOrcamento(rows); } catch (err) { orcInfo = {}; console.warn('orçamento', err); }
     saldoBancos = saldos.filter(s => s.disponibilidade === 'Conta com recursos disponíveis' && (!f.conta || s.conta_id === f.conta)).reduce((a, s) => a + +s.saldo_pago, 0);
     desenhar(root);
@@ -127,12 +130,12 @@ function desenhar(root) {
   tbl.innerHTML = `<table><thead><tr><th>Nº</th><th>Vencimento</th><th>Atraso</th><th>Favorecido</th><th>Descrição</th><th>Plano de contas</th><th>C. Custo</th><th>Banco</th><th>Prioridade</th><th>Orçamento</th><th class="num">Valor</th><th>Autoriza</th><th class="num">Valor autorizado</th><th>Observação</th></tr></thead><tbody>
     ${itens.map((it, i) => { const mk = marc[it.id] || {}; const dias = Math.floor((new Date(today()) - new Date(it.data)) / 864e5);
       return `<tr data-id="${it.id}"><td>${i + 1}</td><td>${dateBR(it.data)}</td><td>${dias > 0 ? `<span class="badge vencido">${dias} d</span>` : ''}</td>
-      <td class="wrap">${esc(it.favorecido_nome || '')}</td><td class="wrap">${esc(it.descricao || '')}</td><td>${esc(it.plano_codigo + ' - ' + it.plano_nome)}</td>
+      <td class="wrap">${esc(it.favorecido_nome || '')}</td><td class="wrap">${BLOQ.has(it.id) ? '<a class="badge vencido" href="#/compras/recebimentos?aba=confronto" title="A nota deste título diverge do pedido de compra. Libere em Compras › Recebimentos › Confronto.">🔒 bloqueado</a> ' : ''}${esc(it.descricao || '')}</td><td>${esc(it.plano_codigo + ' - ' + it.plano_nome)}</td>
       <td>${esc(it.centro_custo_nome || '')}</td><td>${esc(it.conta_nome || '')}</td>
       <td><span class="badge ${it.prioridade_efetiva === 'Obrigatório' ? 'obrig' : 'negoc'}">${it.prioridade_efetiva}</span></td>
       <td>${(() => { const o = acimaOrc(it); if (o) return `<span class="badge vencido" title="Budget acumulado até ${MESES_CURTO[o.mes - 1]}: ${money(o.orcAc)} · pago + em aberto: ${money(o.usado)}">acima ${money(o.usado - o.orcAc)}</span>`; const x = infoOrc(it); return x ? '<span class="badge pago">no orçado</span>' : '<span class="small muted">sem orçamento</span>'; })()}</td>
       <td class="num">${money(Math.abs(+it.valor_sinal))}</td>
-      <td><input type="checkbox" class="aut" ${mk.autoriza ? 'checked' : ''} ${ed ? '' : 'disabled'}></td>
+      <td><input type="checkbox" class="aut" ${mk.autoriza ? 'checked' : ''} ${ed && !BLOQ.has(it.id) ? '' : 'disabled'}></td>
       <td class="num"><input class="cell val" value="${money(mk.valor ?? Math.abs(+it.valor_sinal))}" ${ed ? '' : 'disabled'}></td>
       <td><input class="obs" value="${esc(mk.obs || '')}" style="min-width:160px" ${ed ? '' : 'disabled'}></td></tr>`; }).join('')}</tbody></table>`;
   tbl.onchange = (e) => {
