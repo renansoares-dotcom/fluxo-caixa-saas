@@ -85,25 +85,36 @@ Escolha o **período**. O painel mostra:
 
 ![Figura 3 — Planta da Fábrica ao vivo: produzindo, em manutenção, parada longa e setup, com a OP e o ritmo (dados fictícios)](img/producao-3.jpg)
 
-- **Acompanhar**: a planta mostra cada máquina com a situação ao vivo:
-  - **produzindo**, em verde, com a OP;
-  - **setup ou parada planejada**, em amarelo;
-  - **parada**, em vermelho;
-  - **em manutenção**, em roxo, quando há OS aberta que parou a máquina ou parada de motivo de manutenção;
-  - **livre**.
+A planta mostra cada máquina com a situação ao vivo:
 
-  Entre os setores, as setas mostram as bobinas paradas esperando a etapa seguinte. **Modo TV** é para o telão da fábrica; no celular, a planta aparece vista de cima. Clique numa máquina para ver:
-  - a OP e o quanto já foi feito;
-  - o **ritmo agora**: kg por hora da produção em curso e o percentual da capacidade;
-  - a **OS de manutenção**, com o link para abrir;
-  - o operador.
-- **Ao vivo**: a planta se atualiza **na hora** em que o operador aponta, registra uma parada ou a manutenção mexe na OS. Também se atualiza de tempos em tempos (padrão: 30 segundos). No alto aparece "ao vivo" quando a ligação em tempo real está ativa.
-- **Parada longa**: parada não planejada aberta há mais de 20 minutos (ajustável) pisca e aparece nos números do alto. Quem é administrador ou diretor recebe o aviso **Máquina parada há muito tempo**, uma vez por parada.
-- **Parâmetros ao vivo** (botão **Ao vivo**, administrador, financeiro ou diretor):
-  - tempo real ligado ou desligado;
-  - intervalo da atualização (10 a 300 segundos);
-  - limite da parada longa (5 a 480 minutos);
-  - aviso e quem recebe.
+- **produzindo**, em verde, com a OP;
+- **setup ou parada planejada**, em amarelo;
+- **parada**, em vermelho;
+- **em manutenção**, em roxo, quando há OS aberta que parou a máquina ou parada de motivo de manutenção;
+- **livre**.
+
+Entre os setores, as setas mostram as bobinas paradas esperando a etapa seguinte. **Modo TV** é para o telão da fábrica; no celular, a planta aparece vista de cima.
+
+Clique numa máquina para ver:
+
+- a OP e o quanto já foi feito;
+- o **ritmo agora**: kg por hora da produção em curso e o percentual da capacidade;
+- a **OS de manutenção**, com o link para abrir;
+- o operador.
+
+A planta se atualiza **na hora** em que o operador aponta, registra uma parada ou a manutenção mexe na OS (tempo real). Também se atualiza de tempos em tempos (padrão: 30 segundos). No alto aparece "ao vivo" quando a ligação em tempo real está ativa.
+
+Uma **parada longa** é a parada não planejada aberta há mais de 20 minutos (ajustável). Ela pisca na planta e aparece nos números do alto. Quem é administrador ou diretor recebe o aviso **Máquina parada há muito tempo**, uma vez por parada.
+
+No botão **Ao vivo** (administrador, financeiro ou diretor), ajuste:
+
+- tempo real ligado ou desligado;
+- intervalo da atualização (10 a 300 segundos);
+- limite da parada longa (5 a 480 minutos);
+- aviso e quem recebe.
+
+Para montar ou mudar a planta:
+
 - **Editar**: clique em **Editar planta** (administrador, financeiro ou diretor).
   1. Informe a largura e a profundidade do galpão.
   2. Inclua os elementos: setor, corredor, área de paletes, estoque de MP, expedição, portão, seta de fluxo, parede, doca, vaga de garagem, pátio, rua, guarita, telões e árvores.
