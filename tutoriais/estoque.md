@@ -1,7 +1,7 @@
 ---
 titulo: Estoque e produtos
-tela: Estoque › Implantação do Estoque (EST007), Posição de Estoque (EST001), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
-versao: 1.6
+tela: Estoque › Implantação do Estoque (EST007), Posição de Estoque (EST001), Reposição de Estoque (EST008), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
+versao: 1.7
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -59,13 +59,60 @@ Em **Parâmetros de custo**, marque os impostos **recuperáveis** (que geram cr�
 
 Confirme com a contabilidade quais impostos marcar.
 
+### 3.5 Reposição de Estoque (pelo consumo)
+
+![Figura 2 — Reposição de Estoque: mínimo, ponto de pedido e máximo pelo consumo, cobertura, giro e o que comprar (dados fictícios)](img/estoque-6.jpg)
+
+A tela **Reposição de Estoque** calcula, para cada material, a partir do **consumo real**:
+
+| Número | Cálculo |
+|---|---|
+| Consumo/dia | Consumo dos últimos 90 dias (ajustável) ÷ dias. A variação vem do consumo semana a semana. |
+| Mínimo (estoque de segurança) | z × variação × √prazo de entrega. O z vem do nível de serviço: 90% = 1,28; 95% = 1,65; 98% = 2,05; 99% = 2,33. |
+| Ponto de pedido | Consumo/dia × prazo de entrega + mínimo. |
+| Máximo | Ponto de pedido + consumo/dia × intervalo entre compras (padrão 15 dias). |
+| Comprar | Máximo − saldo − pedidos em aberto, quando saldo + pedidos chegam ao ponto de pedido. |
+| Cobertura | Saldo ÷ consumo/dia, em dias. |
+| Giro | Consumo de um ano ÷ saldo. |
+
+O **consumo** vem das saídas do Kardex. Antes da implantação do estoque (e nos 30 primeiros dias depois dela), vem das **compras** pelas notas de entrada (de-para). Nesse caso a tela avisa, e saldo, cobertura e sugestão aparecem só depois da implantação.
+
+O **prazo de entrega** segue esta ordem:
+
+1. o do cadastro do produto (clique no prazo para fixar);
+2. a média real, do pedido de compra à primeira nota do fornecedor com o produto;
+3. o padrão (15 dias).
+
+As **situações** são:
+
+| Situação | Quando |
+|---|---|
+| Crítico | O saldo está no estoque de segurança. |
+| Comprar | Saldo + pedidos chegaram ao ponto de pedido. |
+| Excesso | O saldo passa de 2× o máximo. |
+| Parado | Há saldo e não há saída há mais de 90 dias (ajustável). |
+| OK | Nenhuma das anteriores. |
+
+Marque os itens e use:
+
+- **Aplicar no cadastro**: grava o mínimo, o ponto de pedido e o máximo calculados no produto. A Posição de Estoque e a requisição automática passam a usar esses valores. A coluna **No cadastro** mostra o mínimo e o ponto de pedido atuais; em amarelo, quando o ponto do cadastro difere mais de 25% do calculado.
+- **Requisição de compra**: cria a requisição com a quantidade sugerida (ajustável). É urgente quando há item crítico.
+
+Em **Parâmetros**:
+
+- a janela de consumo;
+- o nível de serviço;
+- o prazo padrão e o intervalo entre compras;
+- os dias para "parado";
+- de onde vem o consumo (automático, Kardex ou compras).
+
 ## 4. Produtos
 
-![Figura 2 — Cadastro de produtos (dados fictícios)](img/estoque-1.jpg)
+![Figura 3 — Cadastro de produtos (dados fictícios)](img/estoque-1.jpg)
 
 ### 4.1 Cadastrar
 
-![Figura 3 — Novo produto, em quatro seções, com o Fator de compra (dados fictícios)](img/estoque-3.jpg)
+![Figura 4 — Novo produto, em quatro seções, com o Fator de compra (dados fictícios)](img/estoque-3.jpg)
 
 1. Clique em **Novo produto**.
 2. O formulário tem quatro seções. Em **Identificação**, preencha o **tipo**, o **código (Iniflex)** e a **descrição** (obrigatórios), a unidade, o NCM, o grupo e o subgrupo.
@@ -98,7 +145,7 @@ Clique no produto para ver:
 
 ### 5.1 Cadastro pelas Notas de Entrada (em massa)
 
-![Figura 4 — Cadastro pelas Notas de Entrada: prontidão das notas, famílias e produtos propostos com o código do Iniflex (dados fictícios)](img/estoque-4.jpg)
+![Figura 5 — Cadastro pelas Notas de Entrada: prontidão das notas, famílias e produtos propostos com o código do Iniflex (dados fictícios)](img/estoque-4.jpg)
 
 Use esta tela para cadastrar de uma vez os produtos e os de-paras de todos os itens de compra. É o caminho para a implantação do estoque, porque sem de-para as notas de entrada não movimentam nada.
 
@@ -119,7 +166,7 @@ Use esta tela para cadastrar de uma vez os produtos e os de-paras de todos os it
 
 ## 6. Implantação do Estoque
 
-![Figura 5 — Implantação do Estoque: quanto falta, o próximo passo e a situação de cada passo (dados fictícios)](img/estoque-5.jpg)
+![Figura 6 — Implantação do Estoque: quanto falta, o próximo passo e a situação de cada passo (dados fictícios)](img/estoque-5.jpg)
 
 A tela **Implantação do Estoque** acompanha os passos até o estoque da plataforma virar o oficial e andar sozinho pelas notas fiscais. A situação de cada passo é calculada com os números do banco, na hora em que a tela abre (ou em **Atualizar**).
 
@@ -190,3 +237,4 @@ Em **Metas**, ajuste:
 | 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Novo produto em quatro seções; o rótulo "Fator (1 un. de compra = ? un.)" passou a **Fator de compra**. Figuras refeitas. |
 | 1.5 | 07/11/2026 | Nova tela Cadastro pelas Notas de Entrada: prontidão das notas para o estoque, produtos propostos por família com curva ABC, o mesmo material de fornecedores diferentes num produto só, fator pela embalagem, código do Iniflex pelo espelho, regras de classificação editáveis e criação de regra de CFOP. |
 | 1.6 | 08/11/2026 | Nova tela Implantação do Estoque (EST007): os nove passos até o estoque oficial, com a situação calculada, o próximo passo, responsável, prazo, metas ajustáveis e os CFOPs sem regra. |
+| 1.7 | 08/11/2026 | Nova tela Reposição de Estoque (EST008): mínimo, ponto de pedido e máximo pelo consumo real e pelo nível de serviço, prazo de entrega real, cobertura, giro, parados, aplicar no cadastro e requisição de compra. |

@@ -1504,3 +1504,23 @@ window.RPC.pag_remessa_gravar = () => null;
   DB.man_ordens = (DB.man_ordens || []).map(o => ({ ...o, man_equipamentos: { maquina_id: (DB.man_equipamentos || []).find(e => e.id === o.equipamento_id)?.maquina_id || null } }));
   DB.man_ordens.push({ id: 'mo-vivo', empresa_id: E, numero: 131, equipamento_id: eq.id, tipo: 'corretiva', prioridade: 'alta', situacao: 'em_execucao', descricao: 'Resistência da zona 3 queimada', responsavel: 'Marcos Lima', maquina_parou: true, parada_inicio: agoraMenos(52), parada_id: 'pp-man', man_equipamentos: { maquina_id: M('EXT-02').id } });
 }
+
+// Reposição de estoque (SQL 119) — cálculo FICTÍCIO com o estoque já implantado
+{
+  DB.est_reposicao_config = [{ empresa_id: E, janela_dias: 90, nivel_servico: 95, lead_time_padrao: 15, intervalo_compra_dias: 15, parado_dias: 90, fonte: 'auto' }];
+  const R = (id, codigo, descricao, un, familia, d, sd, lt, ltf, minAt, ppAt, saldo, ped, custo, parado) => {
+    const es = Math.round(1.65 * sd * Math.sqrt(lt) * 10) / 10, pp = Math.round((d * lt + es) * 10) / 10, mx = Math.round((pp + d * 15) * 10) / 10;
+    const sit = d === 0 && saldo > 0 && parado >= 90 ? 'parado' : saldo <= es ? 'critico' : saldo + ped <= pp ? 'comprar' : saldo > mx * 2 ? 'excesso' : 'ok';
+    return { produto_id: id, codigo, descricao, unidade: un, familia, fonte: 'kardex', consumo_janela: Math.round(d * 90), consumo_dia: d, sigma_dia: sd, lead_time: lt, lead_fonte: ltf, estoque_seguranca: es, ponto_pedido: pp, estoque_maximo: mx,
+      minimo_atual: minAt, ponto_atual: ppAt, saldo, em_pedido: ped, cobertura_dias: d ? Math.round(saldo / d * 10) / 10 : null, giro_anual: d && saldo ? Math.round(d * 365 / saldo * 100) / 100 : null,
+      dias_sem_saida: parado, valor_saldo: Math.round(saldo * custo * 100) / 100, custo, sugestao: sit === 'critico' || sit === 'comprar' ? Math.max(0, Math.round((mx - saldo - ped) * 10) / 10) : 0, situacao: sit };
+  };
+  window.RPC.est_reposicao = () => [
+    R('rp1', 'MP-001', 'RESINA PEBD LINEAR', 'KG', 'Resinas', 1420, 380, 12, 'real', 8000, 15000, 1800, 0, 8.4, 0),
+    R('rp2', 'MP-002', 'MASTERBATCH BRANCO', 'KG', 'Masterbatch', 96, 31, 20, 'produto', 500, 1500, 1820, 1000, 14.2, 1),
+    R('rp3', 'MP-007', 'RESINA PEAD SOPRO', 'KG', 'Resinas', 610, 190, 12, 'real', 3000, 6000, 3950, 2500, 8.9, 0),
+    R('rp4', 'TN-BASE-AZ', 'CONCENTRADO AZUL FTALO', 'KG', 'Tintas e insumos', 4.8, 2.1, 25, 'padrão', 20, 60, 110, 0, 62.5, 2),
+    R('rp5', 'IN-TUB-3', 'TUBETE 3 POLEGADAS', 'UN', 'Embalagens', 210, 55, 7, 'real', 800, 2000, 2650, 0, 2.15, 0),
+    R('rp6', 'MP-019', 'ADITIVO ANTIBLOQUEIO', 'KG', 'Aditivos', 0, 0, 15, 'padrão', 50, 100, 375, 0, 22.4, 143),
+    R('rp7', 'IN-FITA-48', 'FITA ADESIVA 48 MM', 'UN', 'Embalagens', 18, 6, 5, 'real', 50, 120, 820, 0, 4.9, 3)];
+}
