@@ -23,6 +23,9 @@ async function matrizAno(ano) {
   return comRecompras(montarMatriz(rows.map(r => ({ plano_id: r.plano_id, mes: r.mes, total: +r.total }))), ano, null, FILTROS);
 }
 
+// também usado pelo bloco "Indicadores da diretoria" da Minha Manhã
+export { mesAnterior };
+export async function carregarPainel(ref) { return carregar(ref); }
 async function carregar(ref) {
   const e = state.empresa.id, meses = meses13(ref), hoje = today().slice(0, 7);
   const anos = [...new Set([...meses.map(m => +m.slice(0, 4)), +hoje.slice(0, 4)])].filter(a => a <= +hoje.slice(0, 4)).sort();

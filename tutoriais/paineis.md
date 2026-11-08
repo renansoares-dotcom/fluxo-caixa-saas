@@ -1,8 +1,8 @@
 ---
 titulo: Painéis — Minha Manhã, Decisão do Dia, Decision Center e dashboards
 tela: Painéis › Minha Manhã (PAI001), Decisão do Dia (PAI002), Decision Center (PAI003), Dashboard Executivo (PAI004) e Dashboard (PAI005)
-versao: 1.2
-atualizado: 2026-11-05
+versao: 1.3
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -16,27 +16,70 @@ Os painéis juntam, numa tela só, o que precisa de atenção e de decisão:
 
 ## 2. Quem tem acesso
 
-Os painéis fazem parte da área **Financeiro**. Na Decisão do Dia:
+A **Minha Manhã** é de todos os perfis, e cada um vê só as suas áreas. Os demais painéis fazem parte da área **Financeiro**. Na Decisão do Dia:
 
 - o administrador e o financeiro registram e enviam a decisão;
 - o diretor e o administrador aprovam ou rejeitam.
 
 ## 3. Minha Manhã
 
-![Figura 1 — Minha Manhã (dados fictícios)](img/paineis-1.jpg)
+![Figura 1 — Minha Manhã de um administrador, com os blocos do padrão (dados fictícios)](img/paineis-1.jpg)
 
-A tela abre com:
+A Minha Manhã é a tela inicial. Ela é montada por **blocos**, e cada pessoa escolhe quais aparecem e em que ordem. Agora vale para todos os perfis, inclusive Compras, Vendas e Produção, cada um vendo só as suas áreas.
 
-- **Situação do dia**: saldo, conferência, extratos e travas.
-- **Agenda de hoje**: o que vence hoje, nos próximos 7 dias e o que está vencido.
-- **Decisões pendentes**: o que espera por você conforme o seu perfil (por exemplo, para o diretor: pagamentos antecipados, propostas de borderô, autorizações).
-- **Alertas**.
+### 3.1 Os blocos
 
-Cada item leva à tela certa. **Atualizar** recarrega os dados.
+| Bloco | O que mostra | Quem pode ter |
+|---|---|---|
+| Indicadores da diretoria | Os oito indicadores do Painel da Diretoria do mês anterior, com a situação de cada um. | Administrador, diretor, financeiro e leitura |
+| Minhas aprovações | As 6 decisões mais urgentes, o total e o link para ver todas. | Todos |
+| Situação do dia | Saldo disponível, conferência, extratos e travas. | Quem tem a área Financeiro |
+| O que mudou desde o seu último acesso | O que outras pessoas incluíram, alteraram ou excluíram nas suas áreas, notas importadas e avisos não lidos. | Todos |
+| Resumo do dia anterior | O último dia útil: recebido e pago, faturamento, notas de entrada, produção e refugo, não conformidades e entregas. | Todos (cada um vê as suas áreas) |
+| Agenda de hoje | O que vence hoje, nos próximos 7 dias e o que está vencido. | Quem tem a área Financeiro |
+| Alertas | Caixa abaixo do mínimo, contas negativas, títulos vencidos, extratos atrasados e conferência pendente. | Quem tem a área Financeiro |
+| Meus atalhos | As telas que você mais usa, a um clique. | Todos |
+
+Os blocos que aparecem logo de saída dependem do perfil:
+
+| Perfil | Blocos ligados no padrão |
+|---|---|
+| Administrador | Indicadores da diretoria, aprovações, situação, o que mudou, dia anterior, alertas e agenda |
+| Diretor | Indicadores da diretoria, aprovações, dia anterior, o que mudou, situação e alertas |
+| Financeiro | Situação, aprovações, agenda, alertas, dia anterior e o que mudou |
+| Leitura | Situação, dia anterior, o que mudou e indicadores da diretoria |
+| Compras e Vendas | Aprovações, o que mudou, dia anterior e atalhos |
+| Produção | Dia anterior, o que mudou, aprovações e atalhos |
+
+Cada bloco carrega sozinho: se um demora, os outros já aparecem. Cada item leva à tela certa. **Atualizar** recarrega os dados.
+
+### 3.2 O que mudou e o dia anterior
+
+![Figura 2 — O que mudou desde o último acesso e o resumo do dia anterior (dados fictícios)](img/paineis-6.jpg)
+
+**O que mudou desde o seu último acesso** conta, por módulo, as inclusões, alterações e exclusões feitas **por outras pessoas**. O que você mesmo fez não aparece.
+
+- **Último acesso** é a sua entrada anterior na plataforma. Recarregar a página dentro de 30 minutos não conta como novo acesso. O limite é de 30 dias.
+- Cada pessoa vê só os módulos das áreas que enxerga. Usuários e papéis aparecem só para o administrador e o diretor.
+- Para o administrador e o diretor, **Quem fez o quê** lista as últimas alterações com o nome de quem fez e leva à Auditoria.
+
+**Resumo do dia anterior** mostra o último dia útil (na segunda-feira, a sexta). Cada número leva à tela de detalhe.
+
+### 3.3 Personalizar
+
+![Figura 3 — Personalizar: os blocos, a ordem e os atalhos (dados fictícios)](img/paineis-7.jpg)
+
+Clique em **Personalizar**:
+
+1. Em **Blocos**, marque os que aparecem. Use as setas ↑ e ↓ para mudar a ordem.
+2. Em **Meus atalhos**, marque as telas que você mais usa (use o filtro). Ligue também o bloco **Meus atalhos**.
+3. Clique em **Salvar**.
+
+A escolha vale para você, nesta empresa, em todos os aparelhos. **Voltar ao padrão** devolve os blocos do seu perfil.
 
 ## 4. Decisão do Dia
 
-![Figura 2 — Decisão do Dia (dados fictícios)](img/paineis-2.jpg)
+![Figura 4 — Decisão do Dia (dados fictícios)](img/paineis-2.jpg)
 
 ### 4.1 Simular
 
@@ -67,7 +110,7 @@ A **Decisão sugerida** resume o que a plataforma propõe para o dia.
 
 ## 5. Decision Center
 
-![Figura 3 — Decision Center (dados fictícios)](img/paineis-3.jpg)
+![Figura 5 — Decision Center (dados fictícios)](img/paineis-3.jpg)
 
 As **Recomendações da semana** mostram, para cada uma, o motivo, o impacto estimado, a urgência, a **regra usada** e a ação, com o link para a tela certa. Exemplos:
 
@@ -88,7 +131,7 @@ As recomendações seguem regras fixas e mostram a regra que usaram; não há in
 
 ## 6. Dashboard Executivo
 
-![Figura 4 — Dashboard Executivo (dados fictícios)](img/paineis-4.jpg)
+![Figura 6 — Dashboard Executivo (dados fictícios)](img/paineis-4.jpg)
 
 1. Escolha o **mês de referência**.
 2. Os indicadores podem ser clicados para ver a composição:
@@ -115,7 +158,7 @@ O painel usa só lançamentos com conta bancária, a mesma base dos saldos.
 
 ## 7. Dashboard
 
-![Figura 5 — Dashboard (dados fictícios)](img/paineis-5.jpg)
+![Figura 7 — Dashboard (dados fictícios)](img/paineis-5.jpg)
 
 O resumo do ano mostra:
 
@@ -141,3 +184,4 @@ O resumo do ano mostra:
 | 1.0 | 28/10/2026 | Primeira versão do manual: Minha Manhã, Decisão do Dia com registro e aprovação, Decision Center, Dashboard Executivo e Dashboard. |
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.3 | 07/11/2026 | Minha Manhã personalizada: blocos por perfil, o que mudou desde o último acesso, resumo do dia anterior, aprovações, indicadores da diretoria e atalhos. |

@@ -1095,3 +1095,20 @@ window.FN = {
     { empresa_id: E, mes: '2026-10-01', indicador: 'rj', texto: 'Parcela de outubro paga parcialmente; saldo de R$ 70 mil programado para 10/11.', autor: 'renata@exemplo.com.br' }];
   DB.prod_setores ||= [{ id: 'st1', empresa_id: E, nome: 'Extrusão', ativo: true, ordem: 1 }, { id: 'st2', empresa_id: E, nome: 'Impressão', ativo: true, ordem: 2 }, { id: 'st3', empresa_id: E, nome: 'Corte e solda', ativo: true, ordem: 3 }];
 }
+
+// Minha Manhã personalizada (SQL 102) — FICTÍCIOS
+{
+  const H = (h) => new Date(Date.now() - h * 36e5).toISOString();
+  DB.manha_preferencias = [];
+  const ont = '2026-11-06';
+  window.RPC.manha_resumo = () => ({ desde: H(15.3), ontem: ont, detalhe_pessoas: true,
+    mudou: { avisos: 3, notas: { saida: 14, entrada: 6 },
+      por_tabela: [['lancamentos', 'fin', 23, 17, 5, 1, 2, 1.1], ['paraquedas', 'fin', 4, 2, 2, 0, 2, 2.4], ['prod_apontamentos', 'prd', 38, 38, 0, 0, 5, 0.7], ['qual_rnc', 'prd', 2, 1, 1, 0, 1, 5.2],
+        ['compras_pedidos', 'cmp', 3, 2, 1, 0, 1, 3.9], ['log_carga_notas', 'log', 11, 0, 11, 0, 1, 1.8], ['favorecidos', 'cad', 2, 1, 1, 0, 2, 6.0]]
+        .map(([tabela, area, total, incluiu, alterou, excluiu, pessoas, h]) => ({ tabela, area, total, incluiu, alterou, excluiu, pessoas, ultimo: H(h) })),
+      recentes: [['beatriz', 'incluiu', 'lancamentos', 'TARIFA BANCÁRIA PIX', 1.1], ['ana', 'alterou', 'paraquedas', 'RESINAS DO BRASIL S.A.', 2.4], ['diego', 'incluiu', 'compras_pedidos', '418', 3.9],
+        ['carlos', 'alterou', 'qual_rnc', 'Bobina com variação de espessura', 5.2], ['ana', 'excluiu', 'lancamentos', 'FRETE EM DUPLICIDADE', 6.5]]
+        .map(([u, acao, tabela, rotulo, h]) => ({ user_email: u + '@exemplo.com.br', acao, tabela, rotulo, criado_em: H(h) })) },
+    dia: { fin: { recebido: 186420.55, pago: 142310.18, lancamentos: 47 }, fat: { notas: 14, valor: 52380.4 }, entradas: { notas: 6, valor: 71240 },
+      prod: { boa: 17850, refugo: 1210, apontamentos: 38 }, rnc: 1, log: { cargas: 3, entregues: 11, problemas: 1 } } });
+}

@@ -133,6 +133,9 @@ export const FIGS = [
   ['painel-diretoria', 'diretoria', '## 4.', 'Comentário do responsável sobre o indicador', 'click:[data-com="perdas"]'],
   ['painel-diretoria', 'diretoria', '## 5.', 'Metas e parâmetros: metas do ano, tolerância, recuperação judicial, setores e contas', 'click:#dr-par'],
   ['painel-diretoria', 'diretoria', '## 6.', 'PDF da reunião: destinatário e os itens da deliberação', 'click:#dr-pdf'],
+  // Minha Manhã personalizada (07/11/2026)
+  ['paineis', 'hoje', '### 3.2', 'O que mudou desde o último acesso e o resumo do dia anterior', 'scroll:[data-b="mudou"]'],
+  ['paineis', 'hoje', '### 3.3', 'Personalizar: os blocos, a ordem e os atalhos', 'click:#mm-pers'],
   // Recompras FIDC (07/11/2026)
   ['fidc-recompras', 'fidc-recompras', '## 3.', 'Recompras: as pendências sem registro, os indicadores e os títulos recomprados'],
   ['fidc-recompras', 'fidc-recompras', '### 3.1', 'Registrar a recompra: o título, o motivo (aqui, devolução de mercadoria), a nota de devolução e o que volta para a carteira', 'click:#rc-novo|click:.rc-res [data-i]|click:[data-mo="mo-devolucao"]'],
