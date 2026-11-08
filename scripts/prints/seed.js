@@ -1590,3 +1590,38 @@ window.RPC.pag_remessa_gravar = () => null;
       T('dashboard', 640, 7, 700, 1500, 2600, 4.1), T('producao/terminal', 1450, 9, 380, 900, 1800, 0), T('hoje', 760, 8, 420, 880, 1500, 0), T('producao/ordens', 310, 5, 510, 1100, 2200, 1.3)],
     dias: [] });
 }
+
+// App do motorista (SQL 124) — carga de hoje FICTÍCIA com entregas pelo celular
+{
+  const hoje = new Date().toISOString().slice(0, 10), M1 = DB.frota_motoristas[0], V1 = DB.log_veiculos[0];
+  M1.user_id = 'u-mot1'; DB.frota_motoristas[1].user_id = 'u-mot2';
+  DB.log_app_config = [{ empresa_id: E, exigir_canhoto: true, exigir_assinatura: false, exigir_recebedor: true, exigir_km: true, rastrear_min: 10, avisar_cliente_saida: true, avisar_cliente_entrega: true, portal_mostra_fila: true, papeis_ocorrencia: ['admin', 'financeiro', 'diretor'] }];
+  const cg = { id: 'cg-app', empresa_id: E, numero: 32, data: hoje, veiculo_id: V1.id, motorista_id: M1.id, motorista: M1.nome, status: 'em_rota', peso_kg: 7600, volume_m3: 21, km_previsto: 180, frete_previsto: 900,
+    saida_em: hoje + 'T10:40:00Z', km_saida: 118920 };
+  DB.log_cargas.push(cg);
+  const EN = [
+    ['SUPERMERCADOS BOA COMPRA LTDA', 'AV. AGAMENON MAGALHÃES', '1200', 'MAURÍCIO DE NASSAU', 'CARUARU', '55012000', '8137210000', 24, 'entregue', 'JOÃO PEREIRA', '11:32'],
+    ['FARMÁCIAS SAÚDE MAIS S.A.', 'RUA DUQUE DE CAXIAS', '455', 'CENTRO', 'CARUARU', '55002000', '8137224411', 8, 'entregue', 'ANA LÚCIA', '12:05'],
+    ['ATACADO SERTÃO LTDA', 'ROD. BR-104', 'KM 62', 'DISTRITO INDUSTRIAL', 'TORITAMA', '55125000', '', 30, 'nao_entregue', null, null],
+    ['DISTRIBUIDORA NORDESTE LTDA', 'RUA SANTA CRUZ', '87', 'CENTRO', 'SANTA CRUZ DO CAPIBARIBE', '55190000', '8137311122', 16, 'pendente', null, null],
+    ['MERCADINHO SÃO JOÃO', 'RUA DO COMÉRCIO', '12', 'CENTRO', 'TAQUARITINGA DO NORTE', '55790000', '8137561010', 6, 'pendente', null, null]];
+  window.__appEnt = EN.map(([cli, lgr, nro, bai, cid, cep, fone, vol, sit, rec, hora], k) => {
+    const nota = { id: 'nf-app' + k, empresa_id: E, chave: 'APP' + k, numero: 6120 + k, emissao: hoje, tipo: 'saida', emissao_propria: true, dest_nome: cli, dest_doc: '1122233300018' + k, dest_uf: 'PE', v_nf: 8000 + k * 1500, situacao: 'autorizada' };
+    DB.nfe_notas.push(nota);
+    const cn = { id: 'cn-app' + k, empresa_id: E, carga_id: cg.id, nota_id: nota.id, seq: k + 1, peso_kg: 1500, volume_m3: 4, situacao: sit, entregue_em: hora ? `${hoje}T${String(+hora.slice(0, 2) + 3).padStart(2, '0')}:${hora.slice(3)}:00Z` : null,
+      chegada_em: hora ? new Date(Date.parse(`${hoje}T${String(+hora.slice(0, 2) + 3).padStart(2, '0')}:${hora.slice(3)}:00Z`) - 12 * 60000).toISOString() : null, recebedor_nome: rec, recebedor_doc: rec ? '1234567' : null,
+      canhoto_path: rec ? `${E}/entregas/cg-app/cn-app${k}-canhoto.jpg` : null, baixa_por: sit === 'pendente' ? null : 'app' };
+    DB.log_carga_notas.push(cn);
+    return { id: cn.id, seq: k + 1, situacao: sit, chegada_em: cn.chegada_em, entregue_em: cn.entregue_em, recebedor_nome: rec, tem_canhoto: !!rec, peso_kg: 1500, nota: nota.numero, serie: '1', valor: nota.v_nf, cliente: cli, documento: nota.dest_doc,
+      logradouro: lgr, nro, bairro: bai, cidade: cid, uf: 'PE', cep, fone, volumes: vol, restricao: k === 3 ? 'Recebe das 8h às 16h · doca lateral' : null, ocorrencias: k === 2 ? 1 : 0 };
+  });
+  DB.log_ocorrencias = [{ id: 'oc-app1', empresa_id: E, carga_id: cg.id, carga_nota_id: 'cn-app2', tipo: 'ausente', descricao: 'Galpão fechado, ninguém atendeu no telefone', nao_entregue: true, criado_em: hoje + 'T15:48:00Z', lat: -7.98, lng: -36.06, foto_path: `${E}/entregas/cg-app/ocorrencia-1.jpg` }];
+  DB.log_posicoes = [{ id: 1, empresa_id: E, carga_id: cg.id, lat: -7.95, lng: -36.2, em: hoje + 'T16:10:00Z' }];
+  window.RPC.log_motorista_cargas = () => [{ id: cg.id, empresa_id: E, empresa: 'PLÁSTICOS EXEMPLO', numero: 32, data: hoje, status: 'em_rota', veiculo: V1.codigo, placa: V1.placa, motorista: M1.nome, saida_em: cg.saida_em, km_saida: cg.km_saida,
+    observacao: 'Levar a nota de devolução do Atacado Sertão (NF 5871).', config: DB.log_app_config[0], entregas: window.__appEnt }];
+  window.RPC.log_notas_das_cargas = (a) => DB.log_carga_notas.filter(cn => (a.p_cargas || []).includes(cn.carga_id)).sort((x, y) => x.seq - y.seq).map(cn => {
+    const n = DB.nfe_notas.find(x => x.id === cn.nota_id) || {}, e = (window.__appEnt || []).find(x => x.id === cn.id) || {};
+    return { carga_nota_id: cn.id, carga_id: cn.carga_id, nota_id: n.id, seq: cn.seq, situacao: cn.situacao, entregue_em: cn.entregue_em, numero: n.numero, emissao: n.emissao, dest_doc: n.dest_doc || n.dest_nome, dest_nome: n.dest_nome,
+      uf: 'PE', cmun: null, xmun: e.cidade || 'CARUARU', bairro: e.bairro, cep: e.cep, logradouro: e.logradouro, nro: e.nro, peso_kg: cn.peso_kg, volume_m3: cn.volume_m3, v_nf: n.v_nf };
+  });
+}

@@ -44,7 +44,7 @@ const tamanho = (b) => (b == null ? '' : b < 1024 ? `${b} B` : b < 1048576 ? `${
 const toqueGrosso = () => matchMedia('(pointer: coarse)').matches;
 const ehAudio = (a) => /^audio\//.test(a?.mime || '');
 const ehImg = (a) => /^image\//.test(a?.mime || '');
-const PAPEL = { admin: 'Administrador', financeiro: 'Financeiro', diretor: 'Diretor', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção' };
+const PAPEL = { admin: 'Administrador', financeiro: 'Financeiro', diretor: 'Diretor', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção', motorista: 'Motorista' };
 const papelDe = (uid) => PAPEL[chat.contatoDe(uid)?.papel] || '';
 const REGISTRO = { lancamento: 'Lançamento', paraquedas: 'Pagamento antecipado', compras_pedido: 'Pedido de compra', prod_ordem: 'Ordem de produção', log_frete: 'Frete', fidc_proposta: 'Proposta FIDC',
   qual_rnc: 'Não conformidade', qual_inspecao: 'Inspeção', man_ordem: 'OS de manutenção', pre_projeto: 'Arte', tin_ordem: 'Ordem de tinta',

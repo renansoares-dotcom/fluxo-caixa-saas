@@ -23,7 +23,7 @@ export const TELAS = {
   'qualidade': 'PRD012', 'qualidade/inspecoes': 'PRD013', 'qualidade/nao-conformidades': 'PRD014', 'qualidade/planos': 'PRD015',
   'tintas': 'PRD016', 'tintas/ordens': 'PRD017', 'tintas/receitas': 'PRD018',
   // Logística
-  'logistica': 'LOG001', 'logistica/fretes': 'LOG002', 'logistica/gestao-frota': 'LOG003', 'logistica/indicadores': 'LOG004', 'logistica/frota': 'LOG005',
+  'logistica': 'LOG001', 'logistica/fretes': 'LOG002', 'logistica/gestao-frota': 'LOG003', 'logistica/indicadores': 'LOG004', 'logistica/frota': 'LOG005', 'logistica/motorista': 'LOG006',
   // RH / Trabalhista
   'rh/colaboradores': 'RHT001', 'rh/folha': 'RHT002', 'rh/decimo': 'RHT003',
   // CPD › Fiscal

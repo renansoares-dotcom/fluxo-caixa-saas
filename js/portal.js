@@ -13,7 +13,7 @@ const q = async (p) => { const { data, error } = await p; if (error) throw error
 const avisar = () => { sb.functions.invoke('notificar', { body: {} }).catch(() => {}); sb.functions.invoke('email', { body: {} }).catch(() => {}); };   // manda já o aviso à equipe (o agendamento também manda)
 const main = $('#pt-main');
 const token = new URLSearchParams(location.search).get('convite');
-const S = { clientes: [], fav: null, aba: new URLSearchParams(location.search).get('arte') ? 'artes' : 'titulos', pend: 0, arte: new URLSearchParams(location.search).get('arte') };
+const S = { clientes: [], fav: null, aba: new URLSearchParams(location.search).get('arte') ? 'artes' : (new URLSearchParams(location.search).get('aba') === 'entregas' ? 'entregas' : 'titulos'), pend: 0, arte: new URLSearchParams(location.search).get('arte') };
 const base = () => location.href.split('#')[0].split('?')[0];
 
 // ---------------------------------------------------------------- autenticação
@@ -79,13 +79,13 @@ async function pintar() {
   S.pend = S.lista.filter(a => a.pendente).length;
   if (S.pend && S.aba === 'titulos' && !S.vistoArtes) { S.vistoArtes = true; }
   main.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">${esc(c.cliente)}</h2><div class="muted small">${esc(c.documento || '')} · fornecedor: ${esc(c.empresa)}</div></div></div>
-    <div class="card toolbar"><div class="chips" id="pt-abas">${[['titulos', 'Títulos'], ['notas', 'Notas fiscais'], ['compras', 'O que comprei'], ['pedidos', 'Pedidos de prorrogação'], ...(S.lista.length ? [['artes', 'Artes para aprovar']] : [])]
+    <div class="card toolbar"><div class="chips" id="pt-abas">${[['titulos', 'Títulos'], ['notas', 'Notas fiscais'], ['entregas', 'Entregas'], ['compras', 'O que comprei'], ['pedidos', 'Pedidos de prorrogação'], ...(S.lista.length ? [['artes', 'Artes para aprovar']] : [])]
       .map(([k, t]) => `<span class="chip ${S.aba === k ? 'on' : ''}" data-a="${k}">${t}${k === 'artes' && S.pend ? ` <b class="pt-n">${S.pend}</b>` : ''}</span>`).join('')}</div></div>
     ${S.pend && S.aba !== 'artes' ? `<div class="pt-aviso" style="margin-top:12px;cursor:pointer" id="pt-ir-artes">🎨 <b>${S.pend} arte(s) aguardando a sua aprovação.</b> Clique para conferir e aprovar.</div>` : ''}
     <div id="pt-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#pt-abas').onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { S.aba = a; S.arte = null; pintar(); } };
   $('#pt-ir-artes') && ($('#pt-ir-artes').onclick = () => { S.aba = 'artes'; pintar(); });
-  ({ titulos, notas, compras, pedidos, artes })[S.aba]().catch(err => { fail(err); $('#pt-corpo').innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; });
+  ({ titulos, notas, entregas, compras, pedidos, artes })[S.aba]().catch(err => { fail(err); $('#pt-corpo').innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; });
 }
 
 async function titulos() {
@@ -128,6 +128,21 @@ async function notas() {
     try { const xml = await q(sb.rpc('portal_nota_xml', { p_fav: S.fav.favorecido_id, p_nota: b.dataset.x })); if (!xml) return toast('XML indisponível', true);
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' })); a.download = `NFe_${b.dataset.n}.xml`; a.click(); URL.revokeObjectURL(a.href); } catch (err) { fail(err); }
   });
+}
+
+// entregas (melhoria 7.1, SQL 124): saiu para entrega, quantas faltam antes da sua, entregue com o canhoto
+async function entregas() {
+  let E = [];
+  try { E = await q(sb.rpc('portal_entregas', { p_fav: S.fav.favorecido_id })); } catch { E = []; }
+  const sit = (e) => e.situacao === 'entregue' ? ['Entregue', 'pago'] : e.situacao === 'nao_entregue' ? ['Não entregue — vamos reagendar', 'vencido']
+    : e.carga_status === 'em_rota' ? ['Saiu para entrega', 'aberto'] : e.carga_status === 'concluida' ? ['Em reagendamento', 'negoc'] : ['Programada', 'negoc'];
+  $('#pt-corpo').innerHTML = `<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Nota</th><th>Situação</th><th>Saída</th><th>Entrega</th><th>Recebido por</th><th></th></tr></thead><tbody>
+    ${E.map(e => { const s2 = sit(e); return `<tr><td>${e.numero}</td><td><span class="badge ${s2[1]}">${s2[0]}</span>${e.antes_da_sua != null ? `<div class="small muted">${e.antes_da_sua ? e.antes_da_sua + ' entrega(s) antes da sua' : 'a sua é a próxima'}</div>` : ''}</td>
+      <td>${e.saida_em ? new Date(e.saida_em).toLocaleString('pt-BR').slice(0, 17) : '—'}${e.veiculo ? `<div class="small muted">${esc(e.veiculo)}</div>` : ''}</td>
+      <td>${e.entregue_em ? new Date(e.entregue_em).toLocaleString('pt-BR').slice(0, 17) : '—'}</td><td>${esc(e.recebedor || '')}</td>
+      <td>${e.canhoto_path ? `<button class="btn ghost small" data-can="${esc(e.canhoto_path)}">Canhoto</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">Nenhuma entrega da nossa frota nos últimos 4 meses.</td></tr>'}</tbody></table></div></div>
+    <p class="small muted">Mostra as entregas feitas pelos nossos caminhões. Entregas por transportadora não aparecem aqui.</p>`;
+  $$('[data-can]').forEach(b => b.onclick = async () => { const { data, error } = await sb.storage.from('logistica').createSignedUrl(b.dataset.can, 600); if (error || !data) return toast('Canhoto indisponível', true); window.open(data.signedUrl, '_blank', 'noopener'); });
 }
 
 async function compras() {

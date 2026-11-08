@@ -7,7 +7,7 @@ import { $, $$, esc, toast, fail, modal, dateBR, today } from '../lib/ui.js';
 import { termoHTML, situacaoAcesso, prazoSolicitacao, mascararCPF, modeloTermo, TIPOS_SOLIC, ORIGENS } from '../lib/lgpd-calc.js';
 
 export const title = 'Privacidade e Acessos';
-const PAPEIS = { admin: 'Administrador', diretor: 'Diretor', financeiro: 'Financeiro', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção' };
+const PAPEIS = { admin: 'Administrador', diretor: 'Diretor', financeiro: 'Financeiro', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção', motorista: 'Motorista' };
 const ABAS = [['acessos', 'Acessos'], ['termos', 'Termos de uso'], ['titular', 'Dados pessoais'], ['solic', 'Solicitações dos titulares']];
 const ui = { aba: 'acessos', busca: '', res: null };
 const norm = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();

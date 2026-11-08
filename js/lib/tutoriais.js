@@ -70,6 +70,8 @@ export const MANUAIS = [
     resumo: 'Cores e receitas com versões aprovadas, ordem de preparação com pesagem conferida e balança, correção de proporção, medição de viscosidade e ΔE, lote com etiqueta, entrega à máquina e sobras.' },
   { id: 'manutencao', titulo: 'Manutenção industrial — OS, preventivas, peças e indicadores', area: 'Produção', rotas: ['manutencao', 'manutencao/ordens', 'manutencao/equipamentos', 'manutencao/celular', 'manutencao/preventivas'],
     resumo: 'Equipamentos ligados às máquinas, OS corretiva e preventiva, parada automática, peças do estoque, terceiros no contas a pagar, MTBF, MTTR e disponibilidade.' },
+  { id: 'app-motorista', titulo: 'App do Motorista — entrega pelo celular com canhoto', area: 'Logística', rotas: ['logistica/motorista'],
+    resumo: 'Rota do dia, entrega com foto do canhoto e assinatura, ocorrências, km e o cliente acompanhando pelo Portal; funciona sem internet.' },
   { id: 'logistica', titulo: 'Logística — cargas, entregas e frota', area: 'Logística', rotas: ['logistica', 'logistica/frota'],
     resumo: 'Montagem automática de cargas, romaneio, mapa, baixa das entregas, frota e parâmetros.' },
   { id: 'frota', titulo: 'Gestão da frota e motoristas', area: 'Logística', rotas: ['logistica/gestao-frota'],

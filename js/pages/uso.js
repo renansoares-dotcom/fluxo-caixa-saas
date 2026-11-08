@@ -7,7 +7,7 @@ import { codigoDa } from '../lib/telas.js';
 import { fmtTempo, perfisResumo, telasSemUso, taxaDesistencia, periodo } from '../lib/uso-calc.js';
 
 export const title = 'Uso da Plataforma';
-const PAPEIS = { admin: 'Administrador', diretor: 'Diretor', financeiro: 'Financeiro', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção' };
+const PAPEIS = { admin: 'Administrador', diretor: 'Diretor', financeiro: 'Financeiro', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção', motorista: 'Motorista' };
 const ABAS = [['telas', 'Telas'], ['perfis', 'Perfis'], ['pessoas', 'Pessoas'], ['forms', 'Onde desistem'], ['erros', 'Erros'], ['sem', 'Telas sem uso'], ['desempenho', 'Desempenho']];
 const ui = { dias: 30, de: null, ate: null, papel: '', aba: 'telas' };
 

@@ -1,8 +1,8 @@
 ---
 titulo: Gestão da frota e motoristas
 tela: Logística › Gestão da Frota (LOG003)
-versao: 1.2
-atualizado: 2026-10-29
+versao: 1.3
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -67,6 +67,7 @@ Quem edita a logística: **administrador, financeiro e diretor**. Os demais perf
 1. Na aba **Motoristas**, clique em **Incluir motorista**. Se ele for empregado, escolha o **colaborador do RH**: nome e CPF vêm preenchidos.
 2. Informe CNH (número, categoria, validade e se tem EAR), exame **toxicológico** (data e validade: a plataforma sugere 2 anos e 6 meses depois do exame; confira no laudo), **MOPP** (produtos perigosos, quando houver) e a data do **termo de responsabilidade** assinado.
 3. Alertas: CNH, toxicológico e MOPP vencendo em até 60 dias; toxicológico não cadastrado para CNH C, D ou E; empregado sem termo de responsabilidade.
+4. **Login do App do Motorista**: escolha o usuário com o perfil Motorista. Com o login, as cargas em que ele for escolhido aparecem no celular dele (veja o manual **App do Motorista**).
 4. O **termo de responsabilidade pelo uso do veículo** sai em **Cadastros › Contratos**, na ficha do contrato, em **Minuta para assinatura**.
 
 ## 9. Dúvidas frequentes
@@ -84,3 +85,4 @@ Quem edita a logística: **administrador, financeiro e diretor**. Os demais perf
 | 1.0 | 30/10/2026 | Primeira versão: painel de custos, documentos dos veículos, preventivas, manutenção e multas com conta a pagar, abastecimento com km/l e motoristas com CNH, toxicológico e MOPP. |
 | 1.1 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
+| 1.3 | 08/11/2026 | Ficha do motorista com o login do App do Motorista. |

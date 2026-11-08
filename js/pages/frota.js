@@ -374,9 +374,13 @@ function fichaMotorista(m0, root) {
       <label>MOPP — validade<input type="date" id="o-mo" value="${m.mopp_validade || ''}"></label>
       <label>Termo de responsabilidade assinado em<input type="date" id="o-te" value="${m.termo_assinado_em || ''}"></label>
       <label style="grid-column:1/-1">Observação<input id="o-ob" value="${esc(m.observacao || '')}"></label>
+      <label>Login do App do Motorista<select id="o-us"><option value="">— sem login —</option></select><span class="small muted">pessoas com o perfil Motorista (Cadastros › Empresa e Usuários)</span></label>
       <label style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="o-at" ${m.ativo ? 'checked' : ''} style="width:auto"> Ativo</label></div>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="o-ok">Salvar</button>' });
   const el = md.el, G = (id) => $('#' + id, el);
+  // login do app (melhoria 7.1, SQL 124): só quem tem o perfil motorista
+  q(sb.rpc('listar_membros', { p_empresa: state.empresa.id })).then(ms => { G('o-us').innerHTML = '<option value="">— sem login —</option>' + ms.filter(x => x.papel === 'motorista' || x.user_id === m.user_id)
+    .map(x => `<option value="${x.user_id}" ${x.user_id === m.user_id ? 'selected' : ''}>${esc(x.email)}</option>`).join(''); }).catch(() => { G('o-us').closest('label').hidden = true; });
   G('o-co').onchange = (e) => { const r = D.R.find(x => x.id === e.target.value); if (r) { G('o-n').value = r.nome; if (r.cpf) G('o-cpf').value = r.cpf; } };
   G('o-td').onchange = (e) => { if (e.target.value && !G('o-tv').value) G('o-tv').value = F.addMeses(e.target.value, 30); };
   G('o-ok').onclick = async (ev) => {
@@ -386,6 +390,7 @@ function fichaMotorista(m0, root) {
       cnh_numero: G('o-cn').value.trim() || null, cnh_categoria: G('o-cc').value.trim().toUpperCase() || null, cnh_validade: G('o-cv').value || null, cnh_ear: G('o-ear').checked,
       toxicologico_data: G('o-td').value || null, toxicologico_validade: G('o-tv').value || null, mopp_validade: G('o-mo').value || null, termo_assinado_em: G('o-te').value || null,
       observacao: G('o-ob').value.trim() || null, ativo: G('o-at').checked };
+    if (!G('o-us').closest('label').hidden) row.user_id = G('o-us').value || null;
     try { if (m0) await q(sb.from('frota_motoristas').update(row).eq('id', m0.id)); else await q(sb.from('frota_motoristas').insert(row)); toast('Motorista salvo'); md.close(); refazer(root); }
     catch (err) { fail(err); ev.target.disabled = false; }
   };

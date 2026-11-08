@@ -10,6 +10,9 @@ import { botaoConversa } from '../lib/mini-chat.js';
 export const title = 'Cargas e Entregas';
 const ui = { data: null, de: null, ate: null };
 let B, M, origem, PEND = [], SALVAS = [], PROP = null, BAIXAS = [];
+// App do motorista (melhoria 7.1, SQL 124): motoristas com login, o que veio do celular por entrega e as ocorrências
+let MOT = [], APP = {}, OCO = [], CFGAPP = null;
+const OCORR = { ausente: 'Cliente ausente', recusa: 'Recusa', avaria: 'Avaria', endereco: 'Endereço', atraso: 'Atraso', veiculo: 'Veículo', outro: 'Outra' };
 const kg = (v) => Math.round(+v || 0).toLocaleString('pt-BR');
 const t1 = (v) => (+v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
 const money = (v) => v == null ? '–' : 'R$ ' + Math.round(v).toLocaleString('pt-BR');
@@ -24,13 +27,14 @@ export async function render(root) {
     [B, M] = await Promise.all([carregarBase(), municipios()]);
   } catch (err) { fail(err); root.innerHTML = erroTela(); return; }
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Cargas e Entregas</h2><div class="muted small">Notas de saída com frete por conta da empresa (modFrete ${esc(B.P.mod_fretes.join(', '))}). Peso e volumes vêm da nota; volume em m³ estimado por tonelada quando não há medida.</div></div>
-      <a class="btn ghost" href="#/logistica/frota">Frota e Parâmetros</a></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${podeLogistica() ? '<button class="btn ghost" id="lg-app">App do motorista</button>' : ''}<a class="btn ghost" href="#/logistica/frota">Frota e Parâmetros</a></div></div>
     <div class="card toolbar"><label>Dia das cargas<input type="date" id="lg-d" value="${ui.data}"></label>
       <label>Notas de<input type="date" id="lg-de" value="${ui.de}"></label><label>até<input type="date" id="lg-ate" value="${ui.ate}"></label></div>
     <div id="lg-corpo"><div class="loading">Carregando notas…</div></div>`;
   $('#lg-d', root).onchange = (e) => { ui.data = e.target.value; PROP = null; render(root); };
   $('#lg-de', root).onchange = (e) => { ui.de = e.target.value; PROP = null; render(root); };
   $('#lg-ate', root).onchange = (e) => { ui.ate = e.target.value; PROP = null; render(root); };
+  $('#lg-app', root) && ($('#lg-app', root).onclick = () => parametrosApp());
   await recarregar(root);
 }
 
@@ -48,6 +52,12 @@ async function recarregar(root) {
     BAIXAS = doDia.filter(ehBaixa);
     const cargas = [...doDia.filter(c => !ehBaixa(c)), ...ativas.filter(a => !doDia.some(d => d.id === a.id))];
     const linhas = cargas.length ? await q(sb.rpc('log_notas_das_cargas', { p_empresa: e, p_cargas: cargas.map(c => c.id) })) : [];
+    // o que veio do app (sem o SQL 124 fica vazio)
+    const ids = cargas.map(c => c.id);
+    [MOT, APP, OCO] = await Promise.all([
+      q(sb.from('frota_motoristas').select('id,nome,user_id,ativo').eq('empresa_id', e).eq('ativo', true).order('nome')).catch(() => []),
+      ids.length ? q(sb.from('log_carga_notas').select('id,chegada_em,recebedor_nome,recebedor_doc,canhoto_path,assinatura_path,baixa_por,entregue_em').in('carga_id', ids)).then(r => Object.fromEntries(r.map(x => [x.id, x]))).catch(() => ({})) : {},
+      ids.length ? q(sb.from('log_ocorrencias').select('*').in('carga_id', ids).order('criado_em')).catch(() => []) : []]);
     SALVAS = cargas.map(c => {
       const v = B.veiculos.find(x => x.id === c.veiculo_id) || null, stops = [];
       for (const l of linhas.filter(x => x.carga_id === c.id)) {
@@ -111,16 +121,18 @@ function cardCarga(x, id) {
       <div class="small muted">${v ? `${esc(TIPOS_VEICULO[v.tipo] || v.tipo)}${v.placa ? ' · ' + esc(v.placa) : ''} · ${kg(v.carga_kg)} kg${cap?.m3Bruto ? ' · ' + t1(cap.m3Bruto) + ' m³' : ''}` : ''}</div></div>
       ${prop ? '' : badge(ST_CARGA, c.status)}</div>
     ${editavel && !prop ? `<div class="lg-linha"><select class="lg-veic" data-id="${id}">${outrosV.map(o => `<option value="${o.id}" ${o.id === v?.id ? 'selected' : ''}>${esc(o.codigo)}</option>`).join('')}</select>
-      <input class="lg-mot" data-id="${id}" placeholder="Motorista" value="${esc(c.motorista || v?.motorista || '')}"></div>` : ''}
+      ${MOT.length ? `<select class="lg-motid" data-id="${id}" title="Motorista (com login, a carga aparece no App do Motorista)"><option value="">Motorista…</option>${MOT.map(o => `<option value="${o.id}" ${o.id === c.motorista_id ? 'selected' : ''}>${esc(o.nome)}${o.user_id ? ' 📱' : ''}</option>`).join('')}</select>`
+        : `<input class="lg-mot" data-id="${id}" placeholder="Motorista" value="${esc(c.motorista || v?.motorista || '')}">`}</div>` : ''}
+    ${!prop && c.id ? appResumo(c) : ''}
     ${barra('Peso', pK, kg(m.kg) + ' kg')}${barra('Volume', pV, t1(m.m3) + ' m³')}
     ${m.estoura ? '<div class="small neg">Passa da capacidade do veículo.</div>' : ''}${m.passaJornada ? `<div class="small warn">Passa da jornada (${t1(m.horas)} h).</div>` : ''}
     <ol class="lg-stops">${x.stops.map((s, i) => `<li class="lg-stop" draggable="${editavel}" data-src="${id}" data-key="${esc(s.key)}"><span class="lg-n">${i + 1}</span><div><b>${esc(s.nome || '')}</b><div class="small muted">${esc(s.xmun || '')} · NF ${s.notas.map(n => n.numero).join(', ')} · ${kg(s.kg)} kg</div>
-        ${!prop && c.status === 'em_rota' ? `<div class="lg-ent">${entregaBtns(s, id)}</div>` : ''}</div>${editavel ? `<button class="lg-x" data-tirar="${esc(s.key)}" data-id="${id}" title="Tirar da carga">×</button>` : ''}</li>`).join('') || '<li class="muted small">Arraste entregas para cá.</li>'}</ol>
+        ${!prop ? appParada(s) : ''}${!prop && c.status === 'em_rota' ? `<div class="lg-ent">${entregaBtns(s, id)}</div>` : ''}</div>${editavel ? `<button class="lg-x" data-tirar="${esc(s.key)}" data-id="${id}" title="Tirar da carga">×</button>` : ''}</li>`).join('') || '<li class="muted small">Arraste entregas para cá.</li>'}</ol>
     <div class="small muted">${m.cidades.slice(0, 6).map(esc).join(' → ')}${m.cidades.length > 6 ? ' …' : ''}</div>
     <div class="small">${kg(m.km)} km · ${t1(m.horas)} h · frete ${money(m.frete)}${m.frete && m.kg ? ` (R$ ${(m.frete / m.kg).toFixed(2).replace('.', ',')}/kg)` : ''}</div>
     <div class="lg-bts">
       ${!prop && ed && PROX_ST[c.status] ? `<button class="btn small primary" data-st="${id}">${PROX_ST[c.status][1]}</button>` : ''}
-      <button class="btn small" data-rom="${id}">Romaneio</button>${!prop && c.id ? botaoConversa('log_carga', c.id) : ''}
+      <button class="btn small" data-rom="${id}">Romaneio</button>${!prop && c.id && (c.motorista_id || OCO.some(o => o.carga_id === c.id)) ? `<button class="btn small" data-app="${id}">Entregas do app</button>` : ''}${!prop && c.id ? botaoConversa('log_carga', c.id) : ''}
       ${!prop && ed && c.status === 'planejada' ? `<button class="btn small danger" data-del="${id}">Excluir</button>` : ''}
       ${!prop && ed && ['carregando', 'pronta'].includes(c.status) ? `<button class="btn small ghost" data-canc="${id}">Cancelar</button>` : ''}</div></div>`;
 }
@@ -198,6 +210,9 @@ function ligar(root) {
     al.addEventListener('drop', (ev) => { ev.preventDefault(); al.classList.remove('lg-sobre'); let d; try { d = JSON.parse(ev.dataTransfer.getData('text/plain')); } catch { return; } mover(d, al.dataset.alvo, root); });
   });
   $$('.lg-veic', corpo).forEach(s => s.onchange = async () => { try { const x = achar(s.dataset.id); x.v = B.veiculos.find(v => v.id === s.value); await q(sb.from('log_cargas').update({ veiculo_id: s.value }).eq('id', x.c.id)); await gravarTotais(x); await recarregar(root); } catch (err) { fail(err); } });
+  $$('.lg-motid', corpo).forEach(i => i.onchange = async () => { const o = MOT.find(x => x.id === i.value);
+    try { await q(sb.from('log_cargas').update({ motorista_id: i.value || null, motorista: o?.nome || null }).eq('id', i.dataset.id)); toast(o?.user_id ? 'Motorista salvo: a carga aparece no app dele' : 'Motorista salvo'); } catch (err) { fail(err); } });
+  $$('[data-app]', corpo).forEach(b => b.onclick = () => entregasApp(achar(b.dataset.app), root));
   $$('.lg-mot', corpo).forEach(i => i.onchange = async () => { try { await q(sb.from('log_cargas').update({ motorista: i.value.trim() || null }).eq('id', i.dataset.id)); toast('Motorista salvo'); } catch (err) { fail(err); } });
   $$('[data-rom]', corpo).forEach(b => b.onclick = () => { const x = achar(b.dataset.rom); imprimirRomaneio(x.c || { data: ui.data }, x.v || x.veiculo, x.stops, x.m); });
   $$('[data-del]', corpo).forEach(b => b.onclick = async () => { if (!await confirmDialog('Excluir esta carga? As notas voltam para pendentes.')) return; try { await q(sb.from('log_cargas').delete().eq('id', b.dataset.del)); await recarregar(root); } catch (err) { fail(err); } });
@@ -218,6 +233,61 @@ function ligar(root) {
     const x = achar(b.dataset.id), st = x.stops.find(s => s.key === b.dataset.key);
     try { await q(sb.from('log_carga_notas').update({ situacao: b.dataset.ent === 'ok' ? 'entregue' : 'nao_entregue' }).in('id', st.notas.map(n => n.carga_nota_id))); await recarregar(root); } catch (err) { fail(err); }
   });
+}
+
+// ---------- App do motorista (7.1) ----------
+function appResumo(c) {
+  const oc = OCO.filter(o => o.carga_id === c.id), ab = oc.filter(o => !o.resolvida_em).length;
+  const km = c.km_saida != null ? `km ${(+c.km_saida).toLocaleString('pt-BR')}${c.km_chegada != null ? ' → ' + (+c.km_chegada).toLocaleString('pt-BR') + ` (${t1(c.km_chegada - c.km_saida)} km)` : ''}` : '';
+  return oc.length || km ? `<div class="small" style="margin:4px 0">${km ? `<span class="muted">${km}</span>` : ''}${ab ? ` <span class="lg-tag neg">${ab} ocorrência(s) aberta(s)</span>` : oc.length ? ` <span class="lg-tag ok">ocorrências resolvidas</span>` : ''}</div>` : '';
+}
+function appParada(s) {
+  const a = s.notas.map(n => APP[n.carga_nota_id]).filter(Boolean), r = a.find(x => x.baixa_por === 'app' && x.recebedor_nome);
+  const oc = OCO.filter(o => s.notas.some(n => n.carga_nota_id === o.carga_nota_id));
+  return (r ? `<div class="small muted">📱 recebido por ${esc(r.recebedor_nome)} às ${new Date(r.entregue_em).toLocaleTimeString('pt-BR').slice(0, 5)}${r.canhoto_path ? ' · canhoto' : ''}</div>` : '')
+    + oc.map(o => `<div class="small ${o.resolvida_em ? 'muted' : 'neg'}">⚠ ${OCORR[o.tipo] || o.tipo}${o.descricao ? ': ' + esc(o.descricao) : ''}${o.nao_entregue ? ' (não entregue)' : ''}</div>`).join('');
+}
+async function link(caminho) { if (!caminho) return null; const { data } = await sb.storage.from('logistica').createSignedUrl(caminho, 3600); return data?.signedUrl || null; }
+async function entregasApp(x, root) {
+  const c = x.c, notas = x.stops.flatMap(s => s.notas.map(n => ({ ...n, cli: s.nome }))), oc = OCO.filter(o => o.carga_id === c.id);
+  const urls = {}; await Promise.all([...notas.flatMap(n => [APP[n.carga_nota_id]?.canhoto_path, APP[n.carga_nota_id]?.assinatura_path]), ...oc.map(o => o.foto_path)].filter(Boolean).map(async p => { urls[p] = await link(p); }));
+  const arq = (p, t) => p && urls[p] ? `<a href="${urls[p]}" target="_blank" rel="noopener">${t}</a>` : '';
+  let pos = []; try { pos = await q(sb.from('log_posicoes').select('lat,lng,em').eq('carga_id', c.id).order('em', { ascending: false }).limit(1)); } catch {}
+  const md = modal({ title: `Carga ${c.numero} — entregas pelo app`, wide: true, body: `<div class="small muted" style="margin-bottom:8px">${esc(c.motorista || 'Sem motorista')} · ${ST_CARGA[c.status]?.[0] || c.status}${c.saida_em ? ' · saiu ' + new Date(c.saida_em).toLocaleString('pt-BR').slice(0, 17) : ''}${c.km_saida != null ? ' · km ' + c.km_saida + (c.km_chegada != null ? ' → ' + c.km_chegada : '') : ''}
+      ${pos[0] ? ` · última posição ${new Date(pos[0].em).toLocaleTimeString('pt-BR').slice(0, 5)} <a href="https://www.google.com/maps/search/?api=1&query=${pos[0].lat},${pos[0].lng}" target="_blank" rel="noopener">ver no mapa</a>` : ''}</div>
+    <div class="table-wrap"><table class="small"><thead><tr><th>#</th><th>NF · cliente</th><th>Chegada</th><th>Entrega</th><th>Recebido por</th><th>Canhoto</th><th>Situação</th></tr></thead><tbody>
+    ${notas.map(n => { const a = APP[n.carga_nota_id] || {}; return `<tr><td>${n.seq || ''}</td><td>${n.numero} · ${esc(n.cli || '')}</td><td>${a.chegada_em ? new Date(a.chegada_em).toLocaleTimeString('pt-BR').slice(0, 5) : '—'}</td>
+      <td>${a.entregue_em ? new Date(a.entregue_em).toLocaleTimeString('pt-BR').slice(0, 5) : '—'}</td><td>${esc(a.recebedor_nome || '')}${a.recebedor_doc ? ' · ' + esc(a.recebedor_doc) : ''}</td>
+      <td>${arq(a.canhoto_path, 'canhoto')} ${arq(a.assinatura_path, 'assinatura')}</td><td>${n.situacao === 'entregue' ? '<span class="lg-tag ok">entregue</span>' : n.situacao === 'nao_entregue' ? '<span class="lg-tag neg">não entregue</span>' : 'a entregar'}</td></tr>`; }).join('')}</tbody></table></div>
+    <h3 style="margin:14px 0 6px">Ocorrências</h3>
+    ${oc.map(o => `<div class="card small" style="margin:0 0 6px"><b>${OCORR[o.tipo] || o.tipo}</b>${o.nao_entregue ? ' · não entregue' : ''} · ${new Date(o.criado_em).toLocaleString('pt-BR').slice(0, 17)}${o.descricao ? '<br>' + esc(o.descricao) : ''} ${arq(o.foto_path, 'foto')}
+      ${o.lat ? ` <a href="https://www.google.com/maps/search/?api=1&query=${o.lat},${o.lng}" target="_blank" rel="noopener">local</a>` : ''}
+      <div style="margin-top:4px">${o.resolvida_em ? `<span class="muted">Resolvida por ${esc(o.resolvida_por || '')}: ${esc(o.resolucao || '')}</span>` : podeLogistica() ? `<button class="btn small" data-res="${o.id}">Resolver</button>` : '<span class="neg">aberta</span>'}</div></div>`).join('') || '<div class="muted small">Nenhuma ocorrência.</div>'}`,
+    foot: '<button class="btn" data-close>Fechar</button>' });
+  md.el.querySelectorAll('[data-res]').forEach(b => b.onclick = async () => { const t = prompt('O que foi feito? (ex.: reentrega amanhã, nota de devolução)'); if (!t) return;
+    try { await q(sb.from('log_ocorrencias').update({ resolvida_em: new Date().toISOString(), resolvida_por: state.user?.email, resolucao: t }).eq('id', b.dataset.res)); toast('Ocorrência resolvida'); md.close(); await recarregar(root); } catch (err) { fail(err); } });
+}
+async function parametrosApp() {
+  let c = {}; try { c = (await q(sb.from('log_app_config').select('*').eq('empresa_id', state.empresa.id).maybeSingle())) || {}; } catch { return toast('Execute o SQL 124 para usar o App do motorista', true); }
+  c = { exigir_canhoto: true, exigir_assinatura: false, exigir_recebedor: true, exigir_km: true, rastrear_min: 0, avisar_cliente_saida: true, avisar_cliente_entrega: true, portal_mostra_fila: true, papeis_ocorrencia: ['admin', 'financeiro', 'diretor'], ...c };
+  const ch = (k, t) => `<label class="chk"><input type="checkbox" id="pa-${k}" ${c[k] ? 'checked' : ''}> ${t}</label>`;
+  const PAP = [['admin', 'Administrador'], ['diretor', 'Diretor'], ['financeiro', 'Financeiro']];
+  const md = modal({ title: 'Parâmetros do App do motorista', body: `<div class="small" style="margin-bottom:4px">Na entrega, exigir:</div>
+    ${ch('exigir_recebedor', 'Nome de quem recebeu')}${ch('exigir_canhoto', 'Foto do canhoto assinado')}${ch('exigir_assinatura', 'Assinatura na tela do celular')}${ch('exigir_km', 'Km do painel na saída e na chegada')}
+    <label style="margin-top:8px">Gravar a posição do celular durante a rota a cada (minutos, 0 = não grava)<input type="number" id="pa-rast" min="0" max="60" value="${c.rastrear_min}"></label>
+    <div class="small" style="margin:10px 0 4px">Cliente (Portal e e-mail):</div>
+    ${ch('avisar_cliente_saida', 'Avisar por e-mail quando sair para entrega')}${ch('avisar_cliente_entrega', 'Avisar por e-mail quando for entregue')}${ch('portal_mostra_fila', 'Mostrar no Portal quantas entregas faltam antes da dele')}
+    <div class="small" style="margin:10px 0 4px">Quem recebe o aviso de ocorrência:</div><div style="display:flex;gap:4px 14px;flex-wrap:wrap">${PAP.map(([k, t]) => `<label class="chk" style="font-weight:400"><input type="checkbox" class="pa-p" value="${k}" ${c.papeis_ocorrencia.includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div>
+    <p class="small muted">O motorista entra com o perfil Motorista (Cadastros › Empresa e Usuários) e é ligado ao login na ficha do motorista (Gestão da Frota). A carga aparece no app quando o motorista é escolhido nela.</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pa-ok">Salvar</button>' });
+  $('#pa-ok', md.el).onclick = async () => {
+    const g = (k) => $('#pa-' + k, md.el).checked, rast = +$('#pa-rast', md.el).value;
+    if (!(rast >= 0 && rast <= 60)) return toast('Posição: de 0 a 60 minutos', true);
+    const pap = [...md.el.querySelectorAll('.pa-p:checked')].map(x => x.value); if (!pap.length) return toast('Escolha quem recebe o aviso', true);
+    try { await q(sb.from('log_app_config').upsert({ empresa_id: state.empresa.id, exigir_recebedor: g('exigir_recebedor'), exigir_canhoto: g('exigir_canhoto'), exigir_assinatura: g('exigir_assinatura'), exigir_km: g('exigir_km'),
+      rastrear_min: rast, avisar_cliente_saida: g('avisar_cliente_saida'), avisar_cliente_entrega: g('avisar_cliente_entrega'), portal_mostra_fila: g('portal_mostra_fila'), papeis_ocorrencia: pap, atualizado_em: new Date().toISOString() }));
+      toast('Parâmetros salvos'); md.close(); } catch (err) { fail(err); }
+  };
 }
 
 // move uma parada entre pendentes, sugestões e cargas salvas

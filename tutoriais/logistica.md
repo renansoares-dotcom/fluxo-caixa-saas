@@ -1,8 +1,8 @@
 ---
 titulo: Logística — cargas, entregas e frota
 tela: Logística › Cargas e Entregas (LOG001) e Frota e Parâmetros (LOG005)
-versao: 1.3
-atualizado: 2026-11-05
+versao: 1.4
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -92,6 +92,10 @@ Quando o caminhão voltar, abra a carga e marque cada entrega como **Entregue** 
 
 Para as notas que foram entregues **antes** de usar a plataforma, use **Baixa inicial…**: informe até que data as notas emitidas já foram entregues. Elas saem das pendentes. A baixa inicial pode ser desfeita no mesmo dia.
 
+### 4.5 App do motorista
+
+Com o motorista escolhido na carga, ele registra a entrega pelo celular (canhoto, assinatura e ocorrências), e o cliente acompanha pelo Portal. Veja o manual **App do Motorista**.
+
 ## 5. Regras e travas
 
 - Carga que já saiu não pode perder entregas.
@@ -115,3 +119,4 @@ Para as notas que foram entregues **antes** de usar a plataforma, use **Baixa in
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 04/11/2026 | Aba **e-frete (CIOT)** em Frota e parâmetros. |
 | 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Filtros de Cargas e Entregas numa barra abaixo do título. Figuras refeitas. |
+| 1.4 | 08/11/2026 | Motorista escolhido na carga a partir da Gestão da Frota; entregas e ocorrências do App do Motorista na carga; botão de parâmetros do app. |

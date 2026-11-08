@@ -9,8 +9,8 @@ import { esc, toast, modal, $ } from './ui.js';
 import { ehRede, chaveLeitura, tabelaDa, filtrosDa, mesclar } from './offline-calc.js';
 export { ehRede, chaveLeitura, mesclar };
 
-export const ROTAS = ['producao/terminal', 'manutencao/celular', 'tintas/ordens'];
-export const RPC_PERMITIDAS = ['tin_pesar'];
+export const ROTAS = ['producao/terminal', 'manutencao/celular', 'tintas/ordens', 'logistica/motorista'];
+export const RPC_PERMITIDAS = ['tin_pesar', 'log_motorista_iniciar', 'log_motorista_chegada', 'log_motorista_entregar', 'log_motorista_ocorrencia', 'log_motorista_posicao', 'log_motorista_concluir'];
 const DB_NOME = 'iplamm-offline', LIMITE = 3e6;   // leituras acima de ~3 MB não são guardadas
 let dbP = null;
 const ouvintes = new Set();
@@ -155,7 +155,7 @@ export function iniciarOffline(versao) {
   setInterval(() => { sincronizar(); }, 30000);
   sincronizar(); avisar();
   // deixa as três telas guardadas no aparelho (o service worker grava os arquivos ao baixar)
-  if (versao && navigator.onLine !== false) setTimeout(() => ['producao-terminal', 'manutencao-celular', 'tintas-ordens'].forEach(p => import(`../pages/${p}.js?v=${versao}`).catch(() => {})), 8000);
+  if (versao && navigator.onLine !== false) setTimeout(() => ['producao-terminal', 'manutencao-celular', 'tintas-ordens', 'logistica-motorista'].forEach(p => import(`../pages/${p}.js?v=${versao}`).catch(() => {})), 8000);
 }
 
 // membro e empresa guardados para abrir sem sinal

@@ -18,7 +18,7 @@ begin
 end $$;
 grant execute on all functions in schema pg_temp to authenticated, anon;
 
-select pg_temp.ok((select count(*) from email_padrao()) = 5, 'cinco textos padrão');
+select pg_temp.ok((select count(*) from email_padrao()) >= 5, 'textos padrão (5 do SQL 092 e os que vieram depois)');
 -- convite do Portal
 insert into portal_convites(empresa_id, favorecido_id, email) values ('e000000a-0000-0000-0000-000000000000', 'ef100000-0000-0000-0000-000000000001', 'Comprador@Cliente.Exemplo');
 select pg_temp.ok((select count(*) from email_fila where codigo = 'portal_convite' and para = 'comprador@cliente.exemplo' and campos ->> 'caminho' like 'portal.html?convite=%' and campos ->> 'empresa' = 'Empresa A') = 1, 'convite vai para o e-mail do cliente');

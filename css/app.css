@@ -568,6 +568,13 @@ td.rc-st{white-space:normal;min-width:200px}
 
 /* produção */
 .so-producao #nav .nav-area:not(:has(.nav-producao)), .so-producao #nav .nav-itens a:not(.nav-producao), .so-producao .ano-sel{display:none}
+.so-motorista #nav .nav-area:not(:has(.nav-motorista)), .so-motorista #nav .nav-itens a:not(.nav-motorista), .so-motorista .ano-sel{display:none}
+/* App do motorista (melhoria 7.1): celular primeiro, botões grandes */
+.mot{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:10px}.mot .card{margin:0}
+.mot-cargas{display:flex;gap:6px;flex-wrap:wrap}.mot-topo{display:flex;flex-direction:column;gap:10px}.mot-titulo{font-size:1.25em;font-weight:700}
+.mot-big{min-height:48px;font-size:1.05em}.mot-ent{display:flex;flex-direction:column;gap:6px}.mot-cab{display:flex;gap:10px;align-items:flex-start}
+.mot-n{flex:0 0 30px;height:30px;border-radius:50%;background:var(--bg-soft);display:grid;place-items:center;font-weight:700}
+.mot-prox{border:2px solid var(--accent)}.mot-feita{opacity:.65}.mot-bts{display:flex;gap:6px;flex-wrap:wrap}.mot-bts .btn{min-height:40px}
 .nav-area[data-area="prd"],.trilha[data-area="prd"]{--area:#0f766e}
 .tm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:14px}
 .tm-maq{border-width:2px}.tm-livre{border-color:var(--border)}.tm-produzindo{border-color:var(--pos)}.tm-parada{border-color:var(--warn)}

@@ -10,7 +10,7 @@ const primeiroProx = (mes) => addDias(ultimoDiaMes(mes), 1);
 export const ETAPAS_AUTO = { ext: 'Extratos conciliados', semconta: 'Pagos com conta', abertos: 'Nada vencido em aberto', notas: 'Notas de venda com financeiro',
   bord: 'Borderôs decididos', orc: 'Desvios justificados', contas: 'Contas travadas até o fim do mês' };
 export const SITUACOES = { pendente: 'Pendente', feita: 'Feita', nao_aplica: 'Não se aplica' };
-export const PAPEIS = { admin: 'Administrador', diretor: 'Diretor', financeiro: 'Financeiro', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção' };
+export const PAPEIS = { admin: 'Administrador', diretor: 'Diretor', financeiro: 'Financeiro', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção', motorista: 'Motorista' };
 
 /** prazo de D+N do mês 'YYYY-MM': N-ésimo dia útil do mês seguinte; D+0 = último dia útil do próprio mês */
 export function prazo(mes, n) {

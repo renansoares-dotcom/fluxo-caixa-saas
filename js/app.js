@@ -67,6 +67,7 @@ const routes = {
   'tintas/receitas': () => import(`./pages/tintas-receitas.js?v=${V}`),
   'producao/planta': () => import(`./pages/producao-planta.js?v=${V}`),
   'logistica': () => import(`./pages/logistica.js?v=${V}`),
+  'logistica/motorista': () => import(`./pages/logistica-motorista.js?v=${V}`),
   'logistica/frota': () => import(`./pages/logistica-frota.js?v=${V}`),
   'logistica/fretes': () => import(`./pages/logistica-fretes.js?v=${V}`),
   'logistica/gestao-frota': () => import(`./pages/frota.js?v=${V}`),
@@ -310,11 +311,13 @@ async function entrarEmpresa(emp, papel, areas) {
   document.body.classList.toggle('so-compras', papel === 'compras');
   document.body.classList.toggle('so-vendas', papel === 'vendas');
   document.body.classList.toggle('so-producao', papel === 'producao');
+  document.body.classList.toggle('so-motorista', papel === 'motorista');
   $$('#nav .nav-audit').forEach(el => el.hidden = !['admin', 'diretor'].includes(papel));
   $$('#nav .nav-admin').forEach(el => el.hidden = papel !== 'admin');
   if (papel === 'compras') { if (!rotaDeCompras(location.hash.replace(/^#\//, ''))) location.hash = '#/compras'; else render(); return; }
   if (papel === 'vendas') { if (!rotaDeVendas(location.hash.replace(/^#\//, ''))) location.hash = '#/comercial'; else render(); return; }
   if (papel === 'producao') { if (!rotaDeProducao(location.hash.replace(/^#\//, ''))) location.hash = '#/producao/terminal'; else render(); return; }
+  if (papel === 'motorista') { if (!rotaDeMotorista(location.hash.replace(/^#\//, ''))) location.hash = '#/logistica/motorista'; else render(); return; }
   if (!location.hash || location.hash === '#/') location.hash = '#/' + (temArea('fin') ? 'hoje' : primeiraRota()); else render();
 }
 
@@ -342,6 +345,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil compras: Pagamentos Antecipados e o módulo Compras
 // perfil vendas (representante): só a área Comercial
 // perfil producao (operador no terminal do setor)
+const rotaDeMotorista = (r) => ['logistica/motorista', 'tutoriais', 'meus-avisos'].includes(r);   // motorista: só o app (melhoria 7.1)
 const rotaDeProducao = (r) => ['hoje', 'orcamento-cc', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'estoque/inventario', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
 const rotaDeVendas = (r) => r === 'comercial' || ['hoje', 'orcamento-cc', 'comercial/carteira', 'comercial/funil', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
 const rotaDeCompras = (r) => ['hoje', 'orcamento-cc', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/reposicao', 'estoque/inventario', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
@@ -362,6 +366,7 @@ async function render() {
   if (state.papel === 'compras' && !rotaDeCompras(route)) { location.hash = '#/compras'; return; }
   if (state.papel === 'vendas' && !rotaDeVendas(route)) { location.hash = '#/comercial'; return; }
   if (state.papel === 'producao' && !rotaDeProducao(route)) { location.hash = '#/producao/terminal'; return; }
+  if (state.papel === 'motorista' && !rotaDeMotorista(route)) { location.hash = '#/logistica/motorista'; return; }
   { const ar = routes[route] ? areaDaRota(route) : 'fin'; if ((['fin', 'com', 'cmp', 'prd', 'log', 'cpd', 'cont'].includes(ar) && !temArea(ar)) || (ar === 'rh' && !temRH())) { location.hash = '#/' + primeiraRota(); return; } }
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
