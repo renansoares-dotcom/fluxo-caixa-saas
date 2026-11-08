@@ -1481,3 +1481,26 @@ window.RPC.pag_remessa_gravar = () => null;
     sobras_paradas: [{ ordem: 288, cor: 'LJ-151 LARANJA 151', hex: '#ff8200', lote: 'TI-288', kg: 6.3, validade: d(4) }, { ordem: 292, cor: 'PT-PRETO PRETO', hex: '#111', lote: 'TI-292', kg: 11.8, validade: d(26) }] });
   DB.tin_receitas = DB.tin_receitas || [];
 }
+
+// Planta ao vivo (SQL 118) — planta e situação FICTÍCIAS: produzindo, em manutenção, parada longa e setup
+{
+  const [s0, s1, s2] = DB.prod_setores, M = (c) => DB.prod_maquinas.find(m => m.codigo === c);
+  const agoraMenos = (min) => new Date(Date.now() - min * 6e4).toISOString();
+  DB.prod_planta = [{ empresa_id: E, largura_m: 52, profundidade_m: 24, elementos: [
+    { id: 'pe1', t: 'setor', x: 2, y: 2, w: 14, d: 16, nome: s0.nome, setor_id: s0.id }, { id: 'pe2', t: 'setor', x: 20, y: 2, w: 12, d: 16, nome: s1.nome, setor_id: s1.id },
+    { id: 'pe3', t: 'setor', x: 36, y: 2, w: 13, d: 16, nome: s2.nome, setor_id: s2.id }, { id: 'pe4', t: 'seta', de: 'pe1', para: 'pe2' }, { id: 'pe5', t: 'seta', de: 'pe2', para: 'pe3' },
+    { id: 'pe6', t: 'corredor', x: 1, y: 19.5, w: 50, d: 2.5 }] }];
+  [['EXT-01', 4, 4, 'extrusora'], ['EXT-02', 4, 11, 'extrusora'], ['IMP-01', 22, 6, 'impressora'], ['CS-01', 38, 6, 'corte_solda']].forEach(([c, x, y, tv]) => Object.assign(M(c), { pos_x: x, pos_y: y, rotacao: 0, tipo_visual: tv }));
+  DB.prod_motivos = [['pm-fm', 'Falta de material', false], ['pm-man', 'Manutenção corretiva', false], ['pm-set', 'Setup / troca de pedido', true]].map(([id, nome, planejada]) => ({ id, empresa_id: E, tipo: 'parada', nome, planejada, ativo: true }));
+  const op = DB.prod_ordens.find(o => o.status === 'em_producao') || DB.prod_ordens[0];
+  DB.prod_apontamentos = [{ id: 'pa-vivo', empresa_id: E, ordem_id: op.id, maquina_id: M('EXT-01').id, setor_id: s0.id, inicio: agoraMenos(150), fim: null, qtd_boa: 0, refugo: 0, operador_nome: 'ANA PAULA FERREIRA', origem: 'plataforma' }];
+  DB.prod_bobinas = (DB.prod_bobinas || []).concat([1, 2, 3, 4].map(i => ({ id: 'pbv' + i, empresa_id: E, codigo: 'B-1047' + i, ordem_id: op.id, apontamento_id: 'pa-vivo', maquina_id: M('EXT-01').id, peso_kg: 112 + i * 3, situacao: 'estoque', qualidade: 'liberada' })));
+  DB.prod_paradas = [{ id: 'pp-man', empresa_id: E, maquina_id: M('EXT-02').id, motivo_id: 'pm-man', inicio: agoraMenos(52), fim: null },
+    { id: 'pp-fm', empresa_id: E, maquina_id: M('IMP-01').id, motivo_id: 'pm-fm', inicio: agoraMenos(38), fim: null },
+    { id: 'pp-set', empresa_id: E, maquina_id: M('CS-01').id, motivo_id: 'pm-set', inicio: agoraMenos(12), fim: null }];
+  DB.prod_planta_config = [{ empresa_id: E, atualizar_seg: 30, parada_longa_min: 20, avisar_parada: true, avisar_papeis: ['admin', 'diretor'], tempo_real: true }];
+  // OS aberta que parou a EXT-02 (o equipamento ligado à máquina vem junto, como no select com join)
+  const eq = (DB.man_equipamentos || []).find(e => e.maquina_id === M('EXT-02').id) || { id: 'me-ext2' };
+  DB.man_ordens = (DB.man_ordens || []).map(o => ({ ...o, man_equipamentos: { maquina_id: (DB.man_equipamentos || []).find(e => e.id === o.equipamento_id)?.maquina_id || null } }));
+  DB.man_ordens.push({ id: 'mo-vivo', empresa_id: E, numero: 131, equipamento_id: eq.id, tipo: 'corretiva', prioridade: 'alta', situacao: 'em_execucao', descricao: 'Resistência da zona 3 queimada', responsavel: 'Marcos Lima', maquina_parou: true, parada_inicio: agoraMenos(52), parada_id: 'pp-man', man_equipamentos: { maquina_id: M('EXT-02').id } });
+}

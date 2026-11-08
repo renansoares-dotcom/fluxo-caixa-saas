@@ -15,7 +15,7 @@ export async function carregarThree() {
 
 const BRANCO = '#f5f7fb', ACO = '#cdd5e1', MARINHO = '#34428a', AZUL = '#1590d6', ESCURO = '#3a4256', FILME = '#bfe3f7';
 const TONS = ['#f7f0e2', '#e6f3ee', '#e8f0fb', '#f3edf8'];
-const TXT = { prod: '#15803d', setup: '#b45309', parada: '#dc2626', livre: '#5d6790', imp: '#475569' };
+const TXT = { prod: '#15803d', setup: '#b45309', parada: '#dc2626', manut: '#6d28d9', livre: '#5d6790', imp: '#475569' };
 
 export async function criarPlanta3D(container, opts = {}) {
   const THREE = await carregarThree();
@@ -202,8 +202,8 @@ export async function criarPlanta3D(container, opts = {}) {
       // sinaleiro
       const [tx, ty] = pt(topo[0], topo[1]);
       box(tx - .05, ty - .05, topo[2], .1, .1, 1.1, ACO, null, G);
-      [['parada', topo[2] + .97], ['setup', topo[2] + .72], ['prod', topo[2] + .47]].forEach(([k, z]) => { const on = k === s;
-        const me = cil(tx, ty, z, .13, .22, on ? COR[k] : '#59627a', on ? { emissive: COR[k], emissiveIntensity: 1.6 } : {}, null, G); if (on && k === 'parada') piscam.push(me); });
+      [['parada', topo[2] + .97], ['setup', topo[2] + .72], ['prod', topo[2] + .47]].forEach(([k, z]) => { const on = k === s || (k === 'parada' && s === 'manut'), c = COR[on ? s : k];
+        const me = cil(tx, ty, z, .13, .22, on ? c : '#59627a', on ? { emissive: c, emissiveIntensity: 1.6 } : {}, null, G); if (on && (k === 'parada' || S?.maq?.[mq.id]?.longa)) piscam.push(me); });
       // operador
       const xs = S?.maq?.[mq.id]; if (xs?.operador && s !== 'livre') { const [ox, oy] = pt(Tv.w * .55, Tv.d + .5); pessoa(ox, oy); }
       etiqueta('m:' + mq.id, mq.codigo, textoMaquina(mq, S) || 'Livre', COR[s], TXT[s], tx, ty, topo[2] + 1.6, sel === 'm:' + mq.id);

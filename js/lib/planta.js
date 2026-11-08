@@ -14,12 +14,12 @@ export const TIPOS_VISUAIS = {
   generica: { t: 'Outra máquina', w: 2.4, d: 1.6 },
 };
 export const TIPOS_AREA = { paletes: 'Área de paletes', estoque: 'Estoque de matéria-prima', expedicao: 'Expedição', outro: 'Outra área' };
-export const COR = { prod: '#22c55e', setup: '#f59e0b', parada: '#ef4444', livre: '#94a3b8', imp: '#64748b' };
-export const ROTULO_ST = { prod: 'Produzindo', setup: 'Setup / parada planejada', parada: 'Parada', livre: 'Livre', imp: 'Só Iniflex' };
+export const COR = { prod: '#22c55e', setup: '#f59e0b', parada: '#ef4444', manut: '#8b5cf6', livre: '#94a3b8', imp: '#64748b' };
+export const ROTULO_ST = { prod: 'Produzindo', setup: 'Setup / parada planejada', parada: 'Parada', manut: 'Em manutenção', livre: 'Livre', imp: 'Só Iniflex' };
 export const COR_V = { carr: '#2563eb', pronto: '#22c55e', rota: '#7c3aed', plan: '#0ea5e9', garagem: '#94a3b8', manut: '#ef4444' };
 export const ROT_V = { carr: 'Carregando', pronto: 'Pronto para sair', rota: 'Em rota', plan: 'Carga planejada', garagem: 'Na garagem', manut: 'Em manutenção' };
 const TXT_V = { carr: '#1d4ed8', pronto: '#15803d', rota: '#6d28d9', plan: '#0369a1', garagem: '#5d6790', manut: '#dc2626' };
-const TXT_ST = { prod: '#15803d', setup: '#b45309', parada: '#dc2626', livre: '#5d6790', imp: '#475569' };
+const TXT_ST = { prod: '#15803d', setup: '#b45309', parada: '#dc2626', manut: '#6d28d9', livre: '#5d6790', imp: '#475569' };
 
 export const pegada = (m) => { const T = TIPOS_VISUAIS[m.tipo_visual] || TIPOS_VISUAIS.generica; return +m.rotacao === 90 ? { w: T.d, d: T.w } : { w: T.w, d: T.d }; };
 export const uid = () => Math.random().toString(36).slice(2, 10);
@@ -38,12 +38,16 @@ export async function carregarPlanta() {
 export async function carregarSituacao(C) {
   const e = state.empresa.id, hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Recife' }), ini = `${hoje}T00:00:00-03:00`;
   const desde2d = new Date(Date.now() - 2 * 864e5).toISOString();
-  const [abertos, paradas, doDia, recentes, opsAbertas] = await Promise.all([
+  const [abertos, paradas, doDia, recentes, opsAbertas, osAbertas, cfgP] = await Promise.all([
     q(sb.from('prod_apontamentos').select('*').eq('empresa_id', e).is('fim', null)),
     q(sb.from('prod_paradas').select('*').eq('empresa_id', e).is('fim', null)),
     fetchAll(() => sb.from('prod_apontamentos').select('id,maquina_id,setor_id,inicio,fim,qtd_boa,refugo').eq('empresa_id', e).gte('inicio', ini).order('id')),
     q(sb.from('prod_apontamentos').select('maquina_id,origem,inicio,fim').eq('empresa_id', e).gte('inicio', desde2d).order('inicio', { ascending: false }).limit(500)),
-    fetchAll(() => sb.from('prod_ordens').select('id,numero,numero_iniflex,codigo_produto,descricao,cliente,quantidade,unidade,entrega,status').eq('empresa_id', e).in('status', ['planejada', 'liberada', 'em_producao']).order('id'))]);
+    fetchAll(() => sb.from('prod_ordens').select('id,numero,numero_iniflex,codigo_produto,descricao,cliente,quantidade,unidade,entrega,status').eq('empresa_id', e).in('status', ['planejada', 'liberada', 'em_producao']).order('id')),
+    // OS de manutenção abertas que pararam a máquina (melhoria 6.8)
+    q(sb.from('man_ordens').select('id,numero,tipo,prioridade,situacao,responsavel,descricao,parada_inicio,parada_id,man_equipamentos!inner(maquina_id)').eq('empresa_id', e).eq('maquina_parou', true).not('situacao', 'in', '(concluida,cancelada)')).catch(() => []),
+    q(sb.from('prod_planta_config').select('*').eq('empresa_id', e).maybeSingle()).catch(() => null)]);
+  const cfg = { atualizar_seg: 30, parada_longa_min: 20, tempo_real: true, ...(cfgP || {}) };
   const opIds = opsAbertas.map(o => o.id);
   const fatia = (a, n = 300) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
   let etapas = [], bobEst = [], bobAbertas = [];
@@ -61,8 +65,11 @@ export async function carregarSituacao(C) {
   for (const m of C.maquinas) {
     const ap = abertos.find(a => a.maquina_id === m.id), pa = paradas.find(p => p.maquina_id === m.id);
     let st = 'livre', desde = null, motivo = null;
+    const os = osAbertas.find(o => o.man_equipamentos?.maquina_id === m.id && (!pa || !o.parada_id || o.parada_id === pa.id));
     if (pa) { const mo = C.motById[pa.motivo_id]; st = mo?.planejada ? 'setup' : 'parada'; desde = pa.inicio; motivo = mo?.nome || 'Parada'; }
     else if (ap) { st = 'prod'; desde = ap.inicio; }
+    if (os && st !== 'prod') { st = 'manut'; desde = desde || os.parada_inicio; }
+    else if (st === 'parada' && /manuten/i.test(motivo || '')) st = 'manut';
     const ult = recentes.find(r => r.maquina_id === m.id);
     if (st === 'livre' && ult?.origem === 'iniflex') { st = 'imp'; desde = ult.fim || ult.inicio; }
     else if (st === 'livre' && ult?.fim) desde = ult.fim;
@@ -71,7 +78,9 @@ export async function carregarSituacao(C) {
     const op = ap ? opById[ap.ordem_id] : null;
     const et = ap?.etapa_id ? etapas.find(x => x.id === ap.etapa_id) : null;
     const operador = ap ? (C.opById[ap.operador_id]?.nome || ap.operador_nome || null) : pa ? (C.opById[pa.operador_id]?.nome || null) : null;
-    maq[m.id] = { st, desde, motivo, op, etapa: et, operador, apontamento: ap || null,
+    const hAp = ap ? Math.max((Date.now() - new Date(ap.inicio)) / 36e5, 0) : 0, ritmo = ap && hAp > 0.05 && emCurso ? emCurso / hAp : null;
+    const longa = (st === 'parada' || st === 'manut') && desde && (Date.now() - new Date(desde)) / 6e4 > cfg.parada_longa_min;
+    maq[m.id] = { st, desde, motivo, op, etapa: et, operador, apontamento: ap || null, os: os || null, longa, ritmo, ritmoPct: ritmo && m.capacidade_kg_h ? ritmo / m.capacidade_kg_h : null,
       kgDia: D.reduce((t, a) => t + +a.qtd_boa, 0) + emCurso, refDia: D.reduce((t, a) => t + +a.refugo, 0), bobinasCurso: ap ? bobAbertas.filter(b => b.apontamento_id === ap.id).length : 0 };
   }
   // material parado entre setores: bobina em estoque cuja etapa é do setor A e a etapa seguinte (setor B) ainda não terminou
@@ -98,7 +107,8 @@ export async function carregarSituacao(C) {
     const porVeiculo = {}; for (const c of cargas) { if (!c.veiculo_id) continue; const at = porVeiculo[c.veiculo_id]; if (!at || (peso[c.status] || 0) > (peso[at.status] || 0)) porVeiculo[c.veiculo_id] = c; }
     frota = { veiculos, cargas, porVeiculo, cargasHoje: doDiaC.length, kgHoje: doDiaC.reduce((s, c) => s + (+c.peso_kg || 0), 0) };
   } catch { frota = null; }
-  return { maq, wip, saidaSetor, frota, atualizado: new Date(), kpi: {
+  return { maq, wip, saidaSetor, frota, cfg, atualizado: new Date(), kpi: {
+    manut: ativas.filter(m => maq[m.id].st === 'manut').length, longas: ativas.filter(m => maq[m.id].st === 'parada' && maq[m.id].longa).length,
     produzindo: ativas.filter(m => maq[m.id].st === 'prod').length, total: ativas.length,
     paradas: ativas.filter(m => maq[m.id].st === 'parada').length, setup: ativas.filter(m => maq[m.id].st === 'setup').length,
     kgDia, apara: kgDia + refDia ? refDia / (kgDia + refDia) : null,
@@ -109,6 +119,7 @@ export function textoMaquina(m, S) {
   const x = S?.maq?.[m.id]; if (!x) return '';
   if (x.st === 'prod') return x.op ? `OP ${x.op.numero} · ${dur(x.desde)}` : `Produzindo · ${dur(x.desde)}`;
   if (x.st === 'parada') return `Parada ${dur(x.desde)}`;
+  if (x.st === 'manut') return x.os ? `OS ${x.os.numero} · ${dur(x.desde)}` : `Manutenção ${dur(x.desde)}`;
   if (x.st === 'setup') return `${x.motivo || 'Setup'} ${dur(x.desde)}`;
   if (x.st === 'imp') return `Iniflex · ${hora(x.desde)}`;
   return x.desde ? `Livre há ${dur(x.desde)}` : 'Livre';

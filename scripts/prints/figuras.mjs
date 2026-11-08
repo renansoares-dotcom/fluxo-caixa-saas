@@ -41,7 +41,7 @@ export const FIGS = [
   ['oee', 'producao/oee', '## 3.', 'OEE e Perdas: os quatro números contra as metas, a tendência e as perdas em horas'],
   ['oee', 'producao/oee', '### 3.2', 'OEE por máquina, do pior para o melhor, e o Pareto das paradas e do refugo', 'scroll:#oe-maq'],
   ['oee', 'producao/oee', '## 4.', 'Detalhe da máquina: tendência contra a meta, perdas e paradas', 'click:[data-maq]'],
-  ['producao', 'producao/ordens', '## 4.', 'Ordens de produção em aberto'], ['producao', 'producao/programacao', '## 5.', 'Programação da semana'],
+  ['producao', 'producao/ordens', '## 4.', 'Ordens de produção em aberto'], ['producao', 'producao/programacao', '## 5.', 'Programação da semana'], ['producao', 'producao/planta', '## 7.', 'Planta da Fábrica ao vivo: produzindo, em manutenção, parada longa e setup, com a OP e o ritmo'],
   ['logistica', 'logistica/frota', '## 3.', 'Frota e Parâmetros'], ['logistica', 'logistica', '## 4.', 'Cargas e Entregas'],
   ['frota', 'logistica/gestao-frota', '## 3.', 'Painel da frota: custo por veículo e alertas'], ['frota', 'logistica/gestao-frota', '## 5.', 'Abastecimentos com o consumo de cada trecho', 'abast'], ['frota', 'logistica/gestao-frota', '## 8.', 'Motoristas com CNH, toxicológico e alertas', 'mot'],
   ['logistica-indicadores', 'logistica/indicadores', '## 3.', 'Indicadores de logística com metas e tendência'],

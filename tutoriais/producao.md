@@ -1,8 +1,8 @@
 ---
 titulo: Produção — PCP, ordens, programação e planta
 tela: Produção › Painel de Produção (PRD002), Ordens de Produção (PRD004), Programação (PRD005), Cadastros de Produção (PRD006), Importar do Iniflex (PRD007) e Planta da Fábrica (PRD003)
-versao: 1.3
-atualizado: 2026-11-05
+versao: 1.4
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -83,7 +83,27 @@ Escolha o **período**. O painel mostra:
 
 ## 7. Planta da Fábrica
 
-- **Acompanhar**: a planta mostra cada máquina com a situação ao vivo (produzindo, parada, livre). Entre os setores, as setas mostram as bobinas paradas esperando a etapa seguinte. **Modo TV** é para o telão da fábrica; no celular, a planta aparece vista de cima. Clique numa máquina para abrir a OP.
+![Figura 3 — Planta da Fábrica ao vivo: produzindo, em manutenção, parada longa e setup, com a OP e o ritmo (dados fictícios)](img/producao-3.jpg)
+
+- **Acompanhar**: a planta mostra cada máquina com a situação ao vivo:
+  - **produzindo**, em verde, com a OP;
+  - **setup ou parada planejada**, em amarelo;
+  - **parada**, em vermelho;
+  - **em manutenção**, em roxo, quando há OS aberta que parou a máquina ou parada de motivo de manutenção;
+  - **livre**.
+
+  Entre os setores, as setas mostram as bobinas paradas esperando a etapa seguinte. **Modo TV** é para o telão da fábrica; no celular, a planta aparece vista de cima. Clique numa máquina para ver:
+  - a OP e o quanto já foi feito;
+  - o **ritmo agora**: kg por hora da produção em curso e o percentual da capacidade;
+  - a **OS de manutenção**, com o link para abrir;
+  - o operador.
+- **Ao vivo**: a planta se atualiza **na hora** em que o operador aponta, registra uma parada ou a manutenção mexe na OS. Também se atualiza de tempos em tempos (padrão: 30 segundos). No alto aparece "ao vivo" quando a ligação em tempo real está ativa.
+- **Parada longa**: parada não planejada aberta há mais de 20 minutos (ajustável) pisca e aparece nos números do alto. Quem é administrador ou diretor recebe o aviso **Máquina parada há muito tempo**, uma vez por parada.
+- **Parâmetros ao vivo** (botão **Ao vivo**, administrador, financeiro ou diretor):
+  - tempo real ligado ou desligado;
+  - intervalo da atualização (10 a 300 segundos);
+  - limite da parada longa (5 a 480 minutos);
+  - aviso e quem recebe.
 - **Editar**: clique em **Editar planta** (administrador, financeiro ou diretor).
   1. Informe a largura e a profundidade do galpão.
   2. Inclua os elementos: setor, corredor, área de paletes, estoque de MP, expedição, portão, seta de fluxo, parede, doca, vaga de garagem, pátio, rua, guarita, telões e árvores.
@@ -126,3 +146,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.1 | 29/10/2026 | Botões **💬 Conversa** e **↗ Enviar no chat** da ordem de produção (Conversas, etapa 2). |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.4 | 08/11/2026 | Planta da Fábrica ao vivo: atualização na hora pelo tempo real, situação "em manutenção" com a OS, parada longa com aviso, ritmo da produção em curso e parâmetros. |

@@ -11,7 +11,7 @@ let V3 = null, falhou3d = false;
 
 export const title = 'Planta da Fábrica';
 const ui = { sel: null, editando: false };
-let timer = null;
+let timer = null, canal = null;
 const celular = () => matchMedia('(max-width: 900px)').matches;
 const kg = (v) => Math.round(+v || 0).toLocaleString('pt-BR');
 const pctTxt = (v) => (v == null ? '–' : (v * 100).toFixed(1).replace('.', ',') + '%');
@@ -26,12 +26,13 @@ export async function render(root) {
   const temPlanta = (planta.elementos || []).length || C.maquinas.some(m => m.pos_x != null);
   root.innerHTML = `<div class="pl-pagina">
     <div class="mm-topo"><div><h2 style="margin:0">Planta da Fábrica</h2><div class="muted small" id="pl-at">Carregando situação…</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${temPlanta ? '<button class="btn ghost" id="pl-tv">Modo TV</button>' : ''}${podePCP() ? '<button class="btn" id="pl-ed">Editar planta</button>' : ''}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${temPlanta ? '<button class="btn ghost" id="pl-tv">Modo TV</button>' : ''}${podePCP() ? '<button class="btn" id="pl-cfg">Ao vivo</button><button class="btn" id="pl-ed">Editar planta</button>' : ''}</div></div>
     <div class="pl-leg">${Object.entries(ROTULO_ST).map(([k, t]) => `<span><i style="background:${COR[k]}"></i>${t}</span>`).join('')}</div>
     <div id="pl-kpis" class="pl-kpis"></div>
     <div id="pl-cv" class="pl-cv"></div>
     <div id="pl-det" class="card pl-det"></div></div>`;
   $('#pl-ed', root) && ($('#pl-ed', root).onclick = () => { ui.editando = true; render(root); });
+  $('#pl-cfg', root) && ($('#pl-cfg', root).onclick = () => parametrosAoVivo(root));
   $('#pl-tv', root) && ($('#pl-tv', root).onclick = () => modoTV(true));
   if (!temPlanta) {
     $('#pl-cv', root).innerHTML = `<div class="pl-vazio"><h3>A planta ainda não foi montada</h3><p>Monte os setores e posicione as máquinas no editor. Dá para começar por um rascunho automático, feito a partir dos setores e máquinas cadastrados, e depois arrastar cada coisa para o lugar certo.</p>
@@ -39,12 +40,12 @@ export async function render(root) {
     $('#pl-montar', root) && ($('#pl-montar', root).onclick = () => { ui.editando = true; render(root); });
     $('#pl-det', root).remove();
   }
-  let S = null;
+  let S = null, espera = null, aoVivo = false;
   const pintar = () => {
     if (!root.isConnected) return;
-    $('#pl-at', root).textContent = `Atualizado às ${S.atualizado.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · atualiza sozinho a cada 30 s`;
+    $('#pl-at', root).textContent = `Atualizado às ${S.atualizado.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} · ${aoVivo ? 'ao vivo (cada apontamento atualiza na hora)' : `atualiza sozinho a cada ${S.cfg.atualizar_seg} s`}`;
     const K = S.kpi;
-    $('#pl-kpis', root).innerHTML = [['Produzindo', `${K.produzindo} de ${K.total}`, ''], ['Paradas agora', String(K.paradas), K.paradas ? 'neg' : ''], ['Em setup', String(K.setup), ''],
+    $('#pl-kpis', root).innerHTML = [['Produzindo', `${K.produzindo} de ${K.total}`, ''], ['Paradas agora', String(K.paradas) + (K.longas ? ` (${K.longas} há mais de ${S.cfg.parada_longa_min} min)` : ''), K.paradas ? 'neg' : ''], ['Em manutenção', String(K.manut), K.manut ? 'warn' : ''], ['Em setup', String(K.setup), ''],
       ['Kg bons hoje', kg(K.kgDia), ''], ['Apara hoje', pctTxt(K.apara), K.apara > .08 ? 'warn' : ''], ['OPs atrasadas', String(K.atrasadas), K.atrasadas ? 'neg' : ''], ...(S.frota ? [['Cargas hoje', `${S.frota.cargasHoje} · ${(S.frota.kgHoje / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} t`, '']] : [])]
       .map(([t, v, c]) => `<div class="pl-k"><span>${t}</span><b class="${c}">${v}</b></div>`).join('');
     if (!temPlanta) return;
@@ -69,7 +70,19 @@ export async function render(root) {
   };
   const atualizar = async () => { try { S = await carregarSituacao(C); pintar(); } catch (err) { if (root.isConnected) fail(err); } };
   await atualizar();
-  timer = setInterval(() => { if (!root.isConnected) { clearInterval(timer); modoTV(false); return; } atualizar(); }, 30000);
+  // tempo real (SQL 118): cada apontamento, parada ou OS que para a máquina atualiza a planta na hora (com 1,5 s de folga)
+
+  try { canal?.unsubscribe?.(); } catch { /* sem canal anterior */ }
+  canal = null;
+  if (S?.cfg?.tempo_real !== false && typeof sb.channel === 'function') {
+    try {
+      const e = state.empresa.id, mudou = () => { clearTimeout(espera); espera = setTimeout(() => root.isConnected && atualizar(), 1500); };
+      canal = sb.channel('planta-' + e);
+      for (const t of ['prod_apontamentos', 'prod_paradas', 'man_ordens']) canal.on('postgres_changes', { event: '*', schema: 'public', table: t, filter: `empresa_id=eq.${e}` }, mudou);
+      canal.subscribe((st) => { aoVivo = st === 'SUBSCRIBED'; if (S && root.isConnected) pintar(); });
+    } catch { canal = null; }
+  }
+  timer = setInterval(() => { if (!root.isConnected) { clearInterval(timer); try { canal?.unsubscribe?.(); } catch {} canal = null; modoTV(false); return; } atualizar(); }, (S?.cfg?.atualizar_seg || 30) * 1000);
 }
 
 function detalhe(root, C, S) {
@@ -78,10 +91,12 @@ function detalhe(root, C, S) {
   const m = C.maqById[ui.sel];
   if (!m) { el.innerHTML = '<div class="muted small">Toque numa máquina para ver o resumo.</div>'; return; }
   const x = S.maq[m.id], op = x.op, feito = x.etapa ? +x.etapa.qtd_boa : 0;
-  const tag = `<span class="pl-tag" style="background:${COR[x.st]}">${esc(ROTULO_ST[x.st])}${x.desde && x.st !== 'livre' ? ' há ' + esc(dur(x.desde)) : ''}</span>`;
+  const tag = `<span class="pl-tag" style="background:${COR[x.st]}">${esc(ROTULO_ST[x.st])}${x.desde && x.st !== 'livre' ? ' há ' + esc(dur(x.desde)) : ''}</span>${x.longa ? ' <span class="badge vencido">parada longa</span>' : ''}`;
   el.innerHTML = `<div class="pl-det-g"><div><div class="muted small">${esc(C.setorById[m.setor_id]?.nome || '')} · ${esc((TIPOS_VISUAIS[m.tipo_visual] || TIPOS_VISUAIS.generica).t)}</div>
       <h3 style="margin:2px 0 6px">${esc(m.codigo)} — ${esc(m.nome)}</h3>${tag}
       ${op ? `<div class="small muted" style="margin:12px 0 4px">OP: ${qtd(feito)} de ${qtd(op.quantidade)} ${esc(op.unidade)} apontados na etapa</div><div class="pl-bar"><i style="width:${Math.min(100, feito / op.quantidade * 100).toFixed(0)}%"></i></div>` : ''}
+      ${x.ritmo ? `<div class="small" style="margin-top:8px">Ritmo agora: <b>${kg(x.ritmo)} kg/h</b>${x.ritmoPct != null ? ` (${Math.round(x.ritmoPct * 100)}% da capacidade)` : ''}</div>` : ''}
+      ${x.os ? `<div class="small" style="margin-top:8px;border-left:3px solid ${COR.manut};padding-left:8px"><b>OS ${x.os.numero}</b> · ${esc(x.os.tipo)} · ${esc(x.os.prioridade)} · ${esc(String(x.os.situacao).replace(/_/g, ' '))}<div class="muted">${esc(x.os.descricao || '')}${x.os.responsavel ? ` · ${esc(x.os.responsavel)}` : ''}</div><a href="#/manutencao/ordens?abrir=${x.os.id}">abrir a OS →</a></div>` : ''}
       <div class="small muted" style="margin-top:8px">Hoje: ${kg(x.kgDia)} kg bons${x.refDia ? ` · apara ${kg(x.refDia)} kg` : ''}${x.bobinasCurso ? ` · ${x.bobinasCurso} bobina(s) nesta produção` : ''}</div>
       ${op ? '<div style="margin-top:12px"><button class="btn small" id="pl-op">Abrir OP</button></div>' : ''}</div>
     <dl class="pl-dl">${x.motivo ? `<dt>Motivo</dt><dd>${esc(x.motivo)}</dd>` : ''}${op ? `<dt>OP</dt><dd>${op.numero}${op.numero_iniflex ? ` · Iniflex ${esc(op.numero_iniflex)}` : ''}</dd><dt>Produto</dt><dd>${esc(op.codigo_produto || '')} ${esc(op.descricao || '')}</dd>
@@ -318,4 +333,25 @@ async function editor(root, C, planta) {
     } catch (err) { fail(err); ev.target.disabled = false; }
   };
   tudo();
+}
+
+// parâmetros do acompanhamento ao vivo (SQL 118)
+async function parametrosAoVivo(root) {
+  let c = null; try { c = await q(sb.from('prod_planta_config').select('*').eq('empresa_id', state.empresa.id).maybeSingle()); } catch { /* sem SQL 118 */ }
+  c = { atualizar_seg: 30, parada_longa_min: 20, avisar_parada: true, avisar_papeis: ['admin', 'diretor'], tempo_real: true, ...(c || {}) };
+  const PAP = [['admin', 'Administrador'], ['diretor', 'Diretor'], ['financeiro', 'Financeiro'], ['producao', 'Produção'], ['compras', 'Compras']];
+  const m = modal({ title: 'Acompanhamento ao vivo', body: `
+    <label class="chk"><input type="checkbox" id="pc-tr" ${c.tempo_real ? 'checked' : ''}> Tempo real: cada apontamento, parada ou OS atualiza a planta na hora</label>
+    <div class="grid-form" style="margin-top:8px"><label>Atualização periódica (segundos, 10 a 300)<input type="number" id="pc-s" min="10" max="300" value="${c.atualizar_seg}"></label>
+      <label>Parada longa a partir de (minutos, 5 a 480)<input type="number" id="pc-m" min="5" max="480" value="${c.parada_longa_min}"></label></div>
+    <label class="chk" style="margin-top:8px"><input type="checkbox" id="pc-av" ${c.avisar_parada ? 'checked' : ''}> Avisar quando uma parada não planejada passar do limite (uma vez por parada)</label>
+    <div class="small" style="margin:6px 0 2px">Quem recebe o aviso:</div><div style="display:flex;gap:4px 14px;flex-wrap:wrap">${PAP.map(([k, t]) => `<label class="chk" style="font-weight:400"><input type="checkbox" class="pc-p" value="${k}" ${(c.avisar_papeis || []).includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pc-ok">Salvar</button>' });
+  $('#pc-ok', m.el).onclick = async () => {
+    const reg = { empresa_id: state.empresa.id, tempo_real: $('#pc-tr', m.el).checked, atualizar_seg: +$('#pc-s', m.el).value, parada_longa_min: +$('#pc-m', m.el).value, avisar_parada: $('#pc-av', m.el).checked,
+      avisar_papeis: $$('.pc-p:checked', m.el).map(x => x.value), atualizado_em: new Date().toISOString() };
+    if (!(reg.atualizar_seg >= 10 && reg.atualizar_seg <= 300) || !(reg.parada_longa_min >= 5 && reg.parada_longa_min <= 480)) return toast('Confira as faixas indicadas', true);
+    if (reg.avisar_parada && !reg.avisar_papeis.length) return toast('Escolha quem recebe o aviso', true);
+    try { await q(sb.from('prod_planta_config').upsert(reg)); m.close(); toast('Parâmetros salvos'); render(root); } catch (e) { fail(e); }
+  };
 }
