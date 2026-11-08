@@ -3,7 +3,7 @@
 // no dia e atraso, por e-mail e WhatsApp, com PIX copia e cola), pausas, histórico do que foi mandado e "Cobrar agora".
 import { sb, state, q, fetchAll, podeEditar } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, today, fail, toast, modal } from '../lib/ui.js';
-import { aging, diasAtraso, FAIXAS } from '../lib/cobranca-calc.js';
+import { aging, diasAtraso, FAIXAS, lerBoleto } from '../lib/cobranca-calc.js';
 import { brcode } from '../lib/pix.js';
 
 export const title = 'Cobrança';
@@ -17,13 +17,14 @@ export async function render(root) {
   root.innerHTML = '<div class="loading">Carregando…</div>';
   try {
     const e = state.empresa.id;
-    const [tit, cfg, etapas, envios, pausas] = await Promise.all([
+    const [tit, cfg, etapas, envios, pausas, boletos] = await Promise.all([
       fetchAll(() => sb.from('v_lancamentos').select('id,data,valor,valor_sinal,tipo,favorecido_id,favorecido_nome,documento,descricao,fidc_proposta_id,plano_codigo').eq('empresa_id', e).eq('status', 'Em aberto').in('tipo', ['E', 'S']).order('data')),
       q(sb.from('cob_config').select('*').eq('empresa_id', e).maybeSingle()).catch(() => undefined),
       q(sb.from('cob_etapas').select('*').eq('empresa_id', e).order('dias')).catch(() => []),
       q(sb.from('cob_envios').select('*').eq('empresa_id', e).order('criado_em', { ascending: false }).limit(1000)).catch(() => []),
-      q(sb.from('cob_pausas').select('*').eq('empresa_id', e).gte('ate', today()).order('ate')).catch(() => [])]);
-    D = { tit, cfg: cfg === undefined ? null : { ativo: false, canais: ['email', 'whatsapp'], valor_minimo: 0, excluir_cedidos: true, ...(cfg || {}) }, sql: cfg !== undefined, etapas, envios, pausas };
+      q(sb.from('cob_pausas').select('*').eq('empresa_id', e).gte('ate', today()).order('ate')).catch(() => []),
+      fetchAll(() => sb.from('portal_boletos').select('*').eq('empresa_id', e)).catch(() => [])]);
+    D = { tit, cfg: cfg === undefined ? null : { ativo: false, canais: ['email', 'whatsapp'], valor_minimo: 0, excluir_cedidos: true, ...(cfg || {}) }, sql: cfg !== undefined, etapas, envios, pausas, boletos: Object.fromEntries(boletos.map(b => [b.lancamento_id, b])) };
   } catch (err) { fail(err); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; return; }
   tela(root);
 }
@@ -71,16 +72,51 @@ function titulosDe(p, tits, ult, root) {
     ${l.map(t => { const d = diasAtraso(t.data, hoje), u = ult[t.id]; return `<tr><td>${dateBR(t.data)}</td><td>${esc(t.documento || t.descricao || '')}${t.fidc_proposta_id ? ' <span class="badge negoc">cedido</span>' : ''}</td><td class="num">${money(Math.abs(t.valor_sinal))}</td>
       <td>${d > 0 ? `<span class="badge vencido">${d} d</span>` : `<span class="muted">em ${-d} d</span>`}</td>
       ${rec ? `<td>${u ? `${new Date(u.criado_em).toLocaleDateString('pt-BR')} · ${MOD[u.modelo] || u.modelo} · ${CAN[u.canal]}` : '<span class="muted">—</span>'}</td>
-      <td style="white-space:nowrap">${D.sql && podeEditar() && !t.fidc_proposta_id ? `<button class="btn ghost small" data-co="${t.id}">Cobrar agora</button><button class="btn ghost small" data-pz="${t.id}">Pausar</button>` : ''}${D.cfg?.pix_chave ? `<button class="btn ghost small" data-px="${t.id}">PIX</button>` : ''}</td>` : ''}</tr>`; }).join('')}</tbody></table></div>`,
+      <td style="white-space:nowrap">${D.sql && podeEditar() && !t.fidc_proposta_id ? `<button class="btn ghost small" data-co="${t.id}">Cobrar agora</button><button class="btn ghost small" data-pz="${t.id}">Pausar</button><button class="btn ghost small" data-bo="${t.id}" title="Boleto que o cliente baixa no Portal">${D.boletos[t.id] ? 'Boleto ✓' : 'Boleto'}</button>` : ''}${D.cfg?.pix_chave ? `<button class="btn ghost small" data-px="${t.id}">PIX</button>` : ''}</td>` : ''}</tr>`; }).join('')}</tbody></table></div>`,
     foot: `${rec && D.sql && podeEditar() && p.id !== 'sem' ? '<button class="btn" id="tp-pz">Pausar a cobrança do cliente</button>' : ''}<span class="spacer"></span><button class="btn" data-close>Fechar</button>` });
   $$('[data-co]', md.el).forEach(b => b.onclick = async () => { try { const n = await q(sb.rpc('cob_cobrar_agora', { p_lancamento: b.dataset.co }));
     sb.functions.invoke('email', { body: {} }).catch(() => {}); sb.functions.invoke('whatsapp', { body: {} }).catch(() => {});
     toast(n ? `Cobrança mandada (${n} mensagem(ns))` : 'O cliente não tem e-mail nem WhatsApp aceito: registrado como sem contato', !n); md.close(); render(root); } catch (err) { fail(err); } });
   $$('[data-pz]', md.el).forEach(b => b.onclick = () => { md.close(); pausar(root, { lancamento_id: b.dataset.pz }); });
+  $$('[data-bo]', md.el).forEach(b => b.onclick = () => { md.close(); boleto(root, l.find(x => x.id === b.dataset.bo)); });
   $('#tp-pz', md.el) && ($('#tp-pz', md.el).onclick = () => { md.close(); pausar(root, { favorecido_id: p.id }); });
   $$('[data-px]', md.el).forEach(b => b.onclick = () => { const t = l.find(x => x.id === b.dataset.px);
     try { const code = brcode({ chave: D.cfg.pix_chave, nome: D.cfg.pix_nome || state.empresa.nome, cidade: D.cfg.pix_cidade, valor: Math.abs(t.valor_sinal), txid: t.documento || 'T' + t.id.replace(/-/g, '').slice(0, 20) });
       navigator.clipboard?.writeText(code); toast('PIX copia e cola copiado: cole na mensagem ao cliente'); } catch (err) { fail(err); } });
+}
+
+// boleto do título para o Portal (melhoria 3.5, SQL 127): PDF e/ou linha digitável, com os dígitos conferidos
+function boleto(root, t) {
+  const b = D.boletos[t.id] || {};
+  const m = modal({ title: `Boleto — ${esc(t.documento || t.descricao || '')}`, body: `<p class="small muted">O cliente baixa o boleto na aba Títulos do Portal enquanto o título estiver em aberto.</p>
+    <label>Linha digitável<input id="bo-l" value="${esc(b.linha_digitavel || '')}" placeholder="00190.00009 01234.567890 12345.678901 2 12340000010000" style="font-family:monospace"></label><div class="small" id="bo-i" style="min-height:18px"></div>
+    <label style="margin-top:8px">Vencimento do boleto<input type="date" id="bo-v" value="${b.vencimento || t.data}"></label>
+    <label style="margin-top:8px">PDF do boleto ${b.arquivo_path ? '<span class="muted">(já anexado; escolha outro para trocar)</span>' : ''}<input type="file" id="bo-f" accept="application/pdf,image/png,image/jpeg"></label>`,
+    foot: `${b.id ? '<button class="btn danger" id="bo-x">Retirar do Portal</button>' : ''}<span class="spacer"></span><button class="btn" data-close>Cancelar</button><button class="btn primary" id="bo-ok">Salvar</button>` });
+  const conferir = () => { const v = $('#bo-l', m.el).value.trim(), r = v ? lerBoleto(v) : null, i = $('#bo-i', m.el);
+    if (!r) { i.textContent = ''; return true; }
+    if (!r.ok) { i.innerHTML = `<span class="neg">${esc(r.erro)}</span>`; return false; }
+    const dif = r.valor && Math.abs(r.valor - Math.abs(t.valor_sinal)) > 0.005;
+    i.innerHTML = `<span class="pos">Dígitos conferidos</span>${r.vencimento ? ` · vence ${dateBR(r.vencimento)}` : ''}${r.valor ? ` · ${money(r.valor)}` : ''}${dif ? ` <span class="neg">(o título é de ${money(Math.abs(t.valor_sinal))})</span>` : ''}`;
+    if (r.vencimento && !b.id) $('#bo-v', m.el).value = r.vencimento; return true; };
+  $('#bo-l', m.el).oninput = conferir; conferir();
+  $('#bo-x', m.el) && ($('#bo-x', m.el).onclick = async () => { if (!confirm('Retirar o boleto do Portal?')) return;
+    try { await q(sb.from('portal_boletos').delete().eq('id', b.id)); if (b.arquivo_path) await sb.storage.from('portal').remove([b.arquivo_path]); toast('Boleto retirado'); m.close(); render(root); } catch (e) { fail(e); } });
+  $('#bo-ok', m.el).onclick = async (ev) => {
+    const linha = $('#bo-l', m.el).value.trim() || null, f = $('#bo-f', m.el).files[0];
+    if (linha && !conferir()) return toast('Confira a linha digitável', true);
+    if (!linha && !f && !b.arquivo_path) return toast('Informe a linha digitável ou anexe o PDF', true);
+    ev.target.disabled = true;
+    try {
+      let caminho = b.arquivo_path || null;
+      if (f) { if (f.size > 10 * 1048576) throw new Error('Arquivo acima de 10 MB');
+        caminho = `${state.empresa.id}/boletos/${t.id}/${Date.now()}-${f.name.normalize('NFD').replace(/[^\w.-]+/g, '_').slice(-60)}`;
+        const { error } = await sb.storage.from('portal').upload(caminho, f, { contentType: f.type || 'application/pdf' }); if (error) throw error;
+        if (b.arquivo_path) sb.storage.from('portal').remove([b.arquivo_path]).catch(() => {}); }
+      await q(sb.from('portal_boletos').upsert({ empresa_id: state.empresa.id, lancamento_id: t.id, linha_digitavel: linha, arquivo_path: caminho, vencimento: $('#bo-v', m.el).value || null, atualizado_em: new Date().toISOString() }, { onConflict: 'lancamento_id' }));
+      toast('Boleto disponível no Portal'); m.close(); render(root);
+    } catch (e) { fail(e); ev.target.disabled = false; }
+  };
 }
 
 function pausar(root, alvo) {

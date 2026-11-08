@@ -1660,3 +1660,40 @@ window.RPC.pag_remessa_gravar = () => null;
     V(26, 'cob-l9', 3, 'cob_atraso', 'sem_contato', null), V(50, 'cob-l0', -3, 'cob_lembrete', 'email', 'financeiro@boacompra.exemplo'), V(170, 'cob-l1', 3, 'cob_atraso', 'email', 'financeiro@boacompra.exemplo')];
   DB.cob_pausas = fa ? [{ id: 'cp1', empresa_id: E, favorecido_id: fa.id, ate: dd(12), motivo: 'Negociação do parcelamento com o diretor (reunião dia 15)', criado_por: 'renata@exemplo.com.br' }] : [];
 }
+
+// Portal: boleto, DANFE e uso (SQL 127) — dados FICTÍCIOS (o portal entra como a VILA DOCE)
+{
+  const hoje = new Date().toISOString().slice(0, 10), dd = (n) => new Date(Date.parse(hoje + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+  // linha digitável FICTÍCIA com os dígitos certos (banco 999 inexistente), para o título e o vencimento do exemplo
+  const m10 = (n) => { let s = 0, p = 2; for (let i = n.length - 1; i >= 0; i--) { let x = +n[i] * p; if (x > 9) x -= 9; s += x; p = p === 2 ? 1 : 2; } return (10 - s % 10) % 10; };
+  const m11 = (n) => { let s = 0, p = 2; for (let i = n.length - 1; i >= 0; i--) { s += +n[i] * p; p = p === 9 ? 2 : p + 1; } const d = 11 - s % 11; return d === 0 || d > 9 ? 1 : d; };
+  const linhaFicticia = (venc, valor, livre) => {
+    const f = Math.round((Date.parse(venc) - Date.UTC(2025, 1, 22)) / 864e5) + 1000, v = String(Math.round(valor * 100)).padStart(10, '0');
+    const sem = '9999' + f + v + livre, dv = m11(sem), c1 = '9999' + livre.slice(0, 5), c2 = livre.slice(5, 15), c3 = livre.slice(15, 25);
+    return `${c1.slice(0, 5)}.${c1.slice(5)}${m10(c1)} ${c2.slice(0, 5)}.${c2.slice(5)}${m10(c2)} ${c3.slice(0, 5)}.${c3.slice(5)}${m10(c3)} ${dv} ${f}${v}`;
+  };
+  const XML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><nfeProc xmlns=\"http://www.portalfiscal.inf.br/nfe\" versao=\"4.00\"><NFe><infNFe Id=\"NFe26110812345678000195550010000182111000182118\" versao=\"4.00\">\n<ide><natOp>VENDA DE PRODU\u00c7\u00c3O</natOp><serie>1</serie><nNF>18211</nNF><dhEmi>2026-11-03T09:12:00-03:00</dhEmi><dhSaiEnt>2026-11-03T14:00:00-03:00</dhSaiEnt><tpNF>1</tpNF><tpAmb>1</tpAmb></ide>\n<emit><CNPJ>12345678000195</CNPJ><xNome>PLASTICOS EXEMPLO LTDA</xNome><enderEmit><xLgr>Rua A</xLgr><nro>100</nro><xBairro>Distrito Industrial</xBairro><xMun>Caruaru</xMun><UF>PE</UF><CEP>55000000</CEP></enderEmit><IE>123456789</IE></emit>\n<dest><CNPJ>98765432000110</CNPJ><xNome>VILA DOCE ALIMENTOS LTDA</xNome><enderDest><xLgr>Av. B</xLgr><nro>5</nro><xBairro>Centro</xBairro><xMun>Recife</xMun><UF>PE</UF><CEP>50000000</CEP></enderDest><IE>987654</IE></dest>\n<det nItem=\"1\"><prod><cProd>SAC-01</cProd><xProd>SACOLA 40X50</xProd><NCM>39232190</NCM><CFOP>5101</CFOP><uCom>KG</uCom><qCom>100.0000</qCom><vUnCom>12.3450</vUnCom><vProd>1234.50</vProd></prod>\n<imposto><ICMS><ICMS00><orig>0</orig><CST>00</CST><vBC>1234.50</vBC><pICMS>18.00</pICMS><vICMS>222.21</vICMS></ICMS00></ICMS><IPI><cEnq>999</cEnq><IPITrib><CST>50</CST><vBC>1234.50</vBC><pIPI>0.00</pIPI><vIPI>0.00</vIPI></IPITrib></IPI></imposto><infAdProd>Lote 7</infAdProd></det>\n<det nItem=\"2\"><prod><cProd>BOB-02</cProd><xProd>BOBINA</xProd><NCM>39201099</NCM><CFOP>5101</CFOP><uCom>KG</uCom><qCom>1</qCom><vUnCom>10</vUnCom><vProd>10.00</vProd></prod><imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS></imposto></det>\n<total><ICMSTot><vBC>1234.50</vBC><vICMS>222.21</vICMS><vBCST>0</vBCST><vST>0</vST><vProd>1244.50</vProd><vFrete>0</vFrete><vSeg>0</vSeg><vDesc>0</vDesc><vIPI>0</vIPI><vOutro>0</vOutro><vNF>1244.50</vNF></ICMSTot></total>\n<transp><modFrete>0</modFrete><transporta><xNome>TRANSPORTES EXEMPLO</xNome></transporta><vol><qVol>3</qVol><esp>FARDO</esp><pesoL>100.000</pesoL><pesoB>103.500</pesoB></vol></transp>\n<cobr><dup><nDup>001</nDup><dVenc>2026-12-03</dVenc><vDup>622.25</vDup></dup><dup><nDup>002</nDup><dVenc>2027-01-03</dVenc><vDup>622.25</vDup></dup></cobr>\n<infAdic><infCpl>Pedido 4521</infCpl></infAdic></infNFe></NFe><protNFe><infProt><tpAmb>1</tpAmb><chNFe>26110812345678000195550010000182111000182118</chNFe><dhRecbto>2026-11-03T09:13:05-03:00</dhRecbto><nProt>126260000123456</nProt><cStat>100</cStat></infProt></protNFe></nfeProc>";
+  window.RPC.portal_titulos = () => [
+    { id: 'pt1', data: dd(-4), documento: '18190/2', valor: 6220.5, situacao: 'aberto', prorrogacao: null, pode_prorrogar: false },
+    { id: 'pt2', data: dd(6), documento: '18211/1', valor: 622.25, situacao: 'aberto', prorrogacao: null, pode_prorrogar: true },
+    { id: 'pt3', data: dd(36), documento: '18211/2', valor: 622.25, situacao: 'aberto', prorrogacao: null, pode_prorrogar: true },
+    { id: 'pt4', data: dd(-20), documento: '18102/1', valor: 4810, situacao: 'pago' }, { id: 'pt5', data: dd(-35), documento: '18050/2', valor: 3920.4, situacao: 'pago' }];
+  window.RPC.portal_boletos_meus = () => [{ lancamento_id: 'pt1', linha_digitavel: linhaFicticia(dd(-4), 6220.5, '0000001819000020000000001'), arquivo_path: 'e/boletos/pt1/boleto.pdf', vencimento: dd(-4) },
+    { lancamento_id: 'pt2', linha_digitavel: linhaFicticia(dd(6), 622.25, '0000001821100010000000002'), arquivo_path: null, vencimento: dd(6) }];
+  window.RPC.portal_notas = () => [
+    { id: 'pn1', numero: 18211, serie: '1', emissao: dd(-5), valor: 1244.5, parcelas: [{ vencimento: dd(6), valor: 622.25 }, { vencimento: dd(36), valor: 622.25 }], chave: '26110812345678000195550010000182111000182118', tem_xml: true },
+    { id: 'pn2', numero: 18190, serie: '1', emissao: dd(-34), valor: 12441, parcelas: [{ vencimento: dd(-34), valor: 6220.5 }, { vencimento: dd(-4), valor: 6220.5 }], chave: '26101012345678000195550010000181901000181904', tem_xml: true },
+    { id: 'pn3', numero: 18102, serie: '1', emissao: dd(-50), valor: 4810, parcelas: [{ vencimento: dd(-20), valor: 4810 }], chave: '26100912345678000195550010000181021000181029', tem_xml: false }];
+  window.RPC.portal_nota_xml = () => XML;
+  window.RPC.portal_registrar = () => null;
+  const U = (email, cliente, ult, dias, t, n, e, a, da, x, b, p, c, ar, pr, wa, ativo = true) => ({ user_id: email, email, cliente, favorecido_id: cliente, ativo, ultimo_acesso: ult, dias_com_acesso: dias, titulos: t, notas: n, entregas: e, artes: a, danfe: da, xml: x, boletos: b, pix: p, canhotos: c, artes_respondidas: ar, prorrogacoes: pr, whatsapp: wa });
+  const H = (h) => new Date(Date.now() - h * 36e5).toISOString();
+  window.RPC.portal_uso = () => [
+    U('compras@viladoce.exemplo', 'VILA DOCE ALIMENTOS LTDA', H(2), 14, 22, 9, 6, 11, 7, 3, 4, 2, 1, 5, 1, true),
+    U('financeiro@boacompra.exemplo', 'SUPERMERCADOS BOA COMPRA LTDA', H(26), 9, 15, 4, 2, 0, 3, 3, 6, 5, 0, 0, 2, true),
+    U('marketing@serraazul.exemplo', 'TORREFAÇÃO SERRA AZUL LTDA', H(70), 4, 2, 1, 0, 6, 0, 0, 0, 0, 0, 3, 0, false),
+    U('fiscal@distribuidoranorte.exemplo', 'DISTRIBUIDORA NORTE LTDA', H(24 * 12), 2, 2, 3, 0, 0, 1, 4, 0, 0, 0, 0, 0, false),
+    U('compras@atacadosul.exemplo', 'ATACADO SUL LTDA', H(24 * 75), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false),
+    U('ex@farmavida.exemplo', 'FARMÁCIAS VIDA LTDA', null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, false)];
+  DB.portal_boletos = [{ id: 'pb1', empresa_id: E, lancamento_id: 'cob-l1', linha_digitavel: linhaFicticia(dd(-12), 9800, '0000004790000020000000003'), arquivo_path: E + '/boletos/cob-l1/boleto.pdf', vencimento: dd(-12) }];
+}

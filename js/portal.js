@@ -59,8 +59,8 @@ async function iniciar() {
   }
   $('#pt-cli').innerHTML = S.clientes.map((c, i) => `<option value="${i}">${esc(c.cliente)}${S.clientes.some((x, j) => j !== i && x.empresa !== c.empresa) ? ' — ' + esc(c.empresa) : ''}</option>`).join('');
   $('#pt-cli').hidden = S.clientes.length < 2;
-  $('#pt-cli').onchange = (e) => { S.fav = S.clientes[+e.target.value]; pintar(); };
-  S.fav = S.clientes[0]; pintar();
+  $('#pt-cli').onchange = (e) => { S.fav = S.clientes[+e.target.value]; registrar('entrada'); pintar(); };
+  S.fav = S.clientes[0]; registrar('entrada'); pintar();
   exigirTermo(sb, 'portal_termo_pendente', {}, { sair: () => $('#pt-sair').click() });
 }
 $('#pt-sair').onclick = async () => { await sb.auth.signOut(); location.href = base(); };
@@ -71,6 +71,10 @@ $('#pt-senha').onclick = () => {
     const { error } = await sb.auth.updateUser({ password: a }); if (error) return fail(error); m.close(); toast('Senha alterada'); };
 };
 sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') setTimeout(() => $('#pt-senha').click(), 300); });
+
+// uso do portal (melhoria 3.5, SQL 127): cada aba e cada documento baixado; a mesma aba conta uma vez a cada 10 minutos
+const registrar = (tipo, ref = null) => { if (S.fav) sb.rpc('portal_registrar', { p_fav: S.fav.favorecido_id, p_tipo: tipo, p_ref: ref }).then(() => {}, () => {}); };
+const carregarScript = (src) => new Promise((ok, er) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = er; document.head.appendChild(sc); });
 
 // ---------------------------------------------------------------- telas
 async function pintar() {
@@ -86,11 +90,14 @@ async function pintar() {
   $('#pt-abas').onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { S.aba = a; S.arte = null; pintar(); } };
   $('#pt-ir-artes') && ($('#pt-ir-artes').onclick = () => { S.aba = 'artes'; pintar(); });
   $('#pt-wa').onclick = () => whatsapp();
+  registrar(S.aba);
   ({ titulos, notas, entregas, compras, pedidos, artes })[S.aba]().catch(err => { fail(err); $('#pt-corpo').innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; });
 }
 
 async function titulos() {
   const T = await q(sb.rpc('portal_titulos', { p_fav: S.fav.favorecido_id })), h = today();
+  let B = []; try { B = await q(sb.rpc('portal_boletos_meus', { p_fav: S.fav.favorecido_id })); } catch { B = []; }
+  const bol = Object.fromEntries(B.map(b => [b.lancamento_id, b]));
   const ab = T.filter(t => t.situacao === 'aberto'), neg = T.filter(t => t.situacao === 'negociado'), pg = T.filter(t => t.situacao === 'pago').reverse();
   const venc = ab.filter(t => t.data < h), tot = (a) => a.reduce((s, t) => s + +t.valor, 0);
   $('#pt-corpo').innerHTML = `<div class="kpis"><div class="kpi"><div class="k-label">A pagar</div><div class="k-value">${money(tot(ab))}</div><div class="k-sub">${ab.length} título(s)</div></div>
@@ -98,18 +105,32 @@ async function titulos() {
       ${neg.length ? `<div class="kpi"><div class="k-label">Com banco</div><div class="k-value">${money(tot(neg))}</div><div class="k-sub">${neg.length} título(s)</div></div>` : ''}</div>
     <div class="card flush" style="margin-top:12px"><div style="padding:14px 16px 0"><h2>A pagar</h2></div><div class="table-wrap"><table><thead><tr><th>Vencimento</th><th>Documento</th><th class="num">Valor</th><th>Prorrogação</th><th></th></tr></thead><tbody>
       ${ab.map(t => `<tr><td class="${t.data < h ? 'neg' : ''}">${dateBR(t.data)}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td><td class="small">${esc(rotPr(t.prorrogacao))}</td>
-        <td style="white-space:nowrap"><button class="btn small" data-pix="${t.id}">Pagar com PIX</button>${t.pode_prorrogar ? `<button class="btn ghost small" data-pr="${t.id}">Pedir prorrogação</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum título em aberto.</td></tr>'}</tbody></table></div></div>
+        <td style="white-space:nowrap"><button class="btn small" data-pix="${t.id}">Pagar com PIX</button>${bol[t.id] ? `<button class="btn ghost small" data-bol="${t.id}">Boleto</button>` : ''}${t.pode_prorrogar ? `<button class="btn ghost small" data-pr="${t.id}">Pedir prorrogação</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum título em aberto.</td></tr>'}</tbody></table></div></div>
     ${neg.length ? `<div class="card flush" style="margin-top:12px"><div style="padding:14px 16px 0"><h2>Pagar pelo boleto do banco</h2><p class="pt-aviso" style="margin:0 0 12px">Estes títulos foram transferidos a uma instituição financeira. O pagamento deve ser feito pelo boleto enviado pelo banco; dúvidas sobre eles, inclusive prorrogação, são tratadas com a instituição indicada no boleto.</p></div>
       <div class="table-wrap"><table><thead><tr><th>Vencimento</th><th>Documento</th><th class="num">Valor</th></tr></thead><tbody>${neg.map(t => `<tr><td>${dateBR(t.data)}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
     <div class="card flush" style="margin-top:12px"><div style="padding:14px 16px 0"><h2>Pagos — 12 meses</h2></div><div class="table-wrap" style="max-height:360px"><table><thead><tr><th>Pago em</th><th>Documento</th><th class="num">Valor</th></tr></thead><tbody>
       ${pg.map(t => `<tr><td>${dateBR(t.data)}</td><td>${esc(t.documento || '')}</td><td class="num">${money(t.valor)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Nenhum pagamento registrado.</td></tr>'}</tbody></table></div></div>`;
   $$('[data-pr]').forEach(b => b.onclick = () => pedir(ab.find(t => t.id === b.dataset.pr)));
   $$('[data-pix]').forEach(b => b.onclick = () => pagarPix(ab.find(t => t.id === b.dataset.pix)));
+  $$('[data-bol]').forEach(b => b.onclick = () => boleto(ab.find(t => t.id === b.dataset.bol), bol[b.dataset.bol]));
+}
+
+// boleto do título (melhoria 3.5): o PDF anexado pelo financeiro e/ou a linha digitável para copiar
+function boleto(t, b) {
+  registrar('boleto', t.id);
+  const linha = b.linha_digitavel || '';
+  const m = modal({ title: `Boleto — ${esc(t.documento || '')}`, body: `<p>Vencimento <b>${dateBR(b.vencimento || t.data)}</b> · Valor <b>${money(t.valor)}</b></p>
+    ${linha ? `<label>Linha digitável<textarea id="bo-l" rows="2" readonly style="font-family:monospace">${esc(linha)}</textarea></label>` : ''}
+    <p class="small muted">Pague no aplicativo do seu banco${linha ? ' copiando a linha digitável' : ''}${b.arquivo_path ? ' ou abrindo o PDF do boleto' : ''}.</p>`,
+    foot: `<button class="btn" data-close>Fechar</button>${linha ? '<button class="btn" id="bo-c">Copiar linha</button>' : ''}${b.arquivo_path ? '<button class="btn primary" id="bo-p">Abrir PDF</button>' : ''}` });
+  $('#bo-c', m.el) && ($('#bo-c', m.el).onclick = async () => { try { await navigator.clipboard.writeText(linha.replace(/\D/g, '')); } catch { $('#bo-l', m.el).select(); document.execCommand('copy'); } toast('Linha digitável copiada'); });
+  $('#bo-p', m.el) && ($('#bo-p', m.el).onclick = async () => { const { data, error } = await sb.storage.from('portal').createSignedUrl(b.arquivo_path, 600); if (error || !data) return toast('Boleto indisponível', true); window.open(data.signedUrl, '_blank', 'noopener'); });
 }
 
 // PIX do título (melhoria 3.3, SQL 126): QR e copia e cola com o valor e o número do título
 let qrLib = null;
 async function pagarPix(t) {
+  registrar('pix', t.id);
   let P; try { P = await q(sb.rpc('portal_pix', { p_fav: S.fav.favorecido_id, p_lancamento: t.id })); } catch (err) { return fail(err); }
   if (!qrLib) { await new Promise((ok, er) => { const sc = document.createElement('script'); sc.src = 'vendor/qrcode-generator-1.4.4.js'; sc.onload = ok; sc.onerror = er; document.head.appendChild(sc); }).catch(() => {}); qrLib = window.qrcode || null; }
   let svg = ''; if (qrLib) { const g = qrLib(0, 'M'); g.addData(P.brcode); g.make(); svg = g.createSvgTag({ cellSize: 5, margin: 2 }); }
@@ -138,11 +159,18 @@ async function notas() {
   $('#pt-corpo').innerHTML = `<div class="card flush"><div class="table-wrap" style="max-height:70vh"><table><thead><tr><th>Nota</th><th>Emissão</th><th class="num">Valor</th><th class="pt-hide-sm">Parcelas</th><th class="pt-hide-sm">Chave de acesso</th><th></th></tr></thead><tbody>
     ${N.map(n => `<tr><td>${n.numero}${n.serie ? '-' + esc(n.serie) : ''}</td><td>${dateBR(n.emissao)}</td><td class="num">${money(n.valor)}</td>
       <td class="small pt-hide-sm">${(n.parcelas || []).map(p => `${dateBR(p.vencimento)} ${money(p.valor)}`).join('<br>')}</td><td class="small pt-hide-sm" style="font-family:monospace">${esc(n.chave || '')}</td>
-      <td>${n.tem_xml ? `<button class="btn ghost small" data-x="${n.id}" data-n="${n.numero}">XML</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma nota nos últimos 13 meses.</td></tr>'}</tbody></table></div></div>
-    <p class="small muted">A DANFE pode ser consultada no portal da NF-e com a chave de acesso.</p>`;
+      <td style="white-space:nowrap">${n.tem_xml ? `<button class="btn small" data-d="${n.id}" data-n="${n.numero}">DANFE</button><button class="btn ghost small" data-x="${n.id}" data-n="${n.numero}">XML</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma nota nos últimos 13 meses.</td></tr>'}</tbody></table></div></div>
+    <p class="small muted">A DANFE é gerada a partir do XML autorizado. A autenticidade pode ser conferida no portal da NF-e com a chave de acesso.</p>`;
+  $$('[data-d]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { const xml = await q(sb.rpc('portal_nota_xml', { p_fav: S.fav.favorecido_id, p_nota: b.dataset.d })); if (!xml) return toast('XML indisponível', true);
+      await carregarScript('vendor/jspdf-4.2.1.umd.min.js'); await carregarScript('vendor/jspdf-autotable-5.0.9.min.js');
+      const { lerDanfe, danfePDF } = await import('./lib/danfe.js'); const d = lerDanfe(xml); if (!d) return toast('Não foi possível ler o XML da nota', true);
+      registrar('danfe'); danfePDF(d, window.jspdf.jsPDF).save(`DANFE_${b.dataset.n}.pdf`); } catch (err) { fail(err); } finally { b.disabled = false; }
+  });
   $$('[data-x]').forEach(b => b.onclick = async () => {
     try { const xml = await q(sb.rpc('portal_nota_xml', { p_fav: S.fav.favorecido_id, p_nota: b.dataset.x })); if (!xml) return toast('XML indisponível', true);
-      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' })); a.download = `NFe_${b.dataset.n}.xml`; a.click(); URL.revokeObjectURL(a.href); } catch (err) { fail(err); }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' })); a.download = `NFe_${b.dataset.n}.xml`; registrar('xml'); a.click(); URL.revokeObjectURL(a.href); } catch (err) { fail(err); }
   });
 }
 
@@ -158,7 +186,7 @@ async function entregas() {
       <td>${e.entregue_em ? new Date(e.entregue_em).toLocaleString('pt-BR').slice(0, 17) : '—'}</td><td>${esc(e.recebedor || '')}</td>
       <td>${e.canhoto_path ? `<button class="btn ghost small" data-can="${esc(e.canhoto_path)}">Canhoto</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">Nenhuma entrega da nossa frota nos últimos 4 meses.</td></tr>'}</tbody></table></div></div>
     <p class="small muted">Mostra as entregas feitas pelos nossos caminhões. Entregas por transportadora não aparecem aqui.</p>`;
-  $$('[data-can]').forEach(b => b.onclick = async () => { const { data, error } = await sb.storage.from('logistica').createSignedUrl(b.dataset.can, 600); if (error || !data) return toast('Canhoto indisponível', true); window.open(data.signedUrl, '_blank', 'noopener'); });
+  $$('[data-can]').forEach(b => b.onclick = async () => { const { data, error } = await sb.storage.from('logistica').createSignedUrl(b.dataset.can, 600); if (error || !data) return toast('Canhoto indisponível', true); registrar('canhoto'); window.open(data.signedUrl, '_blank', 'noopener'); });
 }
 
 // WhatsApp (melhoria 1.1b, SQL 125): o cliente cadastra o celular e aceita (ou deixa de aceitar) receber os avisos

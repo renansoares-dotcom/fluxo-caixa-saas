@@ -3,20 +3,20 @@ import { sb, state, q } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, fail, toast, modal, confirmDialog } from '../lib/ui.js';
 
 export const title = 'Portal do Cliente';
-const ui = { aba: 'pedidos' };
+const ui = { aba: 'pedidos', dias: 30 };
 const podeDecidir = () => ['admin', 'financeiro'].includes(state.papel);
 const podeGerir = () => ['admin', 'financeiro', 'diretor'].includes(state.papel);
 const linkPortal = (token) => `${location.origin}${location.pathname.replace(/[^/]*$/, '')}portal.html?convite=${token}`;
 
 export async function render(root) {
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Portal do Cliente</h2><div class="muted small">O cliente vê títulos, notas (XML), o que comprou e pede prorrogação. O vencimento só muda quando o Financeiro aprova aqui.</div></div>
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Portal do Cliente</h2><div class="muted small">O cliente vê títulos (com boleto e PIX), notas (DANFE e XML), entregas, o que comprou e pede prorrogação. O vencimento só muda quando o Financeiro aprova aqui.</div></div>
       ${podeGerir() ? '<button class="btn primary" id="pa-conv">Convidar cliente</button>' : ''}</div>
-    <div class="card toolbar"><div class="chips" id="pa-abas"><span class="chip ${ui.aba === 'pedidos' ? 'on' : ''}" data-a="pedidos">Pedidos de prorrogação</span><span class="chip ${ui.aba === 'acessos' ? 'on' : ''}" data-a="acessos">Acessos</span></div>
+    <div class="card toolbar"><div class="chips" id="pa-abas"><span class="chip ${ui.aba === 'pedidos' ? 'on' : ''}" data-a="pedidos">Pedidos de prorrogação</span><span class="chip ${ui.aba === 'acessos' ? 'on' : ''}" data-a="acessos">Acessos</span><span class="chip ${ui.aba === 'uso' ? 'on' : ''}" data-a="uso">Uso do Portal</span></div>
       <a class="btn ghost small" href="portal.html" target="_blank" rel="noopener">Abrir o portal</a></div>
     <div id="pa-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#pa-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
   $('#pa-conv', root) && ($('#pa-conv', root).onclick = () => convidar(root));
-  try { ui.aba === 'pedidos' ? await pedidos(root) : await acessos(root); } catch (err) { fail(err); $('#pa-corpo', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; }
+  try { await ({ pedidos, acessos, uso })[ui.aba](root); } catch (err) { fail(err); $('#pa-corpo', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar.</div></div>'; }
 }
 const nomeFav = (id) => state.cad?.favById?.[id]?.nome || '–';
 
@@ -55,6 +55,27 @@ async function acessos(root) {
   $$('[data-tg]', root).forEach(b => b.onclick = async () => { try { await q(sb.from('portal_usuarios').update({ ativo: b.dataset.at !== 'true' }).eq('id', b.dataset.tg)); render(root); } catch (err) { fail(err); } });
   $$('[data-cp]', root).forEach(b => b.onclick = () => copiar(linkPortal(b.dataset.cp)));
   $$('[data-cx]', root).forEach(b => b.onclick = async () => { if (!await confirmDialog('Cancelar este convite?')) return; try { await q(sb.rpc('portal_cancelar_convite', { p_id: b.dataset.cx })); render(root); } catch (err) { fail(err); } });
+}
+// uso do Portal (melhoria 3.5, SQL 127): quem entrou, quantos dias, o que consultou e baixou, artes respondidas e prorrogações
+async function uso(root) {
+  let U;
+  try { U = await q(sb.rpc('portal_uso', { p_empresa: state.empresa.id, p_dias: ui.dias })); }
+  catch { $('#pa-corpo', root).innerHTML = '<div class="card"><div class="empty">O painel de uso precisa do SQL 127 aplicado.</div></div>'; return; }
+  const som = (k) => U.reduce((s, u) => s + +(u[k] || 0), 0), ativos = U.filter(u => +u.dias_com_acesso > 0);
+  const baixas = som('danfe') + som('xml') + som('boletos') + som('pix') + som('canhotos');
+  const n = (v) => +v ? v : '<span class="muted">·</span>';
+  $('#pa-corpo', root).innerHTML = `<div style="display:flex;gap:6px;margin-bottom:12px">${[30, 90, 365].map(d => `<button class="chip${ui.dias === d ? ' on' : ''}" data-d="${d}">${d === 365 ? '12 meses' : d + ' dias'}</button>`).join('')}</div>
+    <div class="kpis"><div class="kpi"><div class="k-label">Usaram o portal</div><div class="k-value">${ativos.length} de ${U.length}</div><div class="k-sub">${U.length ? Math.round(ativos.length / U.length * 100) : 0}% dos acessos liberados</div></div>
+      <div class="kpi"><div class="k-label">Documentos baixados</div><div class="k-value">${baixas}</div><div class="k-sub">DANFE ${som('danfe')} · XML ${som('xml')} · boleto ${som('boletos')} · PIX ${som('pix')}</div></div>
+      <div class="kpi"><div class="k-label">Artes respondidas</div><div class="k-value">${som('artes_respondidas')}</div><div class="k-sub">aprovação pelo cliente</div></div>
+      <div class="kpi"><div class="k-label">Prorrogações pedidas</div><div class="k-value">${som('prorrogacoes')}</div><div class="k-sub">pelo portal</div></div></div>
+    <div class="card flush" style="margin-top:12px"><div class="table-wrap"><table class="small"><thead><tr><th>Cliente / quem</th><th>Último acesso</th><th class="num" title="Dias com acesso no período">Dias</th><th class="num">Títulos</th><th class="num">Notas</th><th class="num">Entregas</th><th class="num">Artes</th>
+      <th class="num">DANFE</th><th class="num">XML</th><th class="num">Boleto</th><th class="num">PIX</th><th class="num">Canhoto</th><th class="num" title="Artes aprovadas ou devolvidas pelo cliente">Resp.</th><th class="num" title="Pedidos de prorrogação">Prorr.</th></tr></thead><tbody>
+      ${U.map(u => `<tr class="${u.ativo ? '' : 'muted'}"><td>${esc(u.cliente)}<div class="muted">${esc(u.email)}${u.whatsapp ? ' <span title="Aceitou receber avisos pelo WhatsApp">📱</span>' : ''}</div></td><td>${u.ultimo_acesso ? dateBR(u.ultimo_acesso) : '–'}</td><td class="num"><b>${n(u.dias_com_acesso)}</b></td>
+        ${['titulos', 'notas', 'entregas', 'artes', 'danfe', 'xml', 'boletos', 'pix', 'canhotos', 'artes_respondidas', 'prorrogacoes'].map(k => `<td class="num">${n(u[k])}</td>`).join('')}</tr>`).join('')
+      || '<tr><td colspan="14" class="empty">Nenhum cliente com acesso ao portal.</td></tr>'}</tbody></table></div></div>
+    <p class="small muted">Conta as abas abertas (a mesma aba vale uma vez a cada 10 minutos) e cada documento baixado. Não registra o que o cliente digitou. Clientes que não entram há muito tempo são candidatos a um lembrete do link.</p>`;
+  $$('[data-d]', root).forEach(b => b.onclick = () => { ui.dias = +b.dataset.d; uso(root); });
 }
 const copiar = async (t) => { try { await navigator.clipboard.writeText(t); toast('Link copiado'); } catch { prompt('Copie o link:', t); } };
 

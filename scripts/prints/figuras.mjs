@@ -200,6 +200,8 @@ export const FIGS = [
   ['cobranca', 'cobranca', '## 4.', 'Régua: as etapas, ligadas e quantas mensagens saíram', 'click:[data-aba="regua"]'],
   ['cobranca', 'cobranca', '## 5.', 'Histórico de tudo o que foi mandado', 'click:[data-aba="historico"]'],
   ['cobranca', 'cobranca', '## 7.', 'Parâmetros da cobrança e o PIX da empresa', 'click:#cb-par'],
+  ['cobranca', 'cobranca', '### 3.3', 'Boleto do título para o Portal: linha digitável conferida, vencimento e PDF', 'click:[data-aba="aging"]|click:[data-p]|click:[data-bo="cob-l1"]'],
+  ['portal-cliente', 'portal-clientes', '### 3.6', 'Uso do Portal: quem entrou, quantos dias e o que consultou e baixou', 'click:[data-a=uso]'],
   ['whatsapp', 'config/whatsapp', '## 3.', 'WhatsApp da Plataforma: número, como ligar e os modelos aprovados'],
   ['whatsapp', 'config/whatsapp', '### 3.2', 'Modelo: nome na Meta, campos na ordem, texto sugerido e prévia', 'click:[data-m="entrega_saiu"]'],
   ['whatsapp', 'config/whatsapp', '### 3.4', 'Últimas mensagens e a situação de cada uma', 'scroll:#wa-corpo .card.flush:last-child'],

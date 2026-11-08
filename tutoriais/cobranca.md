@@ -1,7 +1,7 @@
 ---
 titulo: Cobrança — aging, régua e PIX
 tela: Financeiro › Cobrança (FIN024)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -43,6 +43,19 @@ Clique no cliente para ver os títulos dele, com a última cobrança mandada. Em
 - **PIX** copia o código copia e cola do título, para colar numa conversa com o cliente.
 
 **Pausar a cobrança do cliente** suspende todos os títulos dele, por exemplo durante uma negociação. Título cedido ao FIDC aparece marcado e não é cobrado.
+
+### 3.3 Boleto do título para o Portal
+
+![Figura 6 — Boleto do título para o Portal: linha digitável conferida, vencimento e PDF (dados fictícios)](img/cobranca-6.jpg)
+
+O botão **Boleto** do título deixa a 2ª via disponível ao cliente na aba Títulos do Portal do Cliente:
+
+1. Cole a **linha digitável** (47 dígitos; 48 nas contas de consumo). A tela confere os dígitos na hora e mostra o vencimento e o valor lidos da linha. Se o valor for diferente do título, aparece em vermelho;
+2. Confira o **vencimento do boleto** (vem da linha; ajuste se for uma 2ª via com nova data);
+3. Se quiser, anexe o **PDF** (ou imagem) do boleto, até 10 MB;
+4. Clique em **Salvar**. O botão passa a mostrar **Boleto ✓**.
+
+Basta a linha ou o PDF. Para trocar o arquivo, escolha outro. **Retirar do Portal** apaga o boleto e o arquivo.
 
 ## 4. Régua
 
@@ -110,6 +123,7 @@ O PIX é **estático**: o banco não avisa a plataforma do pagamento. A baixa en
 - "Cobrar agora" funciona uma vez a cada 12 horas por título, só a receber em aberto.
 - O cliente do Portal só gera o PIX dos títulos dele, em aberto e não cedidos.
 - Etapas de 30 dias antes até 180 dias depois do vencimento.
+- Linha digitável com dígito errado não é aceita. O boleto só aparece no Portal enquanto o título estiver em aberto.
 
 ## 9. Perguntas frequentes e erros comuns
 
@@ -122,8 +136,13 @@ O PIX é **estático**: o banco não avisa a plataforma do pagamento. A baixa en
 
 **O PIX não aparece no Portal.** Cadastre a chave PIX em Parâmetros e PIX.
 
+**A linha digitável aparece como inválida.** Um dígito foi digitado errado. Copie a linha direto do PDF do banco ou anexe só o PDF.
+
+**O botão Boleto não aparece.** Título cedido ao FIDC é pago pelo boleto do fundo e não recebe boleto da empresa.
+
 ## 10. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 08/11/2026 | Primeira versão: aging a receber e a pagar, régua automática por e-mail e WhatsApp com PIX copia e cola, pausas, histórico, Cobrar agora, parâmetros e PIX no Portal. |
+| 1.1 | 08/11/2026 | Boleto do título para o Portal: linha digitável com os dígitos conferidos, vencimento e PDF. |
