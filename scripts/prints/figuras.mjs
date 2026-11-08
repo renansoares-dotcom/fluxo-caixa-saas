@@ -86,6 +86,11 @@ export const FIGS = [
   ['comercial', 'comercial/mapa', '### 7.2', 'Mapa dos clientes: faturamento por estado e por cidade, com a situação', 'mapa'],
   ['comercial', 'comercial/mapa', '### 7.3', 'Visitas por rota: quem visitar, os dias de visita e os clientes longe demais', 'rotas|click:#rt-montar'],
   ['comercial', 'comercial/mapa', '### 7.4', 'Parâmetros comerciais', 'par'],
+  ['comercial', 'comercial/comissoes', '## 8.', 'Comissões: a apuração do mês por representante, com os recebimentos', 'apuracao|click:[data-tg="rp1"]'],
+  ['comercial', 'comercial/comissoes', '### 8.2', 'Fechar o mês de um representante', 'apuracao|click:[data-fe="rp1"]'],
+  ['comercial', 'comercial/comissoes', '### 8.3', 'Fechamentos: o extrato de cada mês, com a situação do pagamento', 'extrato|click:#cm-corpo details summary'],
+  ['comercial', 'comercial/comissoes', '### 8.4', 'Taxas e exceções por cliente', 'taxas'],
+  ['comercial', 'comercial/comissoes', '### 8.5', 'Parâmetros das comissões', 'par'],
   ['lancamentos', 'lancamentos', '### 3.1', 'Seletor Colunas da lista de lançamentos', 'click:#bulk .col-sel button'],
   // Ativo Imobilizado (07/11/2026)
   ['imobilizado', 'contab/imobilizado', '## 3.', 'Painel do imobilizado: valor líquido, depreciação prevista e grau de depreciação'],

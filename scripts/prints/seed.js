@@ -1770,3 +1770,29 @@ window.RPC.pag_remessa_gravar = () => null;
   const H0 = (d) => new Date(Date.now() - d * 864e5).toISOString();
   DB.comercial_interacoes = (DB.comercial_interacoes || []).concat(cli.slice(0, 6).map((f, i) => ({ id: 'civ' + i, empresa_id: E, favorecido_id: f.id, tipo: 'visita', data: H0([12, 75, 20, 140, 45, 95][i]), resumo: 'Visita de relacionamento', concluido: true })));
 }
+
+// Comissões (SQL 130) — recebimentos e fechamentos FICTÍCIOS
+{
+  DB.comercial_vendedores[0].comissao_pct = 3;
+  DB.comercial_vendedores.push({ id: 'rp2', empresa_id: E, nome: 'JULIANA REPRESENTAÇÕES', email: 'juliana@exemplo.com.br', ativo: true, comissao_pct: 2.5 });
+  const pl = DB.plano_contas.find(p => p.tipo === 'S' && p.nivel === 2);
+  DB.comissao_config = [{ empresa_id: E, base: 'sem_impostos', fidc_regra: 'vencimento', fidc_carencia_dias: 5, atraso_dias: 15, atraso_reducao_pct: 50, inicio: '2026-07-01', plano_id: pl?.id, dia_pagamento: 10, papeis_fechar: ['admin', 'diretor', 'financeiro'] }];
+  const cli = (n) => DB.favorecidos.find(f => f.nome.startsWith(n))?.id || null;
+  DB.comissao_excecoes = [{ id: 'cx1', empresa_id: E, vendedor_id: null, favorecido_id: 'fv-x3', pct: 1.5, motivo: 'Preço especial negociado pela diretoria' }];
+  const I = (dia, nf, cliente, doc, rec, pct, red = 0, atraso = 0, tipo = 'comissao') => { const base = Math.round(rec * 0.92 * 100) / 100;
+    return { lancamento_id: 'cl' + nf + doc, tipo, nota_numero: nf, cliente, documento: nf + '/' + doc, recebido_em: '2026-10-' + String(dia).padStart(2, '0'), vencimento: '2026-10-' + String(Math.max(1, dia - atraso)).padStart(2, '0'),
+      dias_atraso: atraso, valor_recebido: rec, base, pct, reducao_pct: red, comissao: Math.round(base * pct / 100 * (1 - red / 100) * 100) / 100 }; };
+  const itM = [I(2, 4812, 'SUPERMERCADOS BOA COMPRA LTDA', 1, 18400, 3), I(6, 4790, 'SUPERMERCADOS BOA COMPRA LTDA', 2, 9800, 3), I(9, 4801, 'ATACADO SERTÃO LTDA', 1, 12600, 3, 50, 22),
+    I(14, 4820, 'FARMÁCIAS SAÚDE MAIS S.A.', 1, 5400, 3), I(21, 4833, 'DISTRIBUIDORA NORDESTE LTDA', 1, 7300, 3), I(28, 4702, 'DISTRIBUIDORA NORDESTE LTDA', 3, -7300, 3, 0, 0, 'estorno')];
+  const itJ = [I(3, 4815, 'SUPERMERCADO BOA VIZINHANÇA LTDA', 1, 6200, 2.5), I(10, 4826, 'MERCADINHO SOL NASCENTE LTDA', 2, 8150, 2.5), I(17, 4841, 'ATACAREJO DO POVO LTDA', 1, 4300, 1.5), I(24, 4850, 'PADARIA TRIGO BOM LTDA', 1, 2900, 2.5)];
+  const sum = (L, k) => Math.round(L.reduce((s, x) => s + x[k], 0) * 100) / 100;
+  window.RPC.comissao_apurar = (a) => String(a.p_competencia).startsWith('2026-09') ? [
+      { vendedor_id: 'rp2', nome: 'JULIANA REPRESENTAÇÕES', pct: 2.5, itens: [], fechamento: { id: 'cf2', total: 512.4, base_total: 20496, comissao_total: 512.4, ajuste: 0, fechado_em: '2026-10-03T12:00:00Z', fechado_por: 'renata@exemplo.com.br' } },
+      { vendedor_id: 'rp1', nome: 'MARCOS VENDAS', pct: 3, itens: [], fechamento: { id: 'cf1', total: 1365.2, base_total: 45507, comissao_total: 1365.2, ajuste: 0, fechado_em: '2026-10-03T12:00:00Z', fechado_por: 'renata@exemplo.com.br' } }]
+    : [{ vendedor_id: 'rp2', nome: 'JULIANA REPRESENTAÇÕES', pct: 2.5, itens: itJ, fechamento: null }, { vendedor_id: 'rp1', nome: 'MARCOS VENDAS', pct: 3, itens: itM, fechamento: null }];
+  const F = (id, comp, vend, it, pago, pag) => ({ id, competencia: comp, vendedor: vend, base_total: sum(it, 'base'), comissao_total: sum(it, 'comissao'), ajuste: 0, total: sum(it, 'comissao'), lancamento_id: 'lc' + id, pago, pagamento: pag,
+    fechado_em: comp.slice(0, 8) + '28T12:00:00Z', fechado_por: 'renata@exemplo.com.br', itens: it.map(x => ({ ...x, recebido_em: comp.slice(0, 8) + x.recebido_em.slice(8) })) });
+  window.RPC.comissao_extrato = () => [F('cf1', '2026-09-01', 'MARCOS VENDAS', itM.slice(0, 5), false, '2026-10-10'), F('cf2', '2026-09-01', 'JULIANA REPRESENTAÇÕES', itJ, false, '2026-10-10'),
+    F('cf3', '2026-08-01', 'MARCOS VENDAS', itM.slice(0, 4), true, '2026-09-10'), F('cf4', '2026-08-01', 'JULIANA REPRESENTAÇÕES', itJ.slice(0, 3), true, '2026-09-10')];
+  window.RPC.comissao_fechar = () => 'cf-x'; window.RPC.comissao_cancelar = () => null;
+}

@@ -37,6 +37,7 @@ const routes = {
   'comercial/carteira': () => import(`./pages/comercial-carteira.js?v=${V}`),
   'comercial/funil': () => import(`./pages/comercial-funil.js?v=${V}`),
   'comercial/mapa': () => import(`./pages/comercial-mapa.js?v=${V}`),
+  'comercial/comissoes': () => import(`./pages/comercial-comissoes.js?v=${V}`),
   'comercial/vendedores': () => import(`./pages/comercial-vendedores.js?v=${V}`),
   'aprovacoes': () => import(`./pages/aprovacoes.js?v=${V}`),
   'orcamento-cc': () => import(`./pages/orcamento-cc.js?v=${V}`),
@@ -350,7 +351,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil producao (operador no terminal do setor)
 const rotaDeMotorista = (r) => ['logistica/motorista', 'tutoriais', 'meus-avisos'].includes(r);   // motorista: só o app (melhoria 7.1)
 const rotaDeProducao = (r) => ['hoje', 'orcamento-cc', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'estoque/inventario', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
-const rotaDeVendas = (r) => r === 'comercial' || ['hoje', 'orcamento-cc', 'comercial/carteira', 'comercial/funil', 'comercial/mapa', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
+const rotaDeVendas = (r) => r === 'comercial' || ['hoje', 'orcamento-cc', 'comercial/carteira', 'comercial/funil', 'comercial/mapa', 'comercial/comissoes', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
 const rotaDeCompras = (r) => ['hoje', 'orcamento-cc', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/reposicao', 'estoque/inventario', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {

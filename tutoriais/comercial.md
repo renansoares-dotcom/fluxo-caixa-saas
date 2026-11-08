@@ -1,7 +1,7 @@
 ---
 titulo: Comercial — painel, carteira, funil e metas
 tela: Comercial › Painel Comercial (COM001), Carteira e Agenda (COM002), Funil e Propostas (COM003) e Representantes e Metas (COM004)
-versao: 1.3
+versao: 1.4
 atualizado: 2026-11-05
 ---
 ## 1. Para que serve
@@ -13,6 +13,7 @@ O módulo **Comercial** é o CRM de vendas da IPLAMM. Ele vai **até a proposta*
 - **Funil e Propostas**: as oportunidades por etapa e as propostas, com especificação técnica, calculadora de preço e PDF.
 - **Representantes e Metas**: liga cada representante a um usuário e define as metas mensais.
 - **Curva ABC, Mapa e Rotas**: a curva ABC dos clientes, o mapa por cidade, as visitas por rota e os parâmetros comerciais.
+- **Comissões**: a comissão de cada representante pelo valor **recebido**, o fechamento do mês com o título a pagar e o extrato. O representante vê as dele.
 
 ## 2. Quem tem acesso
 
@@ -20,7 +21,8 @@ O módulo **Comercial** é o CRM de vendas da IPLAMM. Ele vai **até a proposta*
 |---|---|
 | Vendas (representante) | Vê só a área Comercial e a **própria carteira**: registra contatos, oportunidades e propostas. Funciona no celular, em campo. |
 | Administrador, diretor e financeiro | Veem todas as carteiras e configuram representantes e metas. |
-| Administrador e diretor | Alteram os parâmetros comerciais (curva ABC, situação, visitas e rotas). |
+| Administrador e diretor | Alteram os parâmetros comerciais (curva ABC, situação, visitas e rotas) e os das comissões, e as taxas. |
+| Quem fecha comissões | Por padrão administrador, diretor e financeiro (ajustável nos parâmetros das comissões). |
 
 ## 3. Painel Comercial
 
@@ -186,14 +188,86 @@ As distâncias são aproximadas: linha reta × fator da estrada.
 | Visitas e km por dia | 5 visitas / 300 km |
 | Fator da estrada / Raio da rota | 1,25 / 250 km |
 
-## 8. Regras e travas
+## 8. Comissões
+
+![Figura 10 — Comissões: a apuração do mês por representante, com os recebimentos (dados fictícios)](img/comercial-10.jpg)
+
+### 8.1 Como a comissão é calculada
+
+A comissão nasce do **recebimento**, não do faturamento. Entra cada título a receber **pago** que:
+
+- está ligado a uma NF-e de venda (o casamento das parcelas em Notas Fiscais);
+- é de um cliente da carteira do representante (o representante no cadastro do cliente).
+
+Para cada recebimento:
+
+- **base** = o valor recebido, ou o recebido sem IPI e ST, na proporção da nota (parâmetro);
+- **taxa** = a do representante ou a exceção do cliente;
+- **redução por atraso**: se o cliente pagou com mais dias de atraso que o parâmetro, a comissão desse recebimento cai no percentual definido;
+- título **cedido ao FIDC** conta na cessão ou no vencimento mais a carência (parâmetro). No vencimento, só conta se não houve recompra;
+- recebimento que já entrou numa comissão fechada e depois voltou a ficar em aberto (recompra, estorno da baixa) vira **estorno** no mês seguinte.
+
+Escolha o **mês**. Cada representante aparece com a taxa, a base e a comissão. Clique no nome para ver os recebimentos. O mês em andamento é só uma prévia.
+
+### 8.2 Fechar o mês
+
+![Figura 11 — Fechar o mês de um representante (dados fictícios)](img/comercial-11.jpg)
+
+Depois que o mês termina, clique em **Fechar** no representante. Informe um **ajuste**, se houver, com o motivo. O fechamento:
+
+- **congela** os recebimentos: o mesmo recebimento nunca é pago duas vezes;
+- gera o **título a pagar** da comissão para o dia de pagamento do mês seguinte, na conta de despesa dos parâmetros, em nome do representante;
+- avisa o representante.
+
+**Cancelar fechamento** devolve os recebimentos para a apuração e exclui o título a pagar. Só funciona enquanto a comissão não foi paga.
+
+### 8.3 Fechamentos e extrato
+
+![Figura 12 — Fechamentos: o extrato de cada mês, com a situação do pagamento (dados fictícios)](img/comercial-12.jpg)
+
+Cada mês fechado mostra a base, o ajuste, o total e se a comissão já foi paga, com os recebimentos. **Imprimir** gera o extrato em PDF para o representante.
+
+### 8.4 Taxas e exceções
+
+![Figura 13 — Taxas e exceções por cliente (dados fictícios)](img/comercial-13.jpg)
+
+- **Taxa de cada representante**: de 0 a 30%.
+- **Exceções por cliente**: uma taxa diferente para um cliente, de um representante ou de todos. Exemplo: um cliente com preço especial paga 1,5%.
+
+### 8.5 Parâmetros
+
+![Figura 14 — Parâmetros das comissões (dados fictícios)](img/comercial-14.jpg)
+
+| Parâmetro | Padrão |
+|---|---|
+| Base da comissão | o valor recebido |
+| Título cedido ao FIDC | conta na cessão |
+| Carência do FIDC | 5 dias |
+| Redução por atraso | sem redução |
+| Contar recebimentos a partir de | o mês da implantação |
+| Conta da despesa | não gera o título a pagar |
+| Dia do pagamento | 10 |
+| Quem fecha o mês | administrador, diretor e financeiro |
+
+### 8.6 Para o representante
+
+O representante entra em **Comissões** e vê só o que é dele:
+
+- **Mês em andamento**: os recebimentos que já contam, com a comissão prevista;
+- **Meu extrato**: os meses fechados, com o total, a data do pagamento e o PDF.
+
+O botão **Minha carteira** abre a Carteira e Agenda, com os clientes dele.
+
+## 9. Regras e travas
 
 - O representante só vê os clientes da **própria carteira**.
 - O faturamento vem das **NF-e de saída** importadas em Notas Fiscais.
 - O pedido de venda continua no Iniflex: o Comercial vai até a proposta.
 - Só administrador e diretor alteram os parâmetros comerciais. Os representantes veem o mapa e as rotas da própria carteira.
+- Comissão só pelo recebido e só de recebimentos ligados a uma NF-e de venda. Mês em andamento não fecha. Um recebimento entra em um fechamento só.
+- O representante vê só a própria comissão.
 
-## 9. Perguntas frequentes e erros comuns
+## 10. Perguntas frequentes e erros comuns
 
 **A mensagem diz "Cliente fora da sua carteira".** O cliente pertence a outro representante. Fale com a direção.
 
@@ -203,9 +277,13 @@ As distâncias são aproximadas: linha reta × fator da estrada.
 
 **A rota não inclui um cliente marcado.** Ele está além do raio da rota (vai para "Longe demais") ou não tem cidade.
 
+**Um recebimento não entrou na comissão.** O título não está ligado à nota (casamento em Notas Fiscais), o cliente não tem o representante no cadastro, foi pago antes do início dos parâmetros ou a taxa é zero.
+
+**A comissão veio negativa.** Houve recompra de um título já comissionado (estorno) maior que os recebimentos do mês. O título a pagar só é gerado quando o total é positivo.
+
 **A calculadora pede "Complete o cálculo".** Preencha o material, a largura e a espessura (e o comprimento, para saco ou sacola), o custo do kg e a margem.
 
-## 10. Histórico de alterações
+## 11. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
@@ -213,3 +291,4 @@ As distâncias são aproximadas: linha reta × fator da estrada.
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Nova oportunidade em seções (Cliente e Oportunidade); metas um semestre por vez, com o seletor **Meses**. Figuras refeitas. |
 | 1.3 | 08/11/2026 | Curva ABC, Mapa e Rotas (COM007): classes ABC, mapa por estado e cidade, visitas por rota com limite de visitas, km e raio, e parâmetros comerciais. Carteira com a classe e a ação sugerida (Agendar). |
+| 1.4 | 08/11/2026 | Comissões (COM008): pelo recebido, base sem impostos, exceção por cliente, redução por atraso, regra do FIDC, estorno da recompra, fechamento com título a pagar, extrato e a visão do representante. |
