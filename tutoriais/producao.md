@@ -1,7 +1,7 @@
 ---
 titulo: Produção — PCP, ordens, programação e planta
 tela: Produção › Painel de Produção (PRD002), Ordens de Produção (PRD004), Programação (PRD005), Cadastros de Produção (PRD006), Importar do Iniflex (PRD007) e Planta da Fábrica (PRD003)
-versao: 1.4
+versao: 1.5
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -66,6 +66,8 @@ Os filtros da lista são **Em aberto**, **Atrasadas**, **Concluídas** e **Todas
 1. Escolha a **semana** e o **setor**.
 2. Em **A programar**, clique em **Programar** na etapa e informe a máquina, o início previsto, as horas previstas e a quantidade desta etapa.
 3. O quadro **máquina × dia** mostra as etapas programadas e a carga em horas contra a capacidade do setor. **Tirar da programação** devolve a etapa para a lista.
+
+O botão **Programação inteligente** abre a sequência sugerida por máquina, com a troca de cor e o que impede cada OP de começar (veja o manual **Programação Inteligente**).
 
 ## 6. Painel de Produção
 
@@ -158,3 +160,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.4 | 08/11/2026 | Planta da Fábrica ao vivo: atualização na hora pelo tempo real, situação "em manutenção" com a OS, parada longa com aviso, ritmo da produção em curso e parâmetros. |
+| 1.5 | 08/11/2026 | Botão **Programação inteligente** no quadro da Programação. |

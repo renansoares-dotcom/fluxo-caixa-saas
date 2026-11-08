@@ -56,6 +56,8 @@ export const MANUAIS = [
     resumo: 'Busca por bobina (QR), OP, lote ou NF-e; caminho materiais → produção → clientes; recolhimento; expedição das bobinas na NF-e.' },
   { id: 'custo-op', titulo: 'Custo das OPs — custo real, orçado e margem', area: 'Produção', rotas: ['producao/custos'],
     resumo: 'Custo real de cada OP (material, tinta, máquina, manutenção) contra o orçado pela estrutura, e a margem pelo preço de venda.' },
+  { id: 'programacao-inteligente', titulo: 'Programação Inteligente — impedimentos e sequência por troca de cor', area: 'Produção', rotas: ['producao/sequenciamento'],
+    resumo: 'O que impede cada OP de começar (arte, clichê, tinta, material) e a ordem por máquina que menos troca de cor sem perder a entrega, com aplicação da fila.' },
   { id: 'oee', titulo: 'OEE e Perdas — disponibilidade, desempenho e qualidade por máquina', area: 'Produção', rotas: ['producao/oee'],
     resumo: 'OEE por máquina contra as metas, tendência, perdas em horas, Pareto das paradas (com as OS de manutenção) e do refugo.' },
   { id: 'producao', titulo: 'Produção — PCP, ordens, programação e planta', area: 'Produção', rotas: ['producao', 'producao/ordens', 'producao/programacao', 'producao/cadastros', 'producao/importar', 'producao/planta'],

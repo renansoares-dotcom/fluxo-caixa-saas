@@ -49,6 +49,7 @@ const routes = {
   'producao': () => import(`./pages/producao.js?v=${V}`),
   'producao/ordens': () => import(`./pages/producao-ordens.js?v=${V}`),
   'producao/programacao': () => import(`./pages/producao-programacao.js?v=${V}`),
+  'producao/sequenciamento': () => import(`./pages/producao-sequenciamento.js?v=${V}`),
   'producao/terminal': () => import(`./pages/producao-terminal.js?v=${V}`),
   'producao/cadastros': () => import(`./pages/producao-cadastros.js?v=${V}`),
   'producao/importar': () => import(`./pages/producao-importar.js?v=${V}`),

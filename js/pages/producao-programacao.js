@@ -12,7 +12,7 @@ export async function render(root) {
   ui.ini ||= segunda(today());
   const dias = Array.from({ length: 7 }, (_, i) => addDias(ui.ini, i)), fim = dias[6];
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Programação da produção</h2><div class="muted small">Horas previstas = quantidade ÷ velocidade (roteiro) ou capacidade da máquina, + setup. Carga acima das horas do setor fica em destaque.</div></div>
-      <div style="display:flex;gap:6px;align-items:end"><button class="btn ghost" id="pg-ant">◀</button><label>Semana de<input type="date" id="pg-ini" value="${ui.ini}"></label><button class="btn ghost" id="pg-prox">▶</button></div></div>
+      <div style="display:flex;gap:6px;align-items:end"><a class="btn" href="#/producao/sequenciamento">Programação inteligente</a><button class="btn ghost" id="pg-ant">◀</button><label>Semana de<input type="date" id="pg-ini" value="${ui.ini}"></label><button class="btn ghost" id="pg-prox">▶</button></div></div>
     <div id="pg-corpo"><div class="loading">Carregando…</div></div>`;
   $('#pg-ant', root).onclick = () => { ui.ini = addDias(ui.ini, -7); render(root); };
   $('#pg-prox', root).onclick = () => { ui.ini = addDias(ui.ini, 7); render(root); };

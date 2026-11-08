@@ -1552,3 +1552,31 @@ window.RPC.pag_remessa_gravar = () => null;
   window.RPC.est_inv_abc = () => [...it.map((x, k) => ({ produto_id: x.p, classe: x.cl, valor: x.s * x.cu, ultima_contagem: k < 5 ? '2026-11-06T10:00:00Z' : null })),
     ...Array.from({ length: 34 }, (_, k) => ({ produto_id: 'abc-' + k, classe: k < 4 ? 'A' : k < 12 ? 'B' : 'C', valor: 1000, ultima_contagem: k % 3 ? new Date(hoje - (k * 6) * 864e5).toISOString() : null }))];
 }
+
+// Programação inteligente (SQL 121) — OPs de impressão FICTÍCIAS com cores e impedimentos
+{
+  DB.prod_prog_config = [{ empresa_id: E, considerar_arte: true, considerar_cliche: true, considerar_tinta: true, considerar_material: true, troca_cor_min: 20, limpeza_escuro_claro_min: 40, janela_entrega_dias: 3, horizonte_dias: 21, setor_impressao_id: null }];
+  const S = (n) => DB.prod_setores.find(s => s.nome.startsWith(n)), imp = S('Impress'), ext = S('Extrus'), IMP = DB.prod_maquinas.find(m => m.setor_id === imp.id);
+  const C = { BR: ['BR-01', 'BRANCO OPACO', '#F7F7F2', 3], AM: ['AM-02', 'AMARELO OURO', '#F6C21C', 18], VM: ['VM-05', 'VERMELHO 485', '#D52B1E', 52], AZ: ['AZ-03', 'AZUL 286', '#0033A0', 78], VD: ['VD-07', 'VERDE BANDEIRA', '#00843D', 60], PT: ['PT-01', 'PRETO', '#1A1A1A', 92] };
+  const cor = (k) => ({ id: 'tc-' + k, codigo: C[k][0], nome: C[k][1], hex: C[k][2], esc: C[k][3] });
+  const OPS = [
+    [1210, 'PA-310', 'SACO PADARIA 30X45 IMPRESSO', 'PANIFICADORA PÃO BOM', '2026-11-10', 2, ['PT', 'VM'], 7.5, []],
+    [1211, 'PA-322', 'SACO HORTIFRUTI 40X60', 'SUPERMERCADOS', '2026-11-11', 3, ['AM', 'VD'], 6, []],
+    [1212, 'PA-410', 'BOBINA AUTOMÁTICA CAFÉ', 'TORREFAÇÃO SERRA', '2026-11-11', 3, ['BR', 'AM'], 5, []],
+    [1213, 'PA-415', 'SACO RAÇÃO 15 KG', 'AGRO NORDESTE', '2026-11-12', 3, ['AZ', 'VM', 'AM'], 9, [{ tipo: 'cliche', texto: 'Clichê não recebido (previsto 12/11)' }]],
+    [1214, 'PA-120', 'SACO FARMÁCIA 20X30', 'FARMÁCIAS', '2026-11-13', 3, ['VD', 'BR'], 4.5, []],
+    [1215, 'PA-501', 'FILME LAMINAÇÃO SNACK', 'SNACKS DO VALE', '2026-11-14', 3, ['VM', 'AM', 'PT'], 8, [{ tipo: 'arte', texto: 'Arte não aprovada (projeto nº 88: aguardando cliente)' }, { tipo: 'tinta', texto: 'Tinta VM-05 não preparada' }]],
+    [1216, 'PA-133', 'SACO DELIVERY 35X50', 'DISTRIBUIDORA', '2026-11-17', 3, ['AZ'], 5, []],
+    [1217, 'PA-210', 'BOBINA PEAD IMPRESSA', 'ATACADO', '2026-11-18', 3, ['BR'], 6, [{ tipo: 'material', texto: 'MP-001 sem saldo: faltam 1.250,0 KG' }]]];
+  window.__progRows = [];
+  OPS.forEach(([n, cod, desc, cli, ent, pri, cs, h, imped], k) => {
+    const op = { id: 'opi' + n, empresa_id: E, numero: n, origem: 'plataforma', codigo_produto: cod, descricao: desc, quantidade: 1500 + k * 250, unidade: 'KG', cliente: cli, entrega: ent, prioridade: pri, status: 'liberada', emissao: '2026-11-01', criado_em: '2026-11-01T08:00:00Z' };
+    DB.prod_ordens.push(op);
+    const e1 = { id: 'pei' + n + 'a', empresa_id: E, ordem_id: op.id, setor_id: ext.id, seq: 1, status: k < 5 ? 'concluida' : 'aguardando', qtd_prevista: op.quantidade, horas_previstas: 8 };
+    const e2 = { id: 'pei' + n + 'b', empresa_id: E, ordem_id: op.id, setor_id: imp.id, seq: 2, status: 'aguardando', qtd_prevista: op.quantidade, horas_previstas: h, maquina_id: null };
+    DB.prod_ordem_etapas.push(e1, e2);
+    window.__progRows.push({ etapa_id: e2.id, ordem_id: op.id, numero: n, maquina_id: null, setor_id: imp.id, seq: 2, impressao: true, impedimentos: imped,
+      avisos: k < 5 ? [] : [{ tipo: 'etapa', texto: 'Aguarda a etapa anterior (Extrusão)' }], cores: cs.map(cor).sort((a, b) => a.esc - b.esc), escuridao: Math.max(...cs.map(c => C[c][3])) });
+  });
+  window.RPC.prod_prontidao = () => window.__progRows;
+}
