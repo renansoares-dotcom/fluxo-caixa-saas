@@ -4,6 +4,7 @@ import { $, $$, esc, toast, fail, modal, confirmDialog, today, dateBR, money, op
 import { abrirRelatorio } from './relatorio.js';
 import { carregarProdutos, datalistProdutos, acharProduto } from './produtos.js';
 import * as Q from './qualidade.js';
+import { conversaNoModal } from './mini-chat.js';
 
 export const BUCKET = 'qualidade';
 export const podeGerir = () => ['admin', 'financeiro', 'diretor'].includes(state.papel);
@@ -129,6 +130,7 @@ export async function fichaInspecao(D, i, { onMudou } = {}) {
     <div style="display:flex;gap:8px;flex-wrap:wrap">${A.map(a => `<a href="#" data-ver="${esc(a.caminho)}" class="btn small ghost">📎 ${esc(a.nome)}</a>`).join('') || '<span class="muted small">Sem anexos.</span>'}</div>`,
     foot: `${aberta && podeGerir() && !i.movimento_id ? '<button class="btn danger" id="fi-canc">Cancelar</button>' : ''}<span class="spacer"></span><button class="btn" id="fi-imp">Imprimir laudo</button>
       ${reg ? '<button class="btn" id="fi-salva">Salvar resultados</button>' : ''}${dec ? '<button class="btn" id="fi-rep">✕ Reprovar</button><button class="btn" id="fi-conc">Aprovar com concessão</button><button class="btn primary" id="fi-apr">✔ Aprovar</button>' : ''}` });
+  conversaNoModal(md, 'qual_inspecao', i.id);
   const el = md.el;
   const ler = () => {
     const out = car.map((c, k) => {
@@ -225,6 +227,7 @@ export async function fichaRnc(D, r, { onMudou } = {}) {
       <label class="xs">Verificada em<input type="date" name="efd" value="${r.eficacia_em || ''}" ${reg ? '' : 'disabled'}></label>
     </div></form>`,
     foot: `<span class="spacer"></span><button class="btn" id="fr-imp">Imprimir RNC</button>${reg ? '<button class="btn primary" id="fr-ok">Salvar</button>' : ''}` });
+  conversaNoModal(md, 'qual_rnc', r.id);
   const el = md.el, f = $('#fr', el);
   $('#fr-imp', el).onclick = () => imprimirRnc(D, r);
   $('#fr-ok', el) && ($('#fr-ok', el).onclick = async () => {

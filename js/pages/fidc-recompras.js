@@ -7,6 +7,7 @@ import { sb, state, q, loadCadastros } from '../lib/data.js';
 import { $, $$, esc, toast, fail, modal, money, pct, dateBR, today, options, parseNum, exportXLSX } from '../lib/ui.js';
 import { kpiGrid } from '../lib/componentes.js';
 import { ACOES, SECOES, carregarMotivos, motivosModal, corMotivo } from '../lib/recompra-motivos.js';
+import { botaoConversa } from '../lib/mini-chat.js';
 
 export const title = 'Recompras';
 const ui = { f: 'aberto', mot: '' };
@@ -114,7 +115,7 @@ export async function render(root) {
         <td>${dateBR(x.data)}<div class="small muted">${esc(x.fundo || '')} · ${esc(x.conta || '')}</div></td>
         <td class="num">${money(x.valor_recompra)}${+x.encargos ? `<div class="small muted">título ${money(x.valor_titulo)} + encargos ${money(x.encargos)}</div>` : ''}</td>
         <td>${sit(x)}${x.lanc_reaberto_id ? `<div class="small"><a href="#/lancamentos?abrir=${x.lanc_reaberto_id}">abrir o título</a></div>` : ''}</td>
-        <td>${pode() && !x.cancelada ? `<button class="btn ghost small" data-m="${x.id}">Motivo</button>${x.reaberto_status !== 'Pago' || x.titulo_acao === 'recebido' ? ` <button class="btn ghost small" data-c="${x.id}">Cancelar</button>` : ''}` : ''}${x.cancelada && x.motivo ? `<div class="small muted wrap">${esc(x.motivo)}</div>` : ''}</td></tr>`).join('')
+        <td>${botaoConversa('fidc_recompra', x.id, '💬')} ${pode() && !x.cancelada ? `<button class="btn ghost small" data-m="${x.id}">Motivo</button>${x.reaberto_status !== 'Pago' || x.titulo_acao === 'recebido' ? ` <button class="btn ghost small" data-c="${x.id}">Cancelar</button>` : ''}` : ''}${x.cancelada && x.motivo ? `<div class="small muted wrap">${esc(x.motivo)}</div>` : ''}</td></tr>`).join('')
         || '<tr><td colspan="7" class="empty">Nenhuma recompra neste filtro.</td></tr>'}</tbody></table></div></div>
       <p class="small muted">A recompra sai em 2.07.11 RECOMPRA/DEVOLUÇÃO DE TÍTULOS NEGOCIADOS e o que o fundo cobrar além do título sai como encargos. O motivo decide o que acontece com o título, a linha na DRE Gerencial e a contrapartida contábil (botão Motivos).</p>`;
     $('#rc-kpis', corpo).classList.add('rc-kpis');

@@ -7,6 +7,7 @@ import { carregarProdutos } from './produtos.js';
 import * as P from './preimpressao.js';
 import { CSS } from './preimpressao-css.js';
 import { viewer, prepararArquivo, subirArquivos, linksArte, conferirArquivo, ACEITOS } from './arte-viewer.js';
+import { conversaNoModal } from './mini-chat.js';
 
 export const pode = () => ['admin', 'financeiro', 'diretor', 'producao', 'vendas'].includes(state.papel);
 export const podeConfig = () => ['admin', 'financeiro', 'diretor'].includes(state.papel);
@@ -186,6 +187,7 @@ export async function fichaArte(D, p0, { onMudou, aba = 'arte', versao = null } 
   let p = p0, Co = [], Ev = [], vw = null, sel = versao, comp = '', marca = null;
   const st = { aba };
   const m = modal({ title: `Arte nº ${p.numero} — ${p.nome}`, wide: true, body: '<div class="loading">Carregando…</div>' });
+  conversaNoModal(m, 'pre_projeto', p.id);
   m.el.querySelector('.modal').style.maxWidth = 'min(1380px, 97vw)';
   const fechar = m.close; m.close = () => { vw?.destruir(); fechar(); };
   m.el.addEventListener('click', (e) => { if (e.target === m.el || e.target.closest('.modal-head [data-close]')) vw?.destruir(); });

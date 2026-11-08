@@ -46,7 +46,9 @@ const ehAudio = (a) => /^audio\//.test(a?.mime || '');
 const ehImg = (a) => /^image\//.test(a?.mime || '');
 const PAPEL = { admin: 'Administrador', financeiro: 'Financeiro', diretor: 'Diretor', leitura: 'Leitura', compras: 'Compras', vendas: 'Vendas', producao: 'Produção' };
 const papelDe = (uid) => PAPEL[chat.contatoDe(uid)?.papel] || '';
-const REGISTRO = { lancamento: 'Lançamento', paraquedas: 'Pagamento antecipado', compras_pedido: 'Pedido de compra', prod_ordem: 'Ordem de produção', log_frete: 'Frete', fidc_proposta: 'Proposta FIDC' };
+const REGISTRO = { lancamento: 'Lançamento', paraquedas: 'Pagamento antecipado', compras_pedido: 'Pedido de compra', prod_ordem: 'Ordem de produção', log_frete: 'Frete', fidc_proposta: 'Proposta FIDC',
+  qual_rnc: 'Não conformidade', qual_inspecao: 'Inspeção', man_ordem: 'OS de manutenção', pre_projeto: 'Arte', tin_ordem: 'Ordem de tinta',
+  log_carga: 'Carga', fidc_recompra: 'Recompra FIDC', contrato: 'Contrato', favorecido: 'Beneficiário', nfe_nota: 'Nota fiscal' };
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
 // *negrito* _itálico_ ~riscado~ `código`, links e menções (como no WhatsApp)
@@ -92,7 +94,7 @@ export async function render(root, { mini = false, abrirId = null } = {}) {
         <button class="btn ghost icon" id="ch-grupo" title="Novo grupo" aria-label="Novo grupo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M19 8v6M16 11h6"/></svg></button>
         <div class="ch-menu-wrap"><button class="btn ghost icon" id="ch-lado-menu" aria-label="Mais opções">⋮</button><div class="ch-menu" id="ch-lado-m" hidden></div></div></div></div>
       <div class="ch-busca"><input id="ch-busca" type="search" placeholder="Pesquisar conversa ou mensagem" autocomplete="off"></div>
-      <div class="ch-filtros" id="ch-filtros">${[['todas', 'Tudo'], ['nao_lidas', 'Não lidas'], ['grupos', 'Grupos'], ['registros', 'Registros'], ['arquivadas', 'Arquivadas']].map(([k, l]) => `<button class="ch-chip${k === 'todas' ? ' on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
+      <div class="ch-filtros" id="ch-filtros">${[['todas', 'Tudo'], ['nao_lidas', 'Não lidas'], ['mencoes', '@ Menções'], ['grupos', 'Grupos'], ['registros', 'Registros'], ['arquivadas', 'Arquivadas']].map(([k, l]) => `<button class="ch-chip${k === 'todas' ? ' on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
       <div class="ch-lista" id="ch-lista"><div class="loading">Carregando…</div></div>
     </section>
     <section class="ch-conv" id="ch-conv"><div class="ch-vazio"><div class="ch-vazio-ico">💬</div><h3>Conversas da equipe</h3><p class="muted">Escolha uma conversa à esquerda ou comece uma nova.<br>As mensagens ficam só entre quem participa.</p></div></section>
@@ -158,13 +160,14 @@ function pintarLista() {
   let l = chat.getResumo();
   if (ui.filtro === 'arquivadas') l = l.filter(c => c.arquivada); else l = l.filter(c => !c.arquivada);
   if (ui.filtro === 'nao_lidas') l = l.filter(c => c.nao_lidas > 0);
+  if (ui.filtro === 'mencoes') l = l.filter(c => c.mencoes > 0);
   if (ui.filtro === 'grupos') l = l.filter(c => c.tipo === 'grupo');
   if (ui.filtro === 'registros') l = l.filter(c => c.tipo === 'registro');
   if (ui.busca) l = l.filter(c => `${c.nome} ${c.ultima_msg_texto || ''}`.toLowerCase().includes(ui.busca));
   const narq = chat.getResumo().filter(c => c.arquivada).length;
   let html = '';
   if (!l.length && !ui.achados.length) {
-    html = `<div class="ch-lista-vazia muted">${ui.busca ? 'Nada encontrado.' : ui.filtro === 'arquivadas' ? 'Nenhuma conversa arquivada.' : ui.filtro === 'nao_lidas' ? 'Tudo lido 👍' : ui.filtro === 'registros' ? 'Nenhuma conversa de registro.<br><span class="small">Use o botão 💬 Conversa num lançamento, pedido de compra, OP, frete, proposta FIDC ou pagamento antecipado.</span>' : 'Nenhuma conversa ainda.<br><button class="btn small primary" id="ch-comecar">Começar uma conversa</button>'}</div>`;
+    html = `<div class="ch-lista-vazia muted">${ui.busca ? 'Nada encontrado.' : ui.filtro === 'arquivadas' ? 'Nenhuma conversa arquivada.' : ui.filtro === 'nao_lidas' ? 'Tudo lido 👍' : ui.filtro === 'mencoes' ? 'Ninguém mencionou você nas mensagens ainda não lidas 👍' : ui.filtro === 'registros' ? 'Nenhuma conversa de registro.<br><span class="small">Use o botão 💬 Conversa num lançamento, pagamento antecipado, pedido de compra, OP, OS, RNC, inspeção, arte, ordem de tinta, carga, frete, proposta ou recompra FIDC, contrato, beneficiário ou nota fiscal.</span>' : 'Nenhuma conversa ainda.<br><button class="btn small primary" id="ch-comecar">Começar uma conversa</button>'}</div>`;
   } else {
     if (ui.busca && l.length) html += '<div class="ch-sec">Conversas</div>';
     html += l.map(c => {

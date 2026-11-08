@@ -4,6 +4,7 @@ import { sb, state, q, isAdmin, loadCadastros } from '../lib/data.js';
 import { $, $$, esc, toast, fail, modal, confirmDialog, today, dateBR, money, options, erroTela, logoPNG } from '../lib/ui.js';
 import * as K from '../lib/contratos.js';
 import * as M from '../lib/contratos-modelos.js';
+import { conversaNoModal } from '../lib/mini-chat.js';
 
 export const title = 'Contratos';
 const BUCKET = 'contratos';
@@ -111,6 +112,7 @@ function ficha(c0, root) {
     </div>
     ${c0 ? `<div id="k-extra"></div>` : '<p class="small muted">Salve para anexar o PDF assinado, gerar as parcelas e propor reajustes.</p>'}`,
     foot: `${c0 ? '<button class="btn danger" id="k-enc" style="margin-right:auto">Encerrar / rescindir</button>' : ''}<button class="btn" data-close>Fechar</button><button class="btn primary" id="k-ok">Salvar</button>` });
+  if (c0) conversaNoModal(md, 'contrato', c0.id);
   const el = md.el, F = (id) => $('#' + id, el);
   const parteSel = () => {
     const pt = F('k-pt').value, w = F('k-parte-w');

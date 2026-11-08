@@ -4,6 +4,7 @@ import { $, $$, esc, toast, fail, modal, confirmDialog, today, dateBR, money, op
 import { abrirRelatorio } from './relatorio.js';
 import { podePCP, podeApontar } from './producao.js';
 import * as M from './manutencao.js';
+import { conversaNoModal } from './mini-chat.js';
 
 export { podePCP, podeApontar };
 export const BUCKET = 'manutencao';
@@ -130,6 +131,7 @@ export async function fichaOS(D, o, { onMudou } = {}) {
     foot: `${ger && aberta ? '<button class="btn danger" id="fo-canc">Cancelar OS</button>' : ''}<span class="spacer"></span><button class="btn" id="fo-imp">Imprimir OS</button>
       ${exe && aberta ? `${o.situacao !== 'em_execucao' ? '<button class="btn" id="fo-ini">▶ Iniciar</button>' : '<button class="btn" id="fo-peca">Aguardando peça</button><button class="btn" id="fo-terc">Aguardando terceiro</button>'}
         <button class="btn" id="fo-salva">Salvar</button><button class="btn primary" id="fo-concl">✔ Concluir</button>` : exe ? '<button class="btn primary" id="fo-salva">Salvar</button>' : ''}` });
+  conversaNoModal(md, 'man_ordem', o.id);
   const el = md.el, recarregar = async () => { md.close(); onMudou?.(); };
   $('#fo-abas', el).onclick = (ev) => { const t = ev.target.closest('[data-t]')?.dataset.t; if (!t) return; $$('#fo-abas .chip', el).forEach(x => x.classList.toggle('on', x.dataset.t === t)); $$('[data-p]', el).forEach(x => { x.hidden = x.dataset.p !== t; }); };
   const ler = () => {

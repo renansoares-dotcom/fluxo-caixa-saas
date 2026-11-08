@@ -5,6 +5,7 @@ import { erroTela, $, $$, esc, dateBR, today, fail, toast, modal, confirmDialog 
 import { badge } from '../lib/compras.js';
 import { carregarBase, municipios, paradas, ordenar, metricas, montarCargas, capacidade, veiculoPequeno, imprimirRomaneio, mapaSVG, podeLogistica,
   TIPOS_VEICULO, ST_CARGA, PROX_ST } from '../lib/logistica.js';
+import { botaoConversa } from '../lib/mini-chat.js';
 
 export const title = 'Cargas e Entregas';
 const ui = { data: null, de: null, ate: null };
@@ -119,7 +120,7 @@ function cardCarga(x, id) {
     <div class="small">${kg(m.km)} km · ${t1(m.horas)} h · frete ${money(m.frete)}${m.frete && m.kg ? ` (R$ ${(m.frete / m.kg).toFixed(2).replace('.', ',')}/kg)` : ''}</div>
     <div class="lg-bts">
       ${!prop && ed && PROX_ST[c.status] ? `<button class="btn small primary" data-st="${id}">${PROX_ST[c.status][1]}</button>` : ''}
-      <button class="btn small" data-rom="${id}">Romaneio</button>
+      <button class="btn small" data-rom="${id}">Romaneio</button>${!prop && c.id ? botaoConversa('log_carga', c.id) : ''}
       ${!prop && ed && c.status === 'planejada' ? `<button class="btn small danger" data-del="${id}">Excluir</button>` : ''}
       ${!prop && ed && ['carregando', 'pronta'].includes(c.status) ? `<button class="btn small ghost" data-canc="${id}">Cancelar</button>` : ''}</div></div>`;
 }

@@ -4,6 +4,7 @@ import { sb, state, q, podeEditar, loadCadastros } from '../lib/data.js';
 import { $, esc, money, options, fail, toast, modal, parseNum, exportXLSX } from '../lib/ui.js';
 import { analisaDocumento, somenteDoc } from '../lib/documentos.js';
 import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
+import { conversaNoModal } from '../lib/mini-chat.js';
 
 export const title = 'Beneficiários';
 
@@ -153,6 +154,7 @@ function editar(f, root) {
       </div></fieldset></form>`,
     foot: ed ? `${f.id ? '<button class="btn danger" id="b-inat" style="margin-right:auto">' + (f.ativo === false ? 'Reativar' : 'Inativar') + '</button>' : ''}${f.id && ['admin', 'diretor'].includes(state.papel) ? '<button class="btn ghost" id="b-hist">Histórico</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="b-ok">Salvar</button>` : '<button class="btn" data-close>Fechar</button>',
   });
+  if (f.id) conversaNoModal(m, 'favorecido', f.id);
   const form = $('#bf', m.el); const F = (n) => form.querySelector(`[name="${n}"]`);
   $('#b-hist', m.el) && ($('#b-hist', m.el).onclick = async () => { const { abrirHistorico } = await import(`./auditoria.js?v=${Date.now()}`); abrirHistorico('favorecidos', f.id, f.nome); });
   if (!ed) form.querySelectorAll('input,select').forEach(i => i.disabled = true);

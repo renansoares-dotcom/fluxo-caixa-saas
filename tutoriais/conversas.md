@@ -1,8 +1,8 @@
 ---
 titulo: Conversas
 tela: Comunicação › Conversas (AJU002)
-versao: 2.5
-atualizado: 2026-11-06
+versao: 2.6
+atualizado: 2026-11-07
 ---
 ## 1. Para que serve
 
@@ -11,7 +11,7 @@ atualizado: 2026-11-06
 - conversas **individuais** e **em grupo** com quem é da empresa;
 - texto, emoji, fotos, arquivos (PDF, Excel, XML de nota fiscal…) e **mensagens de voz**;
 - responder, encaminhar, reagir, editar, apagar e mencionar com **@**;
-- a **conversa do registro**: um bate-papo dentro do lançamento, do pagamento antecipado, do pedido de compra, da ordem de produção, do frete e da proposta FIDC;
+- a **conversa do registro**: um bate-papo dentro do próprio registro — lançamento, pagamento antecipado, pedido de compra, OP, OS de manutenção, não conformidade, inspeção, arte, ordem de tinta, carga, frete, proposta e recompra FIDC, contrato, beneficiário e nota fiscal;
 - as mensagens chegam **na hora**, com **✓✓ lida**, "digitando…", online e aviso no celular e no computador.
 
 O assunto fica registrado junto com o trabalho, e não espalhado em grupos de celular.
@@ -36,7 +36,7 @@ O assunto fica registrado junto com o trabalho, e não espalhado em grupos de ce
 A tela tem duas partes:
 
 - **À esquerda, a lista de conversas.** As mais recentes ficam em cima e as **fixadas** sempre no topo. Cada conversa mostra a última mensagem, a hora e, em verde, quantas mensagens não lidas tem.
-  - Use os filtros **Tudo**, **Não lidas**, **Grupos**, **Registros** e **Arquivadas**.
+  - Use os filtros **Tudo**, **Não lidas**, **@ Menções**, **Grupos**, **Registros** e **Arquivadas**. **@ Menções** mostra só as conversas em que alguém mencionou você numa mensagem que você ainda não leu.
   - A **busca** procura no nome das conversas e também **dentro das mensagens** (a partir de 2 letras). Clique num resultado para ir direto à mensagem, que pisca em verde.
   - Um **@** verde na conversa avisa que alguém mencionou você.
   - A bolinha verde no círculo da pessoa mostra que ela está online.
@@ -106,7 +106,7 @@ Quem recebe toca o áudio na própria conversa e escolhe a velocidade: **1×**, 
 
 Num grupo ou na conversa de um registro, digite **@** e escolha a pessoa na lista (setas e Enter, ou clique). O nome aparece destacado.
 
-A pessoa mencionada recebe o aviso **mesmo que tenha silenciado a conversa**.
+A pessoa mencionada recebe o aviso **mesmo que tenha silenciado a conversa**. Na lista, a conversa ganha o sinal **@** e aparece no filtro **@ Menções** até a mensagem ser lida.
 
 ## 6. O que fazer com uma mensagem
 
@@ -129,7 +129,22 @@ Clique numa reação embaixo da mensagem para ver quem reagiu e para tirar a sua
 
 ## 7. Conversa do registro
 
-Lançamentos, pagamentos antecipados, pedidos de compra, ordens de produção, fretes e propostas FIDC têm, no topo da janela do registro, dois botões:
+O assunto de um registro se conversa **no próprio registro**: quem abre a OP, a RNC ou a nota vê o mesmo histórico, com @ para chamar quem precisa decidir.
+
+| Módulo | Onde ficam os botões | Quem entra na conversa |
+|---|---|---|
+| Lançamentos, Pagamentos antecipados, Propostas FIDC | Janela do registro | Perfis do financeiro (no pagamento antecipado, também quem o pediu) |
+| Compras › Pedidos | Janela do pedido | Financeiro e compras |
+| Produção › Ordens e Manutenção › Ordens de serviço | Janela da OP ou da OS | Quem vê a produção |
+| Qualidade › Não conformidades e Inspeções | Janela da RNC ou da inspeção | Todos os perfis da empresa |
+| Pré-impressão › Artes | Janela da arte | Quem vê a produção e o comercial que atende o cliente da arte |
+| Tintas › Ordens | Janela da ordem | Todos os perfis da empresa |
+| Logística › Cargas e Fretes | Cartão da carga (💬 Conversa) e janela do frete | Quem vê a logística |
+| FIDC › Recompras | Linha da recompra (💬) | Perfis do financeiro |
+| Contratos | Janela do contrato | Só administradores |
+| Cadastros › Beneficiários e Notas fiscais | Janela do beneficiário ou da nota | Perfis do financeiro |
+
+Nas janelas, o topo traz dois botões:
 
 - **💬 Conversa:** abre o bate-papo daquele registro (no mini-chat ou na tela Conversas). Cada registro tem uma conversa só. Entra nela quem abre o botão, e qualquer participante pode **adicionar** outras pessoas.
 - **↗ Enviar no chat:** manda o registro como **cartão** (título, data, valor e situação) para uma ou mais conversas, com uma mensagem opcional. Clicar no cartão abre o registro na tela certa.
@@ -224,3 +239,4 @@ Os avisos usam a mesma liberação do sino de notificações. Clique no **sino**
 | 2.3 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 2.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 2.5 | 06/11/2026 | Sinais de enviada (✓) e entregue/lida (✓✓) redesenhados: o ✓✓ mostrava três traços. |
+| 2.6 | 07/11/2026 | Conversa do registro em todos os módulos: OS, não conformidade, inspeção, arte, ordem de tinta, carga, recompra FIDC, contrato, beneficiário e nota fiscal. Novo filtro **@ Menções**. |

@@ -9,6 +9,7 @@ import { pintarRecebimentos, autoVincular, marcarCancelada, desfazerCancelamento
 import { importarBeneficiariosNFe } from '../lib/nfe-benef.js';
 import { usosPorNota, usarCredito, desfazerUso } from '../lib/creditos.js';
 import { pintarRelatorios, limparCacheRelatorios } from '../lib/notas-relatorio-ui.js';
+import { conversaNoModal } from '../lib/mini-chat.js';
 
 export const title = 'Notas Fiscais';
 
@@ -218,6 +219,7 @@ async function detalhe(n, root) {
       ${n.vinc.filter(v => !v.parcela_id).length ? `<tr><td colspan="4" class="small">Vinculados à nota (sem parcela definida)</td><td class="small">${n.vinc.filter(v => !v.parcela_id).map(v => `${dateBR(v.l?.data)} · ${money(v.l?.valor)} · ${esc(conta(v.l?.conta_id))} · ${esc(v.l?.descricao || '')}${v.l && v.l.status !== 'Pago' ? ' <span class="badge aberto">título em aberto</span>' : ''}${podeEditar() ? ` <button class="btn ghost small" data-dv="${v.id}" title="Desfazer este vínculo">✕</button>` : ''}`).join('<br>')}</td></tr>` : ''}
       </tbody></table></div>` : '<p class="small muted">Nota sem parcelas (sem financeiro).</p>'}`,
     foot: `<span style="margin-right:auto;display:flex;gap:6px">${podeEditar() && n.situacao === 'autorizada' && n.parcelas.length ? `<button class="btn" id="ucred" title="Abater nas parcelas um adiantamento ou crédito ${n.tipo === 'saida' ? 'do cliente' : 'com o fornecedor'}">Usar crédito</button>` : ''}${podeEditar() && n.tipo === 'saida' && n.situacao === 'autorizada' ? '<button class="btn" id="mcanc">Marcar como cancelada</button>' : ''}${podeEditar() && (n.eventos || []).some(x => x.tipo === 'cancelamento_manual') && n.situacao === 'cancelada' ? '<button class="btn" id="dcanc">Desfazer cancelamento informado</button>' : ''}${podeEditar() && n.vinc.length ? '<button class="btn danger" id="desv">Desfazer vínculos de recebimento</button>' : ''}${podeEditar() && n.fidc.length ? '<button class="btn danger" id="desf">Desfazer ligação com borderô</button>' : ''}</span><button class="btn" id="xml">Baixar XML</button><button class="btn" data-close>Fechar</button>` });
+  conversaNoModal(m, 'nfe_nota', n.id);
   $('#xml', m.el).onclick = async () => {
     try { const r = await q(sb.from('nfe_notas').select('xml').eq('id', n.id).single()); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.xml || ''], { type: 'application/xml' })); a.download = `${n.chave}.xml`; a.click(); } catch (e) { fail(e); }
   };

@@ -6,6 +6,7 @@ import { abrirRelatorio } from './relatorio.js';
 import { carregarProdutos } from './produtos.js';
 import { temBalanca, lerBalanca } from './balanca.js';
 import * as T from './tintas.js';
+import { conversaNoModal } from './mini-chat.js';
 
 export const podeGerir = () => ['admin', 'financeiro', 'diretor'].includes(state.papel);
 export const podeTintas = () => ['admin', 'financeiro', 'diretor', 'producao'].includes(state.papel);
@@ -159,6 +160,7 @@ export async function fichaOrdem(D, o, { onMudou } = {}) {
       ${pode && ['aprovada', 'entregue'].includes(o.situacao) ? '<button class="btn" id="fo-ret">Retorno de sobra</button><button class="btn primary" id="fo-ent">Entregar à máquina</button>' : ''}
       ${pode && ['aprovada', 'entregue'].includes(o.situacao) ? '<button class="btn" id="fo-enc">Encerrar</button>' : ''}
       ${aberta && pode && Pe.length ? '<button class="btn primary" id="fo-apr">✔ Aprovar tinta</button>' : ''}` });
+  conversaNoModal(md, 'tin_ordem', o.id);
   const el = md.el, re = () => { md.close(); fichaOrdemAtualizada(D, o.id, onMudou); };
   const b = (sel, fn) => { const x = $(sel, el); if (x) x.onclick = async () => { try { await fn(x); } catch (e) { fail(e); } }; };
   const pesar = async (itemId, qtd, balanca = false) => {
