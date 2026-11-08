@@ -52,6 +52,8 @@ export const MANUAIS = [
     resumo: 'Estoque oficial por local e lote, custo médio ponderado móvel, movimentos e estorno, locais, famílias, tipos de movimento, regras por CFOP e fechamento do mês.' },
   { id: 'terminal-producao', titulo: 'Terminal de produção', area: 'Produção', rotas: ['producao/terminal'],
     resumo: 'Para o operador: iniciar, registrar bobina com etiqueta, parada e encerramento.' },
+  { id: 'oee', titulo: 'OEE e Perdas — disponibilidade, desempenho e qualidade por máquina', area: 'Produção', rotas: ['producao/oee'],
+    resumo: 'OEE por máquina contra as metas, tendência, perdas em horas, Pareto das paradas (com as OS de manutenção) e do refugo.' },
   { id: 'producao', titulo: 'Produção — PCP, ordens, programação e planta', area: 'Produção', rotas: ['producao', 'producao/ordens', 'producao/programacao', 'producao/cadastros', 'producao/importar', 'producao/planta'],
     resumo: 'Cadastros, OPs com material e rastreabilidade, programação, OEE, planta da fábrica e importação do Iniflex.' },
   { id: 'qualidade', titulo: 'Qualidade — inspeção com bloqueio de estoque e não conformidades', area: 'Produção', rotas: ['qualidade', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'qualidade/planos'],

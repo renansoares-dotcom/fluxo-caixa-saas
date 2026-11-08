@@ -1361,3 +1361,33 @@ window.RPC.pag_remessa_gravar = () => null;
     fechamento: { qtd: 0, ultimo: null },
   });
 }
+
+// OEE (SQL 113) — números FICTÍCIOS por máquina e período (a função do banco é simulada aqui)
+{
+  DB.prod_oee_config = [{ empresa_id: E, meta_oee: 65, meta_disp: 85, meta_perf: 85, meta_qual: 95, atencao_pp: 10, metas_maquina: {}, contar_os_manutencao: true }];
+  // perfil de cada máquina: disponibilidade, desempenho e refugo médios
+  const PERF = { 'EXT-01': [0.86, 0.84, 0.045], 'EXT-02': [0.74, 0.79, 0.07], 'IMP-01': [0.81, 0.72, 0.03], 'CS-01': [0.66, 0.88, 0.055] };
+  const MOT = [['Setup / troca de pedido', true], ['Falta de material', false], ['Ajuste de solda', false], ['Limpeza programada', true], ['Falta de operador', false], ['Troca de bobina', false]];
+  window.RPC.prod_oee = (a) => {
+    const de = a.p_de, ate = a.p_ate, g = a.p_grupo || 'dia', dias = [];
+    for (let d = new Date(de + 'T12:00:00'); d.toISOString().slice(0, 10) <= ate; d.setDate(d.getDate() + 1)) dias.push(d.toISOString().slice(0, 10));
+    const perDe = (d) => { if (g === 'dia') return d; if (g === 'mes') return d.slice(0, 8) + '01'; const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
+    const grupos = new Map(); for (const d of dias) (grupos.get(perDe(d)) || grupos.set(perDe(d), []).get(perDe(d))).push(d);
+    const linhas = [], paradas = [], refugos = [];
+    DB.prod_maquinas.forEach((m, mi) => {
+      const [dsp, pf, rf] = PERF[m.codigo] || [0.8, 0.8, 0.05];
+      let k = 0;
+      for (const [per, ds] of grupos) {
+        k++; const onda = 1 + 0.06 * Math.sin(k / 1.7 + mi), cal = 22 * ds.length, plan = cal * 0.07, tp = cal - plan;
+        const run = tp * Math.min(0.98, dsp * onda), prod = run * m.capacidade_kg_h * Math.min(0.99, pf * (2 - onda) ** 0.3), ref = prod * rf * (2 - onda);
+        const os = mi === 1 && k % 3 === 0 ? 6.5 : 0, naoPl = Math.max(0, (tp - run) * 0.62 - os);
+        linhas.push({ maquina_id: m.id, per, horas_cal: cal, dias: ds.length, horas_run: +run.toFixed(2), bom: Math.round(prod - ref), refugo: Math.round(ref), apont: ds.length * 3, h_plan: +plan.toFixed(2), h_nao_plan: +naoPl.toFixed(2), h_os: os, qtd_os: os ? 1 : 0 });
+      }
+      const tot = dias.length * 22;
+      MOT.forEach(([motivo, planejada], j) => { const h = tot * (planejada ? 0.035 : [0, 0.05, 0.018, 0, 0.012, 0.022][j]) * (1 + mi * 0.15); if (h > 0) paradas.push({ maquina_id: m.id, motivo, planejada, qtd: Math.max(1, Math.round(h / 1.4)), horas: +h.toFixed(2) }); });
+      if (mi === 1) paradas.push({ maquina_id: m.id, motivo: 'Manutenção (OS corretiva)', planejada: false, qtd: 2, horas: 13 });
+      [['Bolha / furo no filme', 0.42], ['Espessura fora', 0.25], ['Registro de impressão', 0.18], ['Solda fraca', 0.15]].forEach(([motivo, p]) => refugos.push({ maquina_id: m.id, motivo, kg: Math.round(tot * m.capacidade_kg_h * 0.8 * (PERF[m.codigo]?.[2] || 0.05) * p) }));
+    });
+    return { de, ate, grupo: g, linhas, paradas, refugos };
+  };
+}
