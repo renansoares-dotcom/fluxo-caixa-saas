@@ -127,6 +127,12 @@ export const FIGS = [
   ['lgpd-acessos', 'lgpd?aba=titular&q=123.456.789-09', '### 5.2', 'Anonimizar o cadastro, ligado à solicitação do titular', 'click:[data-an="1"]'],
   ['lgpd-acessos', 'lgpd', '## 6.', 'Solicitações dos titulares com o prazo de resposta', 'click:[data-a="solic"]'],
   ['lgpd-acessos', 'lgpd', '## 7.', 'Parâmetros de privacidade e acessos', 'click:#lg-par'],
+  // Painel da Diretoria (07/11/2026)
+  ['painel-diretoria', 'diretoria', '## 3.', 'Painel da Diretoria: resumo do mês e os cartões dos indicadores com meta, situação e tendência'],
+  ['painel-diretoria', 'diretoria', '### 3.2', 'Evolução de 13 meses, com os meses fora da meta em vermelho', 'scroll:#dr-corpo h3'],
+  ['painel-diretoria', 'diretoria', '## 4.', 'Comentário do responsável sobre o indicador', 'click:[data-com="perdas"]'],
+  ['painel-diretoria', 'diretoria', '## 5.', 'Metas e parâmetros: metas do ano, tolerância, recuperação judicial, setores e contas', 'click:#dr-par'],
+  ['painel-diretoria', 'diretoria', '## 6.', 'PDF da reunião: destinatário e os itens da deliberação', 'click:#dr-pdf'],
   // Recompras FIDC (07/11/2026)
   ['fidc-recompras', 'fidc-recompras', '## 3.', 'Recompras: as pendências sem registro, os indicadores e os títulos recomprados'],
   ['fidc-recompras', 'fidc-recompras', '### 3.1', 'Registrar a recompra: o título, o motivo (aqui, devolução de mercadoria), a nota de devolução e o que volta para a carteira', 'click:#rc-novo|click:.rc-res [data-i]|click:[data-mo="mo-devolucao"]'],

@@ -116,6 +116,7 @@ const routes = {
   'auditoria': () => import(`./pages/auditoria.js?v=${V}`),
   'uso': () => import(`./pages/uso.js?v=${V}`),
   'lgpd': () => import(`./pages/lgpd.js?v=${V}`),
+  'diretoria': () => import(`./pages/diretoria.js?v=${V}`),
 };
 
 // ---------- Tema ----------

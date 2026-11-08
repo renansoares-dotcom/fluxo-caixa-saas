@@ -1078,3 +1078,20 @@ window.FN = {
     .map(([titular_nome, titular_documento, titular_contato, tipo, descricao, d, status], i) => ({ id: 'sl' + i, empresa_id: E, titular_nome, titular_documento, titular_contato, tipo, descricao,
       recebida_em: D(d), prazo: D(d - 15), status, resposta: status === 'atendida' ? 'Endereço corrigido no cadastro e confirmado por e-mail.' : null, atendida_em: status === 'atendida' ? H(d - 3) : null, registros: [] }));
 }
+
+// Painel da Diretoria (SQL 101) — FICTÍCIOS
+{
+  const venda = [812, 845, 790, 702, 768, 880, 905, 870, 931, 958, 902, 975, 921].map(v => v * 1000), dev = [12, 9, 15, 8, 11, 6, 14, 10, 9, 18, 7, 12, 24].map(v => v * 1000);
+  const boa = [402, 418, 377, 351, 389, 426, 431, 415, 447, 452, 428, 461, 433].map(v => v * 1000), ref = [27, 30, 26, 25, 27, 29, 28, 27, 29, 31, 28, 30, 34].map(v => v * 1000);
+  const med = [118, 124, 109, 98, 112, 127, 131, 122, 133, 138, 129, 141, 132], np = [109, 117, 100, 92, 105, 121, 124, 113, 127, 131, 122, 133, 119];
+  window.RPC.diretoria_operacional = () => ({ meses: [], fat_venda: venda, fat_devolucao: dev, prod_boa: boa, prod_refugo: ref,
+    rnc_mes: [5, 6, 4, 3, 5, 4, 6, 5, 3, 4, 5, 3, 7], rnc_cliente: [2, 3, 1, 1, 2, 1, 2, 2, 1, 1, 2, 1, 3], rnc_em_aberto: [6, 7, 6, 5, 6, 5, 7, 6, 5, 4, 5, 4, 6], rnc_custo: [3200, 4100, 1800, 1500, 2700, 900, 3300, 2500, 1200, 1100, 2400, 800, 5600],
+    ent_notas: med.map(x => x + 4), ent_entregues: med, ent_medidas: med, ent_no_prazo: np, ent_problemas: [2, 3, 1, 1, 2, 1, 2, 2, 1, 2, 1, 1, 3],
+    rj_pago: [0, 0, 0, 0, 0, 0, 0, 0, 0, 450000, 450000, 450000, 380000], prazo_entrega_dias: 3, meta_prazo_logistica: 95 });
+  DB.diretoria_config = [{ empresa_id: E, tolerancia_pct: 10, rj_previsto: 450000, rj_processo: '0016214-76.2025.8.17.2480', rj_inicio: '2026-07-01', rj_planos: [], producao_setores: null, caixa_contas: null, ocultos: [] }];
+  DB.diretoria_metas = [['caixa', 300000], ['faturamento', 950000], ['margem', 8], ['producao', 450000], ['perdas', 6.5], ['qualidade', 1], ['entregas', 95]]
+    .map(([indicador, meta]) => ({ empresa_id: E, indicador, ano: 2026, meta }));
+  DB.diretoria_comentarios = [{ empresa_id: E, mes: '2026-10-01', indicador: 'perdas', texto: 'Troca de resina do fornecedor na extrusora 2 aumentou a apara na 2ª quinzena; lote devolvido e fornecedor notificado.', autor: 'carlos@exemplo.com.br' },
+    { empresa_id: E, mes: '2026-10-01', indicador: 'rj', texto: 'Parcela de outubro paga parcialmente; saldo de R$ 70 mil programado para 10/11.', autor: 'renata@exemplo.com.br' }];
+  DB.prod_setores ||= [{ id: 'st1', empresa_id: E, nome: 'Extrusão', ativo: true, ordem: 1 }, { id: 'st2', empresa_id: E, nome: 'Impressão', ativo: true, ordem: 2 }, { id: 'st3', empresa_id: E, nome: 'Corte e solda', ativo: true, ordem: 3 }];
+}
