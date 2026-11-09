@@ -7,6 +7,8 @@ import { sb, state, q, fetchAll, podeEditar, loadCadastros, pontas } from '../li
 import { $, $$, esc, money, money0, cls, dateBR, fail, toast, modal, parseNum, MESES } from '../lib/ui.js';
 import { abrirLancamento } from '../lib/lanc-form.js';
 import { normTxt } from '../lib/nf-titulos.js';
+import { abrirRelatorio } from '../lib/relatorio.js';
+import { montarExtrato, htmlExtrato, CSS_EXTRATO } from '../lib/extrato-conta.js';
 
 export const title = 'Conferência do Dia';
 
@@ -48,6 +50,7 @@ export async function render(root) {
         <label class="chk"><input type="checkbox" name="saldos" ${ui.saldos ? 'checked' : ''}> mostrar saldos</label>
         <label class="chk"><input type="checkbox" name="soProb" ${ui.soProb ? 'checked' : ''}> só com problema</label>
         <label class="chk"><input type="checkbox" name="todas" ${ui.todas ? 'checked' : ''}> todas as contas</label></span>
+        <button class="btn" id="cext" type="button" title="Extrato da conta no formato de extrato bancário: saldo inicial, entradas, saídas e saldo final por dia">Extrato (PDF)</button>
         <button class="btn" id="cimp" type="button">Imprimir / PDF</button>
       </div></div></div>
     <div id="ccorpo"><div class="loading">Conferindo o mês…</div></div>`;
@@ -65,6 +68,7 @@ export async function render(root) {
     pintar();
   });
   $('#cimp', root).onclick = imprimir;
+  $('#cext', root).onclick = extratoDialogo;
   await carregar();
 }
 
@@ -93,6 +97,59 @@ function imprimir() { prepararImpressao(); window.print(); }
 window.addEventListener('beforeprint', prepararImpressao);
 window.addEventListener('afterprint', desfazerImpressao);
 
+
+// ---------------------------------------------------------------------------------------------
+// Extrato da conta em PDF (formato de extrato bancário)
+// ---------------------------------------------------------------------------------------------
+function extratoDialogo() {
+  if (!D) return toast('Aguarde a conferência do mês carregar', true);
+  const us = D.linhas.filter(r => r.usada);
+  if (!us.length) return toast('Nenhuma conta com movimento no mês', true);
+  const atual = ui.conta && us.some(r => r.ct.id === ui.conta) ? ui.conta : us[0].ct.id;
+  const m = modal({ title: `Extrato da conta — ${nomeMes(D.mes)}`, narrow: true, body: `
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <label style="grid-column:1/-1">Conta<select name="conta"><option value="*">Todas as contas com movimento (${us.length})</option>
+        ${us.map(r => `<option value="${r.ct.id}" ${r.ct.id === atual ? 'selected' : ''}>${esc(r.ct.nome)}</option>`).join('')}</select></label>
+      <label>De<input type="date" name="de" value="${D.ini}" min="${D.ini}" max="${D.fim}"></label>
+      <label>Até<input type="date" name="ate" value="${D.fim}" min="${D.ini}" max="${D.fim}"></label>
+      <label style="grid-column:1/-1">Formato<select name="fmt"><option value="det">Detalhado — cada lançamento com o saldo, e o total de cada dia</option><option value="res">Resumido — uma linha por dia (saldo inicial, entradas, saídas, saldo final)</option></select></label>
+      <label class="chk" style="grid-column:1/-1"><input type="checkbox" name="vazios"> incluir os dias sem movimento</label>
+    </div>
+    <p class="small muted">Lançamentos pagos da conta, os mesmos da Conferência do Dia (transferência entra nas duas contas). Para outro mês, troque o mês no alto da tela.</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="cext-ok">Gerar PDF</button>' });
+  $('#cext-ok', m.el).onclick = async () => {
+    const g = (n) => $(`[name=${n}]`, m.el);
+    const de = g('de').value || D.ini, ate = g('ate').value || D.fim;
+    if (de > ate) return toast('A data inicial é depois da final', true);
+    const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para gerar o PDF', true);
+    const contas = g('conta').value === '*' ? us : us.filter(r => r.ct.id === g('conta').value);
+    m.close();
+    await gerarExtrato(w, contas, { de, ate, detalhado: g('fmt').value === 'det', semMovimento: g('vazios').checked });
+  };
+}
+
+function historicoLanc(l) {
+  const cad = state.cad, p = cad.planoById[l.plano_id], f = cad.favById[l.favorecido_id];
+  const transf = l.conta_destino_id ? (l.destino ? `transferência vinda de ${cad.contaById[l.conta_origem_id]?.nome || ''}` : `transferência para ${cad.contaById[l.conta_destino_id]?.nome || ''}`) : '';
+  return { titulo: f?.nome || l.descricao || (p ? p.nome : '—'),
+    detalhe: [p ? `${p.codigo} ${p.nome}` : '', f && l.descricao ? l.descricao : '', transf].filter(Boolean).join(' · '),
+    documento: l.documento || '' };
+}
+
+async function gerarExtrato(w, contas, o) {
+  const partes = contas.map(r => {
+    const e = montarExtrato(r.cel, { de: o.de, ate: o.ate, historico: historicoLanc });
+    return { r, e, html: htmlExtrato(r.ct, e, o) };
+  }).filter(p => contas.length === 1 || p.e.qtd || o.semMovimento);
+  const uma = contas.length === 1;
+  const corpo = partes.map((p, i) => `<section class="ext-conta">${uma ? '' : `<h2>${i + 1}. ${esc(p.r.ct.nome)}</h2>`}${p.html}</section>`).join('')
+    || '<p class="m">Nenhuma conta com movimento no período.</p>';
+  const per = `${dateBR(o.de)} a ${dateBR(o.ate)}`;
+  await abrirRelatorio({ janela: w, nome: uma ? `Extrato ${contas[0].ct.nome}` : 'Extrato das contas', titulo: 'Extrato da conta',
+    subtitulo: `${uma ? esc(contas[0].ct.nome) + ' · ' : ''}${per}${o.detalhado ? '' : ' · resumo por dia'}`,
+    corpo, extraCss: CSS_EXTRATO,
+    rodape: `Lançamentos pagos da plataforma (Conferência do Dia), saldo inicial pelo saldo pago acumulado até ${dateBR(addDias(o.de, -1))}. Valores em R$. ${esc(state.empresa?.nome || '')}` });
+}
 
 async function carregar() {
   const c = $('#ccorpo', rootEl); if (!c) return;

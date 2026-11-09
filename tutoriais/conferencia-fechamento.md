@@ -1,8 +1,8 @@
 ---
 titulo: Conferência do dia e Fechamento do mês
 tela: Financeiro › Conferência do Dia (FIN009) e Fechamento do Mês (FIN010)
-versao: 1.3
-atualizado: 2026-11-08
+versao: 1.4
+atualizado: 2026-11-09
 ---
 ## 1. Para que serve
 
@@ -72,9 +72,33 @@ A aba **Saldos da conta** mostra uma linha por dia de uma conta: saldo inicial, 
 
 **Imprimir / PDF** gera a tela no padrão IPLAMM.
 
+### 3.4 Extrato da conta em PDF
+
+O botão **Extrato (PDF)**, no alto da tela, gera o movimento da conta no formato de um **extrato bancário**, no padrão dos relatórios IPLAMM.
+
+![Figura 2 — Extrato da conta, formato detalhado (dados fictícios)](img/conferencia-fechamento-extrato.jpg)
+
+Ao clicar, escolha:
+
+| Opção | O que faz |
+|---|---|
+| Conta | Uma conta, ou **todas as contas com movimento** no mesmo PDF (uma seção por conta, cada uma começando numa página). |
+| De / Até | O período dentro do mês aberto na tela. Para outro mês, troque o **Mês** no alto da tela antes. |
+| Formato | **Detalhado**: cada lançamento com o saldo depois dele, agrupado por dia. **Resumido**: uma linha por dia. |
+| Incluir os dias sem movimento | Mostra também os dias em que a conta não teve lançamento, com o saldo do dia. |
+
+O extrato traz:
+
+- **No alto**: a conta (com banco, agência e conta, quando cadastrados), o período e o quadro com **saldo inicial**, **(+) entradas**, **(−) saídas** e **(=) saldo final** do período.
+- **Detalhado**: cada dia abre com o **saldo inicial do dia**, mostra os lançamentos (favorecido, classificação, descrição, documento, entrada ou saída e o saldo) e fecha com o **total do dia**: entradas, saídas e saldo final.
+- **Resumido**: data, saldo inicial, entradas, saídas, saldo final e quantidade de lançamentos de cada dia.
+- **No fim**: o total do período.
+
+Os números são os mesmos da Conferência do Dia: lançamentos **pagos** da conta, com a transferência entrando nas duas contas. O saldo inicial é o saldo pago acumulado até o dia anterior ao período. Gerar o extrato não altera nada.
+
 ## 4. Fechamento do Mês
 
-![Figura 2 — Fechamento do mês: quanto falta para fechar e o checklist da equipe (dados fictícios)](img/conferencia-fechamento-2.jpg)
+![Figura 3 — Fechamento do mês: quanto falta para fechar e o checklist da equipe (dados fictícios)](img/conferencia-fechamento-2.jpg)
 
 ### 4.1 O checklist da equipe
 
@@ -159,7 +183,7 @@ Quando o mês terminou e o checklist está pronto, clique em **🔒 Fechar o mê
 
 **Reabrir o mês** exige o **motivo**, com pelo menos 15 letras. A equipe é avisada e o motivo fica no **Histórico**. O Histórico também guarda quem fechou, com quais pendências, e cada tarefa marcada.
 
-![Figura 3 — Fechar o mês com pendências: a lista e a justificativa (dados fictícios)](img/conferencia-fechamento-3.jpg)
+![Figura 4 — Fechar o mês com pendências: a lista e a justificativa (dados fictícios)](img/conferencia-fechamento-3.jpg)
 
 ### 4.7 Parâmetros, lembretes e cobrança
 
@@ -212,3 +236,4 @@ Na **Central de Decisões**, a regra 26 mostra as tarefas atrasadas do mês ante
 | 1.1 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.2 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.3 | 08/11/2026 | Checklist da equipe com responsáveis e prazos em dia útil (modelo e modelo padrão), painel "quanto falta para fechar", conferência das contas travadas, fechar o mês com trava dos lançamentos pagos e reabertura com motivo, histórico, parâmetros, lembretes e cobrança, regra 26 da Central de Decisões. |
+| 1.4 | 09/11/2026 | Extrato da conta em PDF (item 3.4): formato de extrato bancário, detalhado ou resumido por dia, de uma conta ou de todas, com o período escolhido. |
