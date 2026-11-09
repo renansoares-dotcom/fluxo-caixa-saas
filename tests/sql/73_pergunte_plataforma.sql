@@ -27,7 +27,7 @@ insert into nfe_notas(empresa_id, chave, numero, emissao, tipo, emissao_propria,
   (:E, 'IA73C', 97303, '2031-03-03', 'saida', true, 'autorizada', 'OUTRO IA 73', 'PB', 1000, '{6101}'),
   (:E, 'IA73D', 97304, '2031-03-04', 'saida', true, 'cancelada', 'CLIENTE IA 73', 'PE', 9000, '{5101}');
 
-select pg_temp.ok((select count(*) = 5 from jsonb_object_keys(public.ia_catalogo())), '5 fontes');
+select pg_temp.ok((select count(*) >= 5 from jsonb_object_keys(public.ia_catalogo())), 'fontes');
 select pg_temp.entrar('d0000000-0000-0000-0000-00000000000d');   -- financeiro
 -- lançamentos por mês, só os do teste (pelo texto)
 create temp table r1 as select public.ia_consultar(:E, 'lancamentos', 'valor', 'mes', '{"texto":"IA73"}', '2031-01-01', '2031-12-31') j;

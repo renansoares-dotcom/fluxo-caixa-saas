@@ -17,3 +17,14 @@ test('campos, parágrafos vazios e link', () => {
 test('trocar', () => {
   assert.equal(trocar('{{a}} e {{ b }} e {{c}}', { a: 1, b: 'dois' }), '1 e dois e ');
 });
+
+test('relatório agendado: tabelas no corpo, escapadas, com total e link', () => {
+  const tabs = [{ titulo: 'Saldo <das contas>', periodo: 'hoje (11/11/2026)', colunas: ['conta', 'saldo'], linhas: [['BANCO A', 'R$ 1.250,00'], ['<script>', 'R$ 0,00']], total: 'R$ 1.250,00', link: '#/fluxo-diario', rotulo: 'Fluxo de Caixa Diário' },
+    { titulo: 'Bloco ruim', erro: 'Fonte desconhecida' }];
+  const e = montar({ assunto: '{{titulo}}', corpo: 'Segue.' }, { titulo: 'Caixa', tabelas: tabs }, { url_base: 'https://x.com/app' });
+  assert.match(e.html, /Saldo &lt;das contas&gt;/); assert.match(e.html, /&lt;script&gt;/); assert.doesNotMatch(e.html, /<script>/);
+  assert.match(e.html, /Total<\/td><td[^>]*>R\$ 1\.250,00/); assert.match(e.html, /https:\/\/x\.com\/app\/index\.html#\/fluxo-diario/);
+  assert.match(e.html, /Não foi possível montar este bloco: Fonte desconhecida/);
+  assert.match(e.texto, /Saldo <das contas> — hoje \(11\/11\/2026\)\n  BANCO A: R\$ 1\.250,00/);
+  assert.equal(montar({ assunto: 'a', corpo: 'b' }, {}, {}).html.includes('<h3'), false);
+});

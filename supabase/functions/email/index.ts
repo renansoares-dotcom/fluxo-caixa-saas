@@ -15,6 +15,22 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c: string) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const trocar = (t: unknown, c: any = {}) => String(t ?? '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_: string, k: string) => (c[k] == null ? '' : String(c[k])));
 
+// relatório agendado (melhoria 1.7): tabelas montadas pelo banco (rel_previa); todo conteúdo é escapado aqui
+function tabelasHtml(tabs: any, base: string) {
+  if (!Array.isArray(tabs) || !tabs.length) return '';
+  return tabs.map((t: any) => `<h3 style="margin:22px 0 2px;font-size:16px">${esc(t.titulo)}</h3><div style="font-size:12px;color:#6b7385;margin-bottom:8px">${esc(t.periodo || '')}</div>` +
+    (t.erro ? `<p style="color:#c62828;font-size:13px">Não foi possível montar este bloco: ${esc(t.erro)}</p>` :
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px">
+<tr><th align="left" style="border-bottom:2px solid #e2e6ee;padding:6px 4px">${esc(t.colunas?.[0] || '')}</th><th align="right" style="border-bottom:2px solid #e2e6ee;padding:6px 4px">${esc(t.colunas?.[1] || '')}</th></tr>
+${(t.linhas || []).map((l: any) => `<tr><td style="border-bottom:1px solid #eef1f6;padding:5px 4px">${esc(l[0])}</td><td align="right" style="border-bottom:1px solid #eef1f6;padding:5px 4px;white-space:nowrap">${esc(l[1])}</td></tr>`).join('')}
+${t.total ? `<tr><td style="padding:6px 4px;font-weight:bold">Total</td><td align="right" style="padding:6px 4px;font-weight:bold;white-space:nowrap">${esc(t.total)}</td></tr>` : ''}</table>` +
+    (t.link && base ? `<div style="font-size:12px;margin-top:6px"><a href="${esc(base + 'index.html' + t.link)}" style="color:#1f4e9c">Abrir ${esc(t.rotulo || 'na plataforma')}</a></div>` : ''))).join('');
+}
+function tabelasTexto(tabs: any) {
+  if (!Array.isArray(tabs) || !tabs.length) return '';
+  return tabs.map((t: any) => [`${t.titulo} — ${t.periodo || ''}`, ...(t.erro ? [`  (erro: ${t.erro})`] : (t.linhas || []).map((l: any) => `  ${l[0]}: ${l[1]}`)), t.total ? `  Total: ${t.total}` : ''].filter(Boolean).join('\n')).join('\n\n');
+}
+
 /** monta { assunto, html, texto } */
 function montar(modelo: any, campos: any = {}, cfg: any = {}) {
   const base = String(cfg.url_base || '').replace(/\/?$/, '/');
@@ -27,11 +43,12 @@ function montar(modelo: any, campos: any = {}, cfg: any = {}) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e6ee">
 <tr><td style="background:${cor};color:#ffffff;padding:18px 24px;font-size:18px;font-weight:bold">${esc(campos.empresa || cfg.remetente_nome || '')}</td></tr>
 <tr><td style="padding:24px;font-size:15px;line-height:1.55">${paras.map((p: string) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, '<br>')}</p>`).join('')}
+${tabelasHtml(campos.tabelas, base)}
 ${link && modelo.botao ? `<p style="margin:22px 0 8px"><a href="${esc(link)}" style="display:inline-block;background:${cor};color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">${esc(trocar(modelo.botao, campos))}</a></p>
 <p style="margin:0;font-size:12px;color:#6b7385">Se o botão não abrir, copie este endereço: ${esc(link)}</p>` : ''}</td></tr>
 <tr><td style="padding:14px 24px;border-top:1px solid #e2e6ee;font-size:12px;color:#6b7385">${esc(cfg.rodape || '')}</td></tr>
 </table></td></tr></table></body></html>`;
-  const texto = [...paras, link ? `${trocar(modelo.botao || 'Abrir', campos)}: ${link}` : '', cfg.rodape || ''].filter(Boolean).join('\n\n');
+  const texto = [...paras, tabelasTexto(campos.tabelas), link ? `${trocar(modelo.botao || 'Abrir', campos)}: ${link}` : '', cfg.rodape || ''].filter(Boolean).join('\n\n');
   return { assunto, html, texto, link };
 }
 

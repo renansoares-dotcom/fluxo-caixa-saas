@@ -10,6 +10,8 @@ export const MANUAIS = [
     resumo: 'O que precisa de atenção hoje, a decisão de pagamentos do dia com aprovação, recomendações da semana e a visão da direção.' },
   { id: 'perguntar', titulo: 'Pergunte à plataforma (IA)', area: 'Painéis', rotas: ['perguntar'],
     resumo: 'Perguntas em português sobre faturamento, despesas, fretes, compras e produção, respondidas pela IA com texto, gráfico, os números usados e o link da tela. Só consulta.' },
+  { id: 'relatorios', titulo: 'Relatórios agendados', area: 'Painéis', rotas: ['relatorios'],
+    resumo: 'Relatórios enviados por e-mail na frequência escolhida (posição de caixa, contas a pagar, faturamento, despesas, produção, fretes), com modelos prontos e prévia.' },
   { id: 'painel-diretoria', titulo: 'Painel da Diretoria', area: 'Painéis', rotas: ['diretoria'],
     resumo: 'Caixa, faturamento, margem, produção, perdas, qualidade, entregas e recuperação judicial em uma página, com meta, situação, tendência de 13 meses, comentários e o PDF da reunião mensal.' },
   { id: 'aprovacoes', titulo: 'Minhas aprovações — tudo o que espera a sua decisão', area: 'Painéis', rotas: ['aprovacoes'],
