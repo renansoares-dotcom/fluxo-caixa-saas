@@ -2,8 +2,9 @@
 // origem (ticket ou apontamentos), bloqueio, observação e etiqueta com QR.
 import { sb, state, q } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, toast, fail, modal, exportXLSX } from '../lib/ui.js';
-import { carregarRec, podeConfig, kpi, kg, kg0, rkg, badgeLote, semSQL, avisoSQL, desligada, avisoDesligada, nomeMat } from '../lib/rec-ui.js';
-import { TIPOS_LOTE, SIT_LOTE, estoquePorMaterial } from '../lib/recuperadora.js';
+import { carregarRec, podeConfig, podeOperar, kpi, kg, kg0, rkg, badgeLote, semSQL, avisoSQL, desligada, avisoDesligada, nomeMat } from '../lib/rec-ui.js';
+import { TIPOS_LOTE, SIT_LOTE, DESTINOS, estoquePorMaterial } from '../lib/recuperadora.js';
+import { parseNum, today } from '../lib/ui.js';
 import { qrSvg } from '../lib/crachas.js';
 
 export const title = 'Lotes da Recuperadora';
@@ -55,12 +56,29 @@ async function abrir(R, l, root) {
     const regs = await q(sb.from('rec_apara_registros').select('apontamento_id, kg').eq('lote_id', l.id));
     origem = `<p class="small">${regs.length} apontamento(s) da produção com refugo encerrados em ${dateBR(l.data)}.</p>`;
   }
+  const [SA, OR] = await Promise.all([q(sb.from('rec_lote_saidas').select('*').eq('lote_id', l.id).order('data')).catch(() => []), q(sb.from('rec_ordem_entradas').select('kg, ordem:rec_ordens(numero, situacao)').eq('lote_id', l.id)).catch(() => [])]);
+  const hist = (OR.length || SA.length) ? `<h3 style="margin:12px 0 6px">Movimento</h3><table class="small"><tbody>
+      ${OR.map(x => `<tr><td>Reprocesso ${x.ordem?.numero ?? ''} <span class="muted">(${esc(x.ordem?.situacao || '')})</span></td><td class="num">− ${kg(x.kg)}</td></tr>`).join('')}
+      ${SA.map(x => `<tr><td>${dateBR(x.data)} · ${esc(DESTINOS[x.destino] || x.destino)}${x.documento ? ' · ' + esc(x.documento) : ''}${x.observacao ? ` <span class="muted">${esc(x.observacao)}</span>` : ''}</td><td class="num">− ${kg(x.kg)}</td></tr>`).join('')}</tbody></table>` : '';
   const md = modal({ title: `Lote ${l.codigo}`, body: `<div class="kpis">${kpi('Peso', kg(l.peso_kg))}${kpi('Saldo', kg(l.saldo_kg))}${kpi('Custo', money(l.custo_total), +l.peso_kg ? rkg(l.custo_total / l.peso_kg) + '/kg' : '')}</div>
       <p>${TIPOS_LOTE[l.tipo]} · ${esc(nomeMat(R, l.material_id))}${l.classe_id ? ' · classe ' + esc(R.claById[l.classe_id]?.codigo || '') : ''} · ${badgeLote(l.situacao)}</p>${origem}
-      <label>Observação<input id="lt-o" value="${esc(l.observacao || '')}" ${pode ? '' : 'disabled'}></label>`,
+      <label>Observação<input id="lt-o" value="${esc(l.observacao || '')}" ${pode ? '' : 'disabled'}></label>${hist}`,
     foot: `${pode && ['disponivel', 'bloqueado'].includes(l.situacao) ? `<button class="btn ${l.situacao === 'bloqueado' ? '' : 'danger'}" id="lt-b">${l.situacao === 'bloqueado' ? 'Liberar' : 'Bloquear'}</button>` : ''}<span class="spacer"></span>
-      <button class="btn" id="lt-et">Etiqueta</button>${pode ? '<button class="btn primary" id="lt-ok">Salvar</button>' : '<button class="btn" data-close>Fechar</button>'}` });
+      <button class="btn" id="lt-et">Etiqueta</button>${podeOperar() && l.situacao === 'disponivel' && +l.saldo_kg > 0 ? '<button class="btn" id="lt-sai">Dar saída</button>' : ''}${pode ? '<button class="btn primary" id="lt-ok">Salvar</button>' : '<button class="btn" data-close>Fechar</button>'}` });
   $('#lt-et', md.el).onclick = () => etiquetas(R, [l]);
+  $('#lt-sai', md.el) && ($('#lt-sai', md.el).onclick = async () => {
+    const ops = await q(sb.from('prod_ordens').select('id, numero, descricao, codigo_produto, status').eq('empresa_id', state.empresa.id).order('numero', { ascending: false }).limit(300)).catch(() => []);
+    const dest = Object.entries(DESTINOS).filter(([k]) => podeConfig() || ['producao', 'venda'].includes(k));
+    const m2 = modal({ title: `Saída do lote ${l.codigo}`, body: `<form id="sf" class="grid2"><label>Destino<select name="d">${dest.map(([k, t]) => `<option value="${k}" ${l.tipo === 'grao' && k === 'producao' ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <label>Data<input type="date" name="dt" value="${today()}"></label><label>kg (saldo ${String(l.saldo_kg).replace('.', ',')})<input name="k" inputmode="decimal" value="${String(l.saldo_kg).replace('.', ',')}"></label>
+        <label class="sf-op">OP que recebe<select name="op"><option value="">—</option>${ops.filter(o => o.status !== 'cancelada').map(o => `<option value="${o.id}">${o.numero} · ${esc(o.codigo_produto || '')} ${esc(o.descricao || '')}</option>`).join('')}</select></label>
+        <label>Documento<input name="doc" placeholder="NF da venda, nº da OP…"></label><label>Observação / motivo<input name="o"></label></form><p class="small muted">O custo sai pelo custo médio do lote (${+l.peso_kg ? rkg(l.custo_total / l.peso_kg) : '–'}/kg). Na OP, a plataforma confere o limite de reciclado do produto.</p>`,
+      foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="sf-ok">Dar saída</button>' });
+    const f = $('#sf', m2.el), ver = () => { $('.sf-op', m2.el).hidden = f.d.value !== 'producao'; }; f.d.onchange = ver; ver();
+    $('#sf-ok', m2.el).onclick = async (ev) => { ev.target.disabled = true;
+      try { const r = await q(sb.rpc('rec_lote_baixar', { p_lote: l.id, p_kg: parseNum(f.k.value), p_destino: f.d.value, p_data: f.dt.value || today(), p_op: f.d.value === 'producao' ? (f.op.value || null) : null, p_documento: f.doc.value || null, p_obs: f.o.value || null }));
+        m2.close(); md.close(); toast(r.aviso || 'Saída registrada', !!r.aviso); render(root); } catch (err) { ev.target.disabled = false; fail(err); } };
+  });
   $('#lt-ok', md.el) && ($('#lt-ok', md.el).onclick = async () => { try { await q(sb.from('rec_lotes').update({ observacao: $('#lt-o', md.el).value.trim() || null }).eq('id', l.id)); md.close(); toast('Lote salvo'); render(root); } catch (err) { fail(err); } });
   $('#lt-b', md.el) && ($('#lt-b', md.el).onclick = async () => { try { await q(sb.from('rec_lotes').update({ situacao: l.situacao === 'bloqueado' ? 'disponivel' : 'bloqueado', observacao: $('#lt-o', md.el).value.trim() || null }).eq('id', l.id)); md.close(); toast(l.situacao === 'bloqueado' ? 'Lote liberado' : 'Lote bloqueado'); render(root); } catch (err) { fail(err); } });
 }

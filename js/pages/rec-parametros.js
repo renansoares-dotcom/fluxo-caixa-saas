@@ -11,14 +11,14 @@ const ui = { aba: 'geral' };
 const num = (v, d = 2) => v == null || v === '' ? '' : String(+v).replace('.', ',');
 
 export async function render(root) {
-  root.innerHTML = `<div class="card toolbar"><div class="chips" id="rp-abas">${[['geral', 'Geral'], ['materiais', 'Materiais'], ['classes', 'Classes e preços'], ['aparas', 'Regras da apara interna']]
+  root.innerHTML = `<div class="card toolbar"><div class="chips" id="rp-abas">${[['geral', 'Geral'], ['materiais', 'Materiais'], ['classes', 'Classes e preços'], ['aparas', 'Regras da apara interna'], ['processo', 'Processo e custos']]
       .map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div><span class="spacer"></span><span id="rp-acoes"></span></div>
     <div id="rp-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#rp-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
   const c = $('#rp-corpo', root);
   try {
     const R = await carregarRec(true);
-    if (ui.aba === 'geral') await geral(c, R, root); else if (ui.aba === 'materiais') materiais(c, R, root); else if (ui.aba === 'classes') classes(c, R, root); else await aparas(c, R, root);
+    if (ui.aba === 'geral') await geral(c, R, root); else if (ui.aba === 'materiais') materiais(c, R, root); else if (ui.aba === 'classes') classes(c, R, root); else if (ui.aba === 'aparas') await aparas(c, R, root); else await processo(c, R, root);
   } catch (err) { c.innerHTML = semSQL(err) ? avisoSQL : `<div class="card"><div class="empty">${esc(err.message)}</div></div>`; }
 }
 const recarregar = (root) => { limparCacheRec(); document.dispatchEvent(new CustomEvent('rec-config')); render(root); };
@@ -172,4 +172,50 @@ async function aparas(c, R, root) {
       try { const r = await q(sb.rpc('rec_aparas_reprocessar', { p_empresa: e, p_de: $('#rr-d', md.el).value })); md.close(); toast(`${r.apontamentos} apontamento(s) revisto(s): ${String(r.kg).replace('.', ',')} kg de apara em lotes`); }
       catch (err) { ev.target.disabled = false; fail(err); } };
   });
+}
+
+async function processo(c, R, root) {
+  const pode = podeConfig(), dis = pode ? '' : 'disabled', e = state.empresa.id;
+  const [ET, RV] = await Promise.all([q(sb.from('rec_etapas').select('*').eq('empresa_id', e).order('ordem')), q(sb.from('rec_resina_virgem').select('*').eq('empresa_id', e).order('vigencia', { ascending: false }))]);
+  const p = { custo_kwh: 0, custo_m3_agua: 0, custo_hora_mo: 0, custo_hora_maquina: 0, meta_rendimento_pct: 85, exigir_ensaio: true, prefixo_grao: 'GR', ...(R.cfg || {}) };
+  $('#rp-acoes', root).innerHTML = pode ? '<button class="btn" id="rp-net">+ Etapa</button> <button class="btn" id="rp-nrv">+ Preço da resina virgem</button>' : '';
+  c.innerHTML = `<form id="pc-f" class="card"><h3 style="margin:0 0 8px">Custos do processamento</h3><div class="grid2">
+      <label>Energia (R$ por kWh)<input name="kwh" inputmode="decimal" value="${num(p.custo_kwh)}" ${dis}></label><label>Água (R$ por m³)<input name="agua" inputmode="decimal" value="${num(p.custo_m3_agua)}" ${dis}></label>
+      <label>Mão de obra (R$ por hora)<input name="mo" inputmode="decimal" value="${num(p.custo_hora_mo)}" ${dis}><span class="small muted">salário + encargos ÷ horas trabalhadas</span></label>
+      <label>Máquina sem custo-hora (R$ por hora)<input name="maq" inputmode="decimal" value="${num(p.custo_hora_maquina)}" ${dis}><span class="small muted">vale quando a máquina, o setor e o Custo das OPs não têm custo-hora</span></label></div>
+    <h3 style="margin:20px 0 8px">Rendimento e qualidade</h3><div class="grid2">
+      <label>Meta de rendimento (%)<input name="meta" inputmode="decimal" value="${num(p.meta_rendimento_pct)}" ${dis}><span class="small muted">grão ÷ material que entrou na ordem</span></label>
+      <label>Prefixo dos lotes de grão<input name="pg" maxlength="6" value="${esc(p.prefixo_grao)}" ${dis}></label>
+      <label class="chk"><input type="checkbox" name="ens" ${p.exigir_ensaio ? 'checked' : ''} ${dis}> O lote de grão nasce bloqueado até o ensaio aprovado (Qualidade do Grão)</label></div>
+    ${pode ? '<button class="btn primary" style="margin-top:12px">Salvar</button>' : ''}</form>
+    <div class="grid2" style="margin-top:12px;align-items:start">
+      <div class="card flush"><div style="padding:12px 12px 0"><h3 style="margin:0">Etapas do processo</h3></div><div class="table-wrap"><table><thead><tr><th>Ordem</th><th>Código</th><th>Etapa</th><th>Ativa</th></tr></thead><tbody>
+        ${ET.map(x => `<tr class="${pode ? 'clickable' : ''}" data-et="${x.id}"><td>${x.ordem}</td><td><b>${esc(x.codigo)}</b></td><td>${esc(x.nome)}</td><td>${x.ativo ? 'sim' : 'não'}</td></tr>`).join('')
+          || '<tr><td colspan="4" class="empty">Sem etapas. Salve esta aba para criar as padrão (triagem, moagem, lavagem, secagem, aglutinação, extrusão).</td></tr>'}</tbody></table></div></div>
+      <div class="card flush"><div style="padding:12px 12px 0"><h3 style="margin:0">Preço da resina virgem</h3></div><div class="table-wrap"><table><thead><tr><th>Polímero</th><th>Vigência</th><th class="num">R$/kg</th><th>Fonte</th><th></th></tr></thead><tbody>
+        ${RV.map(x => `<tr><td><b>${esc(x.polimero)}</b></td><td>${dateBR(x.vigencia)}</td><td class="num">${rkg(x.preco_kg)}</td><td class="small">${esc(x.fonte || '')}</td><td>${pode ? `<button class="btn ghost sm" data-drv="${x.id}">Excluir</button>` : ''}</td></tr>`).join('')
+          || '<tr><td colspan="5" class="empty">Sem preço: a economia contra a resina virgem não é calculada.</td></tr>'}</tbody></table></div></div></div>
+    <p class="small muted">O custo do kg de grão = custo do material que entrou (pelo custo de cada lote) + energia + água + químicos + mão de obra + horas de máquina de cada etapa × custo-hora (máquina → setor → Custo das OPs → este padrão) + outros.</p>`;
+  $('#pc-f', c).onsubmit = async (ev) => { ev.preventDefault(); if (!pode) return; const f = ev.target;
+    try { if (!R.cfg?.empresa_id || !ET.length) await q(sb.rpc('rec_configurar_padrao', { p_empresa: e }));
+      await q(sb.from('rec_config').update({ custo_kwh: parseNum(f.kwh.value) || 0, custo_m3_agua: parseNum(f.agua.value) || 0, custo_hora_mo: parseNum(f.mo.value) || 0, custo_hora_maquina: parseNum(f.maq.value) || 0,
+        meta_rendimento_pct: Math.min(100, parseNum(f.meta.value) || 85), prefixo_grao: f.pg.value.trim() || 'GR', exigir_ensaio: f.ens.checked, atualizado_em: new Date().toISOString() }).eq('empresa_id', e));
+      toast('Salvo'); recarregar(root); } catch (err) { fail(err); } };
+  const abrirEt = (x = {}) => {
+    const md = modal({ title: x.id ? 'Editar etapa' : 'Nova etapa', narrow: true, body: `<form id="tf" class="grid2"><label>Código *<input name="c" required maxlength="6" value="${esc(x.codigo || '')}"></label><label>Ordem<input type="number" name="o" value="${x.ordem ?? ET.length + 1}"></label>
+        <label class="span2">Nome *<input name="n" required value="${esc(x.nome || '')}"></label><label class="chk"><input type="checkbox" name="a" ${x.ativo !== false ? 'checked' : ''}> Ativa</label></form>`,
+      foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="tf-ok">Salvar</button>' });
+    $('#tf-ok', md.el).onclick = async () => { const f = $('#tf', md.el); if (!f.reportValidity()) return; const v = { empresa_id: e, codigo: f.c.value.trim().toUpperCase(), nome: f.n.value.trim(), ordem: +f.o.value || 0, ativo: f.a.checked };
+      try { await q(x.id ? sb.from('rec_etapas').update(v).eq('id', x.id) : sb.from('rec_etapas').insert(v)); md.close(); render(root); } catch (err) { fail(err); } };
+  };
+  $('#rp-net', root) && ($('#rp-net', root).onclick = () => abrirEt());
+  c.querySelectorAll('tr[data-et]').forEach(tr => tr.onclick = () => pode && abrirEt(ET.find(x => x.id === tr.dataset.et)));
+  $('#rp-nrv', root) && ($('#rp-nrv', root).onclick = () => {
+    const md = modal({ title: 'Preço da resina virgem', body: `<form id="vf" class="grid2"><label>Polímero<select name="p">${POLIMEROS.map(x => `<option>${x}</option>`).join('')}</select></label><label>Vale a partir de<input type="date" name="v" value="${today()}"></label>
+        <label>R$/kg *<input name="k" inputmode="decimal"></label><label>Fonte<input name="f" placeholder="cotação do fornecedor, índice…"></label></form>`, foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="vf-ok">Salvar</button>' });
+    $('#vf-ok', md.el).onclick = async () => { const f = $('#vf', md.el), k = parseNum(f.k.value); if (!(k >= 0)) return toast('Informe o preço', true);
+      try { await q(sb.from('rec_resina_virgem').insert({ empresa_id: e, polimero: f.p.value, vigencia: f.v.value || today(), preco_kg: k, fonte: f.f.value.trim() || null })); md.close(); render(root); }
+      catch (err) { fail(/duplicate|unique/.test(err.message) ? new Error('Já existe preço deste polímero nesta data.') : err); } };
+  });
+  $$('[data-drv]', c).forEach(b => b.onclick = async () => { try { await q(sb.from('rec_resina_virgem').delete().eq('id', b.dataset.drv)); render(root); } catch (err) { fail(err); } });
 }

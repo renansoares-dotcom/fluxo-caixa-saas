@@ -1,7 +1,7 @@
 ---
-titulo: Recuperadora — entradas pela balança, aparas internas e lotes
-tela: Produção › Recuperadora (REC001, REC002, REC003, REC009)
-versao: 1.0
+titulo: Recuperadora — balança, aparas, processamento, qualidade e custo do grão
+tela: Produção › Recuperadora (REC001 a REC006, REC009)
+versao: 1.1
 atualizado: 2026-11-09
 ---
 A Recuperadora controla o material plástico que entra para ser reprocessado (moído, lavado, aglutinado e granulado). Ela serve a três tipos de empresa:
@@ -10,7 +10,7 @@ A Recuperadora controla o material plástico que entra para ser reprocessado (mo
 - **só compra de terceiros**: a empresa compra material reciclável de catadores, cooperativas e sucateiros;
 - **as duas coisas**.
 
-Esta é a parte 1 do módulo: a entrada do material, os fornecedores, os adiantamentos, a relação para a nota de entrada e os lotes. O processamento, o rendimento, a qualidade e o custo do grão vêm na parte 2. O balanço de massa, o controle ambiental e o fiscal vêm na parte 3.
+Este manual cobre as partes 1 e 2 do módulo. A parte 1 trata da entrada do material, dos fornecedores, dos adiantamentos, da relação para a nota de entrada e dos lotes. A parte 2 trata do processamento, da qualidade do grão, da saída dos lotes, do rendimento e do custo. O balanço de massa, o controle ambiental e o fiscal vêm na parte 3.
 
 ## 1. Ligar e configurar (Parâmetros da Recuperadora)
 
@@ -70,6 +70,19 @@ Uma regra diz para qual material vai a apara de um setor, de uma máquina ou de 
 
 Escolha **não vai para a recuperadora** para o refugo que não volta para o processo, como o do próprio aglutinador ou a borra. **Refazer as aparas desde…** aplica as regras de novo aos apontamentos já encerrados a partir de uma data.
 
+### 1.5 Processo e custos
+
+Na aba **Processo e custos** ficam:
+
+- **custos do processamento:** energia (R$ por kWh), água (R$ por m³), mão de obra (R$ por hora) e o custo-hora da máquina que não tem custo cadastrado. A plataforma procura o custo-hora nesta ordem: o da máquina, o do setor, o padrão do Custo das OPs e, por último, este;
+- **meta de rendimento** (%): o grão que sai dividido pelo material que entrou na ordem;
+- **prefixo dos lotes de grão** (GR);
+- **exigir o ensaio:** o lote de grão nasce bloqueado e só é liberado pelo ensaio aprovado;
+- **etapas do processo:** triagem, moagem, lavagem, secagem, aglutinação e extrusão e granulação, já cadastradas. Ajuste os nomes e a ordem, ou desative as que a empresa não tem;
+- **preço da resina virgem** por polímero, com vigência e fonte: é a base da economia (seção 10).
+
+![Figura 3 — Processo e custos: energia, água, mão de obra, máquina, meta de rendimento, ensaio, etapas e resina virgem](img/recuperadora-14.jpg)
+
 ## 2. Painel da Recuperadora
 
 O **Painel da Recuperadora** (REC001) mostra o mês escolhido:
@@ -85,7 +98,7 @@ Abaixo vêm o gráfico das entradas por dia, a tabela **por material** (comprado
 
 Um aviso amarelo aparece quando há apontamentos com refugo que não viraram lote. Isso acontece quando falta o material padrão da apara ou uma regra.
 
-![Figura 3 — Painel da Recuperadora: compras, peso pago, apara interna, entradas por dia, materiais e fornecedores do mês](img/recuperadora-3.jpg)
+![Figura 4 — Painel da Recuperadora: compras, peso pago, apara interna, entradas por dia, materiais e fornecedores do mês](img/recuperadora-3.jpg)
 
 ## 3. Entradas e Balança: o ticket de pesagem
 
@@ -93,7 +106,7 @@ Em **Entradas e Balança** (REC002), a aba **Tickets da balança** lista as pesa
 
 O operador da balança (perfil Produção) usa esta tela e a de Lotes da Recuperadora. Administrador, financeiro e diretor também.
 
-![Figura 4 — Entradas e Balança: os tickets do mês, abertos e fechados, com o peso pago e o total](img/recuperadora-4.jpg)
+![Figura 5 — Entradas e Balança: os tickets do mês, abertos e fechados, com o peso pago e o total](img/recuperadora-4.jpg)
 
 ### 3.1 Abrir o ticket
 
@@ -117,7 +130,7 @@ Uma carga pode ter vários materiais. Em cada linha, informe:
 
 O resumo abaixo da tabela confere a **soma dos materiais** contra o peso líquido. Verde está dentro da tolerância; vermelho mostra a diferença. O resumo também traz o **peso pago**, o **total da compra** e, se o fornecedor tiver adiantamento em aberto, quanto vai ser abatido e quanto fica a pagar.
 
-![Figura 5 — Ticket aberto: pesagem, materiais com classe, desconto e preço da tabela, a conferência do peso e o adiantamento a abater](img/recuperadora-5.jpg)
+![Figura 6 — Ticket aberto: pesagem, materiais com classe, desconto e preço da tabela, a conferência do peso e o adiantamento a abater](img/recuperadora-5.jpg)
 
 **Salvar aberto** guarda o ticket para terminar depois. Um caso comum: a carga é descarregada e separada antes de pesar cada material.
 
@@ -180,7 +193,7 @@ Na mesma tela ficam a **chave PIX** e a marca de **coletor incentivado**.
 
 A tabela mostra o comprado nos últimos 90 dias e o adiantamento em aberto de cada fornecedor.
 
-![Figura 6 — Fornecedores de reciclável com o tipo, o coletor incentivado e os adiantamentos](img/recuperadora-6.jpg)
+![Figura 7 — Fornecedores de reciclável com o tipo, o coletor incentivado e os adiantamentos](img/recuperadora-6.jpg)
 
 ### 4.2 Adiantamentos
 
@@ -200,11 +213,11 @@ A aba **Relação para a nota de entrada** junta as compras fechadas sem nota do
 
 **Excel** baixa a relação para emitir a nota de entrada no sistema fiscal.
 
-![Figura 7 — Relação para a nota de entrada: compras sem nota por fornecedor e material, com o NCM](img/recuperadora-7.jpg)
+![Figura 8 — Relação para a nota de entrada: compras sem nota por fornecedor e material, com o NCM](img/recuperadora-7.jpg)
 
 ## 5. Lotes e etiquetas
 
-**Lotes da Recuperadora** (REC003) lista os lotes de entrada (da balança), os de apara interna e, na parte 2, os de grão. Para cada lote, a tabela mostra:
+**Lotes da Recuperadora** (REC003) lista os lotes de entrada (da balança), os de apara interna e os de grão (do processamento). Para cada lote, a tabela mostra:
 
 - material e classe;
 - origem (fornecedor ou "apontamentos da produção");
@@ -214,9 +227,11 @@ A aba **Relação para a nota de entrada** junta as compras fechadas sem nota do
 
 O lote **bloqueado** não entra no processamento até ser liberado. Ao clicar num lote, você vê a origem, que pode ser o ticket com o desconto e o preço, ou a quantidade de apontamentos. Na mesma ficha dá para bloquear, liberar e anotar uma observação.
 
+A ficha do lote também mostra o **movimento**: as ordens de reprocesso que usaram o lote e as saídas. **Dar saída** registra a saída do lote (seção 9).
+
 **Etiqueta** imprime a etiqueta de 100 × 70 mm com o código do lote em QR. Para imprimir várias, marque os lotes na lista e use **Etiquetas dos marcados**.
 
-![Figura 8 — Lotes da Recuperadora: entradas da balança e aparas internas, com o saldo e o custo por kg](img/recuperadora-8.jpg)
+![Figura 9 — Lotes da Recuperadora: entradas da balança e aparas internas, com o saldo e o custo por kg](img/recuperadora-8.jpg)
 
 ## 6. Aparas internas
 
@@ -229,7 +244,108 @@ O material sai das regras da seção 1.4 ou do material padrão. O lote acompanh
 
 Quando o módulo é ligado depois, ou as regras mudam, use **Refazer as aparas desde…** nos Parâmetros.
 
-## 7. Quem pode o quê
+## 7. Processamento (ordem de reprocesso)
+
+Em **Processamento** (REC004), cada ordem de reprocesso transforma lotes de entrada (compra, apara ou grão a reprocessar) num **lote de grão**. A lista mostra:
+
+- o grão produzido e a máquina;
+- a entrada e a saída em kg;
+- o **rendimento**: verde na meta, amarelo até 10 pontos abaixo e vermelho abaixo disso;
+- o custo por kg e a situação.
+
+![Figura 10 — Processamento: as ordens de reprocesso com a entrada, a saída, o rendimento contra a meta e o custo do kg](img/recuperadora-9.jpg)
+
+### 7.1 Abrir a ordem e escolher os lotes
+
+**+ Nova ordem** pede a data, o **grão que sai** (um material cadastrado, ex.: GR-PEBD) e a máquina principal. Na ficha da ordem, escolha o lote pela lista ou leia a etiqueta e informe os kg. Com o campo vazio, entra todo o saldo do lote.
+
+O saldo sai do lote na hora e o lote fica **em processo**. Tirar o lote enquanto a ordem está aberta devolve os kg. Lote bloqueado não entra.
+
+### 7.2 Apontar as etapas
+
+Para cada etapa, informe:
+
+- a etapa, a máquina (vazio usa a principal), as horas e o operador;
+- os kg de entrada e de saída;
+- as perdas por tipo: **umidade**, **sujeira**, **finos** e **rejeito**.
+
+O resumo avisa quando a entrada, a saída e as perdas apontadas não fecham. O apontamento é feito nesta tela, que funciona no celular e está liberada para o perfil Produção.
+
+![Figura 11 — Ordem aberta: lotes que entram, etapas com horas e perdas, custos e o resumo com o rendimento e o custo do kg de grão](img/recuperadora-10.jpg)
+
+### 7.3 Custos e conclusão
+
+Informe os **custos da ordem**: energia (kWh), água (m³), químicos (R$), mão de obra (horas) e outros (R$). O resumo calcula na hora:
+
+- o custo do processo, item a item, incluindo as horas de máquina de cada etapa;
+- o custo do material, pelo custo de cada lote consumido;
+- o rendimento previsto e o **custo do kg de grão**.
+
+**Concluir** pede o grão pesado na saída. A conclusão cria o lote de grão, com código GR + data + número da ordem e o custo total. Os lotes de entrada que zeraram passam a **consumidos**.
+
+Se os parâmetros pedirem, o grão fica **bloqueado** até o ensaio. Se a opção do Kardex estiver ligada e o grão tiver produto, o grão entra no estoque como produção.
+
+**Cancelar a ordem** (só a aberta) devolve os kg aos lotes.
+
+## 8. Qualidade do grão
+
+Em **Qualidade do Grão** (REC006), a aba **Lotes de grão e ensaios** mostra os lotes aguardando ensaio, os reprovados, a taxa de aprovação e o grão liberado.
+
+![Figura 12 — Qualidade do Grão: lotes aguardando ensaio, reprovados e liberados, com o último ensaio](img/recuperadora-11.jpg)
+
+**Ensaio** registra estas medidas:
+
+- índice de fluidez (g/10 min);
+- umidade (%);
+- densidade (g/cm³);
+- contaminação (%);
+- cor.
+
+A plataforma compara as medidas com a **especificação** do material e mostra o resultado antes de registrar:
+
+- **dentro da especificação:** registrar libera o lote;
+- **fora da especificação:** registrar mantém o lote bloqueado e grava os motivos. **Reprovar** bloqueia mesmo dentro da especificação;
+- **Liberar por concessão:** libera fora da especificação. Só administrador, financeiro ou diretor faz, e com a justificativa.
+
+![Figura 13 — Ensaio fora da especificação: a prévia mostra os motivos antes de registrar](img/recuperadora-12.jpg)
+
+A aba **Especificações** guarda os limites de cada grão. Campo vazio não é verificado. A aba **Limite de reciclado por produto** guarda o percentual máximo de reciclado que cada produto acabado aceita, em relação ao peso da OP.
+
+## 9. Saída dos lotes
+
+Na ficha do lote, **Dar saída** registra o destino:
+
+| Destino | Quem pode | O que acontece |
+|---|---|---|
+| Volta para a linha (OP) | Quem aponta a produção | O grão sai para a OP escolhida. Se o reciclado da OP passar do limite do produto, a plataforma avisa na hora e manda um aviso ao administrador e ao diretor |
+| Venda | Quem aponta a produção | Informe a NF no documento; o lote que zera fica "vendido" |
+| Perda | Administrador, financeiro e diretor | Exige o motivo |
+| Ajuste | Administrador, financeiro e diretor | Correção de saldo |
+
+O custo da saída é o custo médio do lote. Só sai lote **disponível**: o bloqueado precisa do ensaio aprovado ou da liberação.
+
+## 10. Rendimento e custo
+
+**Rendimento e Custo** (REC005) junta as ordens concluídas no período.
+
+- **Indicadores:**
+  - rendimento contra a meta;
+  - **custo do kg de grão**, separado em material e processo;
+  - **economia contra a resina virgem**: o preço da resina virgem menos o custo do grão, vezes os kg produzidos;
+  - perdas por tipo.
+- **Gráficos:** rendimento de cada ordem contra a meta e perdas por tipo.
+- **Fornecedores: quanto paguei × quanto virou grão:**
+  - o grão de cada lote é o kg consumido vezes o rendimento da ordem;
+  - **rendimento sobre o pesado:** o grão dividido pelos kg pesados na balança. Junta o desconto da classe e as perdas do processo;
+  - **material no kg de grão:** o que foi pago ao fornecedor dividido pelo grão que o material dele virou;
+  - **preço equivalente:** o preço pago vezes o rendimento do fornecedor dividido pela média dos fornecedores. A seta ▼ mostra o fornecedor que rende menos que a média: o preço justo do material dele é menor;
+  - use esta tabela para negociar o preço com cada fornecedor.
+- **Grão produzido:** custo por kg do material e do processo, preço da resina virgem e economia, por grão.
+- **Material de entrada:** rendimento de cada material, separando a apara interna e o grão reprocessado.
+
+![Figura 14 — Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu](img/recuperadora-13.jpg)
+
+## 11. Quem pode o quê
 
 | Ação | Quem |
 |---|---|
@@ -238,10 +354,14 @@ Quando o módulo é ligado depois, ou as regras mudam, use **Refazer as aparas d
 | Fechar ticket com desconto acima do máximo | Administrador, financeiro e diretor |
 | Cancelar ticket fechado; adiantamentos; classificar fornecedor | Administrador, financeiro e diretor |
 | Bloquear e liberar lote | Administrador, financeiro e diretor |
-| Parâmetros, materiais, classes, preços e regras da apara | Administrador, financeiro e diretor |
+| Abrir e apontar ordem de reprocesso; concluir; cancelar ordem aberta | Administrador, financeiro, diretor e produção |
+| Registrar ensaio; saída para a OP ou venda | Administrador, financeiro, diretor e produção |
+| Concessão no ensaio; saída por perda ou ajuste | Administrador, financeiro e diretor |
+| Parâmetros, materiais, classes, preços, regras da apara, etapas, custos, especificações e limites | Administrador, financeiro e diretor |
 
-## 8. Histórico de alterações
+## 12. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 09/11/2026 | Primeira versão (Recuperadora, parte 1). Inclui modo do módulo, materiais, classes, preços por vigência, ticket da balança com leitura direta, fechamento com lotes, título a pagar e abatimento do adiantamento, cancelamento, comprovante, fotos, nota, importação da planilha da balança, fornecedores e coletor incentivado, adiantamentos, relação para a nota de entrada, lotes com etiqueta e aparas internas automáticas. |
+| 1.1 | 09/11/2026 | Recuperadora, parte 2. Inclui processo e custos nos parâmetros (etapas, energia, água, mão de obra, máquina, meta de rendimento, exigir ensaio, resina virgem), ordem de reprocesso com lotes, etapas e perdas, conclusão com o lote de grão e o custo, qualidade do grão (ensaio, especificação, concessão, limite de reciclado), saída dos lotes, e rendimento e custo por fornecedor e por grão com a economia contra a resina virgem. |

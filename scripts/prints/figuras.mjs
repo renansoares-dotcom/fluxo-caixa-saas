@@ -304,4 +304,10 @@ export const FIGS = [
   ['recuperadora', 'recuperadora/entradas', '## 4.', 'Fornecedores de reciclável com o tipo, o coletor incentivado e os adiantamentos', 'fornecedores'],
   ['recuperadora', 'recuperadora/entradas', '### 4.3', 'Relação para a nota de entrada: compras sem nota por fornecedor e material, com o NCM', 'relacao'],
   ['recuperadora', 'recuperadora/lotes', '## 5.', 'Lotes da Recuperadora: entradas da balança e aparas internas, com o saldo e o custo por kg', ''],
+  ['recuperadora', 'recuperadora/processamento', '## 7.', 'Processamento: as ordens de reprocesso com a entrada, a saída, o rendimento contra a meta e o custo do kg', ''],
+  ['recuperadora', 'recuperadora/processamento', '### 7.2', 'Ordem aberta: lotes que entram, etapas com horas e perdas, custos e o resumo com o rendimento e o custo do kg de grão', 'click:tr[data-id="ro6"]'],
+  ['recuperadora', 'recuperadora/qualidade', '## 8.', 'Qualidade do Grão: lotes aguardando ensaio, reprovados e liberados, com o último ensaio', ''],
+  ['recuperadora', 'recuperadora/qualidade', '## 8.', 'Ensaio fora da especificação: a prévia mostra os motivos antes de registrar', 'click:[data-en="GRL5"]|fill:#ef label:nth-child(1) input=1,7|fill:#ef label:nth-child(2) input=0,38|fill:#ef label:nth-child(3) input=0,925'],
+  ['recuperadora', 'recuperadora/rendimento', '## 10.', 'Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu', ''],
+  ['recuperadora', 'recuperadora/parametros', '### 1.5', 'Processo e custos: energia, água, mão de obra, máquina, meta de rendimento, ensaio, etapas e resina virgem', 'processo'],
 ];

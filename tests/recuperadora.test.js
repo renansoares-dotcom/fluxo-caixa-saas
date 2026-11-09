@@ -48,3 +48,24 @@ test('placa e coletor incentivado', () => {
   assert.equal(placa('abc-1d23'), 'ABC1D23');
   assert.ok(COLETOR_SUGERIDO('catador_pf')); assert.ok(!COLETOR_SUGERIDO('sucateiro_pj'));
 });
+
+import { custoProcesso, resumoOrdem, avaliarEnsaio, precoEquivalente, horasEtapa } from '../js/lib/recuperadora.js';
+test('custo do processo igual ao banco (teste 88)', () => {
+  const o = { energia_kwh: 100, agua_m3: 2, quimicos_valor: 15, mo_horas: 4, outros_valor: 0, maquina_id: 'agl' };
+  const et = [{ maquina_id: 'moa', inicio: '2026-11-09T08:00:00-03:00', fim: '2026-11-09T09:30:00-03:00', kg_saida: 120, perda_sujeira: 7, perda_finos: 2, ordem: 2 },
+    { horas_maquina: 2, kg_saida: 110, perda_umidade: 10, ordem: 5 }];
+  const cfg = { custo_kwh: 0.8, custo_m3_agua: 10, custo_hora_mo: 25 }, ch = (m) => ({ moa: 40, agl: 60 }[m] || 0);
+  assert.equal(horasEtapa(et[0]), 1.5);
+  assert.equal(custoProcesso(o, et, cfg, ch).total, 395);
+  const R = resumoOrdem(o, [{ kg: 100, custo: 220 }, { kg: 29, custo: 14.5 }], et, cfg, ch);
+  assert.deepEqual([R.entrada, R.kgSaida, R.total, R.perdaTotal, R.naoExplicado], [129, 110, 629.5, 19, 0]);
+  assert.equal(R.custoKg, 5.7227);
+});
+test('ensaio e preço equivalente', () => {
+  const s = { mfi_min: 0.5, mfi_max: 3, umidade_max: 0.3 };
+  assert.deepEqual(avaliarEnsaio({ mfi: 1.2, umidade: 0.5 }, s), ['umidade acima de 0.3%']);
+  assert.deepEqual(avaliarEnsaio({ mfi: 1.2, umidade: 0.2 }, s), []);
+  assert.deepEqual(avaliarEnsaio({ mfi: 1 }, null), []);
+  assert.equal(precoEquivalente({ preco_pago_kg: 2, rendimento_pesado: 0.72 }, 0.8), 1.8);
+  assert.equal(precoEquivalente({ preco_pago_kg: 2 }, 0.8), null);
+});

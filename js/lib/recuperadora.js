@@ -76,3 +76,57 @@ export function estoquePorMaterial(lotes) {
   for (const x of m.values()) x.custoKg = x.kg ? Math.round(x.custo / x.kg * 10000) / 10000 : 0;
   return m;
 }
+
+// ---------------------------------------------------------------- parte 2: processamento, qualidade e custo
+export const DESTINOS = { producao: 'Volta para a linha (OP)', venda: 'Venda', perda: 'Perda', ajuste: 'Ajuste' };
+export const PERDAS = { perda_umidade: 'Umidade', perda_sujeira: 'Sujeira', perda_finos: 'Finos', perda_rejeito: 'Rejeito' };
+
+/** horas da etapa: informadas ou pelo início e fim */
+export const horasEtapa = (e) => +e.horas_maquina > 0 ? +e.horas_maquina : (e.inicio && e.fim ? r2((new Date(e.fim) - new Date(e.inicio)) / 36e5) : 0);
+
+/**
+ * custo do processo da ordem (igual a _rec_custo_processo): energia, água, químicos, mão de obra, outros e máquina por etapa
+ * custoHora(maquina_id) devolve o custo-hora da máquina (máquina → setor → padrão)
+ */
+export function custoProcesso(o, etapas, cfg, custoHora = () => 0) {
+  const p = { energia: r2((+o.energia_kwh || 0) * (+cfg.custo_kwh || 0)), agua: r2((+o.agua_m3 || 0) * (+cfg.custo_m3_agua || 0)), quimicos: r2(+o.quimicos_valor || 0),
+    mao_obra: r2((+o.mo_horas || 0) * (+cfg.custo_hora_mo || 0)), outros: r2(+o.outros_valor || 0),
+    maquina: r2((etapas || []).reduce((s, e) => s + horasEtapa(e) * (+custoHora(e.maquina_id || o.maquina_id) || 0), 0)) };
+  p.total = r2(p.energia + p.agua + p.quimicos + p.mao_obra + p.outros + p.maquina);
+  return p;
+}
+
+/** resumo da ordem: entrada, perdas apontadas, rendimento e custo por kg (com a saída informada ou prevista pela última etapa) */
+export function resumoOrdem(o, entradas, etapas, cfg, custoHora, saida = null) {
+  const entrada = r3((entradas || []).reduce((s, e) => s + (+e.kg || 0), 0)), material = r2((entradas || []).reduce((s, e) => s + (+e.custo || 0), 0));
+  const perdas = Object.fromEntries(Object.keys(PERDAS).map(k => [k, r3((etapas || []).reduce((s, e) => s + (+e[k] || 0), 0))]));
+  const perdaTotal = r3(Object.values(perdas).reduce((s, v) => s + v, 0));
+  const ult = [...(etapas || [])].filter(e => e.kg_saida != null && e.kg_saida !== '').sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0)).at(-1);
+  const kgSaida = saida != null ? +saida : (o.peso_saida != null ? +o.peso_saida : (ult ? +ult.kg_saida : r3(entrada - perdaTotal)));
+  const proc = custoProcesso(o, etapas, cfg, custoHora), total = r2(material + proc.total);
+  return { entrada, material, perdas, perdaTotal, kgSaida, rendimento: entrada ? kgSaida / entrada : null, processo: proc, total, custoKg: kgSaida ? Math.round(total / kgSaida * 10000) / 10000 : null,
+    naoExplicado: r3(entrada - kgSaida - perdaTotal) };
+}
+
+/** avalia o ensaio contra a especificação (prévia do rec_ensaio_registrar): lista de motivos; vazia = aprovado */
+export function avaliarEnsaio(e, s) {
+  const m = []; if (!s) return m;
+  const n = (v) => v === '' || v == null ? null : +v;
+  const mfi = n(e.mfi), um = n(e.umidade), de = n(e.densidade), co = n(e.contaminacao);
+  if (mfi != null && s.mfi_min != null && mfi < +s.mfi_min) m.push(`índice de fluidez abaixo de ${s.mfi_min}`);
+  if (mfi != null && s.mfi_max != null && mfi > +s.mfi_max) m.push(`índice de fluidez acima de ${s.mfi_max}`);
+  if (um != null && s.umidade_max != null && um > +s.umidade_max) m.push(`umidade acima de ${s.umidade_max}%`);
+  if (de != null && s.densidade_min != null && de < +s.densidade_min) m.push(`densidade abaixo de ${s.densidade_min}`);
+  if (de != null && s.densidade_max != null && de > +s.densidade_max) m.push(`densidade acima de ${s.densidade_max}`);
+  if (co != null && s.contaminacao_max != null && co > +s.contaminacao_max) m.push(`contaminação acima de ${s.contaminacao_max}%`);
+  return m;
+}
+
+/**
+ * preço equivalente pelo rendimento: quanto valeria o kg pesado do fornecedor se ele rendesse a média.
+ * f = { preco_pago_kg, rendimento_pesado }, media = rendimento médio (grão ÷ pesado) de todos os fornecedores
+ */
+export function precoEquivalente(f, media) {
+  if (!f || f.preco_pago_kg == null || !f.rendimento_pesado || !media) return null;
+  return Math.round(+f.preco_pago_kg * (+f.rendimento_pesado / media) * 10000) / 10000;
+}

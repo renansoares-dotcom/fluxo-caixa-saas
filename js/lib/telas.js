@@ -19,7 +19,7 @@ export const TELAS = {
   // Produção
   'producao/terminal': 'PRD001', 'producao': 'PRD002', 'producao/planta': 'PRD003', 'producao/ordens': 'PRD004', 'producao/programacao': 'PRD005', 'producao/sequenciamento': 'PRD024',
   'producao/cadastros': 'PRD006', 'producao/importar': 'PRD007', 'producao/oee': 'PRD019', 'producao/custos': 'PRD020', 'producao/rastreio': 'PRD021', 'manutencao/preventivas': 'PRD022', 'tintas/previsao': 'PRD023',
-  'recuperadora': 'REC001', 'recuperadora/entradas': 'REC002', 'recuperadora/lotes': 'REC003', 'recuperadora/parametros': 'REC009',
+  'recuperadora': 'REC001', 'recuperadora/entradas': 'REC002', 'recuperadora/lotes': 'REC003', 'recuperadora/processamento': 'REC004', 'recuperadora/rendimento': 'REC005', 'recuperadora/qualidade': 'REC006', 'recuperadora/parametros': 'REC009',
   'manutencao': 'PRD008', 'manutencao/ordens': 'PRD009', 'manutencao/equipamentos': 'PRD010', 'manutencao/celular': 'PRD011',
   'qualidade': 'PRD012', 'qualidade/inspecoes': 'PRD013', 'qualidade/nao-conformidades': 'PRD014', 'qualidade/planos': 'PRD015',
   'tintas': 'PRD016', 'tintas/ordens': 'PRD017', 'tintas/receitas': 'PRD018',

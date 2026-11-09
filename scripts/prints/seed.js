@@ -2266,3 +2266,48 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
     return ii.length ? { fornecedor_id: f.id, fornecedor: f.nome, documento: f.documento, rec_tipo: f.rec_tipo, coletor_incentivado: true, material: nomeM(m.id), ncm: m.ncm, tickets: tt.filter(t => ii.some(i => i.ticket_id === t.id)).map(t => t.numero).join(', '),
       kg: sumBy(ii, i => i.peso_pago), valor: sumBy(ii, i => i.valor), preco_medio: Math.round(sumBy(ii, i => i.valor) / sumBy(ii, i => i.peso_pago) * 10000) / 10000 } : null; }).filter(Boolean) : []; }).flat();
 }
+
+// Recuperadora parte 2 (SQL 152) — reprocesso FICTÍCIO: ordens, etapas, ensaios e saídas inventados
+{
+  DB.rec_materiais.push({ id: 'rm6', empresa_id: E, codigo: 'GR-PEBD', nome: 'Grão PEBD reciclado', polimero: 'PEBD', cor: 'cinza claro', condicao: 'limpo', ncm: '39011092', produto_id: null, ativo: true });
+  Object.assign(DB.rec_config[0], { custo_kwh: 0.78, custo_m3_agua: 12.5, custo_hora_mo: 24, custo_hora_maquina: 45, meta_rendimento_pct: 82, exigir_ensaio: true, prefixo_grao: 'GR' });
+  DB.rec_etapas = [['TRI', 'Triagem', 1], ['MOA', 'Moagem', 2], ['LAV', 'Lavagem', 3], ['SEC', 'Secagem', 4], ['AGL', 'Aglutinação', 5], ['EXT', 'Extrusão e granulação', 6]].map(([codigo, nome, ordem]) => ({ id: 'et' + codigo, empresa_id: E, codigo, nome, ordem, ativo: true }));
+  DB.rec_resina_virgem = [{ id: 'rv1', empresa_id: E, polimero: 'PEBD', vigencia: '2026-10-01', preco_kg: 9.8, fonte: 'cotação do distribuidor (exemplo)' }, { id: 'rv2', empresa_id: E, polimero: 'PP', vigencia: '2026-10-01', preco_kg: 8.9, fonte: 'cotação do distribuidor (exemplo)' }];
+  DB.rec_especificacoes = [{ id: 'es1', empresa_id: E, material_id: 'rm6', mfi_min: 0.8, mfi_max: 2.5, umidade_max: 0.3, densidade_min: 0.915, densidade_max: 0.935, contaminacao_max: 0.5, observacao: 'Para filme de embalagem industrial' }];
+  const prodSaco = DB.produtos?.[0]; DB.rec_limites = prodSaco ? [{ id: 'li1', empresa_id: E, produto_id: prodSaco.id, max_pct: 30 }] : [];
+  const maq = DB.prod_maquinas?.find(m => m.tipo_visual === 'aglutinador') || DB.prod_maquinas?.[0];
+  DB.rec_ordens = []; DB.rec_ordem_entradas = []; DB.rec_ordem_etapas = []; DB.rec_ensaios = []; DB.rec_lote_saidas = [];
+  const grao = (num, data, ent, sai, cm, cp, sit, en) => {
+    const lid = 'GRL' + num, o = { id: 'ro' + num, empresa_id: E, numero: num, data, material_saida_id: 'rm6', maquina_id: maq?.id || null, situacao: 'concluida', energia_kwh: Math.round(ent * 0.32), agua_m3: Math.round(ent / 400 * 10) / 10,
+      quimicos_valor: Math.round(ent * 0.02), mo_horas: Math.round(ent / 250 * 10) / 10, outros_valor: 0, peso_entrada: ent, peso_saida: sai, custo_material: cm, custo_processo: cp, custo_total: cm + cp, lote_saida_id: lid, observacao: null };
+    DB.rec_ordens.push(o);
+    DB.rec_lotes.push({ id: lid, empresa_id: E, codigo: `GR-${data.slice(2).replace(/-/g, '')}-${num}`, tipo: 'grao', material_id: 'rm6', classe_id: null, fornecedor_id: null, ticket_item_id: null, data, peso_kg: sai, saldo_kg: sit === 'disponivel' ? Math.round(sai * 0.4) : sai, custo_total: cm + cp, situacao: sit, observacao: null });
+    if (en) DB.rec_ensaios.push({ id: id('re'), empresa_id: E, lote_id: lid, data, ...en });
+    return o;
+  };
+  grao(1, '2026-11-03', 3420, 2858, 5280.4, 2342.1, 'disponivel', { mfi: 1.6, umidade: 0.18, densidade: 0.924, contaminacao: 0.2, cor: 'cinza claro', resultado: 'aprovado', motivos: [] });
+  grao(2, '2026-11-04', 1210, 1032, 1010.6, 869.4, 'disponivel', { mfi: 1.9, umidade: 0.22, densidade: 0.921, contaminacao: 0.3, cor: 'cinza claro', resultado: 'aprovado', motivos: [] });
+  grao(3, '2026-11-05', 2680, 2034, 4105.7, 1902.3, 'bloqueado', { mfi: 2.9, umidade: 0.41, densidade: 0.926, contaminacao: 0.4, cor: 'cinza', resultado: 'reprovado', motivos: ['índice de fluidez acima de 2.5', 'umidade acima de 0.3%'] });
+  grao(4, '2026-11-06', 812.5, 696, 0, 581.2, 'disponivel', { mfi: 1.2, umidade: 0.12, densidade: 0.923, contaminacao: 0.1, cor: 'natural', resultado: 'aprovado', motivos: [] });
+  grao(5, '2026-11-07', 2510, 2088, 3907.5, 1774.6, 'bloqueado', null);
+  // ordem aberta com lotes e etapas
+  const lotesE = DB.rec_lotes.filter(l => ['LE122-1', 'AP-261106-AP-PEBD'].includes(l.codigo));
+  DB.rec_ordens.push({ id: 'ro6', empresa_id: E, numero: 6, data: '2026-11-09', material_saida_id: 'rm6', maquina_id: maq?.id || null, situacao: 'aberta', energia_kwh: 640, agua_m3: 5.2, quimicos_valor: 42, mo_horas: 9, outros_valor: 0, peso_entrada: null, peso_saida: null, observacao: null });
+  for (const [l, kgv] of [[lotesE[0], 1600], [lotesE[1], 240]]) if (l) { DB.rec_ordem_entradas.push({ id: id('oe'), empresa_id: E, ordem_id: 'ro6', rec_ordem_id: 'ro6', lote_id: l.id, rec_lote_id: l.id, kg: kgv, custo: Math.round(kgv * l.custo_total / l.peso_kg * 100) / 100, criado_em: '2026-11-09T07:00:00Z' }); l.saldo_kg = Math.round((l.saldo_kg - kgv) * 1000) / 1000; l.situacao = 'em_processo'; }
+  const mq = (c) => DB.prod_maquinas?.find(m => (m.codigo || '').toUpperCase().includes(c))?.id || null;
+  DB.rec_ordem_etapas = [['etTRI', null, 1.5, 1840, 1795, 0, 45, 0, 0, 'Severino'], ['etMOA', mq('MO'), 2.5, 1795, 1781, 0, 0, 14, 0, 'Severino'], ['etLAV', null, 3, 1781, 1702, 0, 79, 0, 0, 'Josué'], ['etSEC', null, 2, 1702, 1611, 91, 0, 0, 0, 'Josué']]
+    .map(([etapa_id, maquina_id, h, ke, ks, pu, ps, pf, pr, operador], i) => ({ id: 'oet' + i, empresa_id: E, ordem_id: 'ro6', etapa_id, maquina_id, operador, horas_maquina: h, kg_entrada: ke, kg_saida: ks, perda_umidade: pu, perda_sujeira: ps, perda_finos: pf, perda_rejeito: pr, criado_em: `2026-11-09T0${8 + i}:00:00Z` }));
+  DB.rec_lote_saidas = [{ id: 'ls1', empresa_id: E, lote_id: 'GRL1', data: '2026-11-05', destino: 'producao', kg: 1715, custo: 4573.6, documento: 'OP 2318', observacao: null }, { id: 'ls2', empresa_id: E, lote_id: 'GRL2', data: '2026-11-06', destino: 'venda', kg: 619, custo: 1127.9, documento: 'NF 10452', observacao: null }];
+  const Fn = (t) => DB.favorecidos.find(f => f.nome.startsWith(t));
+  window.RPC.rec_rendimento = () => ({ meta_pct: 82, total: { ordens: 5, entrada: 10632.5, saida: 8708, rendimento: 0.819, custo_material: 14304.2, custo_processo: 7469.6, custo_kg: 2.5004 },
+    perdas: { umidade: 612.4, sujeira: 978.3, finos: 186.9, rejeito: 146.9 },
+    grao: [{ material: 'GR-PEBD — Grão PEBD reciclado', polimero: 'PEBD', ordens: 5, entrada: 10632.5, saida: 8708, rendimento: 0.819, custo_material_kg: 1.6427, custo_processo_kg: 0.8578, custo_kg: 2.5004, virgem_kg: 9.8, economia: 63563.32 }],
+    fornecedores: [
+      { fornecedor_id: Fn('APARAS NORDESTE').id, fornecedor: 'APARAS NORDESTE COMÉRCIO LTDA', rec_tipo: 'sucateiro_pj', pesado: 3718, consumido: 3421, grao: 2858.6, rendimento: 0.8356, rendimento_pesado: 0.7689, pago: 5134.15, custo_grao_kg: 1.796, preco_pago_kg: 1.3809 },
+      { fornecedor_id: Fn('COOPERATIVA').id, fornecedor: 'COOPERATIVA RECICLA AGRESTE', rec_tipo: 'cooperativa', pesado: 2548, consumido: 2432.3, grao: 2116.1, rendimento: 0.87, rendimento_pesado: 0.8305, pago: 4348.91, custo_grao_kg: 2.0552, preco_pago_kg: 1.7068 },
+      { fornecedor_id: Fn('JOSÉ AMARO').id, fornecedor: 'JOSÉ AMARO DA SILVA', rec_tipo: 'catador_pf', pesado: 728, consumido: 634.3, grao: 470.4, rendimento: 0.7416, rendimento_pesado: 0.6462, pago: 1160.93, custo_grao_kg: 2.4679, preco_pago_kg: 1.5947 },
+      { fornecedor_id: null, fornecedor: 'Aparas internas', rec_tipo: null, pesado: 812.5, consumido: 812.5, grao: 696, rendimento: 0.8566, rendimento_pesado: 0.8566, pago: 0, custo_grao_kg: 0, preco_pago_kg: 0 }],
+    materiais: [{ material: 'PEBD-T — Filme PEBD transparente', tipo: 'entrada', consumido: 5120.4, grao: 4352.3, rendimento: 0.85 }, { material: 'PP-R — Ráfia e sacaria de PP', tipo: 'entrada', consumido: 1308, grao: 1046.4, rendimento: 0.8 },
+      { material: 'PEBD-C — Filme PEBD colorido', tipo: 'entrada', consumido: 1000.96, grao: 790.8, rendimento: 0.79 }, { material: 'AP-PEBD — Apara interna PEBD', tipo: 'apara', consumido: 812.5, grao: 696, rendimento: 0.8566 }],
+    ordens: DB.rec_ordens.filter(o => o.situacao === 'concluida').map(o => ({ id: o.id, numero: o.numero, data: o.data, material: 'GR-PEBD', entrada: o.peso_entrada, saida: o.peso_saida, rendimento: Math.round(o.peso_saida / o.peso_entrada * 10000) / 10000, custo_kg: Math.round(o.custo_total / o.peso_saida * 10000) / 10000 })).reverse() });
+}
