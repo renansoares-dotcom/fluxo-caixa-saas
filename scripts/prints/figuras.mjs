@@ -294,4 +294,6 @@ export const FIGS = [
   ['empresa-usuarios', 'config', '### 4.6', 'Perfis de acesso por tela e as formas de entrar (Google e Microsoft)', 'scroll:#perfis-tela'],
   ['empresa-usuarios', 'config', '### 4.4', 'Perfil de acesso por tela: as telas marcadas, agrupadas como no menu', 'click:#perfis-tela tr[data-p="ap1"]'],
   ['contratos', 'contratos', '### 8.1', 'Rotina automática dos contratos: reajuste proposto, parcelas, avisos e os índices do Banco Central', 'click:#ct-auto'],
+  ['ajuda-na-tela', 'fiscal/apuracao', '## 2.', 'O "?" abre ao lado o trecho do manual da tela, com as seções, os vídeos e o tour', 'click:#ajuda-btn'],
+  ['ajuda-na-tela', 'fiscal/apuracao', '## 4.', 'Tour da plataforma: um passo de cada vez, com o ponto da tela em destaque', 'click:#ajuda-btn|click:#aj-tour'],
 ];

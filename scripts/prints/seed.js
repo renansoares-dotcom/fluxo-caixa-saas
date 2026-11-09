@@ -2198,3 +2198,7 @@ DB.plataforma_login = [{ id: 1, senha: true, google: true, microsoft: true, avis
 // Contratos automáticos (SQL 149) — índices FICTÍCIOS
 DB.contrato_config = [{ empresa_id: E, propor_reajuste: true, dias_antes_reajuste: 30, gerar_parcelas: true, meses_parcelas: 12, avisar: true, dias_aviso_vencimento: 30, papeis: ['admin', 'financeiro'] }];
 DB.indices_economicos = ['IPCA', 'IGP-M', 'INPC'].map((k, i) => ({ indice: k, mes: '2026-' + ['10', '10', '09'][i] + '-01', pct: 0.4 }));
+
+// Ajuda na tela (SQL 150) — vídeo FICTÍCIO (só o título aparece na figura)
+DB.ajuda_videos = [{ id: 'av1', empresa_id: E, rota: 'fiscal/apuracao', titulo: 'Fechar a apuração do mês (2 min)', url: 'https://youtu.be/aaaaaaaaaaa', ordem: 10 }];
+window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () => null;

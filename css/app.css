@@ -1190,3 +1190,19 @@ table.metas-grade td.sticky{min-width:150px;white-space:normal}
 .auth-sociais .auth-social{width:100%;justify-content:center}
 .auth-ou{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
 .auth-ou::before,.auth-ou::after{content:"";flex:1;border-top:1px solid var(--border)}
+
+/* ajuda na tela e tour (melhoria 10.5) */
+.ajuda-painel{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--surface,#fff);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.12);z-index:900;
+  display:flex;flex-direction:column;transform:translateX(105%);transition:transform .2s ease}
+.ajuda-painel.aberto{transform:none}
+.ajuda-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.ajuda-barra{padding:8px 16px}.ajuda-barra select{width:100%}
+.ajuda-videos{padding:0 16px 8px;display:flex;flex-wrap:wrap;gap:6px}
+#aj-player{padding:0 16px}.ajuda-video{position:relative;padding-top:56.25%;margin-bottom:8px}.ajuda-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:8px}
+.ajuda-corpo{flex:1;overflow:auto;padding:4px 16px 16px}.ajuda-corpo .manual-corpo img{max-width:100%;height:auto;border:1px solid var(--border);border-radius:6px}
+.ajuda-pe{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;border-top:1px solid var(--border)}
+.tour-fundo{position:fixed;inset:0;z-index:950}
+.tour-luz{position:fixed;z-index:951;border-radius:10px;box-shadow:0 0 0 9999px rgba(15,23,42,.55);pointer-events:none;transition:all .2s ease}
+.tour-balao{position:fixed;z-index:952;background:var(--surface,#fff);color:var(--text,#111);border-radius:10px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.tour-balao p{margin:6px 0 10px}.tour-acoes{display:flex;gap:6px;align-items:center}
+@media print{.ajuda-painel,.tour-fundo,.tour-luz,.tour-balao{display:none!important}}

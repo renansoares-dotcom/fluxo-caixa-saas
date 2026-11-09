@@ -5,6 +5,7 @@ import { iniciarNotificacoes, pararNotificacoes } from './lib/notif.js';
 import { iniciarBusca } from './lib/busca.js';
 import { iniciarSelectBusca } from './lib/select-busca.js';
 import { manualDaRota } from './lib/tutoriais.js';
+import { abrirAjuda, fecharAjuda, iniciarTour } from './lib/ajuda-ui.js';
 import { verificarAoEntrar, gerenciar as gerenciarMFA } from './lib/mfa.js';
 import { iniciarChat, pararChat, setAberta as chatFechado } from './lib/chat.js';
 import { alternarMini, fecharMini } from './lib/mini-chat.js';
@@ -204,6 +205,7 @@ async function prepararLoginSocial() {
   };
 }
 prepararLoginSocial();
+$('#tour-btn').onclick = (e) => { e.preventDefault(); iniciarTour(true); };
 $('#auth-reset').onclick = async () => {
   const email = $('#auth-form [name=email]').value;
   if (!email) return toast('Digite seu e-mail primeiro', true);
@@ -364,6 +366,7 @@ async function entrarEmpresa(emp, papel, areas) {
   $$('#nav .nav-audit').forEach(el => el.hidden = !['admin', 'diretor'].includes(papel));
   $$('#nav .nav-admin').forEach(el => el.hidden = papel !== 'admin');
   await aplicarPerfil(emp.id, papel);
+  setTimeout(() => iniciarTour().catch(() => {}), 1500);   // tour de boas-vindas (melhoria 10.5): só na primeira vez
   if (papel === 'compras') { if (!rotaDeCompras(location.hash.replace(/^#\//, ''))) location.hash = '#/compras'; else render(); return; }
   if (papel === 'vendas') { if (!rotaDeVendas(location.hash.replace(/^#\//, ''))) location.hash = '#/comercial'; else render(); return; }
   if (papel === 'producao') { if (!rotaDeProducao(location.hash.replace(/^#\//, ''))) location.hash = '#/producao/terminal'; else render(); return; }
@@ -442,7 +445,8 @@ async function render() {
     // código da tela (js/lib/telas.js), como no Iniflex
     { const cod = codigoDa(route), pc = $('#page-cod'); if (pc) { pc.textContent = cod; pc.hidden = !cod; } marcarTela(route); telaUso(route); }
     // botão "?": manual de uso desta tela (Ajuda › Tutoriais)
-    { const man = manualDaRota(route), b = $('#ajuda-btn'); if (b) { b.hidden = !man || (man.rh && !temRH()); if (man) b.href = `#/tutoriais?m=${man.id}`; } }
+    { const man = manualDaRota(route), b = $('#ajuda-btn'); if (b) { b.hidden = !man || (man.rh && !temRH()); if (man) { b.href = `#/tutoriais?m=${man.id}`; b.onclick = (e) => { if (e.ctrlKey || e.metaKey) return; e.preventDefault(); abrirAjuda(route); }; } } }
+    fecharAjuda();
     // trilha: Área › Seção (de onde a página fica no menu)
     { const a = $(`#nav a[data-route="${route}"]`); const area = a?.closest('.nav-area'); const sec = a?.closest('details')?.querySelector('summary')?.textContent;
       const tit = area?.querySelector('.nav-area-tit')?.dataset.nome; const tr = $('#page-trilha');
