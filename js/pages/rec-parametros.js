@@ -51,6 +51,13 @@ async function geral(c, R, root) {
       <label>Prazo de pagamento (dias depois da pesagem)<input type="number" name="prz" min="0" max="120" value="${p.prazo_pagamento_dias}" ${dis}></label>
       <label>Conta do adiantamento a fornecedor<select name="pla" ${dis}>${optPl(p.plano_adiantamento_id)}</select></label>
       <label class="chk"><input type="checkbox" name="abt" ${p.abater_adiantamento ? 'checked' : ''} ${dis}> Abater o adiantamento em aberto do fornecedor ao fechar o ticket</label></div>
+    <h3 style="margin:20px 0 8px">Alertas e ambiental</h3>
+    <div class="grid2"><label>Tolerância da perda não explicada no balanço (% da entrada)<input name="btol" inputmode="decimal" value="${num(p.balanco_tolerancia_pct ?? 2)}" ${dis}></label>
+      <label>Avisar as licenças com (dias de antecedência)<input type="number" name="lant" min="1" max="365" value="${p.licenca_antecedencia_dias ?? 60}" ${dis}></label>
+      <label>Lote de grão sem ensaio vira alerta depois de (dias)<input type="number" name="eal" min="0" max="60" value="${p.ensaio_alerta_dias ?? 2}" ${dis}></label>
+      <label>Adiantamento em aberto vira alerta depois de (dias)<input type="number" name="aal" min="1" max="365" value="${p.adiant_alerta_dias ?? 30}" ${dis}></label>
+      <label>Conta do custo de destinação de resíduos (título a pagar)<select name="plr" ${dis}>${optPl(p.plano_residuos_id)}</select></label>
+      <label class="chk"><input type="checkbox" name="alic" ${p.avisar_licencas !== false ? 'checked' : ''} ${dis}> Avisar o administrador e o diretor das licenças a vencer e vencidas</label></div>
     <h3 style="margin:20px 0 8px">Estoque</h3>
     <div class="grid2"><label class="chk"><input type="checkbox" name="est" ${p.integrar_estoque ? 'checked' : ''} ${dis}> Lançar a compra no Kardex (material ligado a um produto)</label>
       <label>Local do estoque<select name="loc" ${dis}><option value="">— local de aparas (APA) —</option>${LOC.map(l => `<option value="${l.id}" ${p.est_local_id === l.id ? 'selected' : ''}>${esc(l.codigo)} · ${esc(l.nome)}</option>`).join('')}</select></label></div>
@@ -63,7 +70,9 @@ async function geral(c, R, root) {
       await q(sb.from('rec_config').update({ modo: f.modo.value, aparas_auto: f.aa.checked, apara_material_padrao_id: f.amp.value || null, apara_custo_kg: parseNum(f.ack.value) || 0,
         prefixo_apara: f.pa.value.trim() || 'AP', tolerancia_kg: parseNum(f.tol.value) || 0, desconto_max_pct: Math.min(100, parseNum(f.dmax.value) || 0), exigir_foto: f.foto.checked,
         balanca_baud: +f.baud.value || 9600, prefixo_entrada: f.pe.value.trim() || 'LE', plano_compra_id: f.plc.value || null, prazo_pagamento_dias: Math.max(0, Math.min(120, +f.prz.value || 0)),
-        plano_adiantamento_id: f.pla.value || null, abater_adiantamento: f.abt.checked, integrar_estoque: f.est.checked, est_local_id: f.loc.value || null, atualizado_em: new Date().toISOString() }).eq('empresa_id', e));
+        plano_adiantamento_id: f.pla.value || null, abater_adiantamento: f.abt.checked, integrar_estoque: f.est.checked, est_local_id: f.loc.value || null,
+        balanco_tolerancia_pct: Math.min(50, parseNum(f.btol.value) || 0), licenca_antecedencia_dias: Math.max(1, Math.min(365, +f.lant.value || 60)), ensaio_alerta_dias: Math.max(0, Math.min(60, +f.eal.value || 0)),
+        adiant_alerta_dias: Math.max(1, Math.min(365, +f.aal.value || 30)), plano_residuos_id: f.plr.value || null, avisar_licencas: f.alic.checked, atualizado_em: new Date().toISOString() }).eq('empresa_id', e));
       toast('Parâmetros salvos'); recarregar(root);
     } catch (err) { fail(err); }
   };

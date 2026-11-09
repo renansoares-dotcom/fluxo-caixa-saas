@@ -130,3 +130,46 @@ export function precoEquivalente(f, media) {
   if (!f || f.preco_pago_kg == null || !f.rendimento_pesado || !media) return null;
   return Math.round(+f.preco_pago_kg * (+f.rendimento_pesado / media) * 10000) / 10000;
 }
+
+// ---------------------------------------------------------------- parte 3: balanço, ambiental, fiscal e alertas
+export const TIPOS_RESIDUO = { rejeito: 'Rejeito', lodo: 'Lodo da lavagem', borra: 'Borra', finos: 'Finos', outro: 'Outro' };
+const fkg = (v) => Math.round(+v || 0).toLocaleString('pt-BR') + ' kg';
+const fdata = (s) => s ? s.slice(0, 10).split('-').reverse().join('/') : '';
+
+/** situação da licença: vencida, a vencer (dentro da antecedência) ou em dia */
+export function situacaoLicenca(l, hoje, antecedenciaPadrao = 60) {
+  if (!l.validade) return { k: 'sem', txt: 'sem validade', dias: null };
+  const dias = Math.round((new Date(l.validade + 'T12:00:00') - new Date(hoje + 'T12:00:00')) / 864e5);
+  if (dias < 0) return { k: 'vencida', txt: `vencida há ${-dias} dia(s)`, dias };
+  if (dias <= (l.antecedencia_dias ?? antecedenciaPadrao)) return { k: 'avencer', txt: `vence em ${dias} dia(s)`, dias };
+  return { k: 'ok', txt: `em dia (${dias} dias)`, dias };
+}
+
+/** confere as contas do balanço: devolve as linhas de cada bloco e se o processo fecha dentro da tolerância */
+export function conferirBalanco(B) {
+  const m = B.material, p = B.processo, g = B.grao;
+  const calcM = (+m.estoque_inicial) + (+m.comprado) + (+m.aparas) + (+m.outras) - (+m.consumido);
+  const saidas = Object.values(g.saidas || {}).reduce((s, v) => s + +v, 0), calcG = (+g.estoque_inicial) + (+g.produzido) - saidas;
+  const pct = p.entrada ? Math.abs(+p.nao_explicada) / +p.entrada * 100 : 0;
+  return { materialFecha: Math.abs(calcM - +m.estoque_final) < 0.01, grao: { saidas, fecha: Math.abs(calcG - +g.estoque_final) < 0.01 },
+    processoOk: pct <= (+B.tolerancia_pct || 0) + 1e-9, naoExplicadaPct: Math.round(pct * 100) / 100 };
+}
+
+/** alertas do banco (rec_alertas) → itens da Central de Decisões (regra 27) */
+export function alertasParaDecisoes(lista) {
+  const out = [], U = { alto: 'alta', medio: 'media', baixo: 'baixa' };
+  const lic = (lista || []).filter(a => a.k === 'licenca');
+  if (lic.length) out.push({ k: 'rec-licencas', origem: 'Recuperadora', urg: lic.some(a => a.nivel === 'alto') ? 'alta' : 'media', titulo: `${lic.length} licença(s) ambiental(is) vencida(s) ou a vencer`,
+    desc: lic.map(a => `${a.item.tipo}${a.item.numero ? ' ' + a.item.numero : ''}: ${+a.item.dias < 0 ? 'vencida em ' : 'vence em '}${fdata(a.item.validade)}`).join(' · '), impacto: 0, impactoTxt: null,
+    regra: 'Licenças e documentos ambientais da recuperadora com a validade dentro da antecedência dos parâmetros (padrão 60 dias) ou já vencidos. Alta quando faltam 15 dias ou menos.', acao: 'Abrir as licenças', rota: 'recuperadora/ambiental?aba=licencas' });
+  for (const a of (lista || []).filter(x => x.k !== 'licenca')) {
+    const i = a.item || {}, base = { origem: 'Recuperadora', urg: U[a.nivel] || 'media', impacto: 0, impactoTxt: null };
+    if (a.k === 'ensaio') out.push({ ...base, k: 'rec-ensaio', titulo: `${i.lotes} lote(s) de grão aguardando ensaio`, desc: `${fkg(i.kg)} bloqueados até o ensaio`, regra: 'Lote de grão bloqueado sem nenhum ensaio há mais dias do que o parâmetro.', acao: 'Abrir a qualidade do grão', rota: 'recuperadora/qualidade' });
+    if (a.k === 'rendimento') out.push({ ...base, k: 'rec-rendimento', titulo: `${i.ordens} ordem(ns) de reprocesso abaixo da meta de rendimento`, desc: `rendimento dos últimos 30 dias ${String(i.rendimento).replace('.', ',')}% · meta ${String(i.meta).replace('.', ',')}%`, regra: 'Ordens concluídas nos últimos 30 dias com rendimento (grão ÷ entrada) abaixo da meta. Alta com 3 ou mais.', acao: 'Abrir rendimento e custo', rota: 'recuperadora/rendimento' });
+    if (a.k === 'balanco') out.push({ ...base, k: 'rec-balanco', titulo: `Balanço de massa de ${fdata(i.mes).slice(3)} com perda não explicada`, desc: `${fkg(i.kg)} (${String(i.pct).replace('.', ',')}% da entrada) sem perda apontada nas etapas`, regra: 'No mês anterior, a diferença entre a perda das ordens (entrada − grão) e as perdas apontadas nas etapas passou da tolerância dos parâmetros.', acao: 'Abrir o balanço de massa', rota: 'recuperadora/balanco' });
+    if (a.k === 'cdf') out.push({ ...base, k: 'rec-cdf', titulo: `${i.destinacoes} destinação(ões) de resíduo sem CDF`, desc: `${fkg(i.kg)} enviados há mais de 30 dias sem o Certificado de Destinação Final`, regra: 'Resíduo destinado há mais de 30 dias sem o número do CDF.', acao: 'Abrir a destinação de resíduos', rota: 'recuperadora/ambiental' });
+    if (a.k === 'adiantamento') out.push({ ...base, k: 'rec-adiant', titulo: `${i.qtd} adiantamento(s) a fornecedor em aberto há mais de ${i.dias} dias`, desc: `saldo de ${(+i.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} sem compra para abater`, impacto: +i.valor || 0, regra: 'Adiantamento a fornecedor de reciclável com saldo e mais antigo que o prazo dos parâmetros.', acao: 'Abrir os adiantamentos', rota: 'recuperadora/entradas' });
+    if (a.k === 'tickets') out.push({ ...base, k: 'rec-tickets', titulo: `${i.qtd} ticket(s) da balança aberto(s) há mais de 2 dias`, desc: 'Pesagens que ainda não geraram lote nem título a pagar.', regra: 'Ticket aberto com data de pesagem de 2 dias atrás ou mais.', acao: 'Abrir as entradas', rota: 'recuperadora/entradas' });
+  }
+  return out;
+}

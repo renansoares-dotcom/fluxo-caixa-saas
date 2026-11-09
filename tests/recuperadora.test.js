@@ -69,3 +69,18 @@ test('ensaio e preço equivalente', () => {
   assert.equal(precoEquivalente({ preco_pago_kg: 2, rendimento_pesado: 0.72 }, 0.8), 1.8);
   assert.equal(precoEquivalente({ preco_pago_kg: 2 }, 0.8), null);
 });
+
+import { situacaoLicenca, conferirBalanco, alertasParaDecisoes } from '../js/lib/recuperadora.js';
+test('licença, balanço e alertas', () => {
+  assert.equal(situacaoLicenca({ validade: '2026-11-08' }, '2026-11-09').k, 'vencida');
+  assert.equal(situacaoLicenca({ validade: '2026-12-01' }, '2026-11-09').k, 'avencer');
+  assert.equal(situacaoLicenca({ validade: '2026-12-01', antecedencia_dias: 10 }, '2026-11-09').k, 'ok');
+  const B = { tolerancia_pct: 2, material: { estoque_inicial: 100, comprado: 917.6, aparas: 29, outras: 0, consumido: 129, estoque_final: 917.6 },
+    processo: { entrada: 129, nao_explicada: 3 }, grao: { estoque_inicial: 0, produzido: 110, saidas: { producao: 100 }, estoque_final: 10 } };
+  const C = conferirBalanco(B);
+  assert.ok(C.materialFecha); assert.ok(C.grao.fecha); assert.equal(C.processoOk, false); assert.equal(C.naoExplicadaPct, 2.33);
+  const A = alertasParaDecisoes([{ k: 'licenca', nivel: 'alto', item: { tipo: 'LO', numero: '1', validade: '2026-11-01', dias: -8 } }, { k: 'licenca', nivel: 'medio', item: { tipo: 'CTF', validade: '2026-12-20', dias: 41 } },
+    { k: 'ensaio', nivel: 'medio', item: { lotes: 2, kg: 3000 } }, { k: 'adiantamento', nivel: 'medio', item: { qtd: 1, valor: 400, dias: 30 } }]);
+  assert.deepEqual(A.map(a => [a.k, a.urg]), [['rec-licencas', 'alta'], ['rec-ensaio', 'media'], ['rec-adiant', 'media']]);
+  assert.equal(A[2].impacto, 400); assert.ok(A.every(a => a.origem === 'Recuperadora' && a.rota && a.regra));
+});

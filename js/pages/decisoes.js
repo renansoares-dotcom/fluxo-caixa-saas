@@ -57,7 +57,8 @@ async function carregar() {
   const lgpd = await import(`./lgpd.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const arte = temArea('com') || temArea('prd') ? await import(`./preimpressao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd, fech };
+  const recup = temArea('prd') ? await import(`../lib/rec-decisoes.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd, fech, recup };
 }
 
 // ---------------------------------------------------------------- regras
@@ -256,6 +257,9 @@ function regras(D) {
 
   // 26. checklist do fechamento: tarefas manuais atrasadas do mês anterior, com o mês ainda aberto
   for (const a of D.fech || []) out.push(a);
+
+  // 27. recuperadora: licenças, grão sem ensaio, rendimento abaixo da meta, balanço de massa, resíduo sem CDF, adiantamentos e tickets abertos
+  for (const a of D.recup || []) out.push(a);
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

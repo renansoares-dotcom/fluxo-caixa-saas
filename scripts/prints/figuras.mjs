@@ -310,4 +310,8 @@ export const FIGS = [
   ['recuperadora', 'recuperadora/qualidade', '## 8.', 'Ensaio fora da especificação: a prévia mostra os motivos antes de registrar', 'click:[data-en="GRL5"]|fill:#ef label:nth-child(1) input=1,7|fill:#ef label:nth-child(2) input=0,38|fill:#ef label:nth-child(3) input=0,925'],
   ['recuperadora', 'recuperadora/rendimento', '## 10.', 'Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu', ''],
   ['recuperadora', 'recuperadora/parametros', '### 1.5', 'Processo e custos: energia, água, mão de obra, máquina, meta de rendimento, ensaio, etapas e resina virgem', 'processo'],
+  ['recuperadora', 'recuperadora/balanco', '## 11.', 'Balanço de Massa do mês: material, processo com a perda não explicada, grão e resíduos', ''],
+  ['recuperadora', 'recuperadora/ambiental', '## 12.', 'Destinação de resíduos com MTR, CDF, transportador, destinador e custo', ''],
+  ['recuperadora', 'recuperadora/ambiental', '## 12.', 'Licenças e documentos ambientais com a validade e a situação', 'licencas'],
+  ['recuperadora', 'recuperadora/fiscal', '## 13.', 'Créditos Fiscais da Recuperadora: compras por enquadramento, créditos estimados e parâmetros por vigência com a fonte', ''],
 ];

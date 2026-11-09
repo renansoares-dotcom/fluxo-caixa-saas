@@ -1,7 +1,7 @@
 ---
-titulo: Recuperadora — balança, aparas, processamento, qualidade e custo do grão
-tela: Produção › Recuperadora (REC001 a REC006, REC009)
-versao: 1.1
+titulo: Recuperadora — balança, processamento, qualidade, custo, balanço de massa, ambiental e créditos fiscais
+tela: Produção › Recuperadora (REC001 a REC010)
+versao: 1.2
 atualizado: 2026-11-09
 ---
 A Recuperadora controla o material plástico que entra para ser reprocessado (moído, lavado, aglutinado e granulado). Ela serve a três tipos de empresa:
@@ -10,7 +10,11 @@ A Recuperadora controla o material plástico que entra para ser reprocessado (mo
 - **só compra de terceiros**: a empresa compra material reciclável de catadores, cooperativas e sucateiros;
 - **as duas coisas**.
 
-Este manual cobre as partes 1 e 2 do módulo. A parte 1 trata da entrada do material, dos fornecedores, dos adiantamentos, da relação para a nota de entrada e dos lotes. A parte 2 trata do processamento, da qualidade do grão, da saída dos lotes, do rendimento e do custo. O balanço de massa, o controle ambiental e o fiscal vêm na parte 3.
+O manual segue o caminho do material:
+
+- **entrada:** balança, fornecedores, adiantamentos e lotes (seções 1 a 6);
+- **processamento:** qualidade do grão, saída dos lotes, rendimento e custo (seções 7 a 10);
+- **controle:** balanço de massa, ambiental, créditos fiscais e alertas (seções 11 a 14).
 
 ## 1. Ligar e configurar (Parâmetros da Recuperadora)
 
@@ -36,6 +40,11 @@ Em **Produção › Recuperadora › Parâmetros da Recuperadora** (REC009), que
 | Abater o adiantamento | Ao fechar o ticket, o saldo de adiantamento do fornecedor abate a compra |
 | Lançar a compra no Kardex | O material ligado a um produto entra no estoque, no local escolhido (padrão: aparas, APA) |
 | Prefixos | Prefixo do código dos lotes de entrada (LE) e dos lotes de apara (AP) |
+| Tolerância do balanço (%) | Perda não explicada aceita no balanço de massa, em % da entrada nas ordens (seção 11) |
+| Avisar as licenças com (dias) | Antecedência padrão do aviso das licenças (seção 12) |
+| Alertas de ensaio e de adiantamento (dias) | Quando o lote de grão sem ensaio e o adiantamento em aberto viram alerta (seção 14) |
+| Conta do custo de destinação | Conta do título a pagar gerado pela destinação de resíduos com custo |
+| Avisar as licenças | Liga ou desliga o aviso diário das licenças ao administrador e ao diretor |
 
 Na primeira vez, **Criar as classes padrão** cadastra três classes: A (limpo e seco, desconto de 2%), B (sujeira leve, 8%) e C (sujo ou úmido, 15%). Ajuste os percentuais depois.
 
@@ -96,7 +105,7 @@ O **Painel da Recuperadora** (REC001) mostra o mês escolhido:
 
 Abaixo vêm o gráfico das entradas por dia, a tabela **por material** (comprado, valor, apara e saldo em lotes) e a tabela **fornecedores do mês** (peso, desconto, R$/kg pago e valor).
 
-Um aviso amarelo aparece quando há apontamentos com refugo que não viraram lote. Isso acontece quando falta o material padrão da apara ou uma regra.
+O quadro **Pendências da recuperadora** repete os alertas da Central de Decisões (seção 14), cada um com o atalho para a tela que resolve. Um aviso amarelo aparece quando há apontamentos com refugo que não viraram lote. Isso acontece quando falta o material padrão da apara ou uma regra.
 
 ![Figura 4 — Painel da Recuperadora: compras, peso pago, apara interna, entradas por dia, materiais e fornecedores do mês](img/recuperadora-3.jpg)
 
@@ -345,7 +354,74 @@ O custo da saída é o custo médio do lote. Só sai lote **disponível**: o blo
 
 ![Figura 14 — Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu](img/recuperadora-13.jpg)
 
-## 11. Quem pode o quê
+## 11. Balanço de massa
+
+O **Balanço de Massa** (REC007) fecha o mês em quilos e mostra se o material que entrou bate com o que saiu. A tela tem quatro quadros.
+
+- **Material:** estoque inicial em lotes, compra pesada, desconto da classe, apara interna, doações e transferências, consumo no processamento e estoque final. A conta é conferida com o saldo dos lotes.
+- **Processo:** entrada nas ordens concluídas, grão produzido, perdas apontadas por tipo e a **perda não explicada**, que é a entrada menos o grão menos as perdas apontadas. Acima da tolerância dos parâmetros (padrão 2%), o quadro fica vermelho e o alerta vai para a Central de Decisões no mês seguinte.
+- **Grão:** estoque inicial, produção, saídas por destino e estoque final.
+- **Resíduos:** rejeito apontado nas etapas, o que foi destinado no mês por tipo (com e sem CDF) e o total destinado sem CDF.
+
+![Figura 15 — Balanço de Massa do mês: material, processo com a perda não explicada, grão e resíduos](img/recuperadora-15.jpg)
+
+**Relatório de material reciclado** imprime, para o período escolhido:
+
+- as toneladas de grão produzido por material;
+- a origem do material recebido: catadores e cooperativas, empresas, doações e aparas da própria produção;
+- os resíduos destinados.
+
+O relatório serve para clientes, para a logística reversa e para a comunicação da empresa.
+
+## 12. Ambiental
+
+Em **Ambiental** (REC008), quem configura a produção registra os resíduos e os documentos ambientais.
+
+**Destinação de resíduos.** Cada envio de rejeito, lodo da lavagem, borra, finos ou outro resíduo registra:
+
+- data, peso e destinação (aterro, coprocessamento, reciclagem…);
+- transportador e destinador;
+- **MTR** (Manifesto de Transporte de Resíduos, emitido no SINIR) e **CDF** (Certificado de Destinação Final, emitido pelo destinador), com as datas;
+- custo e anexos.
+
+Com custo e a conta de resíduos nos parâmetros, o registro gera o título a pagar. O envio sem CDF fica marcado "aguardando". Passados 30 dias, ele vira alerta.
+
+![Figura 16 — Destinação de resíduos com MTR, CDF, transportador, destinador e custo](img/recuperadora-16.jpg)
+
+**Licenças e documentos.** Cada licença ou documento ambiental registra o tipo, o número, o órgão, a emissão, a validade, a antecedência do aviso, as condicionantes e os anexos. Exemplos: LO, LI, LP, CTF/IBAMA, outorga de água, licença de efluentes, AVCB, alvará.
+
+A situação aparece como vencida, a vencer ou em dia. O administrador e o diretor recebem um aviso quando a licença entra na antecedência e outro quando ela vence. A rotina roda nos dias úteis às 8h35.
+
+![Figura 17 — Licenças e documentos ambientais com a validade e a situação](img/recuperadora-17.jpg)
+
+## 13. Créditos fiscais
+
+**Créditos Fiscais da Recuperadora** (REC010) estima, para as compras fechadas no período, dois tipos de crédito:
+
+- **crédito presumido de CBS e IBS** na compra de **coletor incentivado**: pessoa física que coleta ou faz a triagem, e associação ou cooperativa de catadores (Lei Complementar 214/2025, art. 170). Vale para a empresa do regime regular;
+- **crédito de PIS/COFINS** na compra de **pessoa jurídica** (CNPJ) que não é coletor incentivado, para a empresa no regime não cumulativo (Tema 304 do STF).
+
+O percentual de cada ticket é o da vigência na data da pesagem. Os **parâmetros por vigência** guardam o percentual de CBS, de IBS e de PIS/COFINS, sempre com a **fonte**. **Carregar os percentuais da LC 214/2025** cria as vigências de 2027 a 2033: CBS de 7%, e IBS de 1,3% em 2029 subindo até 13% em 2033.
+
+Os valores são estimativas para o planejamento. Confira os percentuais com a contabilidade; a apuração oficial é feita no sistema fiscal. O alerta amarelo mostra as compras sem percentual vigente na data.
+
+![Figura 18 — Créditos Fiscais da Recuperadora: compras por enquadramento, créditos estimados e parâmetros por vigência com a fonte](img/recuperadora-18.jpg)
+
+## 14. Central de Decisões e avisos
+
+A regra 27 da Central de Decisões traz as pendências da recuperadora na área Produção da saúde da empresa:
+
+| Alerta | Quando aparece |
+|---|---|
+| Licenças vencidas ou a vencer | Dentro da antecedência; alta com 15 dias ou menos, ou vencida |
+| Grão aguardando ensaio | Lote de grão bloqueado sem ensaio há mais dias que o parâmetro |
+| Rendimento abaixo da meta | Ordens dos últimos 30 dias abaixo da meta; alta com 3 ou mais |
+| Balanço de massa | Perda não explicada do mês anterior acima da tolerância |
+| Resíduo sem CDF | Destinação com mais de 30 dias sem o certificado |
+| Adiantamento antigo | Saldo de adiantamento mais antigo que o parâmetro |
+| Ticket aberto | Pesagem aberta há 2 dias ou mais |
+
+## 15. Quem pode o quê
 
 | Ação | Quem |
 |---|---|
@@ -357,11 +433,14 @@ O custo da saída é o custo médio do lote. Só sai lote **disponível**: o blo
 | Abrir e apontar ordem de reprocesso; concluir; cancelar ordem aberta | Administrador, financeiro, diretor e produção |
 | Registrar ensaio; saída para a OP ou venda | Administrador, financeiro, diretor e produção |
 | Concessão no ensaio; saída por perda ou ajuste | Administrador, financeiro e diretor |
+| Ver balanço de massa, ambiental e créditos fiscais | Administrador, financeiro, diretor, leitura e produção |
+| Destinação de resíduos, licenças e parâmetros fiscais | Administrador, financeiro e diretor |
 | Parâmetros, materiais, classes, preços, regras da apara, etapas, custos, especificações e limites | Administrador, financeiro e diretor |
 
-## 12. Histórico de alterações
+## 16. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 09/11/2026 | Primeira versão (Recuperadora, parte 1). Inclui modo do módulo, materiais, classes, preços por vigência, ticket da balança com leitura direta, fechamento com lotes, título a pagar e abatimento do adiantamento, cancelamento, comprovante, fotos, nota, importação da planilha da balança, fornecedores e coletor incentivado, adiantamentos, relação para a nota de entrada, lotes com etiqueta e aparas internas automáticas. |
 | 1.1 | 09/11/2026 | Recuperadora, parte 2. Inclui processo e custos nos parâmetros (etapas, energia, água, mão de obra, máquina, meta de rendimento, exigir ensaio, resina virgem), ordem de reprocesso com lotes, etapas e perdas, conclusão com o lote de grão e o custo, qualidade do grão (ensaio, especificação, concessão, limite de reciclado), saída dos lotes, e rendimento e custo por fornecedor e por grão com a economia contra a resina virgem. |
+| 1.2 | 09/11/2026 | Recuperadora, parte 3. Inclui balanço de massa do mês, relatório de material reciclado, destinação de resíduos com MTR, CDF e título a pagar, licenças com aviso, créditos fiscais (CBS e IBS presumidos do coletor incentivado, PIS/COFINS de pessoa jurídica) com parâmetros por vigência, alertas na Central de Decisões e no Painel, e novos parâmetros de alerta. |

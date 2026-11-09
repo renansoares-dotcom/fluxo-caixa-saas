@@ -6,7 +6,7 @@ export const AREAS = [
   { k: 'fin', nome: 'Financeiro', origens: ['Caixa', 'Conciliação', 'Crédito / FIDC', 'FIDC', 'Financeiro', 'Orçamento', 'Pagamentos', 'Contratos'], inds: ['caixa', 'margem', 'rj'] },
   { k: 'com', nome: 'Comercial', origens: ['Comercial', 'Pré-impressão'], inds: ['faturamento'] },
   { k: 'cmp', nome: 'Compras e estoque', origens: ['Estoque', 'Compras'], inds: [] },
-  { k: 'prd', nome: 'Produção', origens: ['Manutenção', 'Casa de Tintas', 'Produção'], inds: ['producao', 'perdas'] },
+  { k: 'prd', nome: 'Produção', origens: ['Manutenção', 'Casa de Tintas', 'Produção', 'Recuperadora'], inds: ['producao', 'perdas'] },
   { k: 'qua', nome: 'Qualidade', origens: ['Qualidade'], inds: ['qualidade'] },
   { k: 'log', nome: 'Logística', origens: ['Logística'], inds: ['entregas'] },
   { k: 'fis', nome: 'Fiscal e contábil', origens: ['Fiscal', 'Contabilidade'], inds: [] },

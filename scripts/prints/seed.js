@@ -2311,3 +2311,32 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
       { material: 'PEBD-C — Filme PEBD colorido', tipo: 'entrada', consumido: 1000.96, grao: 790.8, rendimento: 0.79 }, { material: 'AP-PEBD — Apara interna PEBD', tipo: 'apara', consumido: 812.5, grao: 696, rendimento: 0.8566 }],
     ordens: DB.rec_ordens.filter(o => o.situacao === 'concluida').map(o => ({ id: o.id, numero: o.numero, data: o.data, material: 'GR-PEBD', entrada: o.peso_entrada, saida: o.peso_saida, rendimento: Math.round(o.peso_saida / o.peso_entrada * 10000) / 10000, custo_kg: Math.round(o.custo_total / o.peso_saida * 10000) / 10000 })).reverse() });
 }
+
+// Recuperadora parte 3 (SQL 153) — ambiental e fiscal FICTÍCIOS: destinador, MTR, CDF, licenças e percentuais de exemplo
+{
+  const fv = (nome, doc) => { const f = { id: id('fv'), empresa_id: E, tipo: 'FORNECEDORES', nome, documento: doc, ativo: true, tipo_pessoa: 'J', municipio: 'CARUARU', uf: 'PE' }; DB.favorecidos.push(f); return f; };
+  const AT = fv('ECOATERRO AGRESTE LTDA', '67891234000171'), TR = fv('TRANSRESÍDUOS PE LTDA', '78912345000182');
+  Object.assign(DB.rec_config[0], { balanco_tolerancia_pct: 2, licenca_antecedencia_dias: 60, ensaio_alerta_dias: 2, adiant_alerta_dias: 30, avisar_licencas: true });
+  DB.rec_residuos = [['2026-11-07', 'lodo', 1840, 'Tratamento de efluentes', '2611070042', '2026-11-07', null, null, 920], ['2026-11-04', 'rejeito', 312.5, 'Aterro industrial', '2611040017', '2026-11-04', 'CDF-88231', '2026-11-06', 468.75],
+    ['2026-10-21', 'rejeito', 286, 'Aterro industrial', '2610210009', '2026-10-21', 'CDF-87912', '2026-10-24', 429], ['2026-10-02', 'borra', 140, 'Coprocessamento', '2610020003', '2026-10-02', null, null, 280]]
+    .map(([data, tipo, kg, destinacao, mtr, mtrd, cdf, cdfd, valor]) => ({ id: id('rs'), empresa_id: E, data, tipo, kg, destinacao, transportador_id: TR.id, destinador_id: AT.id, mtr_numero: mtr, mtr_data: mtrd, cdf_numero: cdf, cdf_data: cdfd, valor, lancamento_id: 'x', arquivos: [], observacao: null }));
+  DB.rec_licencas = [['Licença de Operação (LO)', '07.24.04.001234-5', 'CPRH', '2024-04-15', '2026-12-28', null, 'Condicionante: relatório semestral de efluentes'], ['Cadastro Técnico Federal (CTF/IBAMA)', '8123456', 'IBAMA', '2025-03-31', '2026-03-31', 30, null],
+    ['Outorga de uso de água', 'OUT-2023-0456', 'APAC', '2023-06-01', '2028-06-01', 120, 'Poço tubular: 8 m³/h'], ['AVCB (Corpo de Bombeiros)', 'AVCB 2025/1187', 'CBMPE', '2025-08-10', '2027-08-10', 90, null]]
+    .map(([tipo, numero, orgao, emissao, validade, ant, obs]) => ({ id: id('lc'), empresa_id: E, tipo, numero, orgao, emissao, validade, antecedencia_dias: ant, arquivos: [{ path: 'x', nome: 'licenca.pdf' }], observacao: obs, ativo: true }));
+  DB.rec_fiscal_param = [['2026-01-01', 0, 0, 9.25, 'Lei 10.833/2003, art. 3º, e Tema 304 do STF — conferido com a contabilidade (exemplo)'], ['2027-01-01', 7, 0, 0, 'LC 214/2025, art. 170 — conferir com a contabilidade'], ['2029-01-01', 7, 1.3, 0, 'LC 214/2025, art. 170 — conferir com a contabilidade'],
+    ['2033-01-01', 7, 13, 0, 'LC 214/2025, art. 170 — conferir com a contabilidade']].map(([vigencia, cbs, ibs, pc, fonte]) => ({ id: id('fp'), empresa_id: E, vigencia, cbs_presumido_pct: cbs, ibs_presumido_pct: ibs, pis_cofins_pct: pc, fonte }));
+  window.RPC.rec_balanco = () => ({ mes: '2026-11-01', tolerancia_pct: 2,
+    material: { estoque_inicial: 2386.4, pesado: 10992, desconto: 940, comprado: 10052, aparas: 813, outras: 0, consumido: 10632.5, estoque_final: 2618.9 },
+    processo: { entrada: 10632.5, produzido: 8708, perda: 1924.5, perda_apontada: 1924.5, nao_explicada: 0, nao_explicada_pct: 0, rendimento: 0.819, perdas: { umidade: 612.4, sujeira: 978.3, finos: 186.9, rejeito: 146.9 } },
+    grao: { estoque_inicial: 1240, produzido: 8708, saidas: { producao: 6215, venda: 1880 }, estoque_final: 1853 },
+    residuos: { rejeito_apontado: 146.9, destinado: 2152.5, por_tipo: [{ tipo: 'lodo', kg: 1840, com_cdf: 0, sem_cdf: 1840 }, { tipo: 'rejeito', kg: 312.5, com_cdf: 312.5, sem_cdf: 0 }], sem_cdf: 1980 } });
+  window.RPC.rec_alertas = () => [{ k: 'licenca', nivel: 'medio', item: { tipo: 'Licença de Operação (LO)', numero: '07.24.04.001234-5', validade: '2026-12-28', dias: 49 } },
+    { k: 'ensaio', nivel: 'medio', item: { lotes: 1, kg: 2088 } }, { k: 'rendimento', nivel: 'medio', item: { ordens: 1, meta: 82, rendimento: 81.9 } }, { k: 'cdf', nivel: 'medio', item: { destinacoes: 1, kg: 140 } }];
+  const Fn = (t) => DB.favorecidos.find(f => f.nome.startsWith(t));
+  window.RPC.rec_fiscal = () => ({ total: { compras: 15900.29, coletor: 5509.84, pj: 10390.45, outros: 0, cbs: 0, ibs: 0, pis_cofins: 961.12, sem_parametro: 0 },
+    fornecedores: [{ fornecedor: 'APARAS NORDESTE COMÉRCIO LTDA', documento: '34567891000162', rec_tipo: 'sucateiro_pj', coletor: false, pj: true, tickets: 2, valor: 10390.45, cbs: 0, ibs: 0, pis_cofins: 961.12 },
+      { fornecedor: 'COOPERATIVA RECICLA AGRESTE', documento: '45678912000150', rec_tipo: 'cooperativa', coletor: true, pj: true, tickets: 1, valor: 4348.91, cbs: 0, ibs: 0, pis_cofins: 0 },
+      { fornecedor: 'JOSÉ AMARO DA SILVA', documento: '52998224725', rec_tipo: 'catador_pf', coletor: true, pj: false, tickets: 1, valor: 1160.93, cbs: 0, ibs: 0, pis_cofins: 0 }],
+    meses: [{ mes: '2026-11-01', valor: 15900.29, cbs: 0, ibs: 0, pis_cofins: 961.12, fonte: 'Lei 10.833/2003, art. 3º, e Tema 304 do STF — conferido com a contabilidade (exemplo)' }] });
+  window.RPC.rec_reciclado = () => ({ grao: [], origem: [], residuos: [] });
+}

@@ -3,7 +3,7 @@
 import { sb, state, q } from '../lib/data.js';
 import { $, esc, money, toast, chart, CORES, exportXLSX } from '../lib/ui.js';
 import { carregarRec, kpi, kg0, rkg, semSQL, avisoSQL, desligada, avisoDesligada } from '../lib/rec-ui.js';
-import { TIPOS_FORN, MODOS } from '../lib/recuperadora.js';
+import { TIPOS_FORN, MODOS, alertasParaDecisoes } from '../lib/recuperadora.js';
 
 export const title = 'Painel da Recuperadora';
 const h = new Date();
@@ -14,7 +14,7 @@ export async function render(root) {
   try {
     const R = await carregarRec();
     if (desligada(R)) { root.innerHTML = avisoDesligada(); return; }
-    const P = await q(sb.rpc('rec_painel', { p_empresa: state.empresa.id, p_mes: ui.mes + '-01' }));
+    const [P, AL] = await Promise.all([q(sb.rpc('rec_painel', { p_empresa: state.empresa.id, p_mes: ui.mes + '-01' })), q(sb.rpc('rec_alertas', { p_empresa: state.empresa.id })).then(alertasParaDecisoes).catch(() => [])]);
     const compra = R.cfg.modo !== 'interno', apara = R.cfg.modo !== 'externo';
     const desc = +P.comprado_kg ? 1 - +P.pago_kg / +P.comprado_kg : null;
     root.innerHTML = `<div class="card toolbar"><label class="small">Mês <input type="month" id="rpn-m" value="${ui.mes}"></label><span class="small muted">Modo: ${esc(MODOS[R.cfg.modo])}</span><span class="spacer"></span>
@@ -26,6 +26,8 @@ export async function render(root) {
         ${+P.outras_entradas_kg ? kpi('Doações e transferências', kg0(P.outras_entradas_kg)) : ''}
         ${kpi('Tickets abertos', P.tickets_abertos, 'aguardando fechamento', +P.tickets_abertos ? 'warn' : '')}
         ${compra ? kpi('A pagar a fornecedores', money(P.a_pagar), `adiantamentos em aberto ${money(P.adiant_saldo)}`) : ''}</div>
+      ${AL.length ? `<div class="card" style="margin-top:12px;border-left:4px solid var(--warn,#c80)"><b class="small">Pendências da recuperadora</b><ul class="small" style="margin:6px 0 0;padding-left:18px">
+        ${AL.map(a => `<li><span class="${a.urg === 'alta' ? 'neg' : ''}">${esc(a.titulo)}</span> <span class="muted">${esc(a.desc)}</span> · <a href="#/${a.rota}">${esc(a.acao)}</a></li>`).join('')}</ul></div>` : ''}
       ${+P.aparas_sem_material ? `<div class="card" style="margin-top:12px;border-left:4px solid var(--warn,#c80)"><p class="small" style="margin:0">Há apontamentos com refugo no mês que não viraram lote: falta o material padrão da apara ou uma regra. Ajuste em <a href="#/recuperadora/parametros">Parâmetros da Recuperadora</a> e use "Refazer as aparas".</p></div>` : ''}
       <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Entradas por dia (kg)</h3><div style="height:220px"><canvas id="rpn-c"></canvas></div></div>
       <div class="grid2" style="margin-top:12px;align-items:start">
@@ -36,7 +38,7 @@ export async function render(root) {
           ${(P.fornecedores || []).map(f => `<tr><td>${esc(f.fornecedor)}<div class="small muted">${esc(TIPOS_FORN[f.rec_tipo] || '')} · ${f.tickets} ticket(s)</div></td><td class="num">${kg0(f.kg)}</td>
             <td class="num">${f.desconto_pct == null ? '–' : String(f.desconto_pct).replace('.', ',') + '%'}</td><td class="num">${rkg(f.preco_medio)}</td><td class="num">${money(f.valor)}</td></tr>`).join('')
             || '<tr><td colspan="5" class="empty">Nenhuma compra no mês.</td></tr>'}</tbody></table></div></div>` : ''}</div>
-      <p class="small muted">O rendimento por fornecedor (quanto paguei × quanto virou grão), o custo do kg de grão e a economia contra a resina virgem entram com o processamento (parte 2 da Recuperadora).</p>`;
+      <p class="small muted">Rendimento por fornecedor, custo do kg de grão e economia contra a resina virgem: <a href="#/recuperadora/rendimento">Rendimento e Custo</a>. Fechamento em kg do mês: <a href="#/recuperadora/balanco">Balanço de Massa</a>.</p>`;
     $('#rpn-m', root).onchange = (e) => { if (e.target.value) { ui.mes = e.target.value; render(root); } };
     const D = P.dias || [];
     chart($('#rpn-c', root), { type: 'bar', data: { labels: D.map(d => d.dia.slice(8, 10)), datasets: [
