@@ -2044,3 +2044,34 @@ DB.fisc_param = [{ id: 'fp-1', empresa_id: E, vigencia_inicio: '2026-01-01', pro
   feef_pct: 10, feef_base: 'beneficio', ad_diper_pct: 2, fecep_pct: 2, fecep_ncm: ['3926'], fecep_cfops: [], pis_pct: 1.65, cofins_pct: 7.6, pc_cfops_credito: ['5101', '5102', '6101', '6102'],
   pc_incluir_frete: true, pc_incluir_ipi: false, pc_excluir_icms: true, fonte: 'Exemplo fictício para o manual', observacao: null }];
 DB.fisc_apuracoes = [];
+
+// Fechamento contábil (SQL 142) — valores e contas FICTÍCIOS
+{
+  const CF = [['ct-fc1', '3.1.2.01.0011', 'PROVISÃO DE 13º SALÁRIO (DESPESA)', 'D', 3121], ['ct-fc2', '2.1.3.02.0001', '13º SALÁRIO A PAGAR', 'C', 2131], ['ct-fc3', '3.1.2.01.0012', 'PROVISÃO DE FÉRIAS (DESPESA)', 'D', 3122],
+    ['ct-fc4', '2.1.3.02.0002', 'FÉRIAS A PAGAR', 'C', 2132], ['ct-fc5', '3.1.2.01.0013', 'ENCARGOS SOBRE PROVISÕES', 'D', 3123], ['ct-fc6', '2.1.3.02.0003', 'ENCARGOS SOBRE PROVISÕES A PAGAR', 'C', 2133],
+    ['ct-fc7', '4.1.3.01.0001', 'ICMS SOBRE VENDAS', 'D', 4131], ['ct-fc8', '2.1.4.01.0001', 'ICMS A RECOLHER', 'C', 2141], ['ct-fc9', '4.1.3.01.0003', 'PIS E COFINS SOBRE VENDAS', 'D', 4133], ['ct-fc10', '2.1.4.01.0003', 'PIS E COFINS A RECOLHER', 'C', 2143],
+    ['ct-fc11', '3.1.3.05.0001', 'HONORÁRIOS CONTÁBEIS', 'D', 3135], ['ct-fc12', '2.1.1.01.0009', 'HONORÁRIOS A PAGAR', 'C', 2119]];
+  DB.contab_contas = (DB.contab_contas || []).concat(CF.map(([id, c, d, nat, cod]) => ({ id, empresa_id: E, classificacao: c, descricao: d, tipo: 'A', natureza: nat, nivel: 5, codigo: cod })));
+  const sg = (id, codigo, nome, tipo, valor, base, d, c, extra = {}) => ({ regra_id: id, codigo, nome, tipo, valor, base, aviso: null, conta_debito_id: d, conta_credito_id: c, historico: nome, gerado: false, lancamento_id: null, valor_gerado: null, ...extra });
+  window.RPC.contab_fech_resumo = () => ({ situacao: 'aberto', fechado_em: null, exportado_em: null, lancamentos: 412, por_origem: { financeiro: 386, depreciacao: 18, folha: 3, apuracao: 2, manual: 3 },
+    depreciacao: true, apuracao_fechada: true, balancete_importado: false, sem_partidas_fechando: 0 });
+  window.RPC.contab_fech_sugestoes = () => [
+    sg('rg1', 'decimo', 'Provisão de 13º salário', 'decimo', 21430.52, '8,3333% de 257.168,40 em salários (94 pessoa(s))', 'ct-fc1', 'ct-fc2', { gerado: true, valor_gerado: 21430.52 }),
+    sg('rg2', 'ferias', 'Provisão de férias + 1/3', 'ferias', 28574.06, '11,1111% de 257.168,40 em salários (94 pessoa(s))', 'ct-fc3', 'ct-fc4', { gerado: true, valor_gerado: 28574.06 }),
+    sg('rg3', 'encargos', 'Encargos sobre as provisões (INSS e FGTS)', 'encargos', 14001.15, '28% sobre as provisões de 50.004,58', 'ct-fc5', 'ct-fc6', { gerado: true, valor_gerado: 13500 }),
+    sg('rg4', 'icms', 'ICMS a recolher (apuração fechada)', 'icms', 37086.40, 'apuração fechada em 05/11/2026', 'ct-fc7', 'ct-fc8'),
+    sg('rg5', 'ipi', 'IPI a recolher (apuração fechada)', 'ipi', 0, 'apuração fechada em 05/11/2026', 'ct-fc7', 'ct-fc8'),
+    sg('rg6', 'pis_cofins', 'PIS e COFINS a recolher (apuração fechada)', 'pis_cofins', 83365.05, 'apuração fechada em 05/11/2026', 'ct-fc9', 'ct-fc10'),
+    sg('rg7', 'feef_fecep', 'FEEF, AD/DIPER e FECEP (apuração fechada)', 'feef_fecep', 13351.10, 'apuração fechada em 05/11/2026', null, null, { aviso: 'Escolha as contas de débito e crédito' }),
+    sg('rg8', 'fixo_hon', 'Honorários contábeis do mês', 'fixo', 6800, 'valor fixo do mês', 'ct-fc11', 'ct-fc12')];
+  window.RPC.contab_fech_conferencia = () => ({ fonte: 'plataforma', tolerancia: 1, contas: [
+    { conta_id: 'b1', nome: 'BANCO ALFA C/C', fluxo: 184320.55, contabil: 184320.55, classificacao: '1.1.1.02.0001', conta_contabil: 'BANCO ALFA', mapeada: true, diferenca: 0, ok: true },
+    { conta_id: 'b2', nome: 'BANCO BETA C/C', fluxo: 52110.08, contabil: 51890.08, classificacao: '1.1.1.02.0002', conta_contabil: 'BANCO BETA', mapeada: true, diferenca: -220, ok: false },
+    { conta_id: 'b3', nome: 'CAIXA GERAL', fluxo: 1250, contabil: 1250, classificacao: '1.1.1.01.0001', conta_contabil: 'CAIXA', mapeada: true, diferenca: 0, ok: true },
+    { conta_id: 'b4', nome: 'SUBCONTA FOLHA', fluxo: 3400, contabil: 0, classificacao: null, conta_contabil: null, mapeada: false, diferenca: -3400, ok: false }] });
+  DB.contab_fech_regras = [['rg1', 'decimo', 'Provisão de 13º salário', 'decimo', 8.3333, null, 'ct-fc1', 'ct-fc2'], ['rg2', 'ferias', 'Provisão de férias + 1/3', 'ferias', 11.1111, null, 'ct-fc3', 'ct-fc4'],
+    ['rg3', 'encargos', 'Encargos sobre as provisões (INSS e FGTS)', 'encargos', 28, null, 'ct-fc5', 'ct-fc6'], ['rg4', 'icms', 'ICMS a recolher (apuração fechada)', 'icms', null, null, 'ct-fc7', 'ct-fc8'],
+    ['rg8', 'fixo_hon', 'Honorários contábeis do mês', 'fixo', null, 6800, 'ct-fc11', 'ct-fc12']]
+    .map(([id, codigo, nome, tipo, percentual, valor_fixo, d, c], i) => ({ id, empresa_id: E, codigo, nome, tipo, ativo: true, percentual, valor_fixo, conta_debito_id: d, conta_credito_id: c, historico: nome, ordem: (i + 1) * 10 }));
+  DB.contab_fech_config = [{ empresa_id: E, vinculos: ['clt', 'aprendiz'], tolerancia: 1, dom_separador: ';', dom_data: 'dd/mm/aaaa', dom_decimal: ',', dom_conta: 'codigo', dom_campos: ['data', 'debito', 'credito', 'valor', 'historico_codigo', 'complemento'], dom_historico_codigo: '1', dom_cabecalho: false, dom_origens: ['financeiro', 'folha', 'apuracao', 'depreciacao', 'manual'] }];
+}

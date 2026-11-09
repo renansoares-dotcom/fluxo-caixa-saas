@@ -268,4 +268,8 @@ export const FIGS = [
   ['nfe-sefaz', 'notas/sefaz', '## 2.', 'NF-e da SEFAZ: notas emitidas contra o CNPJ, situação, manifestação e prazo da conclusiva', ''],
   ['nfe-sefaz', 'notas/sefaz', '## 4.', 'Manifestar a nota: confirmação, desconhecimento ou operação não realizada', 'click:[data-man="dfe-1"]'],
   ['nfe-sefaz', 'notas/sefaz', '## 6.', 'Parâmetros: consulta automática, ambiente, ciência automática e quem recebe o aviso', 'click:#sf-par'],
+  ['fechamento-contabil', 'contab/fechamento', '## 2.', 'Fechamento Contábil: checklist do mês, provisões sugeridas e conferência dos bancos', ''],
+  ['fechamento-contabil', 'contab/fechamento', '## 3.', 'Provisões e lançamentos sugeridos: valor ajustável, contas, gerado e a gerar', 'scroll:#cf-gerar'],
+  ['fechamento-contabil', 'contab/fechamento', '## 5.', 'Regras das provisões: percentual ou valor fixo, contas de débito e crédito e histórico', 'click:#cf-regras'],
+  ['fechamento-contabil', 'contab/fechamento', '## 6.', 'Leiaute do arquivo do Domínio e parâmetros do fechamento', 'click:#cf-lay'],
 ];
