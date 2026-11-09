@@ -1930,3 +1930,32 @@ window.RPC.pag_remessa_gravar = () => null;
   DB.frota_manutencoes.push({ id: 'fm-pn', empresa_id: E, veiculo_id: V1.id, data: '2026-11-04', km: 120500, tipo: 'pneus', oficina: 'PNEUS DO AGRESTE', descricao: 'Recapagem de 4 pneus de tração', valor: 2240 },
     { id: 'fm-pv', empresa_id: E, veiculo_id: V1.id, data: '2026-11-05', km: 120600, tipo: 'preventiva', oficina: 'OFICINA DIESEL CENTRO', descricao: 'Lubrificação e regulagem de freios', valor: 380 });
 }
+
+// Pergunte à plataforma (SQL 137) — respostas e números FICTÍCIOS
+{
+  DB.ia_config = [{ empresa_id: E, ativo: true, modelo: 'claude-sonnet-5-5', papeis: ['admin', 'diretor', 'financeiro', 'compras'], limite_dia: 30, max_consultas: 6, guardar_dias: 180, instrucoes: 'Arredonde os valores grandes para mil reais quando fizer comparações.' }];
+  DB.ia_perguntas = [];
+  window.RPC.ia_pode = () => true;
+  window.RPC.ia_uso = () => ({ perguntas: 148, pessoas: 6, erros: 3, positivas: 41, negativas: 4, tokens_entrada: 612400, tokens_saida: 58300, ms_medio: 6400,
+    por_pessoa: [{ email: 'diretoria@exemplo.com.br', n: 52 }, { email: 'financeiro@exemplo.com.br', n: 47 }, { email: 'compras@exemplo.com.br', n: 31 }, { email: 'renan@exemplo.com.br', n: 18 }] });
+  let n = 0;
+  const base = { modelo: 'claude-sonnet-5-5', tokens_entrada: 4100, tokens_saida: 380, ms: 5200 };
+  window.FN = window.FN || {};
+  window.FN.perguntar = (b) => {
+    n++;
+    if (/client/i.test(b.pergunta)) return { id: 'ia' + n, ...base, pergunta: b.pergunta,
+      resposta: 'Nos últimos 12 meses (nov/2025 a out/2026), os 10 maiores clientes somaram **R$ 9.842.300,00**, 61% do faturamento.\n- **SUPERMERCADOS BOM PREÇO** lidera com R$ 2.184.600,00\n- os três primeiros respondem por 34% do faturamento',
+      grafico: { tipo: 'barras', titulo: 'Faturamento por cliente — 12 meses', consulta: 0 }, link: '#/notas', link_rotulo: 'Notas Fiscais',
+      consultas: [{ fonte: 'notas', metrica: 'valor', agrupar: 'cliente', de: '2025-11-01', ate: '2026-10-31', n: 10, total: 16135000 }],
+      tabela: { colunas: ['destinatário da nota', 'valor total das notas'], metrica: 'valor', agrupar: 'cliente', linhas: [
+        ['SUPERMERCADOS BOM PREÇO LTDA', 2184600], ['DISTRIBUIDORA NORDESTE ALIMENTOS', 1563200], ['PANIFICADORA PÃO DOURADO', 1742100], ['ATACADÃO DO AGRESTE', 980400],
+        ['FRIGORÍFICO SERTÃO', 812900], ['LATICÍNIOS VALE VERDE', 744300], ['MERCADINHO SÃO JOSÉ', 551800], ['ÁGUAS CRISTALINAS', 472300], ['CEREALISTA RECIFE', 422100], ['HORTIFRÚTI DA SERRA', 368600]].sort((a, b) => b[1] - a[1]) } };
+    return { id: 'ia' + n, ...base, pergunta: b.pergunta,
+      resposta: 'Em 2026, até 08/11, o faturamento (notas de saída próprias) foi de **R$ 13.426.900,00**, média de R$ 1.342.690,00 por mês.\n- melhor mês: **outubro**, com R$ 1.612.400,00\n- novembro tem só 8 dias e fica fora da comparação\n- de janeiro a outubro, o faturamento cresceu 21%',
+      grafico: { tipo: 'linha', titulo: 'Faturamento por mês — 2026', consulta: 0 }, link: '#/notas', link_rotulo: 'Notas Fiscais',
+      consultas: [{ fonte: 'notas', metrica: 'valor', agrupar: 'mes', filtros: { tipo: 'saida', propria: 'true' }, de: '2026-01-01', ate: '2026-11-08', n: 11, total: 13426900 }],
+      tabela: { colunas: ['mês (AAAA-MM)', 'valor total das notas'], metrica: 'valor', agrupar: 'mes', linhas: [
+        ['2026-01', 1331800], ['2026-02', 1207300], ['2026-03', 1365900], ['2026-04', 1298400], ['2026-05', 1402100], ['2026-06', 1355600],
+        ['2026-07', 1421700], ['2026-08', 1489200], ['2026-09', 1514600], ['2026-10', 1612400], ['2026-11', 427900]] } };
+  };
+}

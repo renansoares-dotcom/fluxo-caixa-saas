@@ -199,6 +199,10 @@ export const FIGS = [
   ['lgpd-acessos', 'lgpd', '## 6.', 'Solicitações dos titulares com o prazo de resposta', 'click:[data-a="solic"]'],
   ['lgpd-acessos', 'lgpd', '## 7.', 'Parâmetros de privacidade e acessos', 'click:#lg-par'],
   // Painel da Diretoria (07/11/2026)
+  ['perguntar', 'perguntar', '## 2.', 'Pergunte à plataforma: exemplos de perguntas e a caixa de pergunta', 'perguntar'],
+  ['perguntar', 'perguntar', '## 2.', 'Resposta com o período, o gráfico, os números usados e o link da tela de origem', 'fill:#ia-p=Quanto faturamos por mês este ano?|click:#ia-ok'],
+  ['perguntar', 'perguntar', '## 2.', 'Segunda pergunta na mesma conversa: ranking dos clientes', 'fill:#ia-p=Quais os 10 clientes que mais compraram nos últimos 12 meses?|click:#ia-ok|scroll:#ia-conv .card:last-child'],
+  ['perguntar', 'perguntar', '## 4.', 'Uso e parâmetros: perguntas, avaliações, tokens, modelo, limites e perfis', 'uso'],
   ['painel-diretoria', 'diretoria', '## 3.', 'Painel da Diretoria: resumo do mês e os cartões dos indicadores com meta, situação e tendência'],
   ['painel-diretoria', 'diretoria', '### 3.2', 'Evolução de 13 meses, com os meses fora da meta em vermelho', 'scroll:#dr-corpo h3'],
   ['painel-diretoria', 'diretoria', '## 4.', 'Comentário do responsável sobre o indicador', 'click:[data-com="perdas"]'],

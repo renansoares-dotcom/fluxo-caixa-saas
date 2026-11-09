@@ -79,5 +79,5 @@ export const sbMock = {
   },
   channel: canal, removeChannel() {}, getChannels: () => [], realtime: { setAuth() {} },
   storage: { from: () => ({ upload: async () => ({ data: {}, error: null }), createSignedUrl: async (p) => ({ data: { signedUrl: arteMock(p) }, error: null }), createSignedUrls: async (ps) => ({ data: ps.map(p => ({ path: p, signedUrl: arteMock(p) })), error: null }), download: async () => ({ data: new Blob(['x']), error: null }), remove: async () => ({ data: [], error: null }), list: async () => ({ data: [], error: null }) }) },
-  functions: { invoke: async (n, o) => ({ data: (window.FN || {})[o?.body?.acao]?.(o.body) ?? null, error: null }) },
+  functions: { invoke: async (n, o) => ({ data: (window.FN || {})[o?.body?.acao ?? n]?.(o.body) ?? null, error: null }) },
 };
