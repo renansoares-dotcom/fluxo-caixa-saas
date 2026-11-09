@@ -108,6 +108,8 @@ export const MANUAIS = [
     resumo: 'Convite do Portal, arte para aprovar, resposta da prorrogação e avisos por e-mail: remetente, como ligar o envio, modelos com prévia e a situação de cada e-mail.' },
   { id: 'empresa-usuarios', titulo: 'Empresa, usuários e auditoria', area: 'Cadastros', rotas: ['config', 'auditoria'],
     resumo: 'Dados da empresa, convites, papéis e áreas, importação por planilha e auditoria com desfazer.' },
+  { id: 'integracoes', titulo: 'Central de Integrações', area: 'Cadastros', rotas: ['integracoes'],
+    resumo: 'Extratos, VExpenses, NF-e, Iniflex, e-frete, remessa CNAB, e-mail, WhatsApp e rotinas automáticas numa tela: última importação, falhas, situação, próximo passo e aviso do que atrasou.' },
   { id: 'uso-plataforma', titulo: 'Uso da Plataforma', area: 'Cadastros', rotas: ['uso'],
     resumo: 'Quais telas cada perfil usa, por quanto tempo, quem não entrou, os formulários abandonados e os erros mais vistos. Só administradores.' },
   { id: 'lgpd-acessos', titulo: 'Privacidade e Acessos (LGPD)', area: 'Cadastros', rotas: ['lgpd'],

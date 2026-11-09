@@ -133,6 +133,7 @@ const routes = {
   'auditoria': () => import(`./pages/auditoria.js?v=${V}`),
   'uso': () => import(`./pages/uso.js?v=${V}`),
   'lgpd': () => import(`./pages/lgpd.js?v=${V}`),
+  'integracoes': () => import(`./pages/integracoes.js?v=${V}`),
   'diretoria': () => import(`./pages/diretoria.js?v=${V}`),
   'perguntar': () => import(`./pages/perguntar.js?v=${V}`),
   'relatorios': () => import(`./pages/relatorios.js?v=${V}`),

@@ -207,6 +207,8 @@ export const FIGS = [
   ['relatorios', 'relatorios', '## 3.', 'Novo relatório: modelos prontos', 'click:#rl-novo'],
   ['relatorios', 'relatorios', '## 3.', 'Editor do relatório: frequência, destinatários e blocos com a pré-visualização', 'click:[data-ed="rl1"]|click:#re-ver'],
   ['relatorios', 'relatorios', '## 4.', 'Histórico de envios do relatório', 'click:[data-hist="rl1"]'],
+  ['integracoes', 'integracoes', '## 2.', 'Central de Integrações: situação, última importação, falhas e próximo passo de cada integração', ''],
+  ['integracoes', 'integracoes', '## 4.', 'Parâmetros: quem recebe o aviso, integrações usadas e o prazo esperado de cada uma', 'click:#in-par'],
   ['painel-diretoria', 'diretoria', '## 3.', 'Painel da Diretoria: resumo do mês e os cartões dos indicadores com meta, situação e tendência'],
   ['painel-diretoria', 'diretoria', '### 3.2', 'Evolução de 13 meses, com os meses fora da meta em vermelho', 'scroll:#dr-corpo h3'],
   ['painel-diretoria', 'diretoria', '## 4.', 'Comentário do responsável sobre o indicador', 'click:[data-com="perdas"]'],

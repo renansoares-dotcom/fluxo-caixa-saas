@@ -1986,3 +1986,25 @@ window.RPC.pag_remessa_gravar = () => null;
     { titulo: 'A receber nos próximos 7 dias', periodo: 'próximos 7 dias (09/11 a 15/11/2026)', colunas: ['cliente/fornecedor/beneficiário', 'soma dos valores'], linhas: [['SUPERMERCADOS BOM PREÇO LTDA', 'R$ 112.450,00'], ['PANIFICADORA PÃO DOURADO', 'R$ 46.300,00'], ['ATACADÃO DO AGRESTE', 'R$ 22.180,00']], total: 'R$ 180.930,00' }];
   window.RPC.rel_enviar_agora = () => 2;
 }
+
+// Central de Integrações (SQL 139) — situações FICTÍCIAS
+{
+  const H = (h) => new Date(Date.now() - h * 36e5).toISOString();
+  const I = (codigo, nome, area, descricao, link, situacao, ultima, dias_uteis, qtd_30d, max_dias, max_padrao, extra = {}) => ({ codigo, nome, area, descricao, link, ativo: situacao !== 'desligada', situacao, ultima, dias_uteis, qtd_30d, max_dias, max_padrao, falhas_7d: 0, ...extra });
+  window.RPC.integ_painel = () => [
+    I('extratos', 'Extratos bancários', 'Financeiro', 'OFX, CNAB 240 e extrato do ERP importados na Conciliação Bancária, por conta.', '#/conciliacao', 'atrasada', H(5), 0, 41, 2, 2,
+      { atrasadas: 1, pendentes: 23, detalhe: '1 conta(s) com o extrato atrasado; 23 lançamento(s) do extrato a conciliar', proximo_passo: 'Importe o extrato de 1 conta(s) atrasada(s) na Conciliação Bancária.' }),
+    I('vexpenses', 'VExpenses', 'Financeiro', 'Extrato de despesas dos cartões (VExpenses) importado na Conciliação.', '#/conciliacao', 'ok', H(98), 4, 5, 7, 7, { proximo_passo: 'Em dia.' }),
+    I('nfe_saida', 'NF-e de saída', 'Fiscal', 'XML das notas emitidas pela empresa, importados em Notas Fiscais.', '#/notas', 'ok', H(16), 1, 22, 1, 1, { detalhe: 'última emissão importada: 06/11/2026', proximo_passo: 'Em dia.' }),
+    I('nfe_entrada', 'NF-e de entrada', 'Fiscal', 'XML das notas dos fornecedores, importados em Notas Fiscais.', '#/notas', 'atrasada', H(150), 5, 9, 3, 3,
+      { proximo_passo: 'Importe os XML das notas de fornecedores recebidas. Última: há 5 dia(s) útil(eis); esperado a cada 3.' }),
+    I('iniflex', 'Iniflex — produção', 'Produção', 'Apontamentos de produção importados do Iniflex.', '#/producao/importar', 'ok', H(20), 1, 19, 1, 1, { proximo_passo: 'Em dia.' }),
+    I('efrete', 'e-frete (CIOT)', 'Logística', 'Chamadas ao e-frete para declarar e encerrar o CIOT dos fretes.', '#/logistica/fretes', 'falha', H(30), 1, 14, 0, 0,
+      { falhas_7d: 1, ultimo_erro: 'Excecao: certificado digital vencido em 05/11/2026', proximo_passo: 'Abra o frete e repita a chamada; se persistir, confira o certificado e as credenciais do e-frete.' }),
+    I('cnab_remessa', 'Remessa de pagamentos (CNAB)', 'Financeiro', 'Arquivos de pagamento gerados na Autorização de Pagamentos para o banco.', '#/autorizacao', 'ok', H(26), 1, 8, 0, 0, { proximo_passo: 'Em dia.' }),
+    I('email', 'E-mail', 'Comunicação', 'Envio dos e-mails da plataforma pelo Resend.', '#/config/email', 'ok', H(1), 0, 312, 0, 0, { proximo_passo: 'Em dia.' }),
+    I('whatsapp', 'WhatsApp', 'Comunicação', 'Envio das mensagens pela API oficial do WhatsApp.', '#/config/whatsapp', 'sem_uso', null, null, 0, 0, 0, { proximo_passo: 'Ainda não usado.' }),
+    I('rotinas', 'Rotinas automáticas', 'Plataforma', 'Agendamentos do banco (avisos, cobranças, relatórios, recorrentes, limpezas).', '#/integracoes', 'ok', H(0.1), 0, 9840, 0, 0, { proximo_passo: 'Em dia.' })];
+  DB.integ_geral = [{ empresa_id: E, avisar: true, papeis: ['admin', 'financeiro'] }];
+  DB.integ_config = [];
+}
