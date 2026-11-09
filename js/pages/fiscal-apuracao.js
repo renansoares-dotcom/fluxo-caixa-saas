@@ -1,12 +1,13 @@
 // CPD › Fiscal › Apuração de impostos — memória de cálculo a partir dos itens das notas importadas.
 // Etapa 1: livro por CFOP/CST (item a item) e resumo dos impostos destacados. Só leitura.
 // Reforma tributária (30/10/2026): conferência IBS/CBS, simulador 2027 e alíquotas por vigência (js/lib/reforma-ui.js, SQL 072).
-// As regras de apuração (PRODEPE, FEEF, AD/DIPER, FECEP, créditos de PIS/COFINS) entram quando os parâmetros forem definidos.
+// Etapa 2 (08/11/2026, SQL 141, melhoria 9.2): imposto a recolher com PRODEPE, FEEF, AD/DIPER, FECEP e créditos de PIS/COFINS pelos parâmetros (js/lib/apuracao-ui.js).
 // Regime (04/11/2026, SQL 078): os textos e as regras seguem o regime vigente da empresa no mês (Cadastros › Empresa › Regime tributário).
 import { sb, state, fetchAll } from '../lib/data.js';
 import { $, esc, money, dateBR, fail, loading, exportXLSX, MESES_CURTO } from '../lib/ui.js';
 import { pintarAliquotas, pintarSimulador, pintarConferencia } from '../lib/reforma-ui.js';
 import { regimeEm, descricao, ehSimples } from '../lib/regime.js';
+import { pintarApuracao, pintarParametros } from '../lib/apuracao-ui.js';
 
 export const title = 'Apuração de Impostos';
 
@@ -58,7 +59,7 @@ async function carregar(root) {
   try {
     const ini = ui.mes + '-01', fim = fimMes(ui.mes);
     const its = await fetchAll(() => sb.from('nfe_itens')
-      .select('nota_id, cfop, cst_icms, cst_ipi, cst_pis, cst_cofins, vprod, vdesc, vfrete, voutro, v_bc_icms, v_icms, v_st, v_ipi, v_pis, v_cofins, nfe_notas!inner(id, numero, serie, emissao, tipo, situacao, emissao_propria, finalidade, emit_nome, dest_nome)')
+      .select('nota_id, cfop, ncm, cst_icms, cst_ipi, cst_pis, cst_cofins, vprod, vdesc, vfrete, voutro, v_bc_icms, v_icms, v_st, v_ipi, v_pis, v_cofins, nfe_notas!inner(id, numero, serie, emissao, tipo, situacao, emissao_propria, finalidade, emit_nome, dest_nome)')
       .eq('nfe_notas.empresa_id', state.empresa.id).gte('nfe_notas.emissao', ini).lte('nfe_notas.emissao', fim));
     const vc = (i) => (+i.vprod || 0) - (+i.vdesc || 0) + (+i.vfrete || 0) + (+i.voutro || 0) + (+i.v_ipi || 0) + (+i.v_st || 0);
     const itens = [], canc = new Map();
@@ -77,10 +78,10 @@ async function carregar(root) {
 }
 
 function pintar(root) {
-  $('#abas', root).innerHTML = [['livro', 'Livro por CFOP / CST'], ['resumo', 'Resumo dos impostos'], ['conferencia', 'Conferência IBS/CBS'], ['simulador', 'Reforma: simulador 2027'], ['aliquotas', 'Alíquotas por vigência'], ['regras', 'Regras e parâmetros']]
+  $('#abas', root).innerHTML = [['livro', 'Livro por CFOP / CST'], ['resumo', 'Resumo dos impostos'], ['apuracao', 'Imposto a recolher'], ['conferencia', 'Conferência IBS/CBS'], ['simulador', 'Reforma: simulador 2027'], ['aliquotas', 'Alíquotas por vigência'], ['regras', 'Regras e parâmetros']]
     .map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('');
   const c = $('#corpo', root);
-  $('#exp', root).style.display = ['simulador', 'aliquotas', 'conferencia'].includes(ui.aba) ? 'none' : '';
+  $('#exp', root).style.display = ['simulador', 'aliquotas', 'conferencia', 'apuracao', 'regras'].includes(ui.aba) ? 'none' : '';
   $('#info', root).style.display = ['simulador', 'aliquotas', 'conferencia'].includes(ui.aba) ? 'none' : '';
   $('#mes', root).closest('label').style.display = ['simulador', 'aliquotas'].includes(ui.aba) ? 'none' : '';
   if (ui.aba === 'aliquotas') return pintarAliquotas(c);
@@ -89,7 +90,8 @@ function pintar(root) {
   if (!D) return carregar(root);
   if (ui.aba === 'livro') return livro(c, root);
   if (ui.aba === 'resumo') return resumo(c);
-  c.innerHTML = regras(D.regime);
+  if (ui.aba === 'apuracao') return pintarApuracao(c, ui.mes, D.itens, D.regime);
+  return pintarParametros(c, regras(D.regime));
 }
 
 // texto da aba Regras pelo regime vigente no mês (nada é suposto: sem regime cadastrado, a tela pede o cadastro)
@@ -102,10 +104,10 @@ function regras(rg) {
     <p class="small">IBS e CBS: ${rg.ibscbs_regular ? '<strong>pelo regime regular</strong> no período (débito e crédito fora do DAS — as abas Conferência e Simulador se aplicam).' : '<strong>dentro do DAS</strong> no período (sem crédito para a empresa; o cliente recebe o crédito transferido).'}</p>` : ''}` + fim;
   if (rg.regime === 'presumido') return cab + `<p class="small">Lucro Presumido: PIS/COFINS cumulativos (0,65% + 3%, sem crédito), IRPJ e CSLL pela presunção sobre a receita${rg.irpj_apuracao ? ', apuração ' + (rg.irpj_apuracao === 'anual' ? 'anual' : 'trimestral') : ''}; ICMS e IPI por débito e crédito.</p>
     <p class="small">Para calcular o imposto a recolher faltam: percentuais de presunção por atividade, adicional do IRPJ e uma apuração da contabilidade para conferir.</p>` + fim;
-  return cab + `<p class="small">Para calcular o imposto a recolher (e não só o destacado nas notas), faltam:</p>
-    <ul class="small">${/prodepe/i.test(rg.incentivos || '') ? '<li>PRODEPE: percentual de crédito presumido, produtos/operações incentivadas e forma de cálculo do FEEF e da taxa AD/DIPER;</li><li>FECEP: base e alíquota;</li>' : rg.incentivos ? `<li>${esc(rg.incentivos)}: regras do incentivo;</li>` : ''}
-      <li>créditos de PIS/COFINS aceitos pela empresa (insumos, energia, fretes, depreciação, aluguéis…);</li>
-      <li>uma apuração já feita pela contabilidade (livro de ICMS/IPI, EFD Contribuições e guias) para calibrar e conferir.</li></ul>` + fim;
+  return cab + `<p class="small">O <strong>imposto a recolher</strong> (aba própria) parte do destacado nas notas e aplica os parâmetros da tabela abaixo, cadastrados com fonte e vigência:</p>
+    <ul class="small">${/prodepe/i.test(rg.incentivos || '') ? '<li>PRODEPE: percentual do crédito presumido, CFOP e NCM incentivados, forma de cálculo, FEEF e taxa AD/DIPER;</li><li>FECEP: percentual e NCM sujeitos;</li>' : rg.incentivos ? `<li>${esc(rg.incentivos)}: confira se o incentivo segue a forma do crédito presumido;</li>` : ''}
+      <li>créditos de PIS/COFINS: alíquotas e CFOP de compra aceitos; os demais (energia, aluguéis, depreciação) entram como ajuste do mês;</li>
+      <li>confira a primeira apuração com a da contabilidade (livro de ICMS/IPI, EFD Contribuições e guias).</li></ul>` + fim;
 }
 
 function soma(arr) { const t = { vc: 0, bc: 0, icms: 0, st: 0, ipi: 0, pis: 0, cofins: 0, notas: new Set() }; for (const i of arr) { for (const [k] of CAMPOS) t[k] += i[k]; t.notas.add(i.nota_id); } return t; }
@@ -146,7 +148,7 @@ function resumo(c) {
   const Eter = soma(D.itens.filter(i => i.lado === 'entradas' && i.terceiro));
   const linha = (t, a, b, cc, cls = '') => `<tr class="${cls}"><td>${t}</td><td class="num">${a == null ? '' : money(a)}</td><td class="num">${b == null ? '' : money(b)}</td><td class="num">${cc == null ? '' : money(cc)}</td></tr>`;
   c.innerHTML = `<div class="card flush"><div class="card-head" style="padding:12px 12px 0"><div><h2>Impostos destacados nas notas — ${MESES_CURTO[+ui.mes.slice(5) - 1]}/${ui.mes.slice(0, 4)}</h2>
-    <p class="muted small">Prévia: soma do que está nas notas autorizadas. Ainda <strong>não</strong> é o imposto a recolher${ehSimples(D.regime) ? ' — no Simples o imposto do mês é o DAS (aba Regras e parâmetros)' : ' — faltam os incentivos, estornos e os créditos de PIS/COFINS pelas regras da empresa (aba Regras e parâmetros)'}.</p></div></div>
+    <p class="muted small">Prévia: soma do que está nas notas autorizadas. Ainda <strong>não</strong> é o imposto a recolher${ehSimples(D.regime) ? ' — no Simples o imposto do mês é o DAS (aba Regras e parâmetros)' : ' — o imposto a recolher, com os incentivos e os créditos pelas regras da empresa, está na aba Imposto a recolher'}.</p></div></div>
     <div class="table-wrap"><table><thead><tr><th></th><th class="num">ICMS</th><th class="num">IPI</th><th class="num">PIS / COFINS</th></tr></thead><tbody>
       ${linha('Débitos — saídas (notas emitidas)', S.icms, S.ipi, null)}
       ${linha('&nbsp;&nbsp;PIS', null, null, S.pis)}${linha('&nbsp;&nbsp;COFINS', null, null, S.cofins)}

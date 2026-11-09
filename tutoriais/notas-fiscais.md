@@ -1,8 +1,8 @@
 ---
 titulo: Notas fiscais e apuração de impostos
 tela: CPD › Notas Fiscais (FIS001) e Apuração de Impostos (FIS002)
-versao: 1.5
-atualizado: 2026-11-05
+versao: 1.6
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -96,10 +96,10 @@ Como os valores são montados:
 ## 6. Apuração de Impostos
 
 1. Escolha o **mês** e a aba **Saídas** (notas emitidas) ou **Entradas** (compras e devoluções).
-2. Escolha como **agrupar**: livro por CFOP / CST, resumo dos impostos, ou regras e parâmetros.
+2. Escolha a aba: livro por CFOP / CST, resumo dos impostos, **imposto a recolher** ou regras e parâmetros.
 3. A tabela mostra o valor contábil, a base do ICMS, o ICMS, o ICMS-ST, o IPI, o PIS e o COFINS. **Exportar Excel** baixa a memória de cálculo.
 
-> **Atenção:** os valores são a **soma do que está destacado nas notas**, ainda não o imposto a recolher. Faltam as regras de PRODEPE, FEEF, AD/DIPER, FECEP, os estornos e os créditos de PIS/COFINS pelas regras da empresa. Cada regra entra com fonte e vigência, conforme forem definidas com a contabilidade.
+> **Atenção:** o livro e o resumo são a **soma do que está destacado nas notas**. O imposto a recolher, com o PRODEPE, o FEEF, a taxa AD/DIPER, o FECEP, os ajustes e os créditos de PIS/COFINS, está na aba **Imposto a recolher** (6.5) e segue os parâmetros cadastrados (6.6).
 
 Nas notas de fornecedores, o CFOP e o CST são os do emitente.
 
@@ -175,6 +175,48 @@ Como a fila se forma (**CPD › Fiscal › Notas de Débito**):
 
 > Quando a integração com a API de emissão (Focus NF-e) estiver ligada, a pendência já traz os dados da nota de débito no layout da NT 2025.002 para a emissão direta.
 
+### 6.5 Imposto a recolher
+
+Calcula, para o mês escolhido, o que vai para as guias:
+
+| Imposto | Como é calculado |
+|---|---|
+| ICMS | débitos das saídas − devoluções de clientes − créditos das compras, com os ajustes do mês e o saldo credor anterior. Do saldo devedor sai o **crédito presumido do PRODEPE** sobre a parte incentivada (CFOP e NCM incentivados) |
+| FEEF e taxa AD/DIPER | percentuais sobre o benefício (ou sobre o saldo incentivado, no FEEF, conforme o parâmetro) |
+| FECEP | percentual sobre a base do ICMS dos itens de saída com NCM sujeito |
+| IPI | débitos − devoluções − créditos das compras − saldo credor anterior |
+| PIS/COFINS | débitos destacados nas saídas − devoluções − créditos das compras com CFOP aceito (alíquotas da empresa) − outros créditos − saldo credor anterior |
+
+![Figura 6 — Imposto a recolher: ICMS com o crédito presumido do PRODEPE, FEEF, AD/DIPER e FECEP, IPI e PIS/COFINS com os créditos](img/notas-fiscais-6.jpg)
+
+O quadro **Antes de fechar** lista o que merece atenção: mês sem parâmetros, PRODEPE ligado sem nenhuma saída incentivada, FECEP sem lista de NCM, nenhum CFOP de crédito de PIS/COFINS, itens sem NCM.
+
+**Ajustes do mês:** saldo credor anterior (ICMS, IPI, PIS/COFINS), outros débitos e créditos, estornos e outros créditos de PIS/COFINS (energia, aluguéis, depreciação). Quando o mês anterior está fechado, os saldos credores dele já vêm preenchidos. **Salvar ajustes** grava sem fechar.
+
+**Fechar a apuração** (administrador ou financeiro) grava a memória de cálculo do mês; os valores deixam de mudar com novas notas e os saldos credores passam para o mês seguinte. Só o administrador **reabre**. **Exportar Excel** baixa a memória.
+
+> É uma prévia gerencial: confira com a apuração da contabilidade (EFD ICMS/IPI e EFD Contribuições) antes de pagar as guias.
+
+### 6.6 Parâmetros da apuração
+
+Na aba **Regras e parâmetros**, o administrador cadastra os parâmetros por **vigência** (cada uma vale do início até a próxima), sempre com a **fonte** (decreto, termo de concessão ou orientação da contabilidade):
+
+- **PRODEPE:** percentual do crédito presumido; cálculo sobre o *saldo devedor × proporção das saídas incentivadas* ou sobre o *débito das saídas incentivadas*; CFOP de saída e início do NCM incentivados (vazio = todos); FEEF e taxa AD/DIPER;
+- **FECEP:** percentual, início do NCM sujeito e CFOP de saída (vazio = todos);
+- **PIS/COFINS:** alíquotas, CFOP do fornecedor que dão crédito, e se o frete e o IPI entram e o ICMS sai da base do crédito.
+
+![Figura 7 — Parâmetros da apuração por vigência, com a fonte](img/notas-fiscais-7.jpg)
+
+Nenhum percentual é suposto pela plataforma: sem parâmetros, a apuração mostra só o destacado nas notas. Uma vigência nova não altera os meses já fechados.
+
+### 6.7 Transição até 2033
+
+No fim da aba **Reforma: simulador 2027**, a tabela **Transição até 2033** repete a base dos últimos 12 meses em cada ano da reforma: o ICMS líquido (com o crédito presumido do PRODEPE, o FEEF e a taxa AD/DIPER) reduzido pelo percentual de ICMS mantido no ano, o PIS/Cofins enquanto cobrado e a CBS/IBS (débito − crédito) pelas alíquotas do ano. A última coluna compara com o total de hoje.
+
+![Figura 8 — Transição até 2033: ICMS e PRODEPE × CBS/IBS, ano a ano, pela base dos 12 meses](img/notas-fiscais-8.jpg)
+
+O PRODEPE entra pelo CFOP principal de cada nota (sem o filtro de NCM) e o FECEP fica fora; as compensações de benefícios previstas na reforma não entram. É ordem de grandeza para o planejamento.
+
 ## 7. Regras e travas
 
 - Nota já importada (mesma chave) não entra de novo.
@@ -206,3 +248,4 @@ Como a fila se forma (**CPD › Fiscal › Notas de Débito**):
 | 1.3 | 30/10/2026 | Relatórios de faturamento e de compras (tela, PDF e Excel) por mês, cliente/fornecedor, produto, UF e CFOP, com devoluções, comparativo do ano anterior, ticket médio e curva ABC. Reforma tributária na Apuração: conferência da CBS/IBS das notas, simulador de 2027 e alíquotas por vigência com a proposta do TCU de 11,3% (SQL 072). |
 | 1.4 | 31/10/2026 | Notas de débito de juros e multa (finalidade 6, tipo 04): fila gerada pelos recebimentos com juros, rateio pelos itens da nota de origem, registro da emissão e juros recebidos pelo fundo como "a decidir" (SQL 074). |
 | 1.5 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
+| 1.6 | 08/11/2026 | Imposto a recolher (ICMS com PRODEPE, FEEF, AD/DIPER e FECEP; IPI; PIS/COFINS com créditos), ajustes e fechamento do mês; parâmetros por vigência com fonte; transição da reforma até 2033 (SQL 141, melhoria 9.2). |

@@ -2038,3 +2038,9 @@ window.RPC.pag_remessa_gravar = () => null;
   window.FN.consultar = () => ({ empresas: [{ novas: 2, xml: 1, ciencias: 1 }] });
   window.FN.manifestar = () => ({ ok: true, cStat: '135' });
 }
+
+// Apuração etapa 2 (SQL 141) — parâmetros FICTÍCIOS (percentuais de exemplo, não os da empresa)
+DB.fisc_param = [{ id: 'fp-1', empresa_id: E, vigencia_inicio: '2026-01-01', prodepe_ativo: true, prodepe_credito_pct: 75, prodepe_base: 'saldo_proporcional', prodepe_cfops: ['5101', '6101'], prodepe_ncm: ['3923'],
+  feef_pct: 10, feef_base: 'beneficio', ad_diper_pct: 2, fecep_pct: 2, fecep_ncm: ['3926'], fecep_cfops: [], pis_pct: 1.65, cofins_pct: 7.6, pc_cfops_credito: ['5101', '5102', '6101', '6102'],
+  pc_incluir_frete: true, pc_incluir_ipi: false, pc_excluir_icms: true, fonte: 'Exemplo fictício para o manual', observacao: null }];
+DB.fisc_apuracoes = [];

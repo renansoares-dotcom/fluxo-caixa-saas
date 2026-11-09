@@ -4,8 +4,10 @@
 //  - Conferência IBS/CBS: o destacado em cada nota × a alíquota do ano da emissão
 import { sb, state, q, fetchAll, isAdmin } from './data.js';
 import { $, esc, money, pct, dateBR, fail, toast, modal, loading, exportXLSX, MESES_CURTO } from './ui.js';
-import { aliquotas, doAno, total, ibs, simular, conferir, SITUACAO, PIS_COFINS, pctBR } from './reforma.js';
+import { aliquotas, doAno, total, ibs, simular, conferir, SITUACAO, PIS_COFINS, pctBR, classeNota, baseEstimada } from './reforma.js';
 import { carregarRegimes, vigente, ehSimples, descricao } from './regime.js';
+import { baseTransicao, transicao, paramDoMes } from './apuracao.js';
+import { carregarParams } from './apuracao-ui.js';
 
 let TAB = null, semTabela = false;
 const sim = { ano: 2027, credAtual: 100, credNovo: 100, notas: null, chave: null };
@@ -72,7 +74,7 @@ export async function pintarSimulador(c) {
   }
   const a = doAno(L, sim.ano), S = simular(sim.notas, a, sim), T = S.total;
   // o simulador compara com PIS/Cofins não cumulativo (Lucro Real); no Simples e no Presumido avisa antes dos números
-  const rg = vigente(await carregarRegimes(state.empresa.id));
+  const rg = vigente(await carregarRegimes(state.empresa.id)), PL = await carregarParams();
   const avisoRegime = !rg ? `<div class="card" style="border-left:4px solid var(--warn,#c80)"><p class="small" style="margin:0"><strong>Regime tributário não cadastrado.</strong> O simulador abaixo compara com o PIS/Cofins não cumulativo (Lucro Real). Cadastre o regime em Cadastros › Empresa › Regime tributário.</p></div>`
     : ehSimples(rg) ? `<div class="card" style="border-left:4px solid var(--warn,#c80)"><p class="small" style="margin:0"><strong>${esc(descricao(rg))}.</strong> Este simulador é do regime regular (débito e crédito, comparado com o PIS/Cofins não cumulativo) e não vale para o DAS. No Simples, com IBS/CBS no DAS a empresa não toma crédito e o cliente recebe só o crédito transferido; pelo regime regular, apura débito e crédito como aqui. A comparação das duas opções entra com a apuração do Simples.</p></div>`
     : rg.regime === 'presumido' ? `<div class="card" style="border-left:4px solid var(--warn,#c80)"><p class="small" style="margin:0"><strong>Lucro Presumido.</strong> O lado “hoje” do simulador usa o PIS/Cofins não cumulativo; no Presumido ele é cumulativo (3,65%, sem crédito). Ajuste para 0% as compras com crédito de PIS/Cofins hoje.</p></div>` : '';
@@ -94,11 +96,27 @@ export async function pintarSimulador(c) {
       <tr><th rowspan="2">Mês</th><th rowspan="2" class="num">Faturamento</th><th colspan="4" style="text-align:center">PIS/Cofins (como hoje)</th><th colspan="5" style="text-align:center">CBS + IBS (${sim.ano})</th><th rowspan="2" class="num">Diferença</th></tr>
       <tr><th class="num" title="Débito das vendas menos as devoluções de clientes">Débito líquido</th><th class="num">Créditos</th><th class="num">A pagar</th><th class="num">% fat.</th><th class="num">Base</th><th class="num" title="Débito das vendas menos as devoluções de clientes">Débito líquido</th><th class="num">Créditos</th><th class="num">A pagar</th><th class="num">% fat.</th></tr></thead><tbody>
       ${S.meses.map(m => lin(m, mesBR(m.mes))).join('')}${lin(T, 'Total')}</tbody></table></div></div>
-    <p class="small muted">Não considera: mudança de preço por a CBS ser cobrada “por fora”, split payment (o tributo sai no recebimento), redutores e regimes específicos, créditos presumidos e o fim do IPI. É uma ordem de grandeza para o planejamento, não a apuração.</p>`;
+    <p class="small muted">Não considera: mudança de preço por a CBS ser cobrada “por fora”, split payment (o tributo sai no recebimento), redutores e regimes específicos, créditos presumidos e o fim do IPI. É uma ordem de grandeza para o planejamento, não a apuração.</p>
+    ${blocoTransicao(L, fim, PL)}`;
   $('#sm-ano', c).onchange = (e) => { sim.ano = +e.target.value; pintarSimulador(c); };
   $('#sm-ca', c).onchange = (e) => { sim.credAtual = Math.min(100, Math.max(0, +e.target.value || 0)); pintarSimulador(c); };
   $('#sm-cn', c).onchange = (e) => { sim.credNovo = Math.min(100, Math.max(0, +e.target.value || 0)); pintarSimulador(c); };
   $('#sm-xls', c).onclick = () => exportXLSX($('#sm-tab table', c), `simulador_cbs_ibs_${sim.ano}`);
+  $('#tr-xls', c) && ($('#tr-xls', c).onclick = () => exportXLSX($('#tr-tab table', c), 'transicao_reforma_2027_2033'));
+}
+
+// transição 2027–2033 pela base dos 12 meses: ICMS (com o PRODEPE e encargos) + PIS/Cofins × CBS/IBS, ano a ano (melhoria 9.2)
+function blocoTransicao(L, fim, PL) {
+  const p = PL ? paramDoMes(PL, fim) : null;
+  const B = baseTransicao(sim.notas, classeNota, baseEstimada, p), T = transicao(B, L.filter(a => a.ano >= 2027), { credNovo: sim.credNovo });
+  const cor = (v) => `<span class="${v > 0 ? 'neg' : 'pos'}">${v > 0 ? '+' : ''}${money(v)}</span>`;
+  return `<div class="card flush" style="margin-top:12px"><div class="card-head" style="padding:12px 12px 0"><div><h2>Transição até 2033: ICMS e PRODEPE × CBS/IBS</h2>
+      <p class="small muted">Mesma base (notas dos 12 meses), repetida em cada ano. Hoje: ICMS líquido ${money(B.icms)}${B.incentivo.credPres ? ` − crédito presumido ${money(B.incentivo.credPres)} + FEEF e AD/DIPER ${money(B.incentivo.encargos)}` : ''} + PIS/Cofins ${money(B.pc)} = <strong>${money(T.hoje)}</strong> por ano.
+      ${p ? `Parâmetros de ${dateBR(p.vigencia_inicio)}${p.prodepe_ativo ? '' : ' (sem PRODEPE)'}.` : 'Sem parâmetros da apuração: PRODEPE e créditos de PIS/Cofins não entram (aba Regras e parâmetros).'}</p></div><button class="btn" id="tr-xls">Excel</button></div>
+    <div class="table-wrap" id="tr-tab"><table><thead><tr><th>Ano</th><th class="num">CBS+IBS</th><th class="num">ICMS mantido</th><th class="num">ICMS após o benefício</th><th class="num" title="Já descontado do ICMS">Crédito presumido</th><th class="num">PIS/Cofins</th><th class="num">CBS + IBS</th><th class="num">Total no ano</th><th class="num">% fat.</th><th class="num">× hoje</th><th>Situação</th></tr></thead><tbody>
+    ${T.linhas.map(x => `<tr><td><b>${x.ano}</b></td><td class="num">${x.aliq.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%</td><td class="num">${x.icmsPct}%</td><td class="num">${money(x.icms)}</td><td class="num">${x.beneficio ? money(-x.beneficio) : '–'}</td>
+      <td class="num">${money(x.pc)}</td><td class="num">${money(x.novo)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${x.pctFat == null ? '–' : pct(x.pctFat)}</td><td class="num">${cor(x.dif)}</td><td>${SITUACAO[x.situacao] || ''}</td></tr>`).join('')}</tbody></table></div>
+    <p class="small muted" style="padding:0 12px 12px">O benefício do PRODEPE cai junto com o ICMS (mesma proporção do ano); compensações de benefícios fiscais previstas na reforma não entram. O PRODEPE é estimado pelo CFOP principal das notas (sem o filtro de NCM, que é por item) e o FECEP fica fora. Ordem de grandeza para o planejamento.</p></div>`;
 }
 
 // ------------------------------------------------------------------ conferência IBS/CBS
