@@ -99,6 +99,7 @@ const routes = {
   'contab/balanco': () => import(`./pages/contab-balanco.js?v=${V}`),
   'contab/indices': () => import(`./pages/contab-indices.js?v=${V}`),
   'contab/fechamento': () => import(`./pages/contab-fechamento.js?v=${V}`),
+  'contab/centros': () => import(`./pages/contab-centros.js?v=${V}`),
   'estoque/implantacao': () => import(`./pages/estoque-implantacao.js?v=${V}`),
   'producao/oee': () => import(`./pages/producao-oee.js?v=${V}`),
   'producao/custos': () => import(`./pages/producao-custos.js?v=${V}`),

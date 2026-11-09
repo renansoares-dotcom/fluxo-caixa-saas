@@ -2075,3 +2075,37 @@ DB.fisc_apuracoes = [];
     .map(([id, codigo, nome, tipo, percentual, valor_fixo, d, c], i) => ({ id, empresa_id: E, codigo, nome, tipo, ativo: true, percentual, valor_fixo, conta_debito_id: d, conta_credito_id: c, historico: nome, ordem: (i + 1) * 10 }));
   DB.contab_fech_config = [{ empresa_id: E, vinculos: ['clt', 'aprendiz'], tolerancia: 1, dom_separador: ';', dom_data: 'dd/mm/aaaa', dom_decimal: ',', dom_conta: 'codigo', dom_campos: ['data', 'debito', 'credito', 'valor', 'historico_codigo', 'complemento'], dom_historico_codigo: '1', dom_cabecalho: false, dom_origens: ['financeiro', 'folha', 'apuracao', 'depreciacao', 'manual'] }];
 }
+
+// Centros de custo em níveis e rateio (SQL 143) — estrutura e valores FICTÍCIOS
+{
+  const C = DB.centros_custo, by = (n) => C.find(c => c.nome === n);
+  const novo = (nome, pai, codigo, tipo) => { const c = { id: id('cc'), empresa_id: E, nome, ativo: true, pai_id: pai ? by(pai).id : null, codigo, tipo, nivel: pai ? (by(pai).nivel || 1) + 1 : 1 }; C.push(c); return c; };
+  novo('INDÚSTRIA', null, '1', null); novo('ADMINISTRAÇÃO E VENDAS', null, '2', null);
+  Object.assign(by('EXTRUSÃO'), { pai_id: by('INDÚSTRIA').id, codigo: '1.1', tipo: 'produtivo', nivel: 2 });
+  Object.assign(by('CORTE E SOLDA'), { pai_id: by('INDÚSTRIA').id, codigo: '1.2', tipo: 'produtivo', nivel: 2 });
+  novo('IMPRESSÃO', 'INDÚSTRIA', '1.3', 'produtivo'); novo('MANUTENÇÃO', 'INDÚSTRIA', '1.4', 'apoio');
+  Object.assign(by('ADMINISTRATIVO'), { pai_id: by('ADMINISTRAÇÃO E VENDAS').id, codigo: '2.1', tipo: 'administrativo', nivel: 2 });
+  Object.assign(by('COMERCIAL'), { pai_id: by('ADMINISTRAÇÃO E VENDAS').id, codigo: '2.2', tipo: 'comercial', nivel: 2 });
+  novo('FINANCEIRO', 'ADMINISTRATIVO', '2.1.1', 'administrativo'); novo('TI', 'ADMINISTRATIVO', '2.1.2', 'apoio');
+  DB.cc_config = [{ empresa_id: E, niveis: 3, nomes_niveis: ['Área', 'Departamento', 'Centro de custo'], so_ultimo_nivel: false, base_valores: 'pago' }];
+  const L = (n, rec, des, rr = 0, re = 0) => ({ cc_id: by(n).id, receitas: rec, despesas: des, rateio_recebido: rr, rateio_enviado: re });
+  window.RPC.cc_resultado = () => ({ base: 'pago', meses_aplicados: [{ mes: '2026-10-01', situacao: 'aplicado' }], linhas: [
+    L('EXTRUSÃO', 612400, 318250.4, 64210.5), L('CORTE E SOLDA', 254300, 121480.9, 31560.2), L('IMPRESSÃO', 198700, 96310.15, 28940.3), L('MANUTENÇÃO', 0, 42800, 0, 42800),
+    L('ADMINISTRATIVO', 0, 18450, 0, 18450), L('FINANCEIRO', 0, 27630.8, 0, 27630.8), L('TI', 0, 14320, 0, 14320), L('COMERCIAL', 0, 58900.6, 0, 21510.2),
+    { cc_id: null, receitas: 3200, despesas: 4870.25, rateio_recebido: 0, rateio_enviado: 0 }] });
+  const D = (n, peso, valor) => ({ cc_id: by(n).id, peso, valor });
+  window.RPC.cc_rateio_calcular = () => [
+    { regra_id: 'rr1', nome: 'Administração para as áreas', criterio: 'pessoas', base_nome: null, origem_cc_id: by('ADMINISTRATIVO').id, direto: 60400.8, recebido: 0, total: 60400.8, aviso: null, soma_pesos: 86,
+      destinos: [D('EXTRUSÃO', 38, 26688.96), D('CORTE E SOLDA', 21, 14748.99), D('IMPRESSÃO', 18, 12642.03), D('MANUTENÇÃO', 9, 6320.82)] },
+    { regra_id: 'rr2', nome: 'Manutenção para a produção', criterio: 'base', base_nome: 'horas-máquina', origem_cc_id: by('MANUTENÇÃO').id, direto: 42800, recebido: 6320.82, total: 49120.82, aviso: null, soma_pesos: 1240,
+      destinos: [D('EXTRUSÃO', 640, 25352.68), D('CORTE E SOLDA', 330, 13072.64), D('IMPRESSÃO', 270, 10695.50)] },
+    { regra_id: 'rr3', nome: 'Comercial por faturamento', criterio: 'percentual', base_nome: null, origem_cc_id: by('COMERCIAL').id, direto: 58900.6, recebido: 0, total: 58900.6, aviso: 'Os percentuais somam 95,00%, não 100%', soma_pesos: 95,
+      destinos: [D('EXTRUSÃO', 55, 0), D('CORTE E SOLDA', 25, 0), D('IMPRESSÃO', 15, 0)] }];
+  DB.cc_rateio_meses = [{ empresa_id: E, mes: (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 8) + '01'; })(), situacao: 'aplicado', aplicado_em: new Date().toISOString() }];
+  DB.cc_rateio_regras = [
+    { id: 'rr1', empresa_id: E, nome: 'Administração para as áreas', ativo: true, ordem: 10, origem_cc_id: by('ADMINISTRATIVO').id, planos: [], criterio: 'pessoas', base_nome: null },
+    { id: 'rr2', empresa_id: E, nome: 'Manutenção para a produção', ativo: true, ordem: 20, origem_cc_id: by('MANUTENÇÃO').id, planos: [], criterio: 'base', base_nome: 'horas-máquina' },
+    { id: 'rr3', empresa_id: E, nome: 'Comercial por faturamento', ativo: true, ordem: 30, origem_cc_id: by('COMERCIAL').id, planos: [], criterio: 'percentual', base_nome: null }];
+  DB.cc_rateio_destinos = [['rr1', 'EXTRUSÃO'], ['rr1', 'CORTE E SOLDA'], ['rr1', 'IMPRESSÃO'], ['rr1', 'MANUTENÇÃO'], ['rr2', 'EXTRUSÃO', null, 640], ['rr2', 'CORTE E SOLDA', null, 330], ['rr2', 'IMPRESSÃO', null, 270],
+    ['rr3', 'EXTRUSÃO', 55], ['rr3', 'CORTE E SOLDA', 25], ['rr3', 'IMPRESSÃO', 15]].map(([r, n, p = null, b = null]) => ({ regra_id: r, cc_id: by(n).id, percentual: p, base: b }));
+}

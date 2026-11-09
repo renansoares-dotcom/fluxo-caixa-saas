@@ -94,6 +94,8 @@ export const MANUAIS = [
     resumo: 'DRE gerencial, balancete importado e da plataforma, balanço, DRE contábil, DFC e de-para contábil.' },
   { id: 'fechamento-contabil', titulo: 'Fechamento Contábil — provisões, conferência e arquivo do Domínio', area: 'Contabilidade', rotas: ['contab/fechamento'],
     resumo: 'Checklist do mês, provisões de 13º, férias, encargos e impostos geradas com um clique, conferência dos bancos e exportação para o Domínio.' },
+  { id: 'centros-custo', titulo: 'Centros de custo em níveis e rateio das despesas indiretas', area: 'Contabilidade', rotas: ['contab/centros'],
+    resumo: 'Área › departamento › centro, resultado por nível e rateio em cascata por percentual, pessoas, folha ou base informada.' },
   { id: 'indices-financeiros', titulo: 'Índices Financeiros — liquidez, endividamento, ciclo de caixa e EBITDA', area: 'Contabilidade', rotas: ['contab/indices'],
     resumo: 'Índices com a faixa da empresa, a tendência de 12 meses, a leitura em linguagem simples e o relatório para a Diretoria ou o Administrador Judicial.' },
   { id: 'imobilizado', titulo: 'Ativo Imobilizado — bens, depreciação, inventário e créditos', area: 'Contabilidade', rotas: ['contab/imobilizado', 'contab/inventario', 'contab/imobilizado-parametros'],

@@ -272,4 +272,8 @@ export const FIGS = [
   ['fechamento-contabil', 'contab/fechamento', '## 3.', 'Provisões e lançamentos sugeridos: valor ajustável, contas, gerado e a gerar', 'scroll:#cf-gerar'],
   ['fechamento-contabil', 'contab/fechamento', '## 5.', 'Regras das provisões: percentual ou valor fixo, contas de débito e crédito e histórico', 'click:#cf-regras'],
   ['fechamento-contabil', 'contab/fechamento', '## 6.', 'Leiaute do arquivo do Domínio e parâmetros do fechamento', 'click:#cf-lay'],
+  ['centros-custo', 'cadastros/centros', '## 2.', 'Centros de custo em níveis: área, departamento e centro, com código e tipo', ''],
+  ['centros-custo', 'contab/centros', '## 4.', 'Resultado por centro de custo: receitas, despesas diretas, rateio recebido e enviado, por nível', ''],
+  ['centros-custo', 'contab/centros', '## 5.', 'Rateio do mês em cascata: total de cada regra e a parte de cada destino', 'rateio'],
+  ['centros-custo', 'contab/centros', '## 6.', 'Regra de rateio: origem, critério, contas e destinos', 'regras|click:tr[data-r="rr2"]'],
 ];
