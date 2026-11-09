@@ -286,4 +286,6 @@ export const FIGS = [
   ['portal-sst', 'portal', '## 4.', 'Meu Portal: documentos, férias e exames do colaborador', ''],
   ['portal-sst', 'rh/sst', '## 5.', 'SST e treinamentos: vencidos, a vencer e nunca feitos, por pessoa', ''],
   ['portal-sst', 'rh/sst', '## 6.', 'Tipos de exame e treinamento: validade, aviso e para quem é obrigatório', 'tipos'],
+  ['horas-folha', 'rh/horas', '## 2.', 'Horas × Folha por setor: pagas, apontadas, aproveitamento e o custo das horas sem apontamento', 'click:tr[data-s="Corte e solda"]'],
+  ['horas-folha', 'rh/horas', '## 3.', 'Ligação dos operadores da produção com os colaboradores do RH', 'ligacao'],
 ];

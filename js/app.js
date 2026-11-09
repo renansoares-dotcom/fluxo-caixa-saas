@@ -82,6 +82,7 @@ const routes = {
   'rh/rescisoes': () => import(`./pages/rh-rescisoes.js?v=${V}`),
   'rh/sst': () => import(`./pages/rh-sst.js?v=${V}`),
   'rh/documentos': () => import(`./pages/rh-documentos.js?v=${V}`),
+  'rh/horas': () => import(`./pages/rh-horas.js?v=${V}`),
   'portal': () => import(`./pages/portal.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),

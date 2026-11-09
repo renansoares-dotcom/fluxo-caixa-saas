@@ -25,7 +25,7 @@ export const TELAS = {
   // Logística
   'logistica': 'LOG001', 'logistica/fretes': 'LOG002', 'logistica/gestao-frota': 'LOG003', 'logistica/indicadores': 'LOG004', 'logistica/frota': 'LOG005', 'logistica/motorista': 'LOG006',
   // RH / Trabalhista
-  'rh/colaboradores': 'RHT001', 'rh/folha': 'RHT002', 'rh/decimo': 'RHT003', 'rh/ferias': 'RHT004', 'rh/rescisoes': 'RHT005', 'rh/sst': 'RHT006', 'rh/documentos': 'RHT007',
+  'rh/colaboradores': 'RHT001', 'rh/folha': 'RHT002', 'rh/decimo': 'RHT003', 'rh/ferias': 'RHT004', 'rh/rescisoes': 'RHT005', 'rh/sst': 'RHT006', 'rh/documentos': 'RHT007', 'rh/horas': 'RHT008',
   // CPD › Fiscal
   'notas': 'FIS001', 'fiscal/apuracao': 'FIS002', 'fiscal/notas-debito': 'FIS003', 'notas/sefaz': 'FIS004',
   // Contabilidade

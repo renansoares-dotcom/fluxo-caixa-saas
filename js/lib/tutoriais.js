@@ -90,6 +90,8 @@ export const MANUAIS = [
     resumo: 'Horas extras levadas à folha, folha oficial × prevista, períodos de férias e passivo, programação de férias e rescisões com previsão no fluxo.' },
   { id: 'portal-sst', titulo: 'Portal do colaborador, documentos do RH e SST', area: 'RH / Trabalhista', rotas: ['rh/sst', 'rh/documentos', 'portal'],
     resumo: 'Holerites e documentos por colaborador, Meu Portal (documentos, férias, exames), ASO, NR e treinamentos com vencimento e aviso.' },
+  { id: 'horas-folha', titulo: 'Horas × Folha — horas apontadas na produção × horas pagas', area: 'RH / Trabalhista', rotas: ['rh/horas'], rh: true,
+    resumo: 'Aproveitamento por setor e por pessoa, horas sem apontamento e o custo delas, ligação operador × colaborador.' },
   { id: 'notas-fiscais', titulo: 'Notas fiscais e apuração de impostos', area: 'CPD', rotas: ['notas', 'fiscal/apuracao'],
     resumo: 'Importar os XML, ligar parcelas a recebimentos e borderôs, impostos por CFOP, relatórios de faturamento e compras, apuração (prévia) e reforma tributária: conferência da CBS/IBS, simulador 2027 e alíquotas.' },
   { id: 'nfe-sefaz', titulo: 'NF-e da SEFAZ — notas contra o CNPJ e manifestação', area: 'CPD', rotas: ['notas/sefaz'],

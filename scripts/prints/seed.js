@@ -2159,3 +2159,20 @@ DB.fisc_apuracoes = [];
     ferias: DB.rh_ferias.filter(f => f.colaborador_id === ana.id).map(f => ({ aquisitivo_ini: f.aquisitivo_ini, gozo_ini: f.gozo_ini, dias: f.dias, abono_dias: f.abono_dias, situacao: f.situacao, pagamento: f.pagamento })),
     sst: Q.filter(x => x.colaborador_id === ana.id) });
 }
+
+// Horas × folha (SQL 146) — horas FICTÍCIAS
+{
+  let R = DB.rh_colaboradores; const by = (m) => R.find(c => c.matricula === m);
+  const P = (m, setor_prod, contrato, extras, apont, ferias = 0, ligado = true) => { const c = by(m); return { colaborador_id: c.id, nome: c.nome, cargo: c.cargo, setor: c.setor, salario: c.salario, situacao: 'ativo', setor_prod,
+    dias_ativos: 31, dias_ferias: ferias, horas_contrato: contrato, horas_extras: extras, horas_apontadas: apont, ligado }; };
+  const extra = [['0101', 'CARLOS ALVES', 'OPERADOR DE EXTRUSORA', 'Extrusão', 2400], ['0102', 'RITA GOMES', 'OPERADORA DE EXTRUSORA', 'Extrusão', 2350], ['0103', 'PAULO NUNES', 'AUXILIAR DE PRODUÇÃO', 'Corte e solda', 1900],
+    ['0104', 'JÚLIA PRADO', 'IMPRESSORA', 'Impressão', 2600]].map(([matricula, nome, cargo, setor, salario]) => ({ id: id('rh'), empresa_id: E, matricula, nome, cpf: null, cargo, setor, vinculo: 'clt', situacao: 'ativo', admissao: '2024-02-01', salario }));
+  R = R.concat(extra);   // só para esta figura: não entram no cadastro do mock
+  window.RPC.hf_horas = () => ({ mes: '2026-10-01', horas_mes: 220, meta_pct: 85, pessoas: [
+    P('0012', 'Extrusão', 220, 12, 201.5), P('0101', 'Extrusão', 220, 8, 214), P('0102', 'Extrusão', 113.5, 0, 98, 15),
+    P('0015', 'Corte e solda', 220, 0, 152.5), P('0030', 'Corte e solda', 220, 6, 171), P('0103', 'Corte e solda', 220, 0, 0, 0, false),
+    P('0104', 'Impressão', 220, 4, 190.5)], operadores_sem_ligacao: [{ operador_id: 'ox', nome: 'TURNO NOITE (genérico)', matricula: null, horas: 46.5 }] });
+  window.RPC.hf_operadores = () => [{ id: 'po1', nome: 'ANA PAULA FERREIRA', matricula: '12', ativo: true, colaborador_id: by('0012').id }, { id: 'po2', nome: 'ELAINE MOURA', matricula: '30', ativo: true, colaborador_id: by('0030').id },
+    { id: 'po3', nome: 'BRUNO COSTA', matricula: '15', ativo: true, colaborador_id: by('0015').id }, { id: 'po4', nome: 'TURNO NOITE (genérico)', matricula: null, ativo: true, colaborador_id: null }];
+  DB.hf_config = [{ empresa_id: E, horas_mes: 220, limite_apontamento_h: 12, descontar_ferias: true, setores_rh: ['Extrusão', 'Corte e solda', 'Impressão'], meta_pct: 85 }];
+}
