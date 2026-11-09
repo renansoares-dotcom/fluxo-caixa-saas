@@ -1184,3 +1184,9 @@ table.metas-grade td.sticky{min-width:150px;white-space:normal}
 .mp-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;align-items:center}
 .mp-leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .rt-dia{border-left:3px solid var(--primary);padding:6px 10px;margin-bottom:10px}
+
+/* entrada com Google/Microsoft (melhoria 10.2) */
+.auth-sociais{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.auth-sociais .auth-social{width:100%;justify-content:center}
+.auth-ou{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+.auth-ou::before,.auth-ou::after{content:"";flex:1;border-top:1px solid var(--border)}

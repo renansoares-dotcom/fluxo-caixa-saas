@@ -1,8 +1,8 @@
 ---
 titulo: Empresa, usuários e auditoria
 tela: Cadastros › Empresa e Usuários (CAD007) e Auditoria (CAD008)
-versao: 1.4
-atualizado: 2026-11-07
+versao: 1.5
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -64,6 +64,31 @@ As **áreas** definem o que a pessoa enxerga no menu: Financeiro (inclui os pain
 - **RH (salários)** só vale para quem for marcado; o administrador sempre vê.
 - Deixe ao menos uma área marcada. A mudança vale no próximo acesso da pessoa.
 
+### 4.4 Perfis de acesso por tela
+
+Para limitar além das áreas, o administrador monta **perfis por tela** (quadro **Perfis de acesso por tela**): um nome (ex.: Contas a pagar) e as telas marcadas, agrupadas como no menu. Na lista de usuários, a coluna **Perfil de telas** escolhe o perfil de cada pessoa.
+
+- Vale para os papéis **financeiro**, **diretor** e **leitura**. O administrador vê tudo; compras, vendas, produção, motorista e colaborador já têm telas fixas.
+- A pessoa só vê no menu, e só abre, as telas do perfil que também estão nas áreas dela. Tutoriais, avisos, conversas e o Meu Portal ficam sempre liberados.
+- O que ela pode **alterar** continua definido pelo papel e pelas regras do banco.
+- A mudança vale no próximo acesso da pessoa. Excluir um perfil devolve a quem o usava todas as telas das áreas.
+
+![Figura 2 — Perfil de acesso por tela: as telas marcadas, agrupadas como no menu](img/empresa-usuarios-8.jpg)
+
+### 4.5 Copiar permissões
+
+Na linha do usuário, **copiar de…** traz de outra pessoa o **papel**, as **áreas** e o **perfil de telas** (útil para quem entra no lugar de alguém). Não copia de um administrador e ninguém muda as próprias permissões.
+
+### 4.6 Entrar com Google ou Microsoft
+
+No quadro **Formas de entrar**, o administrador escolhe o que aparece na tela de login: **e-mail e senha**, **Entrar com Google** e **Entrar com Microsoft (Office 365)**, e um aviso (ex.: "use o seu e-mail da empresa"). A escolha vale para a plataforma toda.
+
+- A pessoa entra com o **mesmo e-mail do convite**: o acesso e o papel continuam vindo do convite e desta tela.
+- Google e Microsoft só funcionam depois de ativados no servidor (o responsável técnico cadastra o aplicativo no Google Cloud e no Azure e liga em Supabase › Authentication › Providers). Antes disso, o botão avisa que a forma de entrar não foi ativada.
+- Sem e-mail e senha, a tela de login mostra um link discreto "Entrar com e-mail e senha", para não trancar ninguém do lado de fora.
+
+![Figura 3 — Perfis de acesso por tela e as formas de entrar (Google e Microsoft)](img/empresa-usuarios-7.jpg)
+
 ## 5. Verificação em duas etapas
 
 A verificação em duas etapas protege a conta mesmo que a senha vaze: ao entrar, além da senha, a plataforma pede um **código de 6 dígitos** do aplicativo autenticador do celular (Google Authenticator, Microsoft Authenticator ou Authy).
@@ -103,7 +128,7 @@ A **importação da base completa** (migração da planilha) só funciona em emp
 
 ## 7. Auditoria
 
-![Figura 2 — Auditoria (dados fictícios)](img/empresa-usuarios-2.jpg)
+![Figura 4 — Auditoria (dados fictícios)](img/empresa-usuarios-2.jpg)
 
 1. Filtre por período (**De / Até**), **onde** (tela ou tabela), **ação** (inclusão, alteração ou exclusão) e **usuário**, ou use a busca.
 2. Clique numa linha para ver o **antes → depois** de cada campo.
@@ -116,7 +141,7 @@ A Auditoria tem três abas: **Movimentos** (a lista acima), **Por registro** e *
 
 ### 7.1 Por registro: quem mudou, e a comparação de versões
 
-![Figura 3 — Auditoria › Por registro: o registro procurado e quantas mudanças teve (dados fictícios)](img/empresa-usuarios-3.jpg)
+![Figura 5 — Auditoria › Por registro: o registro procurado e quantas mudanças teve (dados fictícios)](img/empresa-usuarios-3.jpg)
 
 Para saber, por exemplo, "quem mudou esta OP" ou "quem mudou o banco deste fornecedor":
 
@@ -128,7 +153,7 @@ Para saber, por exemplo, "quem mudou esta OP" ou "quem mudou o banco deste forne
    - se foi **excluído**.
 3. Clique no registro para abrir a **linha do tempo**.
 
-![Figura 4 — Linha do tempo do registro e a comparação de duas versões (dados fictícios)](img/empresa-usuarios-4.jpg)
+![Figura 6 — Linha do tempo do registro e a comparação de duas versões (dados fictícios)](img/empresa-usuarios-4.jpg)
 
 Na linha do tempo, cada mudança é uma **versão** (v1, v2…), com a data, o usuário, a ação e o que mudou.
 
@@ -137,7 +162,7 @@ Na linha do tempo, cada mudança é uma **versão** (v1, v2…), com a data, o u
 
 ### 7.2 Alertas de ações sensíveis
 
-![Figura 5 — Auditoria › Alertas de ações sensíveis (dados fictícios)](img/empresa-usuarios-5.jpg)
+![Figura 7 — Auditoria › Alertas de ações sensíveis (dados fictícios)](img/empresa-usuarios-5.jpg)
 
 A plataforma avisa na hora o administrador e o diretor quando alguém:
 
@@ -158,7 +183,7 @@ Na aba **Alertas**, os novos aparecem primeiro:
 
 Enquanto houver alerta não visto, a **Central de Decisões** mostra a regra 24.
 
-![Figura 6 — Parâmetros dos alertas: o que gera alerta e quem recebe (dados fictícios)](img/empresa-usuarios-6.jpg)
+![Figura 8 — Parâmetros dos alertas: o que gera alerta e quem recebe (dados fictícios)](img/empresa-usuarios-6.jpg)
 
 Em **Parâmetros** você escolhe:
 
@@ -194,3 +219,4 @@ Em **Parâmetros** você escolhe:
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.4 | 07/11/2026 | Auditoria: aba Por registro (busca pelo que foi gravado, linha do tempo e comparação de duas versões), Histórico também no PA e no beneficiário, e aba Alertas de ações sensíveis com parâmetros (regra 24 da Central de Decisões). |
+| 1.5 | 08/11/2026 | Perfis de acesso por tela, copiar permissões de outra pessoa e entrada com Google/Microsoft (SQL 148, melhoria 10.2). |

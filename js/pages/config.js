@@ -1,5 +1,6 @@
 import { sb, state, q, fetchAll, isAdmin, podeEditar, loadCadastros, AREAS } from '../lib/data.js';
 import { $, esc, options, formData, toast, fail, parseNum, dateBR, money, exportXLSX } from '../lib/ui.js';
+import { secaoPerfis, secaoLogin } from '../lib/acesso-ui.js';
 
 export const title = 'Empresa e Usuários';
 const PAPEIS = [['admin', 'Administrador — tudo, inclusive usuários'], ['financeiro', 'Financeiro — lança e edita'], ['diretor', 'Diretor — consulta e aprova autorizações'], ['leitura', 'Leitura — só consulta'], ['compras', 'Compras — módulo Compras, estoque e pagamentos antecipados (os próprios)'], ['vendas', 'Vendas — representante: só a área Comercial e a própria carteira'], ['producao', 'Produção — operador: terminal do setor e ordens de produção'], ['motorista', 'Motorista — só o App do Motorista (as cargas dele)'], ['colaborador', 'Colaborador — só o Meu Portal (holerites, férias, exames)']];
@@ -35,6 +36,7 @@ export async function render(root) {
           <p class="muted small">${PAPEIS.map(p => `<strong>${p[0]}</strong>: ${p[1].split('— ')[1]}`).join(' · ')}</p>` : ''}
       </div>
     </div>
+    ${adm ? '<div class="grid2"><div class="card" id="perfis-tela"></div><div class="card" id="login-formas"></div></div>' : ''}
     ${podeEditar() ? `<div class="card"><h2>Importar lançamentos (Excel ou CSV)</h2>
       <p class="muted small" style="margin-top:0">Colunas aceitas (cabeçalho na 1ª linha): <strong>Data</strong>, <strong>Plano de contas</strong> (código, ex. 2.05.09, ou "2.05.09 - NOME"),
       <strong>Valor</strong>, Descrição, Favorecido, Centro de Custo, Status (Pago / Em aberto), Conta, Opcional 1..4. É o mesmo layout das abas mensais da planilha
@@ -64,6 +66,7 @@ export async function render(root) {
     } catch (err) { ev.target.checked = !liga; fail(err); }
   };
   await membros(root);
+  if (adm) { secaoPerfis($('#perfis-tela', root), () => membros(root)); secaoLogin($('#login-formas', root)); }
   if (adm) await convites(root);
   if (adm) $('#mf', root).onsubmit = async (ev) => {
     ev.preventDefault(); const d = formData(ev.target);
@@ -116,6 +119,11 @@ async function membros(root) {
   try {
     const rows = await q(sb.rpc('listar_membros', { p_empresa: state.empresa.id }));
     const adm = isAdmin();
+    let perfis = [], pm = {};
+    if (adm) { try { [perfis, pm] = await Promise.all([q(sb.from('acesso_perfis').select('id,nome').eq('empresa_id', state.empresa.id).order('nome')), q(sb.rpc('membros_perfis', { p_empresa: state.empresa.id })).then(L => Object.fromEntries(L.map(x => [x.user_id, x.perfil_id])))]); } catch {} }
+    const perfilTd = (r) => !['financeiro', 'diretor', 'leitura'].includes(r.papel) ? '<span class="muted small">—</span>'
+      : adm && r.user_id !== state.user.id && perfis.length ? `<select class="perf"><option value="">todas as telas das áreas</option>${perfis.map(p => `<option value="${p.id}" ${p.id === pm[r.user_id] ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select>`
+      : `<span class="small">${esc(perfis.find(p => p.id === pm[r.user_id])?.nome || 'todas as telas das áreas')}</span>`;
     const comAreas = rows.some(r => 'areas' in r);   // falso enquanto a migration 033 não roda
     const areasTd = (r) => {
       if (r.papel === 'admin') return '<span class="muted small">Todas (administrador)</span>';
@@ -130,11 +138,11 @@ async function membros(root) {
       return `<div class="areas-chk">${AREAS.map(([a, n]) => `<label class="chk"><input type="checkbox" class="ar" value="${a}" ${tem(a) ? 'checked' : ''}> ${n}</label>`).join('')}
         <label class="chk" title="Salários, folha e trabalhista: só quem for marcado aqui (além do administrador)"><input type="checkbox" class="ar-rh" ${rh ? 'checked' : ''}> <b>RH (salários)</b></label></div>`;
     };
-    el.innerHTML = `<table><thead><tr><th>E-mail</th><th>Papel</th><th>Áreas</th><th></th></tr></thead><tbody>
+    el.innerHTML = `<table><thead><tr><th>E-mail</th><th>Papel</th><th>Áreas</th>${adm ? '<th>Perfil de telas</th>' : ''}<th></th></tr></thead><tbody>
       ${rows.map(r => `<tr data-u="${r.user_id}"><td>${esc(r.email)}</td>
         <td>${adm && r.user_id !== state.user.id ? `<select class="pap">${options(PAPEIS.map(([id]) => ({ id, nome: id })), { selected: r.papel })}</select>` : esc(r.papel)}</td>
-        <td>${areasTd(r)}</td>
-        <td>${adm && r.user_id !== state.user.id ? '<button class="btn small danger rm">Remover</button>' : ''}</td></tr>`).join('')}</tbody></table>
+        <td>${areasTd(r)}</td>${adm ? `<td>${perfilTd(r)}</td>` : ''}
+        <td style="white-space:nowrap">${adm && r.user_id !== state.user.id ? `<select class="cop" title="Copiar papel, áreas e perfil de outra pessoa"><option value="">copiar de…</option>${rows.filter(x => x.user_id !== r.user_id && x.papel !== 'admin').map(x => `<option value="${x.user_id}">${esc(x.email)}</option>`).join('')}</select> <button class="btn small danger rm">Remover</button>` : ''}</td></tr>`).join('')}</tbody></table>
       <p class="muted small" style="margin-top:8px">Áreas: o que a pessoa enxerga no menu (Financeiro inclui o Dashboard; Cadastros aparecem para todos).
       <strong>RH (salários)</strong> só vale para quem for marcado — o administrador sempre vê. O que ela pode <strong>alterar</strong> continua definido pelo papel — para um contador só consultar, use papel <em>leitura</em> + área Contabilidade.
       ${adm ? '<br>Último acesso de cada pessoa, suspensão de quem não entra e a revisão periódica: <a href="#/lgpd">Privacidade e Acessos</a>.' : ''}
@@ -143,6 +151,17 @@ async function membros(root) {
       const tr = ev.target.closest('tr');
       if (ev.target.matches('.pap')) {
         try { await q(sb.from('membros').update({ papel: ev.target.value }).eq('empresa_id', state.empresa.id).eq('user_id', tr.dataset.u)); toast('Papel alterado'); membros(root); } catch (err) { fail(err); }
+        return;
+      }
+      if (ev.target.matches('.perf')) {
+        try { await q(sb.from('membros').update({ perfil_id: ev.target.value || null }).eq('empresa_id', state.empresa.id).eq('user_id', tr.dataset.u)); toast('Perfil de telas alterado — vale no próximo acesso da pessoa'); } catch (err) { fail(err); }
+        return;
+      }
+      if (ev.target.matches('.cop')) {
+        const de = ev.target.value; if (!de) return;
+        const nome = rows.find(x => x.user_id === de)?.email;
+        if (!confirm(`Copiar o papel, as áreas e o perfil de telas de ${nome} para ${rows.find(x => x.user_id === tr.dataset.u)?.email}?`)) { ev.target.value = ''; return; }
+        try { await q(sb.rpc('copiar_permissoes', { p_empresa: state.empresa.id, p_de: de, p_para: tr.dataset.u, p_papel: true })); toast('Permissões copiadas'); membros(root); } catch (err) { fail(err); ev.target.value = ''; }
         return;
       }
       if (!ev.target.matches('.ar, .ar-rh')) return;

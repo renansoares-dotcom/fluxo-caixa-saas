@@ -186,6 +186,24 @@ $('#auth-form').onsubmit = async (e) => {
     }
   } catch (err) { msg.innerHTML = `<span class="neg">${esc(err.message)}</span>`; }
 };
+// entrada com Google/Microsoft (melhoria 10.2): as formas de entrar vêm de plataforma_login (lida sem login)
+async function prepararLoginSocial() {
+  let c = null; try { const { data } = await sb.from('plataforma_login').select('*').eq('id', 1).maybeSingle(); c = data; } catch {}
+  if (!c) return;
+  const box = $('#auth-sociais'), form = $('#auth-form');
+  const bt = [c.google && ['google', 'Entrar com Google'], c.microsoft && ['azure', 'Entrar com Microsoft']].filter(Boolean);
+  box.innerHTML = bt.map(([p, t]) => `<button class="btn auth-social" type="button" data-prov="${p}">${t}</button>`).join('') + (c.aviso ? `<p class="small muted">${esc(c.aviso)}</p>` : '')
+    + (bt.length && c.senha ? '<div class="auth-ou"><span>ou</span></div>' : '') + (!c.senha ? '<button class="btn link" type="button" id="auth-mostrar-senha">Entrar com e-mail e senha</button>' : '');
+  box.classList.toggle('hidden', !bt.length && c.senha);
+  if (!c.senha) form.classList.add('hidden');
+  box.onclick = async (e) => {
+    if (e.target.id === 'auth-mostrar-senha') { form.classList.remove('hidden'); e.target.remove(); return; }
+    const p = e.target.closest('[data-prov]')?.dataset.prov; if (!p) return;
+    const { error } = await sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: location.href.split('#')[0], ...(p === 'azure' ? { scopes: 'email' } : {}) } });
+    if (error) $('#auth-msg').innerHTML = `<span class="neg">${esc(/not enabled|provider/i.test(error.message) ? 'Esta forma de entrar ainda não foi ativada no servidor. Use e-mail e senha.' : error.message)}</span>`;
+  };
+}
+prepararLoginSocial();
 $('#auth-reset').onclick = async () => {
   const email = $('#auth-form [name=email]').value;
   if (!email) return toast('Digite seu e-mail primeiro', true);
@@ -288,6 +306,19 @@ function aplicarAreas() {
   // RH: só administrador ou quem tem a área "rh" marcada (sem marcação não dá acesso — salário é sigiloso)
   const rh = $('#nav .nav-area[data-area="rh"]'); if (rh) rh.hidden = !temRH();
 }
+// perfil de acesso por tela (melhoria 10.2): só nos papéis de menu completo; esconde o que o perfil não inclui
+const TELAS_LIVRES = ['tutoriais', 'meus-avisos', 'conversas', 'portal'];
+async function aplicarPerfil(empresa, papel) {
+  $$('#nav a[data-perfil-oculto]').forEach(a => { a.hidden = false; delete a.dataset.perfilOculto; });
+  $$('#nav .nav-area[data-perfil-oculto]').forEach(a => { a.hidden = false; delete a.dataset.perfilOculto; });
+  state.telas = null; state.perfilNome = null;
+  if (!['financeiro', 'diretor', 'leitura'].includes(papel)) return;
+  let t = null; try { t = await q(sb.rpc('minhas_telas', { p_empresa: empresa })); } catch { return; }
+  if (!t) return;
+  state.telas = new Set([...(t.telas || []), ...TELAS_LIVRES]); state.perfilNome = t.perfil;
+  $$('#nav a[data-route]').forEach(a => { if (!a.hidden && !state.telas.has(a.dataset.route)) { a.hidden = true; a.dataset.perfilOculto = '1'; } });
+  $$('#nav .nav-area').forEach(ar => { if (!ar.hidden && ![...ar.querySelectorAll('a[data-route]')].some(a => !a.hidden)) { ar.hidden = true; ar.dataset.perfilOculto = '1'; } });
+}
 // primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
 function primeiraRota() {
   const a = $$('#nav a[data-route]').find(x => !x.hidden && !x.closest('.nav-area')?.hidden && x.dataset.route !== 'conversas');
@@ -332,6 +363,7 @@ async function entrarEmpresa(emp, papel, areas) {
   document.body.classList.toggle('so-colaborador', papel === 'colaborador');
   $$('#nav .nav-audit').forEach(el => el.hidden = !['admin', 'diretor'].includes(papel));
   $$('#nav .nav-admin').forEach(el => el.hidden = papel !== 'admin');
+  await aplicarPerfil(emp.id, papel);
   if (papel === 'compras') { if (!rotaDeCompras(location.hash.replace(/^#\//, ''))) location.hash = '#/compras'; else render(); return; }
   if (papel === 'vendas') { if (!rotaDeVendas(location.hash.replace(/^#\//, ''))) location.hash = '#/comercial'; else render(); return; }
   if (papel === 'producao') { if (!rotaDeProducao(location.hash.replace(/^#\//, ''))) location.hash = '#/producao/terminal'; else render(); return; }
@@ -388,6 +420,7 @@ async function render() {
   if (state.papel === 'producao' && !rotaDeProducao(route)) { location.hash = '#/producao/terminal'; return; }
   if (state.papel === 'motorista' && !rotaDeMotorista(route)) { location.hash = '#/logistica/motorista'; return; }
   if (state.papel === 'colaborador' && !rotaDeColaborador(route)) { location.hash = '#/portal'; return; }
+  if (state.telas && routes[route] && !state.telas.has(route)) { const p = primeiraRota(); if (p !== route && state.telas.has(p)) { location.hash = '#/' + p; return; } }
   { const ar = routes[route] ? areaDaRota(route) : 'fin'; if ((['fin', 'com', 'cmp', 'prd', 'log', 'cpd', 'cont'].includes(ar) && !temArea(ar)) || (ar === 'rh' && !temRH())) { location.hash = '#/' + primeiraRota(); return; } }
   const loader = routes[route] || routes.dashboard;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));

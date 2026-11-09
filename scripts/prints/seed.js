@@ -2188,3 +2188,9 @@ DB.fisc_apuracoes = [];
     logradouro: 'AV. INDUSTRIAL', cep: '50000-000', email: 'contato@exemplo.com.br', telefone: '8132221000', pix: f.documento }));
   DB.qc_config = [{ empresa_id: E, similaridade: 0.85, pesos_fav: {}, pesos_prod: {}, meta: 80 }]; DB.qc_ignorados = [];
 }
+
+// Perfis por tela e login (SQL 148) — perfis FICTÍCIOS
+DB.acesso_perfis = [{ id: 'ap1', empresa_id: E, nome: 'Contas a pagar', descricao: 'Lançamentos, autorização e decisão de pagamentos', telas: ['hoje', 'lancamentos', 'autorizacao', 'decisoes', 'paraquedas', 'conciliacao'] },
+  { id: 'ap2', empresa_id: E, nome: 'Contador externo', descricao: 'Só as demonstrações e o fechamento contábil', telas: ['contab/balancete', 'contab/balanco', 'contab/dre', 'contab/dfc', 'contab/fechamento', 'fiscal/apuracao'] }];
+window.RPC.membros_perfis = () => [{ user_id: 'u2', perfil_id: 'ap1' }, { user_id: 'u5', perfil_id: 'ap2' }];
+DB.plataforma_login = [{ id: 1, senha: true, google: true, microsoft: true, aviso: 'Use o seu e-mail da empresa.' }];

@@ -291,4 +291,6 @@ export const FIGS = [
   ['qualidade-cadastro', 'cadastros/qualidade', '## 2.', 'Qualidade do Cadastro: indicador, duplicados pelo documento e pelo nome, mesclar e "não é duplicado"', ''],
   ['qualidade-cadastro', 'cadastros/qualidade', '## 4.', 'Cadastro incompleto: a nota de cada beneficiário e o que falta', 'click:[data-v="incompletos"]'],
   ['qualidade-cadastro', 'cadastros/qualidade', '## 6.', 'Parâmetros: semelhança dos nomes, meta e pesos de cada campo', 'param'],
+  ['empresa-usuarios', 'config', '### 4.6', 'Perfis de acesso por tela e as formas de entrar (Google e Microsoft)', 'scroll:#perfis-tela'],
+  ['empresa-usuarios', 'config', '### 4.4', 'Perfil de acesso por tela: as telas marcadas, agrupadas como no menu', 'click:#perfis-tela tr[data-p="ap1"]'],
 ];
