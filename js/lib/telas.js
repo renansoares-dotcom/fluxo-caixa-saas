@@ -3,7 +3,7 @@
 // O código NUNCA muda nem é reaproveitado: tela nova pega o próximo número livre da área.
 export const TELAS = {
   // Painéis
-  'hoje': 'PAI001', 'decisao-dia': 'PAI002', 'decisoes': 'PAI003', 'executivo': 'PAI004', 'dashboard': 'PAI005', 'aprovacoes': 'PAI006', 'diretoria': 'PAI007', 'orcamento-cc': 'PAI008', 'perguntar': 'PAI009', 'relatorios': 'PAI010',
+  'hoje': 'PAI001', 'decisao-dia': 'PAI002', 'decisoes': 'PAI003', 'executivo': 'PAI004', 'dashboard': 'PAI005', 'aprovacoes': 'PAI006', 'diretoria': 'PAI007', 'orcamento-cc': 'PAI008', 'perguntar': 'PAI009', 'relatorios': 'PAI010', 'portal': 'PAI011',
   // Financeiro
   'lancamentos': 'FIN001', 'conciliacao': 'FIN002', 'abertos': 'FIN003', 'creditos': 'FIN004', 'conta-fornecedor': 'FIN005', 'portal-clientes': 'FIN006',
   'autorizacao': 'FIN007', 'paraquedas': 'FIN008', 'conferencia': 'FIN009', 'fechamento': 'FIN010',
@@ -25,7 +25,7 @@ export const TELAS = {
   // Logística
   'logistica': 'LOG001', 'logistica/fretes': 'LOG002', 'logistica/gestao-frota': 'LOG003', 'logistica/indicadores': 'LOG004', 'logistica/frota': 'LOG005', 'logistica/motorista': 'LOG006',
   // RH / Trabalhista
-  'rh/colaboradores': 'RHT001', 'rh/folha': 'RHT002', 'rh/decimo': 'RHT003', 'rh/ferias': 'RHT004', 'rh/rescisoes': 'RHT005',
+  'rh/colaboradores': 'RHT001', 'rh/folha': 'RHT002', 'rh/decimo': 'RHT003', 'rh/ferias': 'RHT004', 'rh/rescisoes': 'RHT005', 'rh/sst': 'RHT006', 'rh/documentos': 'RHT007',
   // CPD › Fiscal
   'notas': 'FIS001', 'fiscal/apuracao': 'FIS002', 'fiscal/notas-debito': 'FIS003', 'notas/sefaz': 'FIS004',
   // Contabilidade

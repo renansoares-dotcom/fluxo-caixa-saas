@@ -2128,3 +2128,34 @@ DB.fisc_apuracoes = [];
     verbas: [], total: 9817.22, multa_fgts: 2364.4, pagamento: '2026-11-24', situacao: 'simulada' }];
   window.RPC.rh_ferias_lancar = () => 'x'; window.RPC.rh_rescisao_lancar = () => ({}); window.RPC.rh_rescisao_cancelar = () => null; window.RPC.rh_folha_real = () => ({});
 }
+
+// Portal do colaborador e SST (SQL 145) — pessoas, documentos e datas FICTÍCIOS
+{
+  const R = DB.rh_colaboradores, by = (m) => R.find(c => c.matricula === m), comp = new Date().toISOString().slice(0, 8) + '01';
+  const ant = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 8) + '01'; })();
+  const D = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  DB.rh_documentos = R.map((c, i) => ({ id: 'doc' + i, empresa_id: E, colaborador_id: c.id, tipo: 'holerite', competencia: comp, titulo: 'Holerite Nov/2026', path: `${E}/${c.id}/h.pdf`, publicado: true,
+    visto_em: i < 3 ? new Date(Date.now() - (i + 1) * 864e5).toISOString() : null, enviado_em: new Date(Date.now() - 4 * 864e5).toISOString() }))
+    .concat([{ id: 'docx', empresa_id: E, colaborador_id: by('0021').id, tipo: 'aviso_ferias', competencia: comp, titulo: 'Aviso de férias', path: `${E}/x/a.pdf`, publicado: true, visto_em: null, enviado_em: new Date().toISOString() }]);
+  DB.rh_sst_tipos = [['st1', 'ASO periódico', 'aso', 12, 30, true, [], []], ['st2', 'NR-12 Segurança em máquinas', 'nr', 24, 45, false, [], ['Extrusão', 'Corte']], ['st3', 'NR-11 Empilhadeira', 'nr', 12, 30, false, ['EMPILHADEIRA'], []],
+    ['st4', 'Brigada de incêndio', 'treinamento', 12, 30, false, [], []]].map(([id, nome, categoria, validade_meses, antecedencia_dias, todos, cargos, setores]) => ({ id, empresa_id: E, nome, categoria, validade_meses, antecedencia_dias, todos, cargos, setores, ativo: true }));
+  const S = (m, tipo, tid, cat, realizado, vence, situacao, dias, obrig = true) => { const c = by(m); return { colaborador_id: c.id, nome: c.nome, cargo: c.cargo, setor: c.setor, tipo_id: tid, tipo, categoria: cat, realizado_em: realizado, vence_em: vence, situacao, dias, obrigatorio: obrig }; };
+  const Q = [S('0012', 'ASO periódico', 'st1', 'aso', D(-352), D(13), 'a_vencer', 13), S('0012', 'NR-12 Segurança em máquinas', 'st2', 'nr', D(-700), D(30), 'a_vencer', 30),
+    S('0015', 'ASO periódico', 'st1', 'aso', D(-380), D(-15), 'vencido', -15), S('0015', 'NR-12 Segurança em máquinas', 'st2', 'nr', null, null, 'pendente', null),
+    S('0021', 'ASO periódico', 'st1', 'aso', D(-120), D(245), 'em_dia', 245), S('0027', 'ASO periódico', 'st1', 'aso', D(-200), D(165), 'em_dia', 165),
+    S('0030', 'ASO periódico', 'st1', 'aso', D(-90), D(275), 'em_dia', 275), S('0030', 'NR-12 Segurança em máquinas', 'st2', 'nr', D(-60), D(670), 'em_dia', 670),
+    S('0021', 'Brigada de incêndio', 'st4', 'treinamento', D(-30), D(335), 'em_dia', 335, false)];
+  window.RPC.rh_sst_situacao = () => Q;
+  DB.rh_sst_registros = Q.filter(x => x.realizado_em).map((x, i) => ({ id: 'sr' + i, empresa_id: E, colaborador_id: x.colaborador_id, tipo_id: x.tipo_id, realizado_em: x.realizado_em, vence_em: x.vence_em, resultado: x.categoria === 'aso' ? 'apto' : 'concluido', carga_horaria: x.categoria === 'aso' ? null : 8 }));
+  DB.rh_portal_config = [{ empresa_id: E, ativo: true, mostrar_ferias: true, mostrar_sst: true, mensagem: 'Holerites disponíveis até o 5º dia útil. Dúvidas: RH, ramal 210.', sst_avisar: true, sst_avisar_colaborador: true }];
+  window.RPC.rh_usuarios_portal = () => [{ user_id: 'up1', email: 'ana.ferreira@exemplo.com.br', colaborador_id: by('0012').id }, { user_id: 'up2', email: 'bruno.lima@exemplo.com.br', colaborador_id: by('0015').id }, { user_id: 'up3', email: 'elaine.moura@exemplo.com.br', colaborador_id: null }];
+  const ana = by('0012');
+  window.RPC.portal_meus_dados = () => ({ ligado: true, ativo: true, mensagem: 'Holerites disponíveis até o 5º dia útil. Dúvidas: RH, ramal 210.',
+    colaborador: { id: ana.id, nome: ana.nome, cargo: ana.cargo, setor: ana.setor, matricula: ana.matricula, admissao: ana.admissao, vinculo: 'clt' },
+    documentos: [{ id: 'pd1', tipo: 'holerite', competencia: ant, titulo: 'Holerite Out/2026', path: 'x', visto_em: null, enviado_em: new Date().toISOString() },
+      { id: 'pd2', tipo: 'holerite', competencia: '2026-09-01', titulo: 'Holerite Set/2026', path: 'x', visto_em: '2026-10-06T10:00:00Z', enviado_em: '2026-10-05T10:00:00Z' },
+      { id: 'pd3', tipo: 'informe_rendimentos', competencia: '2025-12-01', titulo: 'Informe de rendimentos 2025', path: 'x', visto_em: '2026-02-27T10:00:00Z', enviado_em: '2026-02-26T10:00:00Z' },
+      { id: 'pd4', tipo: 'aviso_ferias', competencia: '2025-06-01', titulo: 'Aviso e recibo de férias', path: 'x', visto_em: '2025-06-02T10:00:00Z', enviado_em: '2025-06-01T10:00:00Z' }],
+    ferias: DB.rh_ferias.filter(f => f.colaborador_id === ana.id).map(f => ({ aquisitivo_ini: f.aquisitivo_ini, gozo_ini: f.gozo_ini, dias: f.dias, abono_dias: f.abono_dias, situacao: f.situacao, pagamento: f.pagamento })),
+    sst: Q.filter(x => x.colaborador_id === ana.id) });
+}

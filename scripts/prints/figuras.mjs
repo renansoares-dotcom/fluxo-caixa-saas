@@ -281,4 +281,9 @@ export const FIGS = [
   ['folha-completa', 'rh/ferias', '## 4.', 'Férias e provisões: dias a gozar, prazo, avos e o passivo de férias e 13º', ''],
   ['folha-completa', 'rh/ferias', '## 5.', 'Programar férias: período aquisitivo, saída, dias, abono e o cálculo', 'click:[data-prog]'],
   ['folha-completa', 'rh/rescisoes', '## 6.', 'Rescisão: verbas, aviso prévio projetado, multa do FGTS e a saída de caixa', 'click:[data-ab="rs1"]'],
+  ['portal-sst', 'rh/documentos', '## 2.', 'Documentos do RH no mês: holerites por colaborador e quem já abriu no portal', ''],
+  ['portal-sst', 'rh/documentos', '## 3.', 'Portal e usuários: o que o portal mostra, os avisos e a ligação usuário × colaborador', 'portal'],
+  ['portal-sst', 'portal', '## 4.', 'Meu Portal: documentos, férias e exames do colaborador', ''],
+  ['portal-sst', 'rh/sst', '## 5.', 'SST e treinamentos: vencidos, a vencer e nunca feitos, por pessoa', ''],
+  ['portal-sst', 'rh/sst', '## 6.', 'Tipos de exame e treinamento: validade, aviso e para quem é obrigatório', 'tipos'],
 ];
