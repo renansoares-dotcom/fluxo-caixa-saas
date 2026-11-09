@@ -1,0 +1,1 @@
+{ "name": "sefaz-ponte", "private": true, "description": "Ponte HTTPS com o certificado A1 entre a plataforma e a SEFAZ (DF-e e manifestação)", "engines": { "node": "22.x" }, "dependencies": { "node-forge": "1.3.1" } }

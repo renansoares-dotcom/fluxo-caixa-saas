@@ -88,6 +88,8 @@ export const MANUAIS = [
     resumo: 'Cadastro e importação da relação, setor por cargo, previsão da folha e do 13º no fluxo de caixa.' },
   { id: 'notas-fiscais', titulo: 'Notas fiscais e apuração de impostos', area: 'CPD', rotas: ['notas', 'fiscal/apuracao'],
     resumo: 'Importar os XML, ligar parcelas a recebimentos e borderôs, impostos por CFOP, relatórios de faturamento e compras, apuração (prévia) e reforma tributária: conferência da CBS/IBS, simulador 2027 e alíquotas.' },
+  { id: 'nfe-sefaz', titulo: 'NF-e da SEFAZ — notas contra o CNPJ e manifestação', area: 'CPD', rotas: ['notas/sefaz'],
+    resumo: 'Consulta automática à SEFAZ (Distribuição DF-e), ciência para liberar o XML, importação em Notas Fiscais e manifestação conclusiva no prazo.' },
   { id: 'contabilidade', titulo: 'Contabilidade — DRE, balancete, balanço e DFC', area: 'Contabilidade', rotas: ['dre', 'contab/balancete', 'contab/balanco', 'contab/dre', 'contab/dfc', 'contab/depara'],
     resumo: 'DRE gerencial, balancete importado e da plataforma, balanço, DRE contábil, DFC e de-para contábil.' },
   { id: 'indices-financeiros', titulo: 'Índices Financeiros — liquidez, endividamento, ciclo de caixa e EBITDA', area: 'Contabilidade', rotas: ['contab/indices'],

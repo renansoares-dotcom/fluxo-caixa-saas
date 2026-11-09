@@ -12,6 +12,8 @@ import { pintarRelatorios, limparCacheRelatorios } from '../lib/notas-relatorio-
 import { conversaNoModal } from '../lib/mini-chat.js';
 
 export const title = 'Notas Fiscais';
+/** importa XML já carregados (ex.: os que vieram da SEFAZ) pelo mesmo importador dos arquivos */
+export const importarXmls = (xmls, aoTerminar) => importar(null, xmls, aoTerminar);
 
 const hoje = new Date();
 const ant = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
@@ -337,7 +339,7 @@ async function ligarFavorecidos() {
 // ---------------------------------------------------------------------------------------------
 // Importação dos XML
 // ---------------------------------------------------------------------------------------------
-function importar(root) {
+function importar(root, xmls = null, aoTerminar = null) {
   let textos = [], prep = null;
   const m = modal({ title: 'Importar notas fiscais (XML)', wide: true,
     body: `<p class="small muted" style="margin-top:0">Selecione a pasta do mês (ex.: <em>1.7 NF-e Saídas (XML)</em>), os arquivos XML ou um .zip. Entradas e saídas são reconhecidas pelo próprio XML.
@@ -345,11 +347,11 @@ function importar(root) {
       <div class="toolbar"><label>Pasta<input type="file" id="ni-pasta" webkitdirectory directory multiple></label><label>ou arquivos XML / .zip<input type="file" id="ni-arq" accept=".xml,.zip" multiple></label></div>
       <div id="ni-res" style="margin-top:12px"></div>`,
     foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="ni-ok" disabled>Importar</button>' });
-  const ler = async (files) => {
-    if (!files.length) return;
-    $('#ni-res', m.el).innerHTML = `<p class="small">Lendo ${files.length} arquivo(s)…</p>`;
+  const ler = async (files, prontos = null) => {
+    if (!prontos && !files.length) return;
+    $('#ni-res', m.el).innerHTML = `<p class="small">Lendo ${prontos ? prontos.length : files.length} arquivo(s)…</p>`;
     try {
-      textos = await lerArquivos(files);
+      textos = prontos || await lerArquivos(files);
       const lidos = textos.map(t => { const r = lerNFeCompleta(t.xml); if (r?.tipo === 'nfe') r.arquivo = t.nome; if (r?.tipo === 'nfe') r.xml = t.xml; return r; }).filter(Boolean);
       prep = prepararNotas(lidos, state.empresa?.cnpj); prep.naoNFe = textos.length - lidos.length;
       const ch = prep.notas.map(n => n.nota.chave); const exist = new Set();
@@ -370,6 +372,7 @@ function importar(root) {
       $('#ni-ok', m.el).disabled = !prep.notas.length;
     } catch (err) { fail(err); $('#ni-res', m.el).innerHTML = ''; }
   };
+  if (xmls?.length) { m.el.querySelector('.toolbar').style.display = 'none'; ler([], xmls); }   // XML que já vieram (NF-e da SEFAZ)
   $('#ni-pasta', m.el).onchange = (e) => ler([...e.target.files]);
   $('#ni-arq', m.el).onchange = (e) => ler([...e.target.files]);
   // parcelas da nota (sempre com as mesmas colunas, para o insert em lote)
@@ -417,6 +420,7 @@ function importar(root) {
       try { const ids = []; for (const lote of chunks(todas.filter(x => x.nota.tipo === 'saida').map(x => x.nota.chave), 100)) for (const r of await q(sb.from('nfe_notas').select('id').eq('empresa_id', e).in('chave', lote))) ids.push(r.id); auto = await autoVincular(ids); }
       catch (err) { console.warn('vínculo automático', err); }
       limparCacheRelatorios(); toast(`${novas} nota(s) importada(s)${completadas ? ` · ${completadas} completada(s)` : ''}${auto ? ` · ${auto} recebimento(s) vinculado(s) automaticamente` : ''}`); m.close();
+      if (aoTerminar) { aoTerminar(novas); return; }   // chamado de outra tela (NF-e da SEFAZ)
       const meses = [...new Set(todas.map(n => n.nota.emissao.slice(0, 7)))].sort(); if (meses.length) { ui.mes = meses[0]; ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); }
       if (todas.some(n => n.nota.tipo === 'saida')) ui.tipo = 'saida';
       await render(root);

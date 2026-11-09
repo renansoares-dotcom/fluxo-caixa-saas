@@ -2008,3 +2008,33 @@ window.RPC.pag_remessa_gravar = () => null;
   DB.integ_geral = [{ empresa_id: E, avisar: true, papeis: ['admin', 'financeiro'] }];
   DB.integ_config = [];
 }
+
+// NF-e da SEFAZ (SQL 140) — notas e fornecedores FICTÍCIOS
+{
+  const D = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+  const ch = (i) => `26261112345678000190550010000${String(4810 + i).padStart(5, '0')}1000${String(4810 + i).padStart(5, '0')}`.slice(0, 44);
+  const X = '<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe"><ide><nNF>4811</nNF></ide></infNFe></NFe></nfeProc>';
+  const d = (i, nome, doc, dias, valor, situacao, man, extra = {}) => ({ id: 'dfe-' + i, empresa_id: E, chave: ch(i), nsu: 1200 + i, emitente_doc: doc, emitente_nome: nome, emissao: D(dias), valor,
+    situacao_nfe: 'autorizada', situacao, manifestacao: man, manifestado_em: man ? new Date().toISOString() : null, manifestacao_erro: null, nota_id: situacao === 'importada' ? 'nf-x' : null,
+    recebido_em: new Date().toISOString(), xml: situacao === 'xml_disponivel' ? X : null, ...extra });
+  DB.dfe_documentos = [
+    d(1, 'RESINAS DO BRASIL S.A.', '12.345.678/0001-90', 1, 87570, 'xml_disponivel', 'ciencia'),
+    d(2, 'COLOR MASTER TINTAS LTDA', '23.456.789/0001-01', 2, 8400, 'xml_disponivel', 'ciencia'),
+    d(3, 'EMBALAGENS NORDESTE LTDA', '34.567.890/0001-12', 0, 15320.5, 'resumo', null),
+    d(4, 'QUIMICA AGRESTE EIRELI', '45.678.901/0001-23', 3, 4210, 'xml_disponivel', 'ciencia'),
+    d(5, 'ADESIVOS PRIME S.A.', '56.789.012/0001-34', 6, 22980, 'importada', 'confirmacao'),
+    d(6, 'FILMES TÉCNICOS LTDA', '67.890.123/0001-45', 9, 51200, 'importada', 'ciencia'),
+    d(7, 'TRANSPORTES RÁPIDO SUL', '78.901.234/0001-56', 12, 1830, 'ignorada', null),
+    d(8, 'FORNECEDOR DESCONHECIDO LTDA', '89.012.345/0001-67', 4, 3990, 'resumo', 'desconhecimento'),
+    d(9, 'PAPELÃO DO CABO LTDA', '90.123.456/0001-78', 5, 6740, 'resumo', null, { situacao_nfe: 'cancelada' })];
+  DB.dfe_config = [{ empresa_id: E, ativo: true, ambiente: 'producao', ciencia_automatica: true, avisar: true, papeis: ['admin', 'financeiro', 'compras'], ultimo_nsu: 1209, max_nsu: 1209,
+    proxima_consulta: new Date(Date.now() + 42 * 6e4).toISOString(), ultima_consulta: new Date(Date.now() - 18 * 6e4).toISOString(), ultimo_cstat: '137', ultimo_motivo: 'Nenhum documento localizado', ultimo_erro: null,
+    validade_certificado: '2027-06-30T00:00:00Z' }];
+  window.RPC.dfe_resumo = () => { const L = DB.dfe_documentos, c = (s) => L.filter(x => x.situacao === s).length;
+    return { resumo: c('resumo'), xml: c('xml_disponivel'), importadas: c('importada'), ignoradas: c('ignorada'),
+      valor_pendente: L.filter(x => ['resumo', 'xml_disponivel'].includes(x.situacao) && x.situacao_nfe === 'autorizada').reduce((a, x) => a + x.valor, 0) }; };
+  window.RPC.dfe_ignorar = () => null;
+  window.FN = window.FN || {};
+  window.FN.consultar = () => ({ empresas: [{ novas: 2, xml: 1, ciencias: 1 }] });
+  window.FN.manifestar = () => ({ ok: true, cStat: '135' });
+}

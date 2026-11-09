@@ -134,6 +134,7 @@ const routes = {
   'uso': () => import(`./pages/uso.js?v=${V}`),
   'lgpd': () => import(`./pages/lgpd.js?v=${V}`),
   'integracoes': () => import(`./pages/integracoes.js?v=${V}`),
+  'notas/sefaz': () => import(`./pages/notas-sefaz.js?v=${V}`),
   'diretoria': () => import(`./pages/diretoria.js?v=${V}`),
   'perguntar': () => import(`./pages/perguntar.js?v=${V}`),
   'relatorios': () => import(`./pages/relatorios.js?v=${V}`),
@@ -355,7 +356,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 const rotaDeMotorista = (r) => ['logistica/motorista', 'tutoriais', 'meus-avisos'].includes(r);   // motorista: só o app (melhoria 7.1)
 const rotaDeProducao = (r) => ['hoje', 'orcamento-cc', 'perguntar', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'estoque/inventario', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
 const rotaDeVendas = (r) => r === 'comercial' || ['hoje', 'orcamento-cc', 'perguntar', 'comercial/carteira', 'comercial/funil', 'comercial/mapa', 'comercial/comissoes', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
-const rotaDeCompras = (r) => ['hoje', 'orcamento-cc', 'perguntar', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/reposicao', 'estoque/inventario', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
+const rotaDeCompras = (r) => ['notas/sefaz', 'hoje', 'orcamento-cc', 'perguntar', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/reposicao', 'estoque/inventario', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;
