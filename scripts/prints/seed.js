@@ -2117,6 +2117,9 @@ DB.fisc_apuracoes = [];
   DB.rh_horas_extras = [['0012', 12, 4], ['0015', 8, 0], ['0030', 6, 2]].map(([m, h1, h2]) => { const c = by(m), hora = c.salario / 220; return { id: id('he'), empresa_id: E, colaborador_id: c.id, competencia: comp, horas_1: h1, horas_2: h2, valor: Math.round((hora * h1 * 1.5 + hora * h2 * 2) * 100) / 100 }; });
   const fid = id('rf'); DB.rh_folhas.push({ id: fid, empresa_id: E, competencia: comp, tipo: 'mensal', status: 'prevista', real_importado_em: null, real_totais: null });
   R.forEach(c => DB.rh_folha_itens.push({ id: id('ri'), empresa_id: E, folha_id: fid, colaborador_id: c.id, salario: c.salario, proventos: 0, descontos: 0, adiantamento: Math.round(c.salario * 0.4 * 100) / 100, liquido: Math.round(c.salario * 0.52 * 100) / 100, real: null }));
+  { const m = comp.slice(0, 7), [a, mm] = m.split('-').map(Number), prox = `${mm === 12 ? a + 1 : a}-${String(mm === 12 ? 1 : mm + 1).padStart(2, '0')}`;
+    [['adiantamento', 'Adiantamento salarial', `${m}-13`, 5440], ['saldo', 'Saldo da folha', `${prox}-05`, 7072], ['inss', 'INSS (guia)', `${prox}-18`, 1428], ['fgts', 'FGTS (guia)', `${prox}-18`, 1088]]
+      .forEach(([evento, descricao, vencimento, valor]) => DB.rh_folha_eventos.push({ id: id('rv'), empresa_id: E, folha_id: fid, evento, descricao, vencimento, valor, plano_id: null, conta_id: null, lancamento_id: null })); }
   DB.rh_ferias = [
     { id: 'fe1', empresa_id: E, colaborador_id: by('0021').id, aquisitivo_ini: '2024-01-17', gozo_ini: '2026-12-07', dias: 20, abono_dias: 10, adiantar_13: false, salario: 4200, valores: {}, total: 7466.67, pagamento: '2026-12-05', situacao: 'programada', lancamento_id: 'x' },
     { id: 'fe2', empresa_id: E, colaborador_id: by('0012').id, aquisitivo_ini: '2024-03-01', gozo_ini: '2025-07-01', dias: 30, abono_dias: 0, adiantar_13: true, salario: 2300, valores: {}, total: 4216.67, pagamento: '2025-06-29', situacao: 'paga' },
