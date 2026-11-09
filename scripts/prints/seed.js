@@ -2109,3 +2109,19 @@ DB.fisc_apuracoes = [];
   DB.cc_rateio_destinos = [['rr1', 'EXTRUSÃO'], ['rr1', 'CORTE E SOLDA'], ['rr1', 'IMPRESSÃO'], ['rr1', 'MANUTENÇÃO'], ['rr2', 'EXTRUSÃO', null, 640], ['rr2', 'CORTE E SOLDA', null, 330], ['rr2', 'IMPRESSÃO', null, 270],
     ['rr3', 'EXTRUSÃO', 55], ['rr3', 'CORTE E SOLDA', 25], ['rr3', 'IMPRESSÃO', 15]].map(([r, n, p = null, b = null]) => ({ regra_id: r, cc_id: by(n).id, percentual: p, base: b }));
 }
+
+// Folha completa (SQL 144) — pessoas e valores FICTÍCIOS
+{
+  const R = DB.rh_colaboradores, by = (m) => R.find(c => c.matricula === m);
+  const comp = new Date().toISOString().slice(0, 7) + '-01';
+  DB.rh_horas_extras = [['0012', 12, 4], ['0015', 8, 0], ['0030', 6, 2]].map(([m, h1, h2]) => { const c = by(m), hora = c.salario / 220; return { id: id('he'), empresa_id: E, colaborador_id: c.id, competencia: comp, horas_1: h1, horas_2: h2, valor: Math.round((hora * h1 * 1.5 + hora * h2 * 2) * 100) / 100 }; });
+  const fid = id('rf'); DB.rh_folhas.push({ id: fid, empresa_id: E, competencia: comp, tipo: 'mensal', status: 'prevista', real_importado_em: null, real_totais: null });
+  R.forEach(c => DB.rh_folha_itens.push({ id: id('ri'), empresa_id: E, folha_id: fid, colaborador_id: c.id, salario: c.salario, proventos: 0, descontos: 0, adiantamento: Math.round(c.salario * 0.4 * 100) / 100, liquido: Math.round(c.salario * 0.52 * 100) / 100, real: null }));
+  DB.rh_ferias = [
+    { id: 'fe1', empresa_id: E, colaborador_id: by('0021').id, aquisitivo_ini: '2024-01-17', gozo_ini: '2026-12-07', dias: 20, abono_dias: 10, adiantar_13: false, salario: 4200, valores: {}, total: 7466.67, pagamento: '2026-12-05', situacao: 'programada', lancamento_id: 'x' },
+    { id: 'fe2', empresa_id: E, colaborador_id: by('0012').id, aquisitivo_ini: '2024-03-01', gozo_ini: '2025-07-01', dias: 30, abono_dias: 0, adiantar_13: true, salario: 2300, valores: {}, total: 4216.67, pagamento: '2025-06-29', situacao: 'paga' },
+    { id: 'fe3', empresa_id: E, colaborador_id: by('0012').id, aquisitivo_ini: '2025-03-01', gozo_ini: '2027-01-11', dias: 30, abono_dias: 0, adiantar_13: false, salario: 2350, valores: {}, total: 3133.33, pagamento: '2027-01-09', situacao: 'programada', lancamento_id: 'x' }];
+  DB.rh_rescisoes = [{ id: 'rs1', empresa_id: E, colaborador_id: by('0027').id, data_desligamento: '2026-11-14', motivo: 'sem_justa_causa', aviso: 'indenizado', salario: 3100, saldo_fgts: 5420, ferias_vencidas_dias: 0,
+    verbas: [], total: 9817.22, multa_fgts: 2364.4, pagamento: '2026-11-24', situacao: 'simulada' }];
+  window.RPC.rh_ferias_lancar = () => 'x'; window.RPC.rh_rescisao_lancar = () => ({}); window.RPC.rh_rescisao_cancelar = () => null; window.RPC.rh_folha_real = () => ({});
+}

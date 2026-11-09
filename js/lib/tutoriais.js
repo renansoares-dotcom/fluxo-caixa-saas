@@ -86,6 +86,8 @@ export const MANUAIS = [
     resumo: 'Ficha do frete, transportadores, piso mínimo da ANTT, CIOT e MDF-e, conformidade do mês.' },
   { id: 'rh', titulo: 'RH — colaboradores, folha do mês e 13º', area: 'RH / Trabalhista', rotas: ['rh/colaboradores', 'rh/folha', 'rh/decimo'], rh: true,
     resumo: 'Cadastro e importação da relação, setor por cargo, previsão da folha e do 13º no fluxo de caixa.' },
+  { id: 'folha-completa', titulo: 'Folha completa — horas extras, folha real, férias, rescisões e passivo', area: 'RH / Trabalhista', rotas: ['rh/ferias', 'rh/rescisoes'], rh: true,
+    resumo: 'Horas extras levadas à folha, folha oficial × prevista, períodos de férias e passivo, programação de férias e rescisões com previsão no fluxo.' },
   { id: 'notas-fiscais', titulo: 'Notas fiscais e apuração de impostos', area: 'CPD', rotas: ['notas', 'fiscal/apuracao'],
     resumo: 'Importar os XML, ligar parcelas a recebimentos e borderôs, impostos por CFOP, relatórios de faturamento e compras, apuração (prévia) e reforma tributária: conferência da CBS/IBS, simulador 2027 e alíquotas.' },
   { id: 'nfe-sefaz', titulo: 'NF-e da SEFAZ — notas contra o CNPJ e manifestação', area: 'CPD', rotas: ['notas/sefaz'],

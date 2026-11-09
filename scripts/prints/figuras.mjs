@@ -276,4 +276,9 @@ export const FIGS = [
   ['centros-custo', 'contab/centros', '## 4.', 'Resultado por centro de custo: receitas, despesas diretas, rateio recebido e enviado, por nível', ''],
   ['centros-custo', 'contab/centros', '## 5.', 'Rateio do mês em cascata: total de cada regra e a parte de cada destino', 'rateio'],
   ['centros-custo', 'contab/centros', '## 6.', 'Regra de rateio: origem, critério, contas e destinos', 'regras|click:tr[data-r="rr2"]'],
+  ['folha-completa', 'rh/folha', '## 2.', 'Horas extras do mês: horas a 50% e 100%, valor da hora e o total que vai para a folha', 'horas'],
+  ['folha-completa', 'rh/folha', '## 3.', 'Folha real: a planilha da folha oficial × o previsto, pessoa a pessoa', 'real'],
+  ['folha-completa', 'rh/ferias', '## 4.', 'Férias e provisões: dias a gozar, prazo, avos e o passivo de férias e 13º', ''],
+  ['folha-completa', 'rh/ferias', '## 5.', 'Programar férias: período aquisitivo, saída, dias, abono e o cálculo', 'click:[data-prog]'],
+  ['folha-completa', 'rh/rescisoes', '## 6.', 'Rescisão: verbas, aviso prévio projetado, multa do FGTS e a saída de caixa', 'click:[data-ab="rs1"]'],
 ];

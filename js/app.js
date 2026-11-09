@@ -78,6 +78,8 @@ const routes = {
   'rh/colaboradores': () => import(`./pages/rh-colaboradores.js?v=${V}`),
   'rh/folha': () => import(`./pages/rh-folha.js?v=${V}`),
   'rh/decimo': () => import(`./pages/rh-decimo.js?v=${V}`),
+  'rh/ferias': () => import(`./pages/rh-ferias.js?v=${V}`),
+  'rh/rescisoes': () => import(`./pages/rh-rescisoes.js?v=${V}`),
   'dashboard': () => import(`./pages/dashboard.js?v=${V}`),
   'lancamentos': () => import(`./pages/lancamentos.js?v=${V}`),
   'conciliacao': () => import(`./pages/conciliacao.js?v=${V}`),

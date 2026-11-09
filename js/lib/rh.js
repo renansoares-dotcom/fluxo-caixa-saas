@@ -23,7 +23,7 @@ export const EVENTOS = {
   decimo_1: '13º — 1ª parcela', decimo_2: '13º — 2ª parcela', inss_decimo: 'INSS s/ 13º', fgts_decimo_1: 'FGTS s/ 13º (1ª parcela)', fgts_decimo_2: 'FGTS s/ 13º (2ª parcela)', outro: 'Outro',
 };
 // plano de contas padrão de cada evento (código); a empresa pode trocar nos parâmetros
-export const PLANO_PADRAO = { salarios: '2.03.01', inss: '2.03.17', fgts: '2.03.18', irrf: '2.03.20', decimo: '2.03.05' };
+export const PLANO_PADRAO = { salarios: '2.03.01', inss: '2.03.17', fgts: '2.03.18', irrf: '2.03.20', decimo: '2.03.05', ferias: '2.03.01', rescisao: '2.03.01' };
 export const planoDoEvento = (ev) => ({ adiantamento: 'salarios', saldo: 'salarios', inss: 'inss', inss_decimo: 'inss', fgts: 'fgts', fgts_decimo_1: 'fgts', fgts_decimo_2: 'fgts', irrf: 'irrf', decimo_1: 'decimo', decimo_2: 'decimo' }[ev] || 'salarios');
 
 export const PARAM_PADRAO = {
