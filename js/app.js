@@ -134,6 +134,7 @@ const routes = {
   'cadastros/plano': () => import(`./pages/cad-plano.js?v=${V}`),
   'cadastros/contas': () => import(`./pages/cad-contas.js?v=${V}`),
   'cadastros/favorecidos': () => import(`./pages/cad-favorecidos.js?v=${V}`),
+  'cadastros/qualidade': () => import(`./pages/cad-qualidade.js?v=${V}`),
   'cadastros/centros': () => import(`./pages/cad-centros.js?v=${V}`),
   'cadastros/empresa': () => import(`./pages/cad-empresa.js?v=${V}`),
   'contratos': () => import(`./pages/contratos.js?v=${V}`),

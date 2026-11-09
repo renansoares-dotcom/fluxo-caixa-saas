@@ -2176,3 +2176,15 @@ DB.fisc_apuracoes = [];
     { id: 'po3', nome: 'BRUNO COSTA', matricula: '15', ativo: true, colaborador_id: by('0015').id }, { id: 'po4', nome: 'TURNO NOITE (genérico)', matricula: null, ativo: true, colaborador_id: null }];
   DB.hf_config = [{ empresa_id: E, horas_mes: 220, limite_apontamento_h: 12, descontar_ferias: true, setores_rh: ['Extrusão', 'Corte e solda', 'Impressão'], meta_pct: 85 }];
 }
+
+// Qualidade do cadastro (SQL 147) — cadastros repetidos FICTÍCIOS
+{
+  const novo = (tipo, nome, documento, extra = {}) => DB.favorecidos.push({ id: id('fv'), empresa_id: E, tipo, nome, documento, ativo: true, tipo_pessoa: 'PJ', ...extra });
+  novo('FORNECEDORES', 'RESINAS BRASIL SA', '33.000.167/0001-01', { email: 'vendas@resinasbr.com.br', telefone: '1133334444' });
+  novo('FORNECEDORES', 'EMBALAGENS PRIMAVERA', null, { municipio: 'CARUARU', uf: 'PE' });
+  novo('CLIENTES', 'MERCADINHO SÃO JOSÉ', '11.111.111/1111-11');
+  novo('FORNECEDORES', 'GRÁFICA ANTIGA LTDA', '04252011000110', { receita_situacao: 'BAIXADA', receita_consultada_em: '2026-11-03T10:00:00Z' });
+  DB.favorecidos.filter(f => ['RESINAS DO BRASIL S.A.', 'ENERGIA REGIONAL S.A.', 'SUPERMERCADOS BOA COMPRA LTDA'].includes(f.nome)).forEach(f => Object.assign(f, { receita_situacao: 'ATIVA', receita_consultada_em: '2026-11-05T10:00:00Z',
+    logradouro: 'AV. INDUSTRIAL', cep: '50000-000', email: 'contato@exemplo.com.br', telefone: '8132221000', pix: f.documento }));
+  DB.qc_config = [{ empresa_id: E, similaridade: 0.85, pesos_fav: {}, pesos_prod: {}, meta: 80 }]; DB.qc_ignorados = [];
+}

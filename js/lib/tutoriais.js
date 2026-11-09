@@ -106,6 +106,8 @@ export const MANUAIS = [
     resumo: 'Índices com a faixa da empresa, a tendência de 12 meses, a leitura em linguagem simples e o relatório para a Diretoria ou o Administrador Judicial.' },
   { id: 'imobilizado', titulo: 'Ativo Imobilizado — bens, depreciação, inventário e créditos', area: 'Contabilidade', rotas: ['contab/imobilizado', 'contab/inventario', 'contab/imobilizado-parametros'],
     resumo: 'Cadastro e ficha dos bens, compras a imobilizar, depreciação mensal com lançamento contábil e fechamento, baixa, inventário pelo QR, CIAP, PIS/COFINS e relatórios.' },
+  { id: 'qualidade-cadastro', titulo: 'Qualidade do Cadastro — duplicados, cadastro completo e Receita', area: 'Cadastros', rotas: ['cadastros/qualidade'],
+    resumo: 'Beneficiários e produtos repetidos (mesmo CNPJ ou nome parecido), mesclar, indicador de cadastro completo e consulta do CNPJ na Receita.' },
   { id: 'cadastros', titulo: 'Cadastros — plano de contas, contas, beneficiários e centros de custo', area: 'Cadastros', rotas: ['cadastros/plano', 'cadastros/contas', 'cadastros/favorecidos', 'cadastros/centros'],
     resumo: 'Plano de contas com DRE e prioridade, contas bancárias, beneficiários por aba e centros de custo.' },
   { id: 'empresa-identidade', titulo: 'Empresa — identidade visual, regime tributário e crachás', area: 'Cadastros', rotas: ['cadastros/empresa'],

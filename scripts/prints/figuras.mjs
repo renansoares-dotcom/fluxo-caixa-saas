@@ -288,4 +288,7 @@ export const FIGS = [
   ['portal-sst', 'rh/sst', '## 6.', 'Tipos de exame e treinamento: validade, aviso e para quem é obrigatório', 'tipos'],
   ['horas-folha', 'rh/horas', '## 2.', 'Horas × Folha por setor: pagas, apontadas, aproveitamento e o custo das horas sem apontamento', 'click:tr[data-s="Corte e solda"]'],
   ['horas-folha', 'rh/horas', '## 3.', 'Ligação dos operadores da produção com os colaboradores do RH', 'ligacao'],
+  ['qualidade-cadastro', 'cadastros/qualidade', '## 2.', 'Qualidade do Cadastro: indicador, duplicados pelo documento e pelo nome, mesclar e "não é duplicado"', ''],
+  ['qualidade-cadastro', 'cadastros/qualidade', '## 4.', 'Cadastro incompleto: a nota de cada beneficiário e o que falta', 'click:[data-v="incompletos"]'],
+  ['qualidade-cadastro', 'cadastros/qualidade', '## 6.', 'Parâmetros: semelhança dos nomes, meta e pesos de cada campo', 'param'],
 ];
