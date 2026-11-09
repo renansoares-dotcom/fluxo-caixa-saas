@@ -2202,3 +2202,67 @@ DB.indices_economicos = ['IPCA', 'IGP-M', 'INPC'].map((k, i) => ({ indice: k, me
 // Ajuda na tela (SQL 150) — vídeo FICTÍCIO (só o título aparece na figura)
 DB.ajuda_videos = [{ id: 'av1', empresa_id: E, rota: 'fiscal/apuracao', titulo: 'Fechar a apuração do mês (2 min)', url: 'https://youtu.be/aaaaaaaaaaa', ordem: 10 }];
 window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () => null;
+
+// Recuperadora (SQL 151) — reciclagem FICTÍCIA: catadores, cooperativa e sucateiro inventados, pesos e preços de exemplo
+{
+  const fv = (nome, doc, rec_tipo, ci, pix) => { const f = { id: id('fv'), empresa_id: E, tipo: 'FORNECEDORES', nome, documento: doc, ativo: true, tipo_pessoa: doc.length === 11 ? 'F' : 'J', municipio: 'CARUARU', uf: 'PE', rec_tipo, rec_coletor_incentivado: ci, pix }; DB.favorecidos.push(f); return f; };
+  const F1 = fv('JOSÉ AMARO DA SILVA', '52998224725', 'catador_pf', true, '52998224725'), F2 = fv('COOPERATIVA RECICLA AGRESTE', '45678912000150', 'cooperativa', true, 'recicla@exemplo.com.br'),
+    F3 = fv('APARAS NORDESTE COMÉRCIO LTDA', '34567891000162', 'sucateiro_pj', false, '34567891000162'), F4 = fv('MARIA DAS DORES SOUZA', '11144477735', 'catador_pf', true, '81988887777');
+  const pc = DB.plano_contas.find(p => p.codigo === '2.01.01');
+  DB.rec_config = [{ empresa_id: E, modo: 'ambos', aparas_auto: true, apara_material_padrao_id: 'rm5', apara_custo_kg: 0, tolerancia_kg: 2, desconto_max_pct: 25, exigir_foto: false, plano_compra_id: pc?.id, plano_adiantamento_id: pc?.id,
+    prazo_pagamento_dias: 2, abater_adiantamento: true, integrar_estoque: false, est_local_id: null, balanca_baud: 9600, prefixo_entrada: 'LE', prefixo_apara: 'AP' }];
+  DB.rec_materiais = [['rm1', 'PEBD-T', 'Filme PEBD transparente', 'PEBD', 'transparente', 'sujo', '39151000'], ['rm2', 'PEBD-C', 'Filme PEBD colorido', 'PEBD', 'colorido', 'impresso', '39151000'],
+    ['rm3', 'PEAD', 'Embalagem PEAD rígida', 'PEAD', 'mista', 'sujo', '39151000'], ['rm4', 'PP-R', 'Ráfia e sacaria de PP', 'PP', 'mista', 'sujo', '39159000'], ['rm5', 'AP-PEBD', 'Apara interna PEBD', 'PEBD', 'mista', 'limpo', null]]
+    .map(([i, codigo, nome, polimero, cor, condicao, ncm]) => ({ id: i, empresa_id: E, codigo, nome, polimero, cor, condicao, ncm, produto_id: null, ativo: true }));
+  DB.rec_classes = [['rcA', 'A', 'Limpo e seco', 2, 1], ['rcB', 'B', 'Sujeira leve', 8, 2], ['rcC', 'C', 'Sujo ou úmido', 15, 3]].map(([i, codigo, nome, d, o]) => ({ id: i, empresa_id: E, codigo, nome, desconto_padrao_pct: d, ordem: o, ativo: true }));
+  DB.rec_precos = [['rm1', null, '2026-07-01', 1.6], ['rm1', null, '2026-11-01', 1.8], ['rm1', 'rcA', '2026-11-01', 2.2], ['rm2', null, '2026-11-01', 1.2], ['rm3', null, '2026-09-01', 1.9], ['rm4', null, '2026-09-01', 0.95], ['rm1', null, '2026-12-01', 1.9]]
+    .map(([m, c, v, p]) => ({ id: id('rp'), empresa_id: E, material_id: m, classe_id: c, vigencia: v, preco_kg: p }));
+  DB.rec_tickets = []; DB.rec_ticket_itens = []; DB.rec_lotes = [];
+  const prec = { rm1: 1.8, rm2: 1.2, rm3: 1.9, rm4: 0.95 };
+  const tk = (num, dh, f, placa, bruto, tara, itens, sit = 'fechado', extra = {}) => {
+    const t = { id: 'rt' + num, empresa_id: E, numero: num, data_hora: dh, origem: f ? 'compra' : 'transferencia', fornecedor_id: f?.id || null, placa, motorista: extra.motorista || null, peso_bruto: bruto, tara, peso_liquido: bruto - tara,
+      frete_valor: 0, nf_numero: extra.nf || null, nf_chave: null, situacao: sit, fotos: [], observacao: extra.obs || null, total: null, abatido: extra.abatido || 0 };
+    let tot = 0, k = 0;
+    for (const [m, c, kgv, d] of itens) {
+      const desc = d ?? DB.rec_classes.find(x => x.id === c)?.desconto_padrao_pct ?? 0, preco = c === 'rcA' && m === 'rm1' ? 2.2 : prec[m];
+      const pago = Math.round(kgv * (1 - desc / 100) * 1000) / 1000, valor = Math.round(pago * preco * 100) / 100;
+      const it = { id: id('ri'), empresa_id: E, ticket_id: t.id, rec_ticket_id: t.id, material_id: m, classe_id: c, peso_kg: kgv, desconto_pct: sit === 'fechado' ? desc : null, preco_kg: sit === 'fechado' ? preco : null,
+        peso_pago: sit === 'fechado' ? pago : null, valor: sit === 'fechado' ? valor : null };
+      DB.rec_ticket_itens.push(it);
+      if (sit === 'fechado') { tot += valor; k++; DB.rec_lotes.push({ id: id('rl'), empresa_id: E, codigo: `LE${num}-${k}`, tipo: 'entrada', material_id: m, classe_id: c, fornecedor_id: f?.id, ticket_item_id: it.id, data: dh.slice(0, 10),
+        peso_kg: pago, saldo_kg: extra.consumido ? 0 : pago, custo_total: valor, situacao: extra.consumido ? 'consumido' : extra.bloq && k === 1 ? 'bloqueado' : 'disponivel', observacao: extra.bloq && k === 1 ? 'Muita terra: aguardar a lavagem extra' : null }); it.lote_id = DB.rec_lotes.at(-1).id; }
+    }
+    if (sit === 'fechado') t.total = Math.round(tot * 100) / 100;
+    DB.rec_tickets.push(t); return t;
+  };
+  tk(118, '2026-11-02T08:40:00-03:00', F3, 'PEB4F21', 6840, 3120, [['rm1', 'rcB', 2410], ['rm4', 'rcB', 1308]], 'fechado', { nf: '4521', motorista: 'Reginaldo', consumido: true });
+  tk(119, '2026-11-03T10:15:00-03:00', F1, 'KGT2E07', 1980, 1250, [['rm1', 'rcC', 512], ['rm3', 'rcB', 216]], 'fechado', { abatido: 300 });
+  tk(120, '2026-11-04T09:05:00-03:00', F2, 'QWE7H33', 4560, 2010, [['rm1', 'rcA', 1460], ['rm2', 'rcB', 1088]], 'fechado', { motorista: 'Severino' });
+  tk(121, '2026-11-05T14:30:00-03:00', F4, null, 312, 0, [['rm1', 'rcB', 312]], 'aberto');
+  tk(122, '2026-11-06T08:10:00-03:00', F3, 'PEB4F21', 7120, 3120, [['rm1', 'rcB', 2390], ['rm4', 'rcC', 1608]], 'fechado', { nf: '4533', motorista: 'Reginaldo', bloq: true });
+  tk(123, '2026-11-09T07:50:00-03:00', F1, 'KGT2E07', 2140, 1250, [['rm1', 'rcB', 640], ['rm3', 'rcB', 248]], 'aberto');
+  DB.rec_lotes.push(...[['2026-11-03', 186.5, 'disponivel'], ['2026-11-04', 214, 'disponivel'], ['2026-11-05', 172.5, 'disponivel'], ['2026-11-06', 240, 'disponivel']].map(([d, kgv, s], i) =>
+    ({ id: id('rl'), empresa_id: E, codigo: `AP-${d.slice(2).replace(/-/g, '')}-AP-PEBD`, tipo: 'apara', material_id: 'rm5', classe_id: null, fornecedor_id: null, ticket_item_id: null, data: d, peso_kg: kgv, saldo_kg: kgv, custo_total: 0, situacao: s, observacao: null })));
+  DB.rec_apara_registros = DB.rec_lotes.filter(l => l.tipo === 'apara').flatMap(l => [1, 2, 3].map(j => ({ apontamento_id: id('ap'), empresa_id: E, lote_id: l.id, kg: Math.round(l.peso_kg / 3 * 10) / 10 })));
+  DB.rec_adiantamentos = [{ id: 'ra1', empresa_id: E, fornecedor_id: F1.id, data: '2026-10-30', valor: 300, situacao: 'quitado', observacao: 'vale da semana' },
+    { id: 'ra2', empresa_id: E, fornecedor_id: F1.id, data: '2026-11-06', valor: 400, situacao: 'aberto', observacao: 'vale da semana' }, { id: 'ra3', empresa_id: E, fornecedor_id: F4.id, data: '2026-11-07', valor: 150, situacao: 'aberto', observacao: null }];
+  DB.rec_adiant_abatimentos = [{ id: 'rab1', empresa_id: E, adiantamento_id: 'ra1', ticket_id: 'rt119', valor: 300 }];
+  DB.rec_apara_regras = (() => { const set = (n) => DB.prod_setores?.find(s => (s.nome || '').toLowerCase().includes(n)); const r = [];
+    if (set('extrus')) r.push({ id: 'rr1', empresa_id: E, setor_id: set('extrus').id, maquina_id: null, motivo_id: null, material_id: 'rm5', ignorar: false, ativo: true });
+    if (set('impress')) r.push({ id: 'rr2', empresa_id: E, setor_id: set('impress').id, maquina_id: null, motivo_id: null, material_id: 'rm2', ignorar: false, ativo: true });
+    if (set('recup')) r.push({ id: 'rr3', empresa_id: E, setor_id: set('recup').id, maquina_id: null, motivo_id: null, material_id: null, ignorar: true, ativo: true }); return r; })();
+  const fech = DB.rec_tickets.filter(t => t.situacao === 'fechado'), its = DB.rec_ticket_itens.filter(i => fech.some(t => t.id === i.ticket_id));
+  const sumBy = (arr, f) => arr.reduce((s, x) => s + (+f(x) || 0), 0), nomeM = (m) => { const x = DB.rec_materiais.find(y => y.id === m); return x.codigo + ' — ' + x.nome; };
+  window.RPC.rec_painel = () => ({ mes: '2026-11-01', comprado_kg: sumBy(its, i => i.peso_kg), pago_kg: sumBy(its, i => i.peso_pago), valor: sumBy(fech, t => t.total), outras_entradas_kg: 0, apara_kg: 813,
+    tickets: fech.length, tickets_abertos: 2, a_pagar: 9870.45, adiant_saldo: 550, aparas_sem_material: 0,
+    por_material: DB.rec_materiais.map(m => ({ material: nomeM(m.id), kg: sumBy(its.filter(i => i.material_id === m.id), i => i.peso_kg), pago_kg: sumBy(its.filter(i => i.material_id === m.id), i => i.peso_pago),
+      valor: sumBy(its.filter(i => i.material_id === m.id), i => i.valor), apara_kg: m.id === 'rm5' ? 813 : 0, estoque_kg: sumBy(DB.rec_lotes.filter(l => l.material_id === m.id && ['disponivel', 'bloqueado'].includes(l.situacao)), l => l.saldo_kg) }))
+      .filter(x => x.kg || x.apara_kg || x.estoque_kg).sort((a, b) => b.kg - a.kg),
+    fornecedores: [F3, F2, F1].map(f => { const tt = fech.filter(t => t.fornecedor_id === f.id), ii = its.filter(i => tt.some(t => t.id === i.ticket_id)), kgv = sumBy(ii, i => i.peso_kg), pg = sumBy(ii, i => i.peso_pago), v = sumBy(ii, i => i.valor);
+      return { fornecedor: f.nome, rec_tipo: f.rec_tipo, tickets: tt.length, kg: kgv, pago_kg: pg, valor: v, desconto_pct: Math.round((1 - pg / kgv) * 10000) / 100, preco_medio: Math.round(v / pg * 10000) / 10000 }; }),
+    dias: Array.from({ length: 30 }, (_, i) => { const d = `2026-11-${String(i + 1).padStart(2, '0')}`; return { dia: d, compra_kg: sumBy(its.filter(x => DB.rec_tickets.find(t => t.id === x.ticket_id).data_hora.slice(0, 10) === d), x => x.peso_kg),
+      apara_kg: sumBy(DB.rec_lotes.filter(l => l.tipo === 'apara' && l.data === d), l => l.peso_kg) }; }) });
+  window.RPC.rec_relacao_nota = () => [F1, F2].map(f => { const tt = fech.filter(t => t.fornecedor_id === f.id && !t.nf_numero); return tt.length ? DB.rec_materiais.map(m => { const ii = its.filter(i => tt.some(t => t.id === i.ticket_id) && i.material_id === m.id);
+    return ii.length ? { fornecedor_id: f.id, fornecedor: f.nome, documento: f.documento, rec_tipo: f.rec_tipo, coletor_incentivado: true, material: nomeM(m.id), ncm: m.ncm, tickets: tt.filter(t => ii.some(i => i.ticket_id === t.id)).map(t => t.numero).join(', '),
+      kg: sumBy(ii, i => i.peso_pago), valor: sumBy(ii, i => i.valor), preco_medio: Math.round(sumBy(ii, i => i.valor) / sumBy(ii, i => i.peso_pago) * 10000) / 10000 } : null; }).filter(Boolean) : []; }).flat();
+}

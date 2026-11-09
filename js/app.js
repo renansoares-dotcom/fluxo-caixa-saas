@@ -113,6 +113,10 @@ const routes = {
   'producao/rastreio': () => import(`./pages/producao-rastreio.js?v=${V}`),
   'manutencao/preventivas': () => import(`./pages/manutencao-preventivas.js?v=${V}`),
   'tintas/previsao': () => import(`./pages/tintas-previsao.js?v=${V}`),
+  'recuperadora': () => import(`./pages/rec-painel.js?v=${V}`),
+  'recuperadora/entradas': () => import(`./pages/rec-entradas.js?v=${V}`),
+  'recuperadora/lotes': () => import(`./pages/rec-lotes.js?v=${V}`),
+  'recuperadora/parametros': () => import(`./pages/rec-parametros.js?v=${V}`),
   'estoque/reposicao': () => import(`./pages/estoque-reposicao.js?v=${V}`),
   'estoque/inventario': () => import(`./pages/estoque-inventario.js?v=${V}`),
   'contab/dre': () => import(`./pages/contab-dre.js?v=${V}`),
@@ -321,6 +325,17 @@ async function aplicarPerfil(empresa, papel) {
   $$('#nav a[data-route]').forEach(a => { if (!a.hidden && !state.telas.has(a.dataset.route)) { a.hidden = true; a.dataset.perfilOculto = '1'; } });
   $$('#nav .nav-area').forEach(ar => { if (!ar.hidden && ![...ar.querySelectorAll('a[data-route]')].some(a => !a.hidden)) { ar.hidden = true; ar.dataset.perfilOculto = '1'; } });
 }
+// Recuperadora (SQL 151): módulo ligado por empresa; desligado, só quem configura vê os Parâmetros para ligar
+async function aplicarRecuperadora(empresa, papel) {
+  const links = $$('#nav a.nav-rec'); if (!links.length) return;
+  let modo = 'desligado'; try { modo = (await q(sb.from('rec_config').select('modo').eq('empresa_id', empresa).maybeSingle()))?.modo || 'desligado'; } catch {}
+  if (state.empresa?.id !== empresa) return;
+  const pcp = ['admin', 'financeiro', 'diretor'].includes(papel);
+  links.forEach(a => { const ocultar = modo === 'desligado' && !(pcp && a.dataset.route === 'recuperadora/parametros');
+    if (ocultar && !a.hidden) { a.hidden = true; a.dataset.recOculto = '1'; } else if (!ocultar && a.dataset.recOculto) { a.hidden = false; delete a.dataset.recOculto; } });
+  const sec = $('#nav .nav-sec-rec'); if (sec) sec.hidden = !links.some(a => !a.hidden);
+}
+document.addEventListener('rec-config', () => { if (state.empresa) aplicarRecuperadora(state.empresa.id, state.papel).catch(() => {}); });
 // primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
 function primeiraRota() {
   const a = $$('#nav a[data-route]').find(x => !x.hidden && !x.closest('.nav-area')?.hidden && x.dataset.route !== 'conversas');
@@ -366,6 +381,7 @@ async function entrarEmpresa(emp, papel, areas) {
   $$('#nav .nav-audit').forEach(el => el.hidden = !['admin', 'diretor'].includes(papel));
   $$('#nav .nav-admin').forEach(el => el.hidden = papel !== 'admin');
   await aplicarPerfil(emp.id, papel);
+  aplicarRecuperadora(emp.id, papel).catch(() => {});
   setTimeout(() => iniciarTour().catch(() => {}), 1500);   // tour de boas-vindas (melhoria 10.5): só na primeira vez
   if (papel === 'compras') { if (!rotaDeCompras(location.hash.replace(/^#\//, ''))) location.hash = '#/compras'; else render(); return; }
   if (papel === 'vendas') { if (!rotaDeVendas(location.hash.replace(/^#\//, ''))) location.hash = '#/comercial'; else render(); return; }
@@ -401,7 +417,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil producao (operador no terminal do setor)
 const rotaDeMotorista = (r) => ['logistica/motorista', 'portal', 'tutoriais', 'meus-avisos'].includes(r);   // motorista: só o app (melhoria 7.1)
 const rotaDeColaborador = (r) => ['portal', 'meus-avisos'].includes(r);   // colaborador: só o Meu Portal (melhoria 8.2)
-const rotaDeProducao = (r) => ['portal', 'hoje', 'orcamento-cc', 'perguntar', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'estoque/inventario', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
+const rotaDeProducao = (r) => ['portal', 'hoje', 'orcamento-cc', 'perguntar', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'recuperadora/entradas', 'recuperadora/lotes', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'estoque/inventario', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
 const rotaDeVendas = (r) => r === 'comercial' || ['portal', 'hoje', 'orcamento-cc', 'perguntar', 'comercial/carteira', 'comercial/funil', 'comercial/mapa', 'comercial/comissoes', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
 const rotaDeCompras = (r) => ['portal', 'notas/sefaz', 'hoje', 'orcamento-cc', 'perguntar', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/reposicao', 'estoque/inventario', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;

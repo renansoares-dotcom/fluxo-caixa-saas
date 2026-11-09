@@ -296,4 +296,12 @@ export const FIGS = [
   ['contratos', 'contratos', '### 8.1', 'Rotina automática dos contratos: reajuste proposto, parcelas, avisos e os índices do Banco Central', 'click:#ct-auto'],
   ['ajuda-na-tela', 'fiscal/apuracao', '## 2.', 'O "?" abre ao lado o trecho do manual da tela, com as seções, os vídeos e o tour', 'click:#ajuda-btn'],
   ['ajuda-na-tela', 'fiscal/apuracao', '## 4.', 'Tour da plataforma: um passo de cada vez, com o ponto da tela em destaque', 'click:#ajuda-btn|click:#aj-tour'],
+  ['recuperadora', 'recuperadora/parametros', '## 1.', 'Parâmetros da Recuperadora: modo, aparas internas, balança, pagamento ao fornecedor e estoque', ''],
+  ['recuperadora', 'recuperadora/parametros', '### 1.3', 'Classes de qualidade com o desconto padrão e a tabela de preços por vigência', 'classes'],
+  ['recuperadora', 'recuperadora', '## 2.', 'Painel da Recuperadora: compras, peso pago, apara interna, entradas por dia, materiais e fornecedores do mês', ''],
+  ['recuperadora', 'recuperadora/entradas', '## 3.', 'Entradas e Balança: os tickets do mês, abertos e fechados, com o peso pago e o total', ''],
+  ['recuperadora', 'recuperadora/entradas', '### 3.2', 'Ticket aberto: pesagem, materiais com classe, desconto e preço da tabela, a conferência do peso e o adiantamento a abater', 'click:tr[data-id="rt123"]'],
+  ['recuperadora', 'recuperadora/entradas', '## 4.', 'Fornecedores de reciclável com o tipo, o coletor incentivado e os adiantamentos', 'fornecedores'],
+  ['recuperadora', 'recuperadora/entradas', '### 4.3', 'Relação para a nota de entrada: compras sem nota por fornecedor e material, com o NCM', 'relacao'],
+  ['recuperadora', 'recuperadora/lotes', '## 5.', 'Lotes da Recuperadora: entradas da balança e aparas internas, com o saldo e o custo por kg', ''],
 ];
