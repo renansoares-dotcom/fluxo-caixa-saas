@@ -33,8 +33,9 @@ const alertasDe = (c) => K.alertas(c, arqDe(c), reaDe(c), D.hoje);
 export async function render(root) {
   if (!isAdmin()) { root.innerHTML = '<div class="card"><div class="empty">Contratos: acesso só para administradores da empresa.</div></div>'; return; }
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Contratos</h2><div class="muted small">Vigência, aviso prévio, reajuste, PDF assinado e parcelas no fluxo de caixa. Acesso só de administradores.</div></div>
-      <button class="btn primary" id="ct-novo">Novo contrato</button></div><div id="ct-corpo"><div class="loading">Carregando…</div></div>`;
+      <div><button class="btn" id="ct-auto">Automático</button> <button class="btn primary" id="ct-novo">Novo contrato</button></div></div><div id="ct-corpo"><div class="loading">Carregando…</div></div>`;
   $('#ct-novo', root).onclick = () => ficha(null, root);
+  $('#ct-auto', root).onclick = () => automatico(root);
   try { await carregar(); } catch (err) { console.error(err); $('#ct-corpo', root).innerHTML = erroTela('os contratos'); return; }
   lista($('#ct-corpo', root), root);
   const ab = state.abrir?.tipo === 'contrato' ? state.abrir : null;
@@ -53,7 +54,8 @@ function lista(corpo, root) {
     .filter(c => !t || `${c.numero} ${c.parte_nome} ${c.objeto} ${K.TIPOS[c.tipo]} ${c.parte_documento || ''}`.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().includes(t));
   const kpi = (r, v, s = '', cl = '') => `<div class="kpi"><div class="k-label">${r}</div><div class="k-value ${cl}">${v}</div>${s ? `<div class="k-sub">${s}</div>` : ''}</div>`;
   corpo.innerHTML = `<div class="kpis">${kpi('Contratos vigentes', vig.length)}${kpi('A pagar por mês', money(pagar), 'equivalente mensal')}${kpi('A receber por mês', money(receber), 'equivalente mensal')}
-      ${kpi('Com alerta', comAlerta.length, comAlerta.length ? 'vencimento, aviso ou reajuste' : 'nenhum', comAlerta.length ? 'neg' : '')}${kpi('Sem PDF assinado', semPdf, semPdf ? 'anexe o contrato assinado' : 'todos anexados', semPdf ? 'warn' : '')}</div>
+      ${kpi('Com alerta', comAlerta.length, comAlerta.length ? 'vencimento, aviso ou reajuste' : 'nenhum', comAlerta.length ? 'neg' : '')}${kpi('Sem PDF assinado', semPdf, semPdf ? 'anexe o contrato assinado' : 'todos anexados', semPdf ? 'warn' : '')}
+      ${(() => { const n = Object.values(D.R).flat().filter(r => r.status === 'proposto').length; return kpi('Reajustes a aprovar', n, n ? 'propostos pelo índice' : 'nenhum', n ? 'warn' : ''); })()}</div>
     <div class="card toolbar" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <div class="chips" id="ct-f">${[['vigentes', 'Vigentes'], ['alertas', 'Com alerta'], ['rascunho', 'Rascunhos'], ['encerrados', 'Encerrados'], ['todos', 'Todos']].map(([k, n]) => `<span class="chip ${ui.filtro === k ? 'on' : ''}" data-f="${k}">${n}</span>`).join('')}</div>
       <input id="ct-busca" placeholder="Buscar nº, parte, objeto, CNPJ…" value="${esc(ui.busca)}" style="min-width:240px;margin-left:auto"></div>
@@ -232,7 +234,7 @@ function propor(c, md0, root) {
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="r-ok">Propor reajuste</button>' });
   const el = md.el, atual = () => { const p = +$('#r-pct', el).value; $('#r-novo', el).value = isFinite(p) && $('#r-pct', el).value !== '' ? money(K.reajustar(c.valor, p)) : ''; };
   $('#r-pct', el).oninput = atual; atual();
-  if (c.indice !== 'fixo') K.indiceAcumulado(c.indice, c.data_base).then(r => { $('#r-pct', el).value = r.percentual; $('#r-fonte', el).value = r.fonte; $('#r-msg', el).textContent = `Acumulado em 12 meses: ${K.pctBR(r.percentual)}. Confira antes de propor.`; atual(); })
+  if (c.indice !== 'fixo') q(sb.rpc('indice_acumulado', { p_indice: c.indice, p_data_base: c.data_base })).catch(() => null).then(r => r || K.indiceAcumulado(c.indice, c.data_base)).then(r => { $('#r-pct', el).value = r.percentual; $('#r-fonte', el).value = r.fonte; $('#r-msg', el).textContent = `Acumulado em 12 meses: ${K.pctBR(r.percentual)}. Confira antes de propor.`; atual(); })
     .catch(err => { $('#r-msg', el).innerHTML = `<span class="warn">Não foi possível buscar o índice (${esc(err.message)}). Informe o percentual acumulado e a fonte.</span>`; $('#r-fonte', el).value = 'informado'; });
   $('#r-ok', el).onclick = async (ev) => {
     const p = $('#r-pct', el).value; if (p === '' || !isFinite(+p)) return toast('Informe o percentual', true);
@@ -320,5 +322,35 @@ function minuta(c, box, md, root) {
       await new Promise(r => setTimeout(r, 500));
       fr.contentWindow.focus(); fr.contentWindow.print();
     } catch (err) { fail(err); } finally { ev.target.disabled = false; }
+  };
+}
+
+// rotina automática (melhoria 10.4, SQL 149): reajuste proposto pelo índice, parcelas até N meses e avisos; índices do Banco Central
+async function automatico(root) {
+  let cfg, I;
+  try { [cfg, I] = await Promise.all([q(sb.from('contrato_config').select('*').eq('empresa_id', state.empresa.id)).then(r => r[0] || null), q(sb.from('indices_economicos').select('indice,mes,pct').order('mes', { ascending: false }).limit(60))]); }
+  catch (err) { return toast(/contrato_config|indices_/.test(err.message || '') ? 'A rotina automática precisa do SQL 149' : err.message, true); }
+  const c = cfg || { propor_reajuste: true, dias_antes_reajuste: 30, gerar_parcelas: true, meses_parcelas: 12, avisar: true, dias_aviso_vencimento: 30, papeis: ['admin'] };
+  const ult = (k) => I.find(x => x.indice === k);
+  const md = modal({ title: 'Contratos — rotina automática', body: `<div class="form">
+      <label class="chk"><input type="checkbox" id="ca-r" ${c.propor_reajuste ? 'checked' : ''}> Propor o reajuste sozinho perto da data-base</label>
+      <label>Quantos dias antes da data-base<input type="number" id="ca-rd" min="0" max="120" value="${c.dias_antes_reajuste}"></label>
+      <label class="chk"><input type="checkbox" id="ca-p" ${c.gerar_parcelas ? 'checked' : ''}> Gerar as parcelas no fluxo sozinho</label>
+      <label>Até quantos meses à frente<input type="number" id="ca-pm" min="1" max="36" value="${c.meses_parcelas}"></label>
+      <label class="chk"><input type="checkbox" id="ca-a" ${c.avisar ? 'checked' : ''}> Avisar: reajuste proposto, prazo do aviso prévio e fim de vigência</label>
+      <label>Avisar com quantos dias de antecedência<input type="number" id="ca-ad" min="0" max="180" value="${c.dias_aviso_vencimento}"></label>
+      <div><b class="small">Quem recebe os avisos</b><div style="display:flex;gap:14px;margin-top:4px">${[['admin', 'Administrador'], ['diretor', 'Diretor'], ['financeiro', 'Financeiro']].map(([k, t]) => `<label class="chk"><input type="checkbox" class="ca-pp" value="${k}" ${(c.papeis || []).includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div></div>
+      <p class="small muted">Roda todo dia às 7h15. O reajuste fica <b>proposto</b>: só muda o valor e as parcelas depois de aprovado na ficha do contrato. Índices do Banco Central já baixados:
+        ${['IPCA', 'IGP-M', 'INPC'].map(k => { const u = ult(k); return `${k} ${u ? `até ${u.mes.slice(5, 7)}/${u.mes.slice(0, 4)}` : 'ainda não'}`; }).join(' · ')}.</p></div>`,
+    foot: '<button class="btn" id="ca-run">Rodar agora</button><span class="spacer"></span><button class="btn" data-close>Cancelar</button><button class="btn primary" id="ca-ok">Salvar</button>' });
+  $('#ca-ok', md.el).onclick = async () => {
+    try { await q(sb.from('contrato_config').upsert({ empresa_id: state.empresa.id, propor_reajuste: $('#ca-r', md.el).checked, dias_antes_reajuste: +$('#ca-rd', md.el).value || 0, gerar_parcelas: $('#ca-p', md.el).checked,
+      meses_parcelas: +$('#ca-pm', md.el).value || 12, avisar: $('#ca-a', md.el).checked, dias_aviso_vencimento: +$('#ca-ad', md.el).value || 0, papeis: $$('.ca-pp:checked', md.el).map(x => x.value), atualizado_em: new Date().toISOString() }));
+      toast('Rotina salva'); md.close(); } catch (err) { fail(err); }
+  };
+  $('#ca-run', md.el).onclick = async (ev) => {
+    ev.target.disabled = true;
+    try { const r = await q(sb.rpc('contratos_rodar_agora', { p_empresa: state.empresa.id })); toast(`${r.reajustes} reajuste(s) proposto(s), ${r.parcelas} parcela(s) e ${r.avisos} aviso(s)`); md.close(); await carregar(); lista($('#ct-corpo', root), root); }
+    catch (err) { fail(err); ev.target.disabled = false; }
   };
 }

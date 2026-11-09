@@ -1,8 +1,8 @@
 ---
 titulo: Contratos
 tela: Cadastros › Contratos (CAD006)
-versao: 1.5
-atualizado: 2026-11-07
+versao: 1.6
+atualizado: 2026-11-08
 ---
 ## 1. Para que serve
 
@@ -103,6 +103,18 @@ Os dados da empresa vêm de **Empresa e Usuários** (CNPJ, endereço e represent
    - **recusado**: o valor continua o mesmo.
 5. Nos dois casos, a próxima data-base passa para um ano depois.
 
+### 8.1 Rotina automática
+
+O botão **Automático** (no topo da lista) liga o que a plataforma faz sozinha, todo dia às 7h15:
+
+- **Propor o reajuste** perto da data-base (padrão: 30 dias antes), pelo índice acumulado em 12 meses (do 13º ao 2º mês antes da data-base) ou pelo percentual fixo do contrato. O reajuste fica **proposto**, e só muda os valores depois de aprovado;
+- **Gerar as parcelas** no fluxo até N meses à frente (padrão: 12), sem duplicar;
+- **Avisar** quem você escolher: reajuste proposto, prazo do aviso prévio (fim da vigência menos os dias de aviso) e fim da vigência ou renovação automática.
+
+Os índices (IPCA, IGP-M e INPC) são baixados todo dia do Banco Central pelo próprio servidor; a janela mostra até que mês já estão disponíveis. Se faltar algum dos 12 meses, o reajuste é proposto no dia em que o índice sair. **Rodar agora** faz a parte da empresa na hora. O cartão **Reajustes a aprovar** conta os propostos.
+
+![Figura 4 — Rotina automática dos contratos: reajuste proposto, parcelas, avisos e os índices do Banco Central](img/contratos-4.jpg)
+
 ## 9. Renovar, encerrar ou rescindir
 
 - **Renovação automática**: quando o prazo termina, a ficha mostra **Renovar até …** (mesmo prazo do período anterior).
@@ -130,3 +142,4 @@ Os dados da empresa vêm de **Empresa e Usuários** (CNPJ, endereço e represent
 | 1.3 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.4 | 06/11/2026 | Dois modelos novos, consolidados com as minutas do jurídico: locação de veículos para transporte de cargas e prestação de serviços de transporte rodoviário de cargas (com anexos de veículos e de fretes). |
 | 1.5 | 07/11/2026 | O Decision Center e a Decisão do Dia passaram a ser a Central de Decisões. |
+| 1.6 | 08/11/2026 | Rotina automática: índices do Banco Central baixados pelo servidor, reajuste proposto sozinho perto da data-base, parcelas geradas até N meses e avisos de reajuste, aviso prévio e fim de vigência (SQL 149, melhoria 10.4). |

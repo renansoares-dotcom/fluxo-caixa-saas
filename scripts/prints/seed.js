@@ -2194,3 +2194,7 @@ DB.acesso_perfis = [{ id: 'ap1', empresa_id: E, nome: 'Contas a pagar', descrica
   { id: 'ap2', empresa_id: E, nome: 'Contador externo', descricao: 'Só as demonstrações e o fechamento contábil', telas: ['contab/balancete', 'contab/balanco', 'contab/dre', 'contab/dfc', 'contab/fechamento', 'fiscal/apuracao'] }];
 window.RPC.membros_perfis = () => [{ user_id: 'u2', perfil_id: 'ap1' }, { user_id: 'u5', perfil_id: 'ap2' }];
 DB.plataforma_login = [{ id: 1, senha: true, google: true, microsoft: true, aviso: 'Use o seu e-mail da empresa.' }];
+
+// Contratos automáticos (SQL 149) — índices FICTÍCIOS
+DB.contrato_config = [{ empresa_id: E, propor_reajuste: true, dias_antes_reajuste: 30, gerar_parcelas: true, meses_parcelas: 12, avisar: true, dias_aviso_vencimento: 30, papeis: ['admin', 'financeiro'] }];
+DB.indices_economicos = ['IPCA', 'IGP-M', 'INPC'].map((k, i) => ({ indice: k, mes: '2026-' + ['10', '10', '09'][i] + '-01', pct: 0.4 }));
