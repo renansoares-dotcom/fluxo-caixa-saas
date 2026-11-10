@@ -22,7 +22,7 @@ const num1 = (v) => (+v || 0).toFixed(1).replace('.', ',');
 // aprova/rejeita: diretor ou admin (SQL 048)
 const ehDiretor = () => ['diretor', 'admin'].includes(state.papel);
 const sacadoDe = (t) => state.cad.favById[t.favorecido_id]?.nome || t.descricao || '(sem cliente)';
-const cnpjDe = (t) => state.cad.favById[t.favorecido_id]?.documento || '';
+const cnpjDe = (t) => t._cnpj || state.cad.favById[t.favorecido_id]?.documento || '';
 function descCustos(c, fu, n) {
   if (!c) return '';
   const p = [];
@@ -69,7 +69,7 @@ async function carregar() {
     q(sb.from('fidc_fundos').select('*').eq('empresa_id', e).order('nome')),
     receitas.length ? fetchAll(() => sb.from('lancamentos').select('id,data,emissao,documento,descricao,favorecido_id,valor,conta_id,status,fidc_proposta_id').eq('empresa_id', e).eq('status', 'Em aberto').in('plano_id', receitas).order('data')) : [],
     q(sb.from('fidc_propostas').select('*').eq('empresa_id', e).order('numero', { ascending: false })),
-    q(sb.from('fidc_proposta_itens').select('lancamento_id, proposta_id, fidc_propostas!inner(numero,status)').eq('empresa_id', e).in('fidc_propostas.status', ['Rascunho', 'Pendente'])),
+    q(sb.from('fidc_proposta_itens').select('*, fidc_propostas!inner(numero,status)').eq('empresa_id', e).in('fidc_propostas.status', ['Rascunho', 'Pendente'])),
     fetchAll(() => sb.from('fidc_titulos').select('fundo,valor,vencimento,sacado_agrupado,sacado,cnpj_sacado').eq('empresa_id', e)),
   ]);
   // condições por grupo de sacados (SQL 050); sem a tabela, cada fundo usa os próprios campos
@@ -77,8 +77,14 @@ async function carregar() {
   cmpCfg = { cdi_aa: 13.65, cdi_data: null, periodo_meses: 12, faixas_prazo: [30, 45, 60, 90], respeitar_limites: true, economia_minima: 200, banco: false };
   try { const c = await q(sb.from('fidc_comparador_config').select('*').eq('empresa_id', e).maybeSingle()); cmpCfg.banco = true; if (c) Object.assign(cmpCfg, c, { cdi_aa: +c.cdi_aa, economia_minima: +c.economia_minima }); } catch { /* sem o SQL 110 */ }
   const hj = hojeISO(); carteira = historico.filter(t => t.vencimento > hj);
+  // cheques de clientes em carteira (Controle de Cheques, SQL 154) entram na lista como títulos: id "chq:<id>", vencimento = bom para
+  try {
+    const ch = await q(sb.from('chq_cheques').select('id,numero,banco,emitente,emitente_doc,favorecido_id,valor,bom_para,recebido_em').eq('empresa_id', e).eq('situacao', 'carteira').order('bom_para'));
+    titulos = titulos.concat(ch.map(x => ({ id: 'chq:' + x.id, _chq: x.id, _cnpj: String(x.emitente_doc || '').replace(/\D/g, '') || null, data: x.bom_para, emissao: x.recebido_em, documento: `CH ${x.numero}`,
+      descricao: x.emitente || `Cheque ${x.numero}`, favorecido_id: x.favorecido_id, valor: x.valor, status: 'Em aberto', conta_id: null, fidc_proposta_id: null }))).sort((a, b) => String(a.data).localeCompare(String(b.data)));
+  } catch { /* sem o SQL 154 */ }
   emProposta = {};
-  for (const i of itensAbertos || []) emProposta[i.lancamento_id] = i.fidc_propostas;
+  for (const i of itensAbertos || []) emProposta[i.cheque_id ? 'chq:' + i.cheque_id : i.lancamento_id] = i.fidc_propostas;
   for (const id of [...ui.sel]) if (!titulos.some(t => t.id === id) || (emProposta[id] && !ui.propostaEdit)) ui.sel.delete(id);
 }
 
@@ -219,12 +225,12 @@ function abaTitulos(c, root) {
       <span class="spacer"></span>
       <span class="muted small">${titulos.length} títulos em aberto · ${money0(titulos.reduce((s, t) => s + +t.valor, 0))}</span></div></div>
     <div class="grid2 prop-grid">
-      <div class="card flush"><div class="card-head"><div><h2>Títulos disponíveis</h2><p class="muted small">Duplicatas em aberto (receita 1.01). Marque os títulos que vão para o borderô.</p></div>
+      <div class="card flush"><div class="card-head"><div><h2>Títulos disponíveis</h2><p class="muted small">Duplicatas em aberto (receita 1.01) e cheques de clientes em carteira. Marque o que vai para o borderô.</p></div>
         ${ed ? `<div class="toolbar"><button class="btn small" id="sel-todos">Marcar filtrados</button><button class="btn small" id="sel-nenhum">Limpar</button></div>` : ''}</div>
         <div class="table-wrap" style="max-height:560px">${filt.length ? `<table class="tit-disp"><thead><tr><th></th><th>Vencimento<div class="small">emissão</div></th><th class="num">Prazo</th><th>Cliente (sacado)<div class="small">NF / parcela</div></th><th class="num">Valor</th></tr></thead><tbody>
           ${filt.map(t => { const ep = emProposta[t.id]; const pz = dias(ui.dataOp, t.data); return `<tr class="${ep ? 'muted' : 'clickable'}" data-id="${t.id}">
             <td>${ep ? `<span class="badge ${STATUS_CLS[ep.status]}" title="Já está na proposta nº ${ep.numero}">nº ${ep.numero}</span>` : `<input type="checkbox" ${ui.sel.has(t.id) ? 'checked' : ''} ${ed ? '' : 'disabled'} aria-label="Selecionar">`}</td>
-            <td>${dateBR(t.data)}${t.emissao ? `<div class="small muted">${dateBR(t.emissao)}</div>` : ''}</td><td class="num${pz < 7 ? ' neg' : ''}">${pz}</td><td class="wrap">${esc(sacadoDe(t))}${t.documento ? `<div class="small muted">${esc(t.documento)}</div>` : ''}</td><td class="num">${money(t.valor)}</td></tr>`; }).join('')}
+            <td>${dateBR(t.data)}${t.emissao ? `<div class="small muted">${dateBR(t.emissao)}</div>` : ''}</td><td class="num${pz < 7 ? ' neg' : ''}">${pz}</td><td class="wrap">${esc(sacadoDe(t))}${t.documento ? `<div class="small muted">${esc(t.documento)}${t._chq ? ' <span class="badge negoc">cheque</span>' : ''}</div>` : ''}</td><td class="num">${money(t.valor)}</td></tr>`; }).join('')}
           </tbody></table>` : `<div class="empty">${titulos.length ? 'Nenhum título no filtro.' : 'Nenhum título em aberto. Use “Importar XML das NFs”.'}</div>`}</div></div>
       <div id="painel"></div>
     </div>`;
@@ -380,7 +386,8 @@ async function gravarProposta(S, chk, sims, status) {
       await q(sb.from('fidc_proposta_itens').delete().eq('proposta_id', p.id));
     } else p = await q(sb.from('fidc_propostas').insert(row).select().single());
     const docNF = await cnpjDasNotas(S.itens.map(x => x.t.id));
-    const itens = S.itens.map(x => ({ proposta_id: p.id, empresa_id: e, lancamento_id: x.t.id, documento: x.t.documento, sacado: sacadoDe(x.t), cnpj: docNF[x.t.id] || cnpjDe(x.t) || null,
+    const temChq = S.itens.some(x => x.t._chq);   // a coluna cheque_id só vai no envio quando há cheque (SQL 154)
+    const itens = S.itens.map(x => ({ proposta_id: p.id, empresa_id: e, lancamento_id: x.t._chq ? null : x.t.id, ...(temChq ? { cheque_id: x.t._chq || null } : {}), documento: x.t.documento, sacado: sacadoDe(x.t), cnpj: docNF[x.t.id] || cnpjDe(x.t) || null,
       emissao: x.t.emissao, vencimento: x.t.data, valor: x.t.valor, prazo: x.prazo, custo_estimado: +x.custo.toFixed(2), ...(x.t.venc_orig ? { vencimento_original: x.t.venc_orig } : {}) }));
     for (let i = 0; i < itens.length; i += 500) await q(sb.from('fidc_proposta_itens').insert(itens.slice(i, i + 500)));
     return p;
@@ -389,7 +396,7 @@ async function gravarProposta(S, chk, sims, status) {
 
 // CNPJ do sacado de cada título vem do destinatário da NF (o favorecido pode reunir filiais com CNPJs diferentes)
 async function cnpjDasNotas(lancIds) {
-  const ids = lancIds.filter(Boolean); const r = {};
+  const ids = lancIds.filter(x => x && !String(x).startsWith('chq:')); const r = {};
   for (let i = 0; i < ids.length; i += 200) {
     const vs = await q(sb.from('nfe_vinculos').select('lancamento_id,p:nfe_parcelas(n:nfe_notas(dest_doc))').in('lancamento_id', ids.slice(i, i + 200)));
     for (const v of vs) { const d = String(v.p?.n?.dest_doc || '').replace(/\D/g, ''); if (d) r[v.lancamento_id] = d; }
@@ -500,8 +507,8 @@ async function detalhe(p, root) {
   $('#canc', m.el) && ($('#canc', m.el).onclick = () => { if (confirm('Cancelar o envio? A proposta volta a rascunho.')) act(() => q(sb.from('fidc_propostas').update({ status: 'Rascunho', enviado_em: null }).eq('id', p.id)), 'Envio cancelado'); });
   $('#del', m.el) && ($('#del', m.el).onclick = () => { if (confirm(`Excluir a proposta nº ${p.numero}?`)) act(() => q(sb.from('fidc_propostas').delete().eq('id', p.id)), 'Proposta excluída'); });
   $('#edit', m.el) && ($('#edit', m.el).onclick = () => {
-    ui.propostaEdit = p; ui.sel = new Set(itens.map(i => i.lancamento_id).filter(Boolean)); ui.fundoId = p.fundo_id; ui.dataOp = p.data_operacao;
-    ui.vencAj = Object.fromEntries(itens.filter(i => i.lancamento_id && i.vencimento_original && i.vencimento !== i.vencimento_original).map(i => [i.lancamento_id, i.vencimento]));
+    ui.propostaEdit = p; ui.sel = new Set(itens.map(i => i.cheque_id ? 'chq:' + i.cheque_id : i.lancamento_id).filter(Boolean)); ui.fundoId = p.fundo_id; ui.dataOp = p.data_operacao;
+    ui.vencAj = Object.fromEntries(itens.filter(i => (i.lancamento_id || i.cheque_id) && i.vencimento_original && i.vencimento !== i.vencimento_original).map(i => [i.cheque_id ? 'chq:' + i.cheque_id : i.lancamento_id, i.vencimento]));
     ui.recompras = p.recompras ? String(p.recompras).replace('.', ',') : ''; ui.obs = p.observacao || ''; ui.aba = 'titulos';
     for (const id of ui.sel) delete emProposta[id];
     m.close(); render(root);

@@ -2340,3 +2340,49 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
     meses: [{ mes: '2026-11-01', valor: 15900.29, cbs: 0, ibs: 0, pis_cofins: 961.12, fonte: 'Lei 10.833/2003, art. 3º, e Tema 304 do STF — conferido com a contabilidade (exemplo)' }] });
   window.RPC.rec_reciclado = () => ({ grao: [], origem: [], residuos: [] });
 }
+
+// ---------------------------------------------------------------- Controle de Cheques (SQL 154) — dados fictícios
+{
+  const hoje = new Date().toISOString().slice(0, 10), dd = (n) => new Date(Date.parse(hoje + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+  DB.contas.push({ id: 'ct-chq-c', empresa_id: E, codigo: '90', tipo: 'Cheques', nome: 'CHEQUES EM CARTEIRA', grupo_id: 'g2', disponibilidade: 'Conta com recursos bloqueados', saldo_inicial: 0, ativo: true },
+    { id: 'ct-chq-e', empresa_id: E, codigo: '91', tipo: 'Cheques', nome: 'CHEQUES EMITIDOS A COMPENSAR', grupo_id: 'g2', disponibilidade: 'Conta com recursos bloqueados', saldo_inicial: 0, ativo: true });
+  const B1 = DB.contas[0].id, B2 = DB.contas[1].id, pl = (nat, i = 0) => DB.plano_contas.filter(p => p.nivel === 2 && p.natureza === nat && p.tipo !== 'T')[i]?.id || null;
+  DB.chq_config = [{ empresa_id: E, conta_carteira_id: 'ct-chq-c', conta_emitidos_id: 'ct-chq-e', plano_transferencia_id: DB.plano_contas.find(p => p.nivel === 2 && p.tipo === 'T')?.id,
+    plano_avulso_id: pl('C'), plano_devolvido_receber_id: pl('C', 1), plano_estorno_id: pl('D', 3), plano_perda_id: null, plano_juros_id: pl('C', 2), plano_tarifa_id: pl('D', 4), plano_fidc_devolvido_id: pl('C', 1),
+    plano_repasse_entrada_id: pl('C', 1), plano_repasse_pagar_id: pl('D', 5), prazo_praca: 30, prazo_fora: 60, prescricao_meses: 6, max_reapresentacoes: 1, limite_cliente: 80000, alerta_devolucoes: 1 }];
+  const cl = (n) => F(n).id;
+  const C = (numero, banco, ag, conta, cliente, emitente, doc, valor, bom, rec, situacao, x = {}) => ({ id: 'chq' + numero, empresa_id: E, recebimento: 'rec' + (x.rec || numero), banco, agencia: ag, conta, numero, cmc7: null,
+    emitente, emitente_doc: doc, favorecido_id: cl(cliente), valor, emissao: dd(rec), bom_para: dd(bom), recebido_em: dd(rec), praca_outra: false, situacao, devolucoes: 0, alinea: null, devolvido_em: null, origem_devolucao: null,
+    deposito_id: null, conta_deposito_id: null, fidc_proposta_id: null, fundo: null, repasse_favorecido_id: null, lanc_cobranca_id: null, encerrado_em: null, observacao: null, fotos: [], ...x });
+  DB.chq_cheques = [
+    C('000451', '001', '3321', '18450-2', 'SUPERMERCADOS', 'SUPERMERCADOS BOA COMPRA LTDA', '11444777000161', 12400, -3, -20, 'carteira'),
+    C('000452', '001', '3321', '18450-2', 'SUPERMERCADOS', 'SUPERMERCADOS BOA COMPRA LTDA', '11444777000161', 12400, 27, -20, 'carteira', { rec: '000451' }),
+    C('000453', '001', '3321', '18450-2', 'SUPERMERCADOS', 'SUPERMERCADOS BOA COMPRA LTDA', '11444777000161', 12400, 57, -20, 'carteira', { rec: '000451' }),
+    C('118822', '237', '0456', '77120-9', 'ATACADO', 'ATACADO SERTÃO LTDA', '06990590000123', 8750.5, -28, -40, 'carteira'),
+    C('003310', '104', '1290', '00034567-1', 'DISTRIBUIDORA', 'MERCADINHO DO BAIRRO EXEMPLO ME', '27865757000102', 3200, 0, -12, 'carteira', { observacao: 'cheque de terceiro, endossado pelo cliente' }),
+    C('003311', '104', '1290', '00034567-1', 'DISTRIBUIDORA', 'MERCADINHO DO BAIRRO EXEMPLO ME', '27865757000102', 3200, 14, -12, 'carteira', { rec: '003310' }),
+    C('770015', '341', '8801', '45210-7', 'FARMÁCIAS', 'FARMÁCIAS SAÚDE MAIS S.A.', '19131243000197', 21900, -2, -30, 'depositado', { deposito_id: 'dep2', conta_deposito_id: B1 }),
+    C('770016', '341', '8801', '45210-7', 'FARMÁCIAS', 'FARMÁCIAS SAÚDE MAIS S.A.', '19131243000197', 15300, -2, -30, 'depositado', { deposito_id: 'dep2', conta_deposito_id: B1, rec: '770015' }),
+    C('118820', '237', '0456', '77120-9', 'ATACADO', 'ATACADO SERTÃO LTDA', '06990590000123', 6900, -9, -45, 'devolvido', { devolucoes: 1, alinea: '11', devolvido_em: dd(-6), origem_devolucao: 'deposito', conta_deposito_id: B1 }),
+    C('003302', '104', '1290', '00034567-1', 'DISTRIBUIDORA', 'MERCADINHO DO BAIRRO EXEMPLO ME', '27865757000102', 2850, -25, -50, 'devolvido', { devolucoes: 2, alinea: '12', devolvido_em: dd(-15), origem_devolucao: 'deposito', conta_deposito_id: B2 }),
+    C('000448', '001', '3321', '18450-2', 'SUPERMERCADOS', 'SUPERMERCADOS BOA COMPRA LTDA', '11444777000161', 18600, 12, -25, 'fidc', { fundo: 'FUNDO EXEMPLO FIDC' }),
+    C('000449', '001', '3321', '18450-2', 'SUPERMERCADOS', 'SUPERMERCADOS BOA COMPRA LTDA', '11444777000161', 18600, 42, -25, 'fidc', { fundo: 'FUNDO EXEMPLO FIDC', rec: '000448' }),
+    C('118815', '237', '0456', '77120-9', 'ATACADO', 'ATACADO SERTÃO LTDA', '06990590000123', 4300, 6, -18, 'repassado', { repasse_favorecido_id: F('TRANSPORTES').id }),
+    C('770010', '341', '8801', '45210-7', 'FARMÁCIAS', 'FARMÁCIAS SAÚDE MAIS S.A.', '19131243000197', 19800, -35, -60, 'compensado', { deposito_id: 'dep1', conta_deposito_id: B1, encerrado_em: dd(-33) }),
+    C('118810', '237', '0456', '77120-9', 'ATACADO', 'ATACADO SERTÃO LTDA', '06990590000123', 5100, -70, -95, 'compensado', { devolucoes: 1, alinea: '11', deposito_id: 'dep1', conta_deposito_id: B1, encerrado_em: dd(-60) }),
+    C('003290', '104', '1290', '00034567-1', 'DISTRIBUIDORA', 'MERCADINHO DO BAIRRO EXEMPLO ME', '27865757000102', 1950, -80, -100, 'cobranca', { devolucoes: 2, alinea: '13', devolvido_em: dd(-70), origem_devolucao: 'deposito' }),
+  ];
+  DB.chq_depositos = [{ id: 'dep2', empresa_id: E, numero: 2, data: dd(-1), conta_id: B1, qtd: 2, valor: 37200, lancamento_id: null }, { id: 'dep1', empresa_id: E, numero: 1, data: dd(-34), conta_id: B1, qtd: 2, valor: 24900, lancamento_id: null }];
+  DB.chq_taloes = [{ id: 'tal1', empresa_id: E, conta_id: B1, numero_ini: 850101, numero_fim: 850120, ativo: true }, { id: 'tal2', empresa_id: E, conta_id: B2, numero_ini: 300041, numero_fim: 300060, ativo: true }];
+  const M = (numero, conta, fornecedor, valor, em, bom, situacao, x = {}) => ({ id: 'em' + numero, empresa_id: E, conta_id: conta, talao_id: conta === B1 ? 'tal1' : 'tal2', numero, favorecido_id: fornecedor ? F(fornecedor).id : null, nominal: fornecedor ? F(fornecedor).nome : null,
+    valor, emissao: dd(em), bom_para: dd(bom), cruzado: true, situacao, compensado_em: null, alinea: null, devolvido_em: null, motivo: null, observacao: null, ...x });
+  DB.chq_emitidos = [
+    M(850107, B1, 'RESINAS', 28400, -2, 5, 'emitido'), M(850106, B1, 'EMBALAGENS', 9650, -6, 2, 'emitido'), M(850105, B1, 'TRANSPORTES', 4120, -12, -10, 'emitido'),
+    M(850104, B1, 'IMÓVEIS', 7800, -20, -20, 'compensado', { compensado_em: dd(-18) }), M(850103, B1, null, 0, -22, -22, 'cancelado', { motivo: 'folha rasurada' }),
+    M(850102, B1, 'SISTEMAS', 2300, -30, -30, 'sustado', { motivo: 'fornecedor pediu PIX' }), M(850101, B1, 'ENERGIA', 6480, -40, -38, 'compensado', { compensado_em: dd(-37) }),
+    M(300041, B2, 'JOSÉ CARLOS', 1850, -4, 10, 'emitido', { observacao: 'frete avulso' }),
+  ];
+  DB.chq_eventos = [['chq118820', 'recebido', -45, 'bom para ' + dd(-9).split('-').reverse().join('/')], ['chq118820', 'depositado', -9, 'depósito nº 1'], ['chq118820', 'devolvido', -6, 'alínea 11']]
+    .map(([cheque_id, tipo, d, detalhe], i) => ({ id: 'ev' + i, empresa_id: E, cheque_id, emitido_id: null, tipo, data: dd(d), detalhe, created_at: dd(d) + 'T12:00:00Z' }));
+  DB.chq_receb_titulos = []; DB.chq_emitido_titulos = [];
+}

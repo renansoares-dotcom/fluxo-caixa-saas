@@ -57,8 +57,9 @@ async function carregar() {
   const lgpd = await import(`./lgpd.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []);
   const arte = temArea('com') || temArea('prd') ? await import(`./preimpressao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const cheq = temArea('fin') ? await import(`./cheques.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const recup = temArea('prd') ? await import(`../lib/rec-decisoes.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd, fech, recup };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd, fech, recup, cheq };
 }
 
 // ---------------------------------------------------------------- regras
@@ -260,6 +261,13 @@ function regras(D) {
 
   // 27. recuperadora: licenças, grão sem ensaio, rendimento abaixo da meta, balanço de massa, resíduo sem CDF, adiantamentos e tickets abertos
   for (const a of D.recup || []) out.push(a);
+
+  // 28. cheques: prazo de apresentação, devolvidos sem ação, prontos para depositar e cheques próprios a compensar
+  const cq = (D.cheq || []).filter(a => a.nivel !== 'baixo');
+  if (cq.length) out.push({ k: 'cheques', origem: 'Financeiro', urg: cq.some(a => a.nivel === 'alto') ? 'alta' : 'media', titulo: 'Resolver os cheques pendentes',
+    desc: cq.map(a => a.titulo).join(' · '), impacto: cq.reduce((s, a) => s + (a.valor || 0), 0), impactoTxt: null,
+    regra: 'Cheque de cliente em carteira com o prazo de apresentação vencido ou a 5 dias de vencer, cheque devolvido sem reapresentação, resgate ou cobrança, cheque em carteira que já passou do "bom para" e cheque próprio a compensar nos próximos 7 dias. Os prazos ficam nos Parâmetros dos cheques.',
+    acao: 'Abrir os cheques', rota: cq.some(a => a.k === 'devolvidos') ? 'cheques?aba=devolvidos' : 'cheques' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

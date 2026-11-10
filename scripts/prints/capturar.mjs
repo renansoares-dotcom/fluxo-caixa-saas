@@ -11,11 +11,12 @@ const cont = {};
 for (const [m, rota, , leg, aba] of FIGS) {
   const n = cont[m] = (cont[m] || 0) + 1; if (so && !so.includes(m)) continue;
   await p.evaluate((r) => { document.querySelectorAll('.modal-back, .cp-drawer-back').forEach(m => m.remove()); location.hash = '#/x'; setTimeout(() => { location.hash = '#/' + r; }, 50); }, rota); await p.waitForTimeout(2000);
-  // passos separados por "|": aba (data-a), click:<seletor>, scroll:<seletor>, fill:<seletor>=<valor>, offline ou online, na ordem
+  // passos separados por "|": aba (data-a), click:<seletor>, scroll:<seletor>, fill:<seletor>=<valor>, select:<seletor>=<texto da opção>, offline ou online, na ordem
   if (aba) for (const passo of aba.split('|')) {
     if (passo === 'offline' || passo === 'online') { await p.context().setOffline(passo === 'offline'); await p.evaluate((o) => window.dispatchEvent(new Event(o)), passo); await p.waitForTimeout(500); }
     else if (passo.startsWith('file:')) { await p.setInputFiles(passo.slice(5), { name: 'extrato.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 ficticio') }); await p.waitForTimeout(800); }
-    else if (passo.startsWith('fill:')) { const [sel, val] = passo.slice(5).split('='); await p.fill(sel, val); }
+    else if (passo.startsWith('select:')) { const r = passo.slice(7), k = r.lastIndexOf('='), sel = r.slice(0, k), txt = r.slice(k + 1); await p.evaluate(([s, t]) => { const e = document.querySelector(s), o = [...e.options].find(x => x.textContent.includes(t)); if (o) { e.value = o.value; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); } }, [sel, txt]); await p.waitForTimeout(700); }
+    else if (passo.startsWith('fill:')) { const r = passo.slice(5), k = r.lastIndexOf('='); await p.fill(r.slice(0, k), r.slice(k + 1)); }
     else if (passo.startsWith('scroll:')) { await p.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'start' }), passo.slice(7)); await p.waitForTimeout(300); }
     else { await p.click(passo.startsWith('click:') ? passo.slice(6) : `[data-a="${passo}"]`); await p.waitForTimeout(800); }
   }
