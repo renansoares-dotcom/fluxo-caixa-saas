@@ -2409,3 +2409,35 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
   DB.agenda_excecoes = [{ id: 'agx1', compromisso_id: 'ag1', empresa_id: E, data: dd(-7 + ((8 - new Date(hoje + 'T12:00:00Z').getUTCDay()) % 7) - 7), acao: 'feito' }];
   window.RPC.agenda_ocorrencia = () => null; window.RPC.agenda_encerrar_repeticao = () => null;
 }
+
+// ---------------------------------------------------------------- Emissão de NF-e (SQL 156) — dados fictícios
+{
+  const hoje = new Date().toISOString().slice(0, 10), dd = (n) => new Date(Date.parse(hoje + 'T12:00:00Z') + n * 864e5).toISOString();
+  if (!DB.empresas) DB.empresas = [];
+  if (!DB.empresas.some(x => x.id === E)) DB.empresas.push({ id: E, nome: 'PLÁSTICOS EXEMPLO', razao_social: 'PLÁSTICOS EXEMPLO INDÚSTRIA LTDA', cnpj: '11444777000161', ie: '018456723', logradouro: 'Rodovia BR-232, km 100', municipio: 'Bezerros', uf: 'PE', cep: '55660000' });
+  DB.nfe_naturezas = [
+    { id: 'nat1', empresa_id: E, nome: 'Venda de produção', natureza_operacao: 'VENDA DE PRODUCAO DO ESTABELECIMENTO', tipo_documento: 1, finalidade: 1, cfop_interno: '5101', cfop_interestadual: '6101', icms_cst: '00', icms_aliquota_interna: 20.5, icms_aliquota_inter: null, icms_reducao: 0,
+      ipi_cst: '50', ipi_aliquota: 15, ipi_enquadramento: '999', pis_cst: '01', pis_aliquota: 1.65, cofins_cst: '01', cofins_aliquota: 7.6, ibs_cbs_cst: '000', ibs_cbs_classificacao: '000001', cbs_aliquota: 0.9, ibs_uf_aliquota: 0.1, ibs_mun_aliquota: 0, info_complementar: null, ativo: true },
+    { id: 'nat2', empresa_id: E, nome: 'Remessa de amostra grátis', natureza_operacao: 'REMESSA DE AMOSTRA GRATIS', tipo_documento: 1, finalidade: 1, cfop_interno: '5911', cfop_interestadual: '6911', icms_cst: '40', icms_aliquota_interna: 0, icms_aliquota_inter: null, icms_reducao: 0,
+      ipi_cst: '53', ipi_aliquota: 0, ipi_enquadramento: '999', pis_cst: '08', pis_aliquota: 0, cofins_cst: '08', cofins_aliquota: 0, ibs_cbs_cst: null, ibs_cbs_classificacao: null, cbs_aliquota: 0, ibs_uf_aliquota: 0, ibs_mun_aliquota: 0, info_complementar: null, ativo: true },
+    { id: 'nat3', empresa_id: E, nome: 'Devolução de compra', natureza_operacao: 'DEVOLUCAO DE COMPRA PARA INDUSTRIALIZACAO', tipo_documento: 1, finalidade: 4, cfop_interno: '5201', cfop_interestadual: '6201', icms_cst: '00', icms_aliquota_interna: 20.5, icms_aliquota_inter: null, icms_reducao: 0,
+      ipi_cst: '99', ipi_aliquota: 0, ipi_enquadramento: '999', pis_cst: '49', pis_aliquota: 0, cofins_cst: '49', cofins_aliquota: 0, ibs_cbs_cst: null, ibs_cbs_classificacao: null, cbs_aliquota: 0, ibs_uf_aliquota: 0, ibs_mun_aliquota: 0, info_complementar: null, ativo: true }];
+  DB.nfe_config = [{ empresa_id: E, ambiente: 'homologacao', papeis: ['financeiro'], crt: 3, nome_fantasia: 'PLÁSTICOS EXEMPLO', numero: 'S/N', complemento: null, bairro: 'Distrito Industrial', telefone: '8135550100', serie: '1', natureza_padrao_id: 'nat1',
+    modalidade_frete: 0, forma_pagamento: '15', prazos_padrao: [28, 35, 42], info_padrao: 'Mercadoria de produção própria.', pis_cofins_exclui_icms: true, ibs_cbs_exclui_tributos: true, danfe_logo: true, email_copia: 'fiscal@exemplo.com.br', enviar_email_destinatario: true }];
+  const dest = (nome, doc, mun, uf) => ({ nome, documento: doc, ie: '112233445', indicador_ie: 1, email: 'compras@exemplo.com.br', logradouro: 'Av. das Indústrias', numero: '1500', bairro: 'Centro', municipio: mun, uf, cep: '60000000', telefone: '8533330000' });
+  const it = (cod, desc, q, vu, cfop, al) => ({ produto_id: null, codigo: cod, descricao: desc, ncm: '39201099', unidade: 'KG', quantidade: q, valor_unitario: vu, desconto: 0, cfop, icms_origem: '0', icms_cst: '00', icms_aliquota: al, icms_reducao: 0, ipi_cst: '50', ipi_aliquota: 15, ipi_enquadramento: '999',
+    pis_cst: '01', pis_aliquota: 1.65, cofins_cst: '01', cofins_aliquota: 7.6, ibs_cbs_cst: '000', ibs_cbs_classificacao: '000001', cbs_aliquota: 0.9, ibs_uf_aliquota: 0.1, ibs_mun_aliquota: 0, info: '' });
+  const N = (id, status, numero, d, itens, total, dias, x = {}) => ({ id: 'nf' + id, empresa_id: E, ambiente: 'homologacao', status, natureza_id: 'nat1', natureza_operacao: 'VENDA DE PRODUCAO DO ESTABELECIMENTO', tipo_documento: 1, finalidade: 1, consumidor_final: false, presenca: 9,
+    data_emissao: dd(dias), favorecido_id: null, destinatario: d, itens, transporte: { modalidade: 0, nome: 'TRANSPORTES RÁPIDO LTDA', documento: '19131243000197', volumes: 18, especie: 'BOBINA', peso_liquido: 2400, peso_bruto: 2460 }, valor_frete: 0, valor_seguro: 0, valor_outras: 0,
+    duplicatas: [], forma_pagamento: '15', referenciadas: [], info_complementar: 'Mercadoria de produção própria.', totais: {}, valor_total: total, numero, serie: numero ? '1' : null, chave: numero ? '2611' + '11444777000161' + '55001' + String(numero).padStart(9, '0') + '1' + '00000000' + '5' : null,
+    protocolo: numero ? '1262600000' + numero : null, erros: [], xml: null, autorizada_em: status === 'autorizada' || status === 'cancelada' ? dd(dias) : null, cartas: [], criado_em: dd(dias), ...x });
+  DB.nfe_emissoes = [
+    N(1, 'rascunho', null, dest('SUPERMERCADOS BOA COMPRA LTDA', '06990590000123', 'Fortaleza', 'CE'), [it('F-1020', 'FILME PEBD LISO 0,05 X 800 MM', 1500, 13.8, '6101', 12), it('F-2040', 'BOBINA IMPRESSA 4 CORES - PÃO DE FORMA', 900, 21.4, '6101', 12)], 45954, 0),
+    N(2, 'erro', null, dest('ATACADO SERTÃO LTDA', '27865757000102', 'Caruaru', 'PE'), [it('F-1020', 'FILME PEBD LISO 0,05 X 800 MM', 800, 13.8, '5101', 20.5)], 12696, -1, { erros: ['Rejeição 233: IE do destinatário não cadastrada'], status_sefaz: '233' }),
+    N(3, 'autorizada', '1204', dest('FARMÁCIAS SAÚDE MAIS S.A.', '19131243000197', 'Recife', 'PE'), [it('S-3310', 'SACOLA PERSONALIZADA 30 X 40', 2000, 9.9, '5101', 20.5)], 22770, -1),
+    N(4, 'autorizada', '1203', dest('DISTRIBUIDORA NORDESTE LTDA', '33000167000101', 'João Pessoa', 'PB'), [it('F-2040', 'BOBINA IMPRESSA 4 CORES - BISCOITO', 1200, 22.1, '6101', 12)], 30498, -3, { cartas: [{ seq: 1, texto: 'Correção do endereço de entrega', em: dd(-2) }] }),
+    N(5, 'cancelada', '1202', dest('TORREFAÇÃO SERRA AZUL LTDA', '45543915000181', 'Garanhuns', 'PE'), [it('F-2051', 'BOBINA IMPRESSA 6 CORES - CAFÉ 500 G', 600, 24.5, '5101', 20.5)], 16905, -5),
+    N(6, 'autorizada', '1201', dest('SUPERMERCADOS BOA COMPRA LTDA', '06990590000123', 'Fortaleza', 'CE'), [it('F-1020', 'FILME PEBD LISO 0,05 X 800 MM', 2600, 13.6, '6101', 12)], 40664, -8),
+  ];
+  window.RPC.nfe_pode = () => true; window.RPC.nfe_naturezas_padrao = () => 0;
+}

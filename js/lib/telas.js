@@ -28,7 +28,7 @@ export const TELAS = {
   // RH / Trabalhista
   'rh/colaboradores': 'RHT001', 'rh/folha': 'RHT002', 'rh/decimo': 'RHT003', 'rh/ferias': 'RHT004', 'rh/rescisoes': 'RHT005', 'rh/sst': 'RHT006', 'rh/documentos': 'RHT007', 'rh/horas': 'RHT008',
   // CPD › Fiscal
-  'notas': 'FIS001', 'fiscal/apuracao': 'FIS002', 'fiscal/notas-debito': 'FIS003', 'notas/sefaz': 'FIS004',
+  'notas': 'FIS001', 'fiscal/apuracao': 'FIS002', 'fiscal/notas-debito': 'FIS003', 'notas/sefaz': 'FIS004', 'notas/emissao': 'FIS005',
   // Contabilidade
   'dre': 'CTB001', 'contab/balancete': 'CTB002', 'contab/balanco': 'CTB003', 'contab/dre': 'CTB004', 'contab/dfc': 'CTB005', 'contab/depara': 'CTB006',
   'contab/imobilizado': 'CTB007', 'contab/inventario': 'CTB008', 'contab/imobilizado-parametros': 'CTB009', 'contab/indices': 'CTB010', 'contab/fechamento': 'CTB011', 'contab/centros': 'CTB012',

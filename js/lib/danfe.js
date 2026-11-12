@@ -37,6 +37,7 @@ export const fmtNum = (n) => so(n).padStart(9, '0').replace(/^(\d{3})(\d{3})(\d{
 const br = (v, c = 2) => v == null || v === '' ? '' : (+v).toLocaleString('pt-BR', { minimumFractionDigits: c, maximumFractionDigits: c });
 const dataBR = (s) => s ? s.slice(0, 10).split('-').reverse().join('/') : '';
 const horaBR = (s) => s && s.length > 15 ? s.slice(11, 19) : '';
+export const CRT = { 1: '1 - SIMPLES NACIONAL', 2: '2 - SIMPLES NACIONAL (EXCESSO DE SUBLIMITE)', 3: '3 - REGIME NORMAL', 4: '4 - SIMPLES NACIONAL (MEI)' };
 export const MOD_FRETE = { 0: '0-Por conta do Emitente', 1: '1-Por conta do Destinatário', 2: '2-Por conta de Terceiros', 3: '3-Próprio por conta do Remetente', 4: '4-Próprio por conta do Destinatário', 9: '9-Sem Ocorrência de Transporte' };
 
 // ---------------------------------------------------------------- leitura do XML (sem DOM, para rodar também no Node)
@@ -63,11 +64,20 @@ export function lerDanfe(xml) {
   const itens = todos(inf, 'det').map(({ corpo }) => {
     const p = bloco(corpo, 'prod'), imp = bloco(corpo, 'imposto'), icms = filho(bloco(imp, 'ICMS')), ipi = bloco(imp, 'IPITrib');
     const orig = tx(icms, 'orig'), cst = tx(icms, 'CST') || tx(icms, 'CSOSN');
-    return { cod: tx(p, 'cProd'), desc: tx(p, 'xProd'), ncm: tx(p, 'NCM'), cst: (orig || '') + (cst || ''), cfop: tx(p, 'CFOP'), un: tx(p, 'uCom'),
+    // Reforma Tributária (grupo UB): com redução (gRed) vale a alíquota efetiva — NT 2026.010
+    const ub = bloco(imp, 'IBSCBS'), gi = bloco(ub, 'gIBSCBS'), gUF = bloco(gi, 'gIBSUF'), gMun = bloco(gi, 'gIBSMun'), gCBS = bloco(gi, 'gCBS'), is = bloco(imp, 'IS');
+    const aliq = (g, t) => num(bloco(g, 'gRed'), 'pAliqEfet') ?? num(g, t);
+    const rtc = ub || is ? { classTrib: tx(ub, 'cClassTrib'), cst: tx(ub, 'CST'), bc: num(gi, 'vBC'), pIBSUF: aliq(gUF, 'pIBSUF'), vIBSUF: num(gUF, 'vIBSUF'), pIBSMun: aliq(gMun, 'pIBSMun'), vIBSMun: num(gMun, 'vIBSMun'),
+      pCBS: aliq(gCBS, 'pCBS'), vCBS: num(gCBS, 'vCBS'), bcIS: num(is, 'vBCIS'), pIS: num(is, 'pIS'), vIS: num(is, 'vIS') } : null;
+    return { rtc, cod: tx(p, 'cProd'), desc: tx(p, 'xProd'), ncm: tx(p, 'NCM'), cst: (orig || '') + (cst || ''), cfop: tx(p, 'CFOP'), un: tx(p, 'uCom'),
       qtd: num(p, 'qCom'), vun: num(p, 'vUnCom'), vtot: num(p, 'vProd'), bc: num(icms, 'vBC'), vicms: num(icms, 'vICMS'), picms: num(icms, 'pICMS'),
       vipi: num(ipi, 'vIPI'), pipi: num(ipi, 'pIPI'), info: tx(corpo, 'infAdProd') };
   });
+  const rt = bloco(inf, 'IBSCBSTot'), tIBS = bloco(rt, 'gIBS'), tMono = bloco(rt, 'gMono'), tIS = bloco(inf, 'ISTot');
+  const totRtc = rt || tIS ? { cbs: num(bloco(rt, 'gCBS'), 'vCBS'), ibsUF: num(bloco(tIBS, 'gIBSUF'), 'vIBSUF'), ibsMun: num(bloco(tIBS, 'gIBSMun'), 'vIBSMun'), is: num(tIS, 'vIS'),
+    ibsMono: num(tMono, 'vIBSMono'), cbsMono: num(tMono, 'vCBSMono'), ibsMonoRet: num(tMono, 'vIBSMonoReten'), cbsMonoRet: num(tMono, 'vCBSMonoReten') } : null;
   return {
+    crt: tx(emit, 'CRT'), totRtc,
     chave, numero: tx(ide, 'nNF'), serie: tx(ide, 'serie'), tipo: tx(ide, 'tpNF'), natureza: tx(ide, 'natOp'), ambiente: tx(ide, 'tpAmb'),
     emissao: tx(ide, 'dhEmi') || tx(ide, 'dEmi'), saida: tx(ide, 'dhSaiEnt') || tx(ide, 'dSaiEnt'),
     emit: pessoa(emit, 'enderEmit'), dest: pessoa(dest, 'enderDest'),
@@ -86,8 +96,8 @@ export function lerDanfe(xml) {
 // as fontes padrão do jsPDF só têm Latin-1
 const lat = (s) => String(s ?? '').replace(/[\u00b5\u03bc]/g, 'u').replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[  ]/g, ' ').replace(/[^\x00-\xff]/g, '');
 
-/** gera a DANFE (retrato, A4) e devolve o documento jsPDF; d = lerDanfe(xml) */
-export function danfePDF(d, jsPDF) {
+/** gera a DANFE (retrato, A4, leiaute da NT 2026.010) e devolve o documento jsPDF; d = lerDanfe(xml); o.logo = imagem (data URL) do emitente; o.marca = texto da marca-d'água (prévia) */
+export function danfePDF(d, jsPDF, o = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const M = 6, W = 210 - 2 * M;
   doc.setLineWidth(0.2); doc.setDrawColor(0); doc.setTextColor(0);
@@ -116,7 +126,9 @@ export function danfePDF(d, jsPDF) {
   // emitente, DANFE e chave
   const he = 32, wE = 80, wD = 32, wC = W - wE - wD;
   doc.rect(M, y, wE, he); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-  doc.text(doc.splitTextToSize(lat(d.emit.nome), wE - 4), M + wE / 2, y + 7, { align: 'center' });
+  let comLogo = false;
+  if (o.logo) { try { doc.addImage(o.logo, /^data:image\/jpe?g/i.test(o.logo) ? 'JPEG' : 'PNG', M + wE / 2 - 13, y + 1.5, 26, 9, undefined, 'FAST'); comLogo = true; } catch { /* logo inválida: segue sem */ } }
+  doc.text(doc.splitTextToSize(lat(d.emit.nome), wE - 4).slice(0, comLogo ? 1 : 2), M + wE / 2, y + (comLogo ? 14 : 7), { align: 'center' });
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
   [enderEmit, [d.emit.bairro, fmtCep(d.emit.cep)].filter(Boolean).join(' - '), `${d.emit.mun} - ${d.emit.uf}`, d.emit.fone ? `Fone: ${d.emit.fone}` : ''].filter(Boolean)
     .forEach((t, i) => doc.text(lat(t), M + wE / 2, y + 17 + i * 3.4, { align: 'center' }));
@@ -139,7 +151,8 @@ export function danfePDF(d, jsPDF) {
   doc.text(doc.splitTextToSize('Consulta de autenticidade no portal nacional da NF-e www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora', wC - 4).map(lat), xc + wC / 2, y + 24.5, { align: 'center' });
   y += he;
   y = linha(y, 7, [[60, 'Natureza da operação', d.natureza], [40, 'Protocolo de autorização de uso', sem ? 'NÃO AUTORIZADA' : `${d.protocolo} - ${dataBR(d.autorizada_em)} ${horaBR(d.autorizada_em)}`]]);
-  y = linha(y, 7, [[34, 'Inscrição estadual', d.emit.ie], [33, 'Insc. estadual do subst. trib.', d.emit.iest], [33, 'CNPJ', fmtDoc(d.emit.doc)]]);
+  // NT 2026.010: código do regime tributário (CRT) e área reservada ao regime de apuração do IBS/CBS (sem conteúdo até a NT futura)
+  y = linha(y, 7, [[22, 'Inscrição estadual', d.emit.ie], [22, 'Insc. estadual do subst. trib.', d.emit.iest], [22, 'CNPJ', fmtDoc(d.emit.doc)], [20, 'Código do regime tributário', CRT[d.crt] || d.crt || ''], [14, 'Regime apuração IBS/CBS', '']]);
 
   // destinatário
   y += 3; sec(y, 'DESTINATÁRIO / REMETENTE');
@@ -164,6 +177,13 @@ export function danfePDF(d, jsPDF) {
   y = linha(y, 7, [[1, 'Base de cálc. do ICMS', br(t.bc), R], [1, 'Valor do ICMS', br(t.icms), R], [1, 'Base de cálc. ICMS S.T.', br(t.bcst), R], [1, 'Valor do ICMS subst.', br(t.st), R], [1, 'V. aprox. tributos', br(t.trib), R], [1.2, 'Valor total dos produtos', br(t.prod), R]]);
   y = linha(y, 7, [[1, 'Valor do frete', br(t.frete), R], [1, 'Valor do seguro', br(t.seg), R], [1, 'Desconto', br(t.desc), R], [1, 'Outras despesas', br(t.outro), R], [1, 'Valor total do IPI', br(t.ipi), R], [1.2, 'Valor total da nota', br(t.nf), { dir: true, negrito: true }]]);
 
+  // NT 2026.010: bloco "Total do IBS/CBS/IS", logo depois do Total do ICMS/IPI. Só o que existir no XML é impresso.
+  const z = d.totRtc || {}, vz = (v) => v == null ? '' : br(v);
+  y += 3; sec(y, 'TOTAL DO IBS / CBS / IS');
+  y = linha(y, 7, [[1, 'Valor da CBS', vz(z.cbs), R], [1, 'Valor do IBS UF', vz(z.ibsUF), R], [1, 'Valor do IBS Município', vz(z.ibsMun), R], [1, 'Valor do Imposto Seletivo', vz(z.is), R]]);
+  if ([z.ibsMono, z.cbsMono, z.ibsMonoRet, z.cbsMonoRet].some(v => v != null))
+    y = linha(y, 7, [[1, 'Valor do IBS monofásico', vz(z.ibsMono), R], [1, 'Valor da CBS monofásica', vz(z.cbsMono), R], [1, 'IBS monofásico por retenção', vz(z.ibsMonoRet), R], [1, 'CBS monofásica por retenção', vz(z.cbsMonoRet), R]]);
+
   // transportador
   y += 3; sec(y, 'TRANSPORTADOR / VOLUMES TRANSPORTADOS'); const p = d.transp;
   y = linha(y, 7, [[34, 'Nome / razão social', p.nome], [18, 'Frete', MOD_FRETE[p.mod] || p.mod], [10, 'Código ANTT', ''], [10, 'Placa do veículo', p.placa], [5, 'UF', p.placa_uf], [23, 'CNPJ / CPF', fmtDoc(p.doc)]]);
@@ -181,9 +201,15 @@ export function danfePDF(d, jsPDF) {
     startY: y, margin: { left: M, right: M, top: M + 10, bottom: 34 }, theme: 'grid',
     styles: { font: 'helvetica', fontSize: 6, cellPadding: 0.7, lineColor: 0, lineWidth: 0.15, textColor: 0, overflow: 'linebreak' },
     headStyles: { fillColor: false, textColor: 0, fontStyle: 'bold', fontSize: 5.5, halign: 'center' },
-    head: [['Código', 'Descrição do produto / serviço', 'NCM/SH', 'CST', 'CFOP', 'Un', 'Quant.', 'Valor unit.', 'Valor total', 'BC ICMS', 'Valor ICMS', 'Valor IPI', '% ICMS', '% IPI']],
-    body: d.itens.map(i => [lat(i.cod), lat(i.desc + (i.info ? '\n' + i.info : '')), i.ncm, i.cst, i.cfop, lat(i.un), br(i.qtd, 4), br(i.vun, 4), br(i.vtot), br(i.bc), br(i.vicms), br(i.vipi), br(i.picms), br(i.pipi)]),
-    columnStyles: { 0: { cellWidth: 16 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 12 }, 3: { cellWidth: 7 }, 4: { cellWidth: 8 }, 5: { cellWidth: 7 },
+    head: [['Código', 'Descrição do produto / serviço', 'NCM/SH\ncClassTrib', 'CST', 'CFOP', 'Un', 'Quant.', 'Valor unit.', 'Valor total', 'BC ICMS', 'Valor ICMS', 'Valor IPI', '% ICMS', '% IPI']],
+    // NT 2026.010 (grupo UB): classificação tributária junto do NCM e, abaixo do item, base, alíquotas e valores de IBS, CBS e IS
+    body: d.itens.flatMap(i => { const r = i.rtc, pz = (v) => v == null ? '-' : br(v, 4).replace(/,?0+$/, '') + '%';
+      const linhaItem = [lat(i.cod), lat(i.desc + (i.info ? '\n' + i.info : '')), i.ncm + (r?.classTrib ? '\n' + r.classTrib : ''), i.cst, i.cfop, lat(i.un), br(i.qtd, 4), br(i.vun, 4), br(i.vtot), br(i.bc), br(i.vicms), br(i.vipi), br(i.picms), br(i.pipi)];
+      if (!r) return [linhaItem];
+      const txt = [`BC IBS/CBS ${vz(r.bc) || '-'}`, `IBS UF ${pz(r.pIBSUF)} = ${vz(r.vIBSUF) || '-'}`, `IBS Mun. ${pz(r.pIBSMun)} = ${vz(r.vIBSMun) || '-'}`, `CBS ${pz(r.pCBS)} = ${vz(r.vCBS) || '-'}`,
+        r.vIS != null || r.bcIS != null ? `IS: BC ${vz(r.bcIS) || '-'} ${pz(r.pIS)} = ${vz(r.vIS) || '-'}` : ''].filter(Boolean).join('   |   ');
+      return [linhaItem, [{ content: '', styles: { lineWidth: { left: 0.15, bottom: 0.15 } } }, { content: lat(txt), colSpan: 13, styles: { fontSize: 5.5, textColor: 40 } }]]; }),
+    columnStyles: { 0: { cellWidth: 16 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 13 }, 3: { cellWidth: 7 }, 4: { cellWidth: 8 }, 5: { cellWidth: 7 },
       6: { cellWidth: 13, halign: 'right' }, 7: { cellWidth: 13, halign: 'right' }, 8: { cellWidth: 14, halign: 'right' }, 9: { cellWidth: 13, halign: 'right' },
       10: { cellWidth: 12, halign: 'right' }, 11: { cellWidth: 11, halign: 'right' }, 12: { cellWidth: 8, halign: 'right' }, 13: { cellWidth: 7, halign: 'right' } },
     didDrawPage: (h) => { if (h.pageNumber > 1) topoFolha(h.pageNumber); },
@@ -198,10 +224,10 @@ export function danfePDF(d, jsPDF) {
   doc.setFontSize(6.5);
   const compl = [d.infCpl, d.infFisco].filter(Boolean).join(' ');
   doc.text(doc.splitTextToSize(lat(compl), W * 0.65 - 2).slice(0, 9), M + 0.8, ya + 4.6);
-  if (sem || d.ambiente === '2') { // sem protocolo ou homologação: marca d'água
+  if (o.marca || sem || d.ambiente === '2') { // prévia, sem protocolo ou homologação: marca d'água
     const tot = doc.getNumberOfPages();
     for (let i = 1; i <= tot; i++) { doc.setPage(i); doc.setTextColor(200); doc.setFont('helvetica', 'bold'); doc.setFontSize(34);
-      doc.text(d.ambiente === '2' ? 'SEM VALOR FISCAL' : 'NÃO AUTORIZADA', 105, 170, { align: 'center', angle: 30 }); doc.setTextColor(0); }
+      doc.text(lat(o.marca || (d.ambiente === '2' ? 'SEM VALOR FISCAL' : 'NÃO AUTORIZADA')), 105, 170, { align: 'center', angle: 30 }); doc.setTextColor(0); }
   }
   if (typeof doc.putTotalPages === 'function') doc.putTotalPages('{fl}');
   return doc;

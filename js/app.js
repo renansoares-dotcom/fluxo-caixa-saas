@@ -157,6 +157,7 @@ const routes = {
   'lgpd': () => import(`./pages/lgpd.js?v=${V}`),
   'integracoes': () => import(`./pages/integracoes.js?v=${V}`),
   'notas/sefaz': () => import(`./pages/notas-sefaz.js?v=${V}`),
+  'notas/emissao': () => import(`./pages/nfe-emissao.js?v=${V}`),
   'diretoria': () => import(`./pages/diretoria.js?v=${V}`),
   'perguntar': () => import(`./pages/perguntar.js?v=${V}`),
   'relatorios': () => import(`./pages/relatorios.js?v=${V}`),

@@ -331,4 +331,9 @@ export const FIGS = [
   ['agenda', 'agenda', '## 4.', 'Novo compromisso: hora, repetição, responsável, participantes e privado', 'click:[data-v="mes"]|click:#ag-novo|fill:#fc-titulo=Reunião de resultados do mês|fill:#fc-hora=09:00|fill:#fc-fim=10:30|select:#fc-rep=Todo mês'],
   ['agenda', 'agenda', '## 5.', 'Detalhe do item: feito, adiar e passar para outra pessoa', 'click:.ag-dia.hoje .ag-it'],
   ['agenda', 'agenda', '## 7.', 'Parâmetros da agenda: fontes, calendário e saldo previsto', 'click:#ag-par'],
+  ['nfe-emissao', 'notas/emissao', '## 4.', 'Emissão de NF-e: ambiente, indicadores e as notas com a situação na SEFAZ'],
+  ['nfe-emissao', 'notas/emissao', '### 3.2', 'Parâmetros da emissão: ambiente, teste do token, dados do emitente e padrões', 'click:#nf-par'],
+  ['nfe-emissao', 'notas/emissao', '### 3.3', 'Naturezas de operação: CFOP, CST e alíquotas de cada tipo de nota', 'click:#nf-nat'],
+  ['nfe-emissao', 'notas/emissao', '## 5.', 'Nota em rascunho: destinatário, itens com os impostos calculados e totais', 'click:[data-a="abrir"]'],
+  ['nfe-emissao', 'notas/emissao', '## 6.', 'Nota autorizada: e-mail, carta de correção e cancelamento', 'click:[data-a="mais"]'],
 ];

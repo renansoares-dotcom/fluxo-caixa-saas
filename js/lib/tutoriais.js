@@ -101,6 +101,8 @@ export const MANUAIS = [
     resumo: 'Aproveitamento por setor e por pessoa, horas sem apontamento e o custo delas, ligação operador × colaborador.' },
   { id: 'notas-fiscais', titulo: 'Notas fiscais e apuração de impostos', area: 'CPD', secoes: { 'notas': '## 3.' }, rotas: ['notas', 'fiscal/apuracao'],
     resumo: 'Importar os XML, ligar parcelas a recebimentos e borderôs, impostos por CFOP, relatórios de faturamento e compras, apuração (prévia) e reforma tributária: conferência da CBS/IBS, simulador 2027 e alíquotas.' },
+  { id: 'nfe-emissao', titulo: 'Emissão de NF-e pela Focus NFe e o novo DANFE', area: 'CPD', rotas: ['notas/emissao'],
+    resumo: 'Como implantar o ambiente da Focus NFe, cadastrar naturezas de operação, emitir, cancelar e corrigir notas, e o DANFE no leiaute da NT 2026.010 (IBS, CBS e Imposto Seletivo).' },
   { id: 'nfe-sefaz', titulo: 'NF-e da SEFAZ — notas contra o CNPJ e manifestação', area: 'CPD', rotas: ['notas/sefaz'],
     resumo: 'Consulta automática à SEFAZ (Distribuição DF-e), ciência para liberar o XML, importação em Notas Fiscais e manifestação conclusiva no prazo.' },
   { id: 'contabilidade', titulo: 'Contabilidade — DRE, balancete, balanço e DFC', area: 'Contabilidade', rotas: ['dre', 'contab/balancete', 'contab/balanco', 'contab/dre', 'contab/dfc', 'contab/depara'],
