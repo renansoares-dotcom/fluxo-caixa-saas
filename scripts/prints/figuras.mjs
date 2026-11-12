@@ -325,4 +325,10 @@ export const FIGS = [
   ['cheques', 'cheques', '## 9.', 'Agenda de compensação: o que entra e o que sai do banco por dia', 'click:[data-f="agenda"]'],
   ['cheques', 'cheques', '### 9.1', 'Emitentes: quantos cheques, devoluções e o que está em aberto', 'click:[data-f="emitentes"]'],
   ['cheques', 'cheques', '## 10.', 'Parâmetros: contas de movimento, contas do plano e regras', 'click:#cq-par'],
+  ['agenda', 'agenda', '## 3.', 'Agenda no mês: compromissos, resumo de cada dia, saldo previsto e o painel do dia'],
+  ['agenda', 'agenda', '### 3.2', 'Visão da semana: cada item com hora, valor e detalhe', 'click:[data-v="semana"]'],
+  ['agenda', 'agenda', '### 3.3', 'Visão em lista: tudo em ordem de data', 'click:[data-v="lista"]'],
+  ['agenda', 'agenda', '## 4.', 'Novo compromisso: hora, repetição, responsável, participantes e privado', 'click:[data-v="mes"]|click:#ag-novo|fill:#fc-titulo=Reunião de resultados do mês|fill:#fc-hora=09:00|fill:#fc-fim=10:30|select:#fc-rep=Todo mês'],
+  ['agenda', 'agenda', '## 5.', 'Detalhe do item: feito, adiar e passar para outra pessoa', 'click:.ag-dia.hoje .ag-it'],
+  ['agenda', 'agenda', '## 7.', 'Parâmetros da agenda: fontes, calendário e saldo previsto', 'click:#ag-par'],
 ];

@@ -92,7 +92,8 @@ function blocosFin(D, root) {
       ${card('Extratos', extAtras.length ? `${extAtras.length} atrasado(s)` : 'em dia', `referência: ${dateBR(ontem)}`, extAtras.length ? 'neg' : 'pos', 'conciliacao')}
       ${card('Contas travadas até', travaMin ? dateBR(travaMin) : '—', `${Object.keys(ultTrava).length} conta(s) com trava`, travaMin && travaMin < ontem ? 'neg' : '', 'fechamento')}
     </div>`,
-    agenda: `<div class="card mm-card"><div class="card-head"><h2>Agenda de hoje</h2><span class="muted small">a receber ${money0(soma(deHoje, rec))} · a pagar ${money0(soma(deHoje, pag))}</span></div>
+    agenda: `<div class="card mm-card"><div class="card-head"><h2>Agenda de hoje</h2><span class="muted small">a receber ${money0(soma(deHoje, rec))} · a pagar ${money0(soma(deHoje, pag))} · <a href="#/agenda">abrir a agenda</a></span></div>
+        <div id="mm-comp"></div>
         ${topHoje.length ? `<div class="table-wrap"><table id="mm-hoje"><tbody>${topHoje.map(linhaL).join('')}</tbody></table></div>${deHoje.length > topHoje.length ? `<p class="small muted">+ ${deHoje.length - topHoje.length} lançamento(s) em Contas a pagar / receber.</p>` : ''}` : '<div class="empty">Nada vencendo hoje.</div>'}
         <div class="mm-mini">
           <div class="clickable" data-ir="abertos"><div class="muted small">Próximos 7 dias</div><div>receber <strong class="pos">${money0(soma(semana, rec))}</strong> · pagar <strong class="neg">${money0(soma(semana, pag))}</strong></div></div>
@@ -102,6 +103,10 @@ function blocosFin(D, root) {
           ${al.length ? al.map(a => `<div class="mm-item clickable" data-ir="${a.rota}"><span class="mm-dot ${a.n}"></span><span>${esc(a.txt)}</span></div>`).join('') : '<div class="empty">Sem alertas.</div>'}</div>`,
     ligar: (el) => {
       $$('[data-ir]', el).forEach(x => x.onclick = () => ir(x.dataset.ir));
+      // compromissos de hoje e de amanhã da pessoa (Agenda, SQL 155)
+      const mc = $('#mm-comp', el);
+      if (mc) import(`./agenda.js?v=${Date.now()}`).then(m => m.compromissosDoDia()).then(L => { if (!L.length) return;
+        mc.innerHTML = `<div class="mm-mini" style="margin:0 0 10px">${L.slice(0, 6).map(i => `<a class="clickable" href="#/agenda?abrir=${i.id}" style="text-decoration:none;color:inherit"><div class="muted small">${i.data === D.hoje ? 'Hoje' : 'Amanhã'}${i.hora ? ' · ' + i.hora : ''}</div><div><strong>${esc(i.titulo)}</strong></div></a>`).join('')}</div>`; }).catch(() => {});
       $('#mm-hoje', el)?.addEventListener('click', async (e) => {
         const id = e.target.closest('tr[data-l]')?.dataset.l; if (!id) return;
         try { const [l] = await q(sb.from('lancamentos').select('*').eq('id', id)); abrirLancamento(l, () => render(root)); } catch (err) { fail(err); }

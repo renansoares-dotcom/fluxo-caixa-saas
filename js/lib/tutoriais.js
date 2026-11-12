@@ -10,6 +10,8 @@ export const MANUAIS = [
     resumo: 'O que precisa de atenção hoje, a decisão de pagamentos do dia com aprovação, recomendações da semana e a visão da direção.' },
   { id: 'perguntar', titulo: 'Pergunte à plataforma (IA)', area: 'Painéis', rotas: ['perguntar'],
     resumo: 'Perguntas em português sobre faturamento, despesas, fretes, compras e produção, respondidas pela IA com texto, gráfico, os números usados e o link da tela. Só consulta.' },
+  { id: 'agenda', titulo: 'Agenda — calendário único da empresa', area: 'Painéis', rotas: ['agenda'],
+    resumo: 'Calendário (mês, semana e lista) com compromissos próprios e tudo o que tem data na plataforma: títulos, cheques, contatos, fechamento, contratos, frota, manutenção e mais; saldo previsto por dia; resolver, adiar e delegar.' },
   { id: 'relatorios', titulo: 'Relatórios agendados', area: 'Painéis', rotas: ['relatorios'],
     resumo: 'Relatórios enviados por e-mail na frequência escolhida (posição de caixa, contas a pagar, faturamento, despesas, produção, fretes), com modelos prontos e prévia.' },
   { id: 'painel-diretoria', titulo: 'Painel da Diretoria', area: 'Painéis', rotas: ['diretoria'],

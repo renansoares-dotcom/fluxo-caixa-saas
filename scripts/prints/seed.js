@@ -2386,3 +2386,26 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
     .map(([cheque_id, tipo, d, detalhe], i) => ({ id: 'ev' + i, empresa_id: E, cheque_id, emitido_id: null, tipo, data: dd(d), detalhe, created_at: dd(d) + 'T12:00:00Z' }));
   DB.chq_receb_titulos = []; DB.chq_emitido_titulos = [];
 }
+
+// ---------------------------------------------------------------- Agenda única (SQL 155) — dados fictícios
+{
+  const hoje = new Date().toISOString().slice(0, 10), dd = (n) => new Date(Date.parse(hoje + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+  const seg = dd(-((new Date(hoje + 'T12:00:00Z').getUTCDay() + 6) % 7));   // segunda desta semana
+  DB.agenda_config = [{ empresa_id: E, fontes_desligadas: [], semana_inicio: 0, fim_de_semana: true, saldo_dia: true, saldo_papeis: ['admin', 'diretor', 'financeiro'], saldo_cheques: true, vencidos_em_hoje: true, visao_padrao: 'mes' }];
+  const A = (id, titulo, tipo, data, hora, fim, x = {}) => ({ id: 'ag' + id, empresa_id: E, titulo, tipo, data, hora, hora_fim: fim, descricao: null, local: null, repetir: 'nao', intervalo: 1, dias_semana: [], repetir_ate: null,
+    dono: 'u1', responsavel: 'u1', participantes: [], privado: false, favorecido_id: null, situacao: 'aberto', feito_em: null, feito_por: null, ...x });
+  DB.agenda_compromissos = [
+    A(1, 'Posição de caixa com a diretoria', 'reuniao', dd(-70), '08:30', '09:00', { repetir: 'semanal', dias_semana: [1], participantes: ['u2', 'u3'], local: 'Sala de reuniões' }),
+    A(2, 'Reunião com o banco: renovação do limite', 'reuniao', hoje, '10:00', '11:00', { participantes: ['u3'], local: 'Agência Centro', descricao: 'Levar o fluxo projetado e o balancete de outubro.' }),
+    A(3, 'Ligar para a Atacado Sertão sobre o cheque devolvido', 'ligacao', hoje, '14:30', null, { responsavel: 'u2', dono: 'u1' }),
+    A(4, 'Visita ao cliente Supermercados Boa Compra', 'visita', dd(2), '09:00', '11:30', { local: 'Caruaru/PE', participantes: ['u3'] }),
+    A(5, 'Entregar documentos ao contador', 'tarefa', dd(1), null, null, {}),
+    A(6, 'Fechamento da folha', 'tarefa', dd(-40), null, null, { repetir: 'mensal', responsavel: 'u2', participantes: ['u1'] }),
+    A(7, 'Comitê de crédito', 'reuniao', dd(6), '15:00', '16:00', { participantes: ['u2', 'u3'] }),
+    A(8, 'Renovar o certificado digital', 'lembrete', dd(9), null, null, {}),
+    A(9, 'Conferir a apuração de impostos', 'tarefa', dd(-2), null, null, { situacao: 'feito' }),
+    A(10, 'Inventário rotativo do almoxarifado', 'tarefa', dd(4), '07:30', null, { responsavel: 'u4', dono: 'u4', participantes: [] }),
+  ];
+  DB.agenda_excecoes = [{ id: 'agx1', compromisso_id: 'ag1', empresa_id: E, data: dd(-7 + ((8 - new Date(hoje + 'T12:00:00Z').getUTCDay()) % 7) - 7), acao: 'feito' }];
+  window.RPC.agenda_ocorrencia = () => null; window.RPC.agenda_encerrar_repeticao = () => null;
+}
