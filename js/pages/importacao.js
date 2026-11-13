@@ -3,11 +3,13 @@
 // NCM e alíquotas, câmbio (adiantamento e saldo, contratação e liquidação, exposição com a PTAX do Banco Central), despesas e impostos
 // da nacionalização, custo estimado e custo final por item, documentos, títulos no financeiro e entrada no estoque com o custo apurado.
 // Pedido do Renan em 13/11/2026.
+// SQL 159: importação por meio de terceiro. Um intermediário importa; a empresa repassa reais a ele (os adiantamentos a fornecedor do
+// financeiro) e acompanha o repassado contra o total que ele informou. Nesses processos a aba Câmbio dá lugar a Repasses.
 import { sb, state, q, fetchAll, loadCadastros } from '../lib/data.js';
 import { $, $$, esc, toast, fail, modal, money, money0, dateBR, today, options, parseNum, confirmDialog, exportXLSX } from '../lib/ui.js';
 import { kpiGrid } from '../lib/componentes.js';
 import { ETAPAS, ETAPA, ABERTAS, DATA_ETAPA, INCOTERMS, MODAL, CANAL, MOEDAS, SGS, CATEGORIAS, DOCS, CAMBIO_TIPO, CAMBIO_STATUS, proximaEtapa, freteNoPreco, seguroNoPreco,
-  fobTotal, numeroProcesso, diasEntre, estimar, custoFinal, coberturaCambio, exposicao, alertas, lerSgs, faltaParaEtapa } from '../lib/importacao.js';
+  fobTotal, numeroProcesso, diasEntre, estimar, custoFinal, coberturaCambio, exposicao, alertas, lerSgs, faltaParaEtapa, MODALIDADES, resumoRepasses } from '../lib/importacao.js';
 
 export const title = 'Importação';
 const CFG0 = { papeis: ['financeiro', 'diretor', 'compras'], moeda_padrao: 'USD', rateio: 'valor', recupera_icms: true, recupera_ipi: true, recupera_pis_cofins: true, gerar_titulos: true,
@@ -42,7 +44,7 @@ const st = (s) => `<span class="im-st ${s === 'cancelado' ? 'neg' : s === 'encer
 const dataEtapa = (p) => p[DATA_ETAPA[p.status]] || null;
 
 async function dados(e) {
-  const [Cf, Pr, It, Cb, Dp, Px, pode] = await Promise.all([
+  const [Cf, Pr, It, Cb, Dp, Px, pode, Rp] = await Promise.all([
     q(sb.from('imp_config').select('*').eq('empresa_id', e)),
     fetchAll(() => sb.from('imp_processos').select('*').eq('empresa_id', e).order('numero', { ascending: false })),
     fetchAll(() => sb.from('imp_itens').select('*').eq('empresa_id', e).order('ordem')),
@@ -50,9 +52,10 @@ async function dados(e) {
     fetchAll(() => sb.from('imp_despesas').select('*').eq('empresa_id', e).order('vencimento')),
     q(sb.from('imp_ptax').select('*').order('data', { ascending: false }).limit(120)),
     q(sb.rpc('imp_pode', { p_empresa: e })),
+    fetchAll(() => sb.from('imp_repasses').select('*').eq('empresa_id', e).order('data', { nullsFirst: false })).catch(() => []),   // antes do SQL 159 não existe
   ]);
   const cot = {}; for (const x of Px) if (!cot[x.moeda]) cot[x.moeda] = x;     // a mais recente de cada moeda
-  return { cfg: { ...CFG0, ...(Cf[0] || {}), _existe: !!Cf[0] }, Pr, It, Cb, Dp, Px, cot, pode: !!pode };
+  return { cfg: { ...CFG0, ...(Cf[0] || {}), _existe: !!Cf[0] }, Pr, It, Cb, Dp, Rp, Px, cot, pode: !!pode };
 }
 
 /** alertas para a Central de Decisões (regra 29) */
@@ -79,7 +82,8 @@ export async function render(root) {
   const re = () => { ui.interno = true; return render(root); }, cfg = D.cfg, pode = D.pode, admin = state.papel === 'admin';
   const forn = (id) => cad.fornecedores.find(f => f.id === id)?.nome || state.cad?.favById?.[id]?.nome || '—';
   const contas = () => (state.cad?.contas || []).filter(c => c.ativo !== false && c.tipo !== 'Cheques');
-  const itensDe = (id) => D.It.filter(i => i.processo_id === id), cambDe = (id) => D.Cb.filter(c => c.processo_id === id), despDe = (id) => D.Dp.filter(d => d.processo_id === id);
+  const itensDe = (id) => D.It.filter(i => i.processo_id === id), cambDe = (id) => D.Cb.filter(c => c.processo_id === id), despDe = (id) => D.Dp.filter(d => d.processo_id === id), repDe = (id) => D.Rp.filter(r => r.processo_id === id);
+  const terc = (p) => p.modalidade === 'terceiro', repsDe = (p) => resumoRepasses(p, repDe(p.id), itensDe(p.id));
   const cotDe = (m) => +D.cot[m]?.venda || null;
   const custoDe = (p) => custoFinal(p, itensDe(p.id), despDe(p.id), cambDe(p.id), cfg, cotDe(p.moeda));
   const AL = alertas(D.Pr, D.Cb, cfg, hoje), alDe = (id) => AL.filter(a => a.processo_id === id);
@@ -103,7 +107,7 @@ export async function render(root) {
   const aPagarBrl = EX.reduce((s, x) => s + (x.aberto_brl || 0) + x.travado_brl, 0), semTrava = EX.reduce((s, x) => s + (x.aberto_brl || 0), 0);
   const prox = D.Pr.filter(p => p.status === 'embarcado' && p.chegada_prevista).sort((a, b) => a.chegada_prevista.localeCompare(b.chegada_prevista))[0];
   const resumoItens = (p) => { const I = itensDe(p.id); return I.length ? `${esc(I[0].descricao)}${I.length > 1 ? ` <span class="muted">+ ${I.length - 1}</span>` : ''}` : '<span class="muted">sem itens</span>'; };
-  const pctLiq = (p) => { const c = coberturaCambio(itensDe(p.id), cambDe(p.id)); return c.fob > 0 ? Math.min(100, c.liquidado / c.fob * 100) : 0; };
+  const pctLiq = (p) => { if (terc(p)) return repsDe(p).pct || 0; const c = coberturaCambio(itensDe(p.id), cambDe(p.id)); return c.fob > 0 ? Math.min(100, c.liquidado / c.fob * 100) : 0; };
   const cardProc = (p) => { const a = alDe(p.id)[0], I = itensDe(p.id);
     return `<div class="im-card" data-p="${p.id}"><b>${numeroProcesso(p)}${p.referencia ? ` <span class="muted" style="font-weight:400">· ${esc(p.referencia)}</span>` : ''}</b>${esc(forn(p.favorecido_id))}
       <div class="muted">${fm(fobTotal(I), p.moeda)}${p.status === 'embarcado' && p.chegada_prevista ? ` · chega ${dateBR(p.chegada_prevista).slice(0, 5)}` : dataEtapa(p) ? ` · ${dateBR(dataEtapa(p)).slice(0, 5)}` : ''}</div>${a ? `<div class="al">${a.nivel === 'baixo' ? '' : '⚠ '}${esc(a.texto.replace(/^IMP \d+: /, ''))}</div>` : ''}</div>`; };
@@ -116,15 +120,15 @@ export async function render(root) {
           : `<div class="empty">Nenhum processo em andamento.${pode ? ' Use "Novo processo" para registrar a primeira importação.' : ''}</div>`}</div>`,
     processos: () => { const b = ui.busca.trim().toLowerCase();
       const F = { abertos: (p) => ABERTAS.includes(p.status) && p.status !== 'recebido', recebidos: (p) => ['recebido', 'encerrado'].includes(p.status), cancelados: (p) => p.status === 'cancelado', todos: () => true };
-      const L = D.Pr.filter(p => F[ui.filtro](p) && (!b || [numeroProcesso(p), p.referencia, forn(p.favorecido_id), p.declaracao, p.conhecimento, p.invoice, ...itensDe(p.id).map(i => i.descricao)].some(v => String(v || '').toLowerCase().includes(b))));
+      const L = D.Pr.filter(p => F[ui.filtro](p) && (!b || [numeroProcesso(p), p.referencia, forn(p.favorecido_id), p.declaracao, p.conhecimento, p.invoice, p.proforma, terc(p) ? forn(p.intermediario_id) : '', ...itensDe(p.id).map(i => i.descricao)].some(v => String(v || '').toLowerCase().includes(b))));
       return `<div class="card toolbar" style="margin-bottom:12px"><div class="chips" id="im-f">${[['abertos', 'Em andamento'], ['recebidos', 'Recebidos e encerrados'], ['cancelados', 'Cancelados'], ['todos', 'Todos']].map(([k, t]) => `<span class="chip ${ui.filtro === k ? 'on' : ''}" data-f="${k}">${t}</span>`).join('')}</div>
         <span class="spacer"></span><label>Buscar<input id="im-b" value="${esc(ui.busca)}" placeholder="processo, exportador, DI, BL, item" style="min-width:230px"></label><button class="btn ghost" id="im-xls">Excel</button></div>
-      <div class="card flush"><div class="table-wrap"><table id="im-tab"><thead><tr><th>Processo</th><th>Exportador</th><th>Mercadoria</th><th class="num">Valor</th><th>Etapa</th><th>Chegada</th><th>Câmbio pago</th><th></th></tr></thead><tbody>
+      <div class="card flush"><div class="table-wrap"><table id="im-tab"><thead><tr><th>Processo</th><th>Exportador</th><th>Mercadoria</th><th class="num">Valor</th><th>Etapa</th><th>Chegada</th><th>Pago</th><th></th></tr></thead><tbody>
       ${L.map(p => { const liq = pctLiq(p), a = alDe(p.id).filter(x => x.nivel !== 'baixo');
-        return `<tr><td><a href="#" data-p="${p.id}"><b>${numeroProcesso(p)}</b></a>${p.referencia ? `<div class="small muted">${esc(p.referencia)}</div>` : ''}</td><td class="wrap">${esc(forn(p.favorecido_id))}<div class="small muted">${esc([p.pais_origem, p.incoterm, MODAL[p.modal]].filter(Boolean).join(' · '))}</div></td>
+        return `<tr><td><a href="#" data-p="${p.id}"><b>${numeroProcesso(p)}</b></a>${p.referencia ? `<div class="small muted">${esc(p.referencia)}</div>` : ''}</td><td class="wrap">${esc(forn(p.favorecido_id))}<div class="small muted">${esc([p.pais_origem, p.incoterm, MODAL[p.modal]].filter(Boolean).join(' · '))}</div>${terc(p) ? `<div class="small muted">por meio de ${esc(forn(p.intermediario_id))}</div>` : ''}</td>
           <td class="wrap">${resumoItens(p)}</td><td class="num">${fm(fobTotal(itensDe(p.id)), p.moeda)}</td><td>${st(p.status)}${dataEtapa(p) ? `<div class="small muted">${dateBR(dataEtapa(p))}</div>` : ''}${a.length ? `<div class="small neg">⚠ ${a.length} alerta(s)</div>` : ''}</td>
           <td>${p.data_chegada ? dateBR(p.data_chegada) : p.chegada_prevista ? `<span class="muted">prev.</span> ${dateBR(p.chegada_prevista)}` : '—'}</td>
-          <td style="min-width:110px"><div class="im-bar"><i style="width:${liq.toFixed(0)}%;background:var(--pos)"></i></div><div class="small muted">${liq.toFixed(0)}% liquidado</div></td>
+          <td style="min-width:110px"><div class="im-bar"><i style="width:${liq.toFixed(0)}%;background:var(--pos)"></i></div><div class="small muted">${liq.toFixed(0)}% ${terc(p) ? 'repassado' : 'liquidado'}</div></td>
           <td><button class="btn ghost small" data-p="${p.id}">Abrir</button></td></tr>`; }).join('') || '<tr><td colspan="8" class="empty">Nenhum processo aqui.</td></tr>'}</tbody></table></div></div>`; },
     cambio: () => `<div class="card"><h2 style="margin-top:0">Exposição cambial</h2><div class="small muted" style="margin-bottom:8px">O que ainda vai ser pago ao exterior. "Sem taxa travada" é o valor previsto, sem contrato de câmbio: é ele que muda com a cotação.</div>
         <div class="table-wrap"><table><thead><tr><th>Moeda</th><th class="num">Sem taxa travada</th><th class="num">Cotação (venda)</th><th class="num">Em reais hoje</th><th class="num">A cada 1% da moeda</th><th class="num">Com contrato</th><th class="num">Em reais (contratado)</th></tr></thead><tbody>
@@ -175,10 +179,10 @@ export async function render(root) {
 
   // ------------------------------------------------------------ processo aberto
   function detalhe(p) {
-    const I = itensDe(p.id), C = cambDe(p.id), Dz = despDe(p.id), cob = coberturaCambio(I, C), cf = custoDe(p), al = alDe(p.id), aberto = !['encerrado', 'cancelado'].includes(p.status), edita = pode && aberto;
+    const I = itensDe(p.id), C = cambDe(p.id), Dz = despDe(p.id), R = repDe(p.id), T = terc(p), rr = repsDe(p), cob = coberturaCambio(I, C), cf = custoDe(p), al = alDe(p.id), aberto = !['encerrado', 'cancelado'].includes(p.status), edita = pode && aberto;
     const prox = proximaEtapa(p.status), ord = ETAPA[p.status]?.ordem ?? -1;
     const cab = `<div class="card"><div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap"><div style="flex:1;min-width:240px"><h2 style="margin:0">${numeroProcesso(p)} ${st(p.status)}</h2>
-        <div><b>${esc(forn(p.favorecido_id))}</b>${p.referencia ? ` · ref. ${esc(p.referencia)}` : ''}</div><div class="small muted">${esc([p.pais_origem, INCOTERMS[p.incoterm]?.split(' — ')[0], MODAL[p.modal], p.local_embarque && p.local_destino ? `${p.local_embarque} → ${p.local_destino}` : p.local_destino].filter(Boolean).join(' · '))}</div></div>
+        <div><b>${esc(forn(p.favorecido_id))}</b>${p.referencia ? ` · ref. ${esc(p.referencia)}` : ''}</div>${T ? `<div class="small"><span class="im-st info">Por meio de terceiro</span> importado por <b>${esc(forn(p.intermediario_id))}</b></div>` : ''}<div class="small muted">${esc([p.pais_origem, INCOTERMS[p.incoterm]?.split(' — ')[0], MODAL[p.modal], p.local_embarque && p.local_destino ? `${p.local_embarque} → ${p.local_destino}` : p.local_destino].filter(Boolean).join(' · '))}</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">${edita && p.status === 'desembaracado' ? '<button class="btn primary" id="im-rec">Receber no estoque</button>' : ''}
           ${edita && prox && !(p.status === 'desembaracado') ? `<button class="btn ${p.status === 'recebido' ? 'ghost' : 'primary'}" id="im-av">Avançar: ${esc(ETAPA[prox].nome)}</button>` : ''}
           ${edita && p.status === 'recebido' && I.some(i => +i.qtd_recebida < +i.quantidade) ? '<button class="btn ghost" id="im-rec">Receber o saldo</button>' : ''}
@@ -186,12 +190,27 @@ export async function render(root) {
           ${pode && p.status === 'negociacao' ? '<button class="btn ghost" id="im-exc">Excluir</button>' : ''}</div></div>
       ${p.status === 'cancelado' ? `<p class="neg" style="margin:8px 0 0">Cancelado: ${esc(p.motivo_cancelamento || '')}</p>` : `<div class="im-passos">${ETAPAS.map(([k, n], i) => `<div class="im-passo ${i < ord ? 'ok' : i === ord ? 'at ok' : ''}">${esc(n)}<small>${dateBR(p[DATA_ETAPA[k]] || (k === 'embarcado' && i > ord ? p.embarque_previsto : k === 'chegada' && i > ord ? p.chegada_prevista : '')) || '&nbsp;'}</small></div>`).join('')}</div>`}
       ${al.length ? `<ul class="small" style="margin:8px 0 0;padding-left:18px">${al.map(a => `<li class="${a.nivel === 'alto' ? 'neg' : ''}">${esc(a.texto.replace(/^IMP \d+: /, ''))}</li>`).join('')}</ul>` : ''}</div>`;
+    function vistaRepasses() {
+      return `<div class="im-res"><div><span>Total informado pelo intermediário</span><b>${rr.informado == null ? '—' : money(rr.informado)}</b></div><div><span>Repassado</span><b>${money(rr.repassado)}</b></div>
+          <div><span>Com lançamento pago</span><b>${money(rr.confirmado)}</b></div><div><span>A confirmar</span><b class="${rr.a_confirmar > 0.005 ? 'warn' : ''}">${money(rr.a_confirmar)}</b></div>
+          <div><span>Saldo a repassar</span><b class="${rr.saldo > 0.005 ? 'warn' : ''}">${rr.saldo == null ? '—' : money(rr.saldo)}</b></div><div><span>Mercadoria ainda não abatida</span><b>${fm(rr.saldo_moeda, p.moeda)}</b></div></div>
+        ${rr.informado ? `<div class="im-bar" style="margin-bottom:10px"><i style="width:${Math.min(100, rr.confirmado / rr.informado * 100)}%;background:var(--pos)"></i><i style="width:${Math.min(100, rr.a_confirmar / rr.informado * 100)}%;background:var(--warn)"></i></div>` : ''}
+        <div class="card flush"><div class="table-wrap"><table><thead><tr><th>Data</th><th>Repasse</th><th class="num">Valor</th><th>Situação</th><th class="num">Abatido (${p.moeda})</th><th class="num">Taxa informada</th><th></th></tr></thead><tbody>
+        ${R.map(r => `<tr><td>${r.data ? dateBR(r.data) : '<span class="warn">a confirmar</span>'}</td><td class="wrap">${r.credito_id ? 'Adiantamento a fornecedor' : 'Valor informado, sem lançamento'}${r.observacao ? `<div class="small muted">${esc(r.observacao)}</div>` : ''}</td><td class="num">${money(r.valor)}</td>
+          <td>${r.confirmado ? '<span class="im-st pos">pago</span>' : `<span class="im-st warn">${r.credito_id ? 'lançamento em aberto' : 'a confirmar'}</span>`}</td><td class="num">${r.valor_moeda ? nv(r.valor_moeda) : '—'}</td><td class="num">${r.taxa ? nv(r.taxa, 4) : '—'}</td>
+          <td style="white-space:nowrap">${edita ? `<button class="btn ghost small" data-rp="${r.id}">Editar</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhum repasse neste processo.</td></tr>'}</tbody>
+        ${R.length ? `<tfoot><tr><td colspan="2"><b>${R.length} repasse(s)</b></td><td class="num"><b>${money(rr.repassado)}</b></td><td></td><td class="num"><b>${rr.abatido_moeda ? nv(rr.abatido_moeda) : ''}</b></td><td class="num">${rr.taxa_media ? nv(rr.taxa_media, 4) : ''}</td><td></td></tr></tfoot>` : ''}</table></div></div>
+        ${edita ? '<p><button class="btn" id="im-vrep">Vincular adiantamentos do financeiro</button> <button class="btn ghost" id="im-nrep">+ Valor informado a confirmar</button></p>' : ''}
+        <p class="small muted">Nesta modalidade quem fecha o câmbio e paga o exportador é <b>${esc(forn(p.intermediario_id))}</b>; a empresa repassa reais. Cada repasse é um <b>adiantamento a fornecedor</b> já lançado no financeiro (Créditos e adiantamentos): vincule-o aqui, sem lançar de novo.
+          "Valor informado a confirmar" guarda um pagamento ainda sem data ou sem comprovante; ele não mexe no caixa. "Abatido" e "taxa informada" são o que o intermediário diz ter quitado da mercadoria com aquele repasse. A nota fiscal dele abate os adiantamentos quando chegar.</p>`;
+    }
     const sub = {
       resumo: () => `<div class="im-res"><div><span>Mercadoria</span><b>${fm(cob.fob, p.moeda)}</b></div><div><span>Taxa ${{ declaracao: 'da declaração', prevista: 'prevista', cotacao: 'da última cotação', sem_taxa: '' }[cf.taxa_origem]}</span><b>${cf.taxa ? nv(cf.taxa, 4) : '—'}</b></div>
           <div><span>Mercadoria em reais</span><b>${cf.taxa ? money(cf.fob_brl) : '—'}</b></div><div><span>Despesas no custo</span><b>${money(cf.despesas_custo)}</b></div><div><span>Custo total</span><b>${cf.taxa ? money(cf.custo_total) : '—'}</b></div>
-          <div><span>Câmbio liquidado</span><b>${cob.fob ? (cob.liquidado / cob.fob * 100).toFixed(0) : 0}%</b></div></div>
+          ${T ? `<div><span>Total informado pelo intermediário</span><b>${rr.informado == null ? '—' : money(rr.informado)}</b></div><div><span>Repassado</span><b>${money(rr.repassado)}</b></div><div><span>Saldo a repassar</span><b class="${rr.saldo > 0.005 ? 'warn' : ''}">${rr.saldo == null ? '—' : money(rr.saldo)}</b></div>`
+            : `<div><span>Câmbio liquidado</span><b>${cob.fob ? (cob.liquidado / cob.fob * 100).toFixed(0) : 0}%</b></div>`}</div>
         <div class="card"><div class="im-g small">
-          ${[['Proforma', p.proforma], ['Fatura comercial', p.invoice], ['Conhecimento de embarque', p.conhecimento], ['Navio / voo', p.navio], ['Contêineres', p.containers], ['Declaração (DI / DUIMP)', p.declaracao],
+          ${[['Modalidade', MODALIDADES[p.modalidade || 'direta']], ...(T ? [['Intermediário (importador)', forn(p.intermediario_id)]] : []), ['Proforma', p.proforma], ['Fatura comercial', p.invoice], ['Conhecimento de embarque', p.conhecimento], ['Navio / voo', p.navio], ['Contêineres', p.containers], ['Declaração (DI / DUIMP)', p.declaracao],
              ['Canal', p.canal ? CANAL[p.canal][0] : ''], ['Despachante', p.despachante_id ? forn(p.despachante_id) : ''], ['Agente de carga', p.agente_id ? forn(p.agente_id) : ''], ['Embarque previsto', dateBR(p.embarque_previsto)], ['Chegada prevista', dateBR(p.chegada_prevista)],
              ['Dias livres do contêiner', p.free_time_dias], ['Devolver o contêiner até', dateBR(p.data_devolucao_container)], ['Peso líquido / bruto', p.peso_liquido || p.peso_bruto ? `${nv(p.peso_liquido, 0)} / ${nv(p.peso_bruto, 0)} kg` : ''], ['Taxa prevista', p.taxa_prevista ? nv(p.taxa_prevista, 4) : ''], ['Taxa da declaração', p.taxa_di ? nv(p.taxa_di, 4) : '']]
             .map(([r, v]) => `<div class="c2"><span class="muted">${r}</span><div><b>${esc(v == null || v === '' ? '—' : v)}</b></div></div>`).join('')}
@@ -202,7 +221,7 @@ export async function render(root) {
           <td style="white-space:nowrap">${edita ? `<button class="btn ghost small" data-it="${i.id}">Editar</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="12" class="empty">Nenhum item. Inclua a matéria-prima deste processo.</td></tr>'}</tbody>
         ${I.length ? `<tfoot><tr><td colspan="4"><b>${I.length} item(ns)</b></td><td class="num"><b>${nv(cob.fob)}</b></td><td colspan="7"></td></tr></tfoot>` : ''}</table></div></div>${edita ? '<p><button class="btn" id="im-nit">+ Incluir item</button></p>' : ''}
         <p class="small muted">As alíquotas servem ao custo estimado. Os impostos realmente pagos entram em Despesas, pelo valor da declaração.</p>`,
-      cambio: () => `<div class="im-res"><div><span>Mercadoria</span><b>${fm(cob.fob, p.moeda)}</b></div><div><span>Liquidado</span><b>${fm(cob.liquidado, p.moeda)}</b></div><div><span>Contratado</span><b>${fm(cob.contratado, p.moeda)}</b></div><div><span>Previsto</span><b>${fm(cob.previsto, p.moeda)}</b></div>
+      cambio: () => T ? vistaRepasses() : `<div class="im-res"><div><span>Mercadoria</span><b>${fm(cob.fob, p.moeda)}</b></div><div><span>Liquidado</span><b>${fm(cob.liquidado, p.moeda)}</b></div><div><span>Contratado</span><b>${fm(cob.contratado, p.moeda)}</b></div><div><span>Previsto</span><b>${fm(cob.previsto, p.moeda)}</b></div>
           <div><span>Sem programação</span><b class="${cob.sem_programar > 0.005 ? 'warn' : ''}">${fm(cob.sem_programar, p.moeda)}</b></div><div><span>Variação cambial</span><b class="${cf.variacao_cambial > 0 ? 'neg' : cf.variacao_cambial < 0 ? 'pos' : ''}">${cf.variacao_cambial == null || !cf.cambio_liquidado_moeda ? '—' : money(cf.variacao_cambial)}</b></div></div>
         <div class="im-bar" style="margin-bottom:10px">${cob.fob ? `<i style="width:${cob.liquidado / cob.fob * 100}%;background:var(--pos)"></i><i style="width:${cob.contratado / cob.fob * 100}%;background:var(--warn)"></i><i style="width:${cob.previsto / cob.fob * 100}%;background:var(--primary)"></i>` : ''}</div>
         ${tabCambio(C.map(c => ({ ...c, moeda: p.moeda })), false)}${edita ? '<p><button class="btn" id="im-ncb">+ Programar pagamento</button></p>' : ''}
@@ -235,7 +254,7 @@ export async function render(root) {
       docs: () => '<div id="im-docs"><div class="loading">Carregando…</div></div>',
       hist: () => '<div id="im-hist"><div class="loading">Carregando…</div></div>',
     };
-    corpo.innerHTML = `${cab}<div class="chips tabs" id="im-pabas" style="margin:12px 0">${PABAS.map(([k, t]) => `<span class="chip ${ui.paba === k ? 'on' : ''}" data-paba="${k}">${t}${k === 'itens' ? ` (${I.length})` : k === 'cambio' ? ` (${C.length})` : k === 'despesas' ? ` (${Dz.length})` : ''}</span>`).join('')}</div><div id="im-sub">${sub[ui.paba]()}</div>`;
+    corpo.innerHTML = `${cab}<div class="chips tabs" id="im-pabas" style="margin:12px 0">${PABAS.map(([k, t]) => `<span class="chip ${ui.paba === k ? 'on' : ''}" data-paba="${k}">${k === 'cambio' && T ? 'Repasses' : t}${k === 'itens' ? ` (${I.length})` : k === 'cambio' ? ` (${T ? R.length : C.length})` : k === 'despesas' ? ` (${Dz.length})` : ''}</span>`).join('')}</div><div id="im-sub">${sub[ui.paba]()}</div>`;
     $$('#im-pabas [data-paba]', corpo).forEach(b => b.onclick = () => { ui.paba = b.dataset.paba; re(); });
     ligar(corpo);
     const on = (s, f) => $(s, corpo) && ($(s, corpo).onclick = f);
@@ -247,7 +266,8 @@ export async function render(root) {
     on('#im-reab', async () => { if (!await confirmDialog(`Reabrir o processo ${numeroProcesso(p)}?`)) return; try { await q(sb.from('imp_processos').update({ status: p.status === 'cancelado' ? 'negociacao' : 'recebido' }).eq('id', p.id)); toast('Processo reaberto.'); re(); } catch (err) { fail(err); } });
     on('#im-exc', async () => { if (!await confirmDialog(`Excluir o processo ${numeroProcesso(p)} e tudo o que foi lançado nele?`)) return; try { await q(sb.from('imp_processos').delete().eq('id', p.id)); ui.proc = null; toast('Processo excluído.'); re(); } catch (err) { fail(err); } });
     on('#im-nit', () => item(p, null)); $$('[data-it]', corpo).forEach(b => b.onclick = () => item(p, I.find(i => i.id === b.dataset.it)));
-    on('#im-ncb', () => cambio(null, p, 'editar')); on('#im-ndp', () => despesa(p, null, I)); on('#im-imp', () => impostos(p));
+    on('#im-ncb', () => cambio(null, p, 'editar')); on('#im-vrep', () => vincular(p)); on('#im-nrep', () => repasse(p, null));
+    $$('[data-rp]', corpo).forEach(b => b.onclick = () => repasse(p, R.find(r => r.id === b.dataset.rp))); on('#im-ndp', () => despesa(p, null, I)); on('#im-imp', () => impostos(p));
     $$('[data-dp]', corpo).forEach(b => b.onclick = () => despesa(p, Dz.find(d => d.id === b.dataset.dp), I));
     on('#im-sprem', async () => { const est = Object.fromEntries($$('#im-prem input', corpo).map(i => [i.name, pn(i.value) || null]));
       try { await q(sb.from('imp_processos').update({ estimativa: est }).eq('id', p.id)); toast('Premissas salvas.'); re(); } catch (err) { fail(err); } });
@@ -257,9 +277,12 @@ export async function render(root) {
 
   // ------------------------------------------------------------ formulários
   function editarProcesso(p) {
-    const n = p || { moeda: cfg.moeda_padrao, incoterm: 'FOB', modal: 'maritimo', free_time_dias: cfg.free_time_padrao, taxa_prevista: cotDe(cfg.moeda_padrao) };
+    const n = p || { modalidade: 'direta', moeda: cfg.moeda_padrao, incoterm: 'FOB', modal: 'maritimo', free_time_dias: cfg.free_time_padrao, taxa_prevista: cotDe(cfg.moeda_padrao) };
     const F = cad.fornecedores, d = (k) => esc(n[k] ?? ''), dt = (k, r) => `<label>${r}<input type="date" name="${k}" value="${d(k)}"></label>`;
     modal({ title: p ? `Editar ${numeroProcesso(p)}` : 'Novo processo de importação', wide: true, body: `<form id="im-fp"><div class="im-g">
+        <label class="c2">Quem importa<select name="modalidade">${Object.entries(MODALIDADES).map(([k, t]) => `<option value="${k}" ${(n.modalidade || 'direta') === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+        <label class="c2 im-terc">Intermediário (importador)<select name="intermediario_id">${options(F, { selected: n.intermediario_id, empty: 'Escolha…' })}</select></label><label class="c2 im-terc">Total informado por ele (R$)<input name="total_informado_brl" value="${nv(n.total_informado_brl)}" inputmode="decimal"></label>
+        <div class="c6 small muted im-terc">Por meio de terceiro: o intermediário importa em nome dele ou por conta da empresa, paga o exportador e os tributos, e a empresa repassa reais. O processo acompanha os repasses em vez do câmbio.</div>
         <label class="c3">Exportador<select name="favorecido_id" required>${options(F, { selected: n.favorecido_id, empty: 'Escolha…' })}</select></label><label class="c2">Referência do exportador / pedido<input name="referencia" value="${d('referencia')}"></label><label>País de origem<input name="pais_origem" value="${d('pais_origem')}"></label>
         <label class="c2">Incoterm<select name="incoterm">${Object.entries(INCOTERMS).map(([k, t]) => `<option value="${k}" ${n.incoterm === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
         <label>Moeda<select name="moeda">${Object.entries(MOEDAS).map(([k, t]) => `<option value="${k}" ${n.moeda === k ? 'selected' : ''}>${k} — ${esc(t)}</option>`).join('')}</select></label><label>Taxa prevista<input name="taxa_prevista" value="${nv(n.taxa_prevista, 4)}" inputmode="decimal"></label>
@@ -275,9 +298,12 @@ export async function render(root) {
         <label class="c6">Observação<textarea name="observacao" rows="2">${d('observacao')}</textarea></label></div></form>
         ${F.length ? '' : '<p class="small neg">Cadastre o exportador em Cadastros › Beneficiários antes de abrir o processo.</p>'}`,
       foot: '<button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="im-sp">Salvar</button>',
-      onMount: (m, close) => { $('#im-sp', m).onclick = async () => { const f = Object.fromEntries(new FormData($('#im-fp', m)));
+      onMount: (m, close) => { const fp = $('#im-fp', m), pintar = () => $$('.im-terc', m).forEach(x => x.style.display = fp.modalidade.value === 'terceiro' ? '' : 'none'); fp.modalidade.onchange = pintar; pintar();
+        $('#im-sp', m).onclick = async () => { const f = Object.fromEntries(new FormData($('#im-fp', m)));
         if (!f.favorecido_id) return toast('Escolha o exportador.', true);
-        const row = {}; for (const [k, v] of Object.entries(f)) row[k] = ['taxa_prevista', 'taxa_di', 'peso_liquido', 'peso_bruto'].includes(k) ? (pn(v) || null) : k === 'free_time_dias' ? (v === '' ? null : +v) : (String(v).trim() || null);
+        if (f.modalidade === 'terceiro' && !f.intermediario_id) return toast('Escolha o intermediário.', true);
+        if (f.modalidade !== 'terceiro') { f.intermediario_id = ''; f.total_informado_brl = ''; }
+        const row = {}; for (const [k, v] of Object.entries(f)) row[k] = ['taxa_prevista', 'taxa_di', 'peso_liquido', 'peso_bruto', 'total_informado_brl'].includes(k) ? (pn(v) || null) : k === 'free_time_dias' ? (v === '' ? null : +v) : (String(v).trim() || null);
         try { if (p) await q(sb.from('imp_processos').update(row).eq('id', p.id)); else { const r = await q(sb.from('imp_processos').insert({ ...row, empresa_id: e }).select('id')); ui.proc = r[0]?.id || null; ui.paba = 'itens'; }
           close(); toast(p ? 'Processo atualizado.' : 'Processo aberto. Inclua os itens.'); re(); } catch (err) { fail(err); } }; } });
   }
@@ -338,6 +364,32 @@ export async function render(root) {
           if (s !== 'previsto' && (!row.taxa || !row.data_contratacao)) return toast('Informe a taxa e a data da contratação.', true);
           if (s === 'liquidado' && !row.conta_id && contas().length) return toast('Escolha a conta de onde saiu o pagamento.', true);
           try { if (c) await q(sb.from('imp_cambios').update(row).eq('id', c.id)); else await q(sb.from('imp_cambios').insert({ ...row, empresa_id: e, processo_id: p.id })); close(); toast('Pagamento salvo.'); re(); } catch (err) { fail(err); } }; } });
+  }
+  async function vincular(p) {
+    let L = [];
+    try { L = await q(sb.rpc('imp_adiantamentos_livres', { p_processo: p.id })); } catch (err) { return fail(err); }
+    modal({ title: `Vincular adiantamentos — ${numeroProcesso(p)}`, wide: true, body: `<p class="small muted">Adiantamentos a <b>${esc(forn(p.intermediario_id))}</b> lançados no financeiro e ainda fora de qualquer processo de importação. Marque os que são desta importação.</p>
+        <div class="table-wrap"><table><thead><tr><th style="width:32px"></th><th>Data</th><th>Lançamento</th><th>Conta</th><th class="num">Valor</th><th>Situação</th></tr></thead><tbody>
+        ${L.map(c => `<tr><td><input type="checkbox" data-c="${c.id}" data-v="${c.valor}" style="width:auto;min-height:0"></td><td>${dateBR(c.data)}</td><td class="wrap">${esc(c.descricao || '')}</td><td>${esc(c.conta || '—')}</td><td class="num">${money(c.valor)}</td><td>${c.pago ? '<span class="im-st pos">pago</span>' : '<span class="im-st warn">em aberto</span>'}</td></tr>`).join('')
+          || '<tr><td colspan="6" class="empty">Nenhum adiantamento livre para este fornecedor. Lance o pagamento como adiantamento em Financeiro › Créditos e adiantamentos (ou em Pagamentos Antecipados) e volte aqui.</td></tr>'}</tbody></table></div><p class="small" id="im-vtot"></p>`,
+      foot: '<button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="im-sv">Vincular</button>',
+      onMount: (m, close) => { const sel = () => $$('[data-c]:checked', m), tot = () => { $('#im-vtot', m).textContent = sel().length ? `${sel().length} marcado(s): ${money(sel().reduce((s, x) => s + +x.dataset.v, 0))}.` : ''; }; m.onchange = tot;
+        $('#im-sv', m).onclick = async (ev) => { const rows = sel().map(x => ({ empresa_id: e, processo_id: p.id, credito_id: x.dataset.c, valor: +x.dataset.v })); if (!rows.length) return toast('Marque ao menos um adiantamento.', true);
+          ev.target.disabled = true; try { await q(sb.from('imp_repasses').insert(rows)); close(); toast(`${rows.length} repasse(s) vinculado(s).`); re(); } catch (err) { fail(err); ev.target.disabled = false; } }; } });
+  }
+  function repasse(p, r) {
+    const n = r || {}, lig = !!n.credito_id;
+    modal({ title: `${r ? 'Editar repasse' : 'Valor informado a confirmar'} — ${numeroProcesso(p)}`, body: `<form id="im-frp"><div class="im-g">
+        <label class="c2">Valor (R$)<input name="valor" value="${nv(n.valor)}" inputmode="decimal" required ${lig ? 'disabled' : ''}></label><label class="c2">Data<input type="date" name="data" value="${esc(n.data || '')}" max="${hoje}" ${lig ? 'disabled' : ''}></label><div class="c2"></div>
+        <label class="c2">Abatido da mercadoria (${p.moeda})<input name="valor_moeda" value="${nv(n.valor_moeda)}" inputmode="decimal"></label><label class="c2">Taxa informada<input name="taxa" value="${nv(n.taxa, 4)}" inputmode="decimal" placeholder="valor ÷ abatido"></label><div class="c2"></div>
+        <label class="c6">Observação<input name="observacao" value="${esc(n.observacao || '')}"></label></div></form>
+        <p class="small muted">${lig ? 'Valor e data vêm do adiantamento no financeiro. Aqui você registra quanto da mercadoria o intermediário abateu com este repasse e a que taxa.' : 'Use para um pagamento que o intermediário ou a empresa informou e que ainda não tem data ou comprovante. Não mexe no caixa: quando o adiantamento for lançado no financeiro, exclua este e vincule o lançamento.'}</p>`,
+      foot: `${r ? '<button class="btn ghost" id="im-xrp" style="margin-right:auto">' + (lig ? 'Desvincular' : 'Excluir') + '</button>' : ''}<button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="im-srp">Salvar</button>`,
+      onMount: (m, close) => { const f = $('#im-frp', m);
+        $('#im-xrp', m) && ($('#im-xrp', m).onclick = async () => { try { await q(sb.from('imp_repasses').delete().eq('id', r.id)); close(); toast(lig ? 'Repasse desvinculado: o adiantamento continua no financeiro.' : 'Excluído.'); re(); } catch (err) { fail(err); } });
+        $('#im-srp', m).onclick = async () => { const row = { valor_moeda: pn(f.valor_moeda.value) || null, taxa: pn(f.taxa.value) || null, observacao: f.observacao.value.trim() || null };
+          if (!lig) { row.valor = pn(f.valor.value); row.data = f.data.value || null; if (!(row.valor > 0)) return toast('Informe o valor.', true); }
+          try { if (r) await q(sb.from('imp_repasses').update(row).eq('id', r.id)); else await q(sb.from('imp_repasses').insert({ ...row, empresa_id: e, processo_id: p.id })); close(); toast('Repasse salvo.'); re(); } catch (err) { fail(err); } }; } });
   }
   function despesa(p, d0, I) {
     const n = d0 || { categoria: 'frete_internacional', vencimento: hoje, compoe_custo: true };

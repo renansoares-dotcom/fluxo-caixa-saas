@@ -2503,5 +2503,17 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
   DB.imp_eventos = [['negociacao', -82], ['pedido', -75], ['producao', -68], ['embarcado', -47], ['chegada', -19], ['registro', -12], ['desembaracado', -3]].map(([etapa, d], i) => ({ id: 'ie' + i, empresa_id: E, processo_id: 'imp2', etapa, data: dd(d), texto: null, em: dd(d) + 'T14:20:00Z' }));
   DB.imp_anexos = [['proforma', 'PF-2202.pdf'], ['invoice', 'INV-55102.pdf'], ['packing', 'Packing list INV-55102.pdf'], ['conhecimento', 'BL HLCUHOU2609981.pdf'], ['declaracao', 'Extrato DI 26-1840377-2.pdf'], ['cambio', 'Contrato CC-2609-0098.pdf']]
     .map(([tipo, nome], i) => ({ id: 'ia' + i, empresa_id: E, processo_id: 'imp2', tipo, nome, caminho: `${E}/imp2/${nome}`, tamanho: 180000, em: dd(-70 + i * 10) + 'T10:00:00Z' }));
+  // importação por meio de terceiro (SQL 159): o intermediário importa e a empresa repassa reais
+  const INT = fv('fvx6', 'RESINAS DO NORTE EXEMPLO LTDA');
+  for (const x of DB.imp_processos) { x.modalidade = 'direta'; x.intermediario_id = null; x.total_informado_brl = null; }
+  DB.imp_processos.unshift(P(7, 'embarcado', X1, 'PO-7830', { modalidade: 'terceiro', intermediario_id: INT, total_informado_brl: 700000, incoterm: 'CFR', taxa_prevista: 5.6, local_destino: 'Manaus', data_pedido: dd(-55), data_embarque: dd(-30),
+    chegada_prevista: dd(9), conhecimento: 'HLCUHOU2610555', navio: 'MV AMAZONAS EXEMPLO', despachante_id: null, agente_id: null, observacao: 'Nota fiscal de entrada será emitida pelo intermediário.' }));
+  DB.imp_itens.push(I('ii7a', 7, 'MP-003', 'RESINA PEBDL FILME', '39014000', 40000, 1.2, { ordem: 1 }), I('ii7b', 7, 'MP-004', 'RESINA PEBD COM ADITIVOS', '39011030', 60000, 1.5, { ordem: 2 }));
+  DB.imp_repasses = [
+    { id: 'ir1', empresa_id: E, processo_id: 'imp7', credito_id: 'cr-imp1', lancamento_id: 'l-imp1', data: dd(-52), valor: 150000, valor_moeda: 30000, taxa: 5, confirmado: true, observacao: 'antecipação de 20% ao exportador', criado_em: dd(-52) },
+    { id: 'ir2', empresa_id: E, processo_id: 'imp7', credito_id: 'cr-imp2', lancamento_id: 'l-imp2', data: dd(-1), valor: 180000, valor_moeda: null, taxa: null, confirmado: true, observacao: null, criado_em: dd(-1) },
+    { id: 'ir3', empresa_id: E, processo_id: 'imp7', credito_id: null, lancamento_id: null, data: null, valor: 50000, valor_moeda: null, taxa: null, confirmado: false, observacao: 'informado pelo intermediário; falta o comprovante', criado_em: dd(0) },
+  ];
+  window.RPC.imp_adiantamentos_livres = () => [{ id: 'cr-imp3', data: dd(0), valor: 90000, descricao: 'ADIANTAMENTO FORNECEDOR: RESINAS DO NORTE EXEMPLO LTDA', conta: DB.contas[0]?.nome || 'BANCO EXEMPLO', pago: true }];
   window.RPC.imp_pode = () => true; window.RPC.imp_receber = () => ({ movimentos: 2, registrados: 0, faltam: 0 }); window.RPC.imp_ptax_gravar = () => 0;
 }

@@ -344,4 +344,5 @@ export const FIGS = [
   ['importacao', 'compras/importacao', '## 7.', 'Despesas e impostos da nacionalização, com o que entra e o que fica fora do custo', 'click:.im-card[data-p="imp2"]|click:[data-paba="despesas"]'],
   ['importacao', 'compras/importacao', '## 8.', 'Custo estimado e custo final por item', 'click:.im-card[data-p="imp2"]|click:[data-paba="custo"]'],
   ['importacao', 'compras/importacao', '## 9.', 'Recebimento: quantidade, lote e o custo que vai para o estoque', 'click:.im-card[data-p="imp2"]|click:#im-rec'],
+  ['importacao', 'compras/importacao', '### 6.3', 'Importação por meio de terceiro: repasses ao intermediário contra o total informado', 'click:.im-card[data-p="imp7"]|click:[data-paba="cambio"]'],
 ];

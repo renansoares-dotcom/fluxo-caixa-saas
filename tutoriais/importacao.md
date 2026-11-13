@@ -1,7 +1,7 @@
 ---
 titulo: Importação de matéria-prima — do pedido ao estoque
 tela: Compras › Importação (CMP005)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-13
 ---
 ## 1. Para que serve
@@ -112,9 +112,32 @@ A aba **Câmbio** da tela soma todos os processos:
 
 Em **Cotações**, o botão **Buscar no Banco Central** grava a PTAX do dólar e do euro. As outras moedas são digitadas.
 
+### 6.3 Importação por meio de terceiro: repasses
+
+![Figura 6 — Importação por meio de terceiro: repasses ao intermediário contra o total informado (dados fictícios)](img/importacao-9.jpg)
+
+Use quando **outra empresa faz a importação** (um parceiro, uma trading ou um industrializador): ela fecha o câmbio, paga o exportador e os tributos, e a sua empresa **repassa reais** a ela. Nesse caso não há câmbio próprio para controlar; o que importa é quanto já foi repassado e quanto falta.
+
+1. Ao abrir o processo, escolha **Quem importa: Por meio de terceiro**, o **Intermediário (importador)** e, se ele já informou, o **Total informado por ele (R$)**. O exportador, a proforma e os itens são preenchidos normalmente.
+2. No processo, a aba **Câmbio** dá lugar à aba **Repasses**.
+3. **Vincular adiantamentos do financeiro**: a tela lista os adiantamentos a esse fornecedor que já estão em Financeiro › Créditos e adiantamentos e ainda não pertencem a nenhum processo. Marque os desta importação. Nada é lançado de novo no caixa.
+4. **+ Valor informado a confirmar**: guarda um pagamento que alguém informou e que ainda não tem data ou comprovante. Não mexe no caixa. Quando o adiantamento for lançado no financeiro, exclua este registro e vincule o lançamento.
+5. Em cada repasse, **Editar** permite anotar quanto da mercadoria o intermediário abateu com aquele valor (na moeda do processo) e a taxa que ele informou.
+
+| Indicador | O que mostra |
+|---|---|
+| Total informado pelo intermediário | O valor total da operação que ele passou, em reais |
+| Repassado | Tudo o que está na lista, pago ou não |
+| Com lançamento pago | Repasses com adiantamento pago no financeiro |
+| A confirmar | Valores informados sem lançamento, ou com lançamento ainda em aberto |
+| Saldo a repassar | Total informado menos o repassado |
+| Mercadoria ainda não abatida | Valor dos itens menos o que o intermediário diz ter abatido, na moeda do processo |
+
+Quando a nota fiscal do intermediário chegar, ela abate os adiantamentos em **Notas Fiscais › Pagamentos × Notas**, como em qualquer compra com pagamento antecipado.
+
 ## 7. Despesas e impostos
 
-![Figura 6 — Despesas e impostos da nacionalização, com o que entra e o que fica fora do custo (dados fictícios)](img/importacao-6.jpg)
+![Figura 7 — Despesas e impostos da nacionalização, com o que entra e o que fica fora do custo (dados fictícios)](img/importacao-6.jpg)
 
 1. **Lançar os impostos da declaração**: digite de uma vez II, IPI, PIS, COFINS, ICMS, Siscomex e AFRMM, pelo extrato da declaração.
 2. **+ Lançar despesa**: frete internacional, seguro, capatazia, armazenagem, despachante, frete interno, demurrage, despesa bancária e outras. Se a despesa nasceu em moeda estrangeira, informe o valor e a taxa: a tela converte.
@@ -124,7 +147,7 @@ Em **Cotações**, o botão **Buscar no Banco Central** grava a PTAX do dólar e
 
 ## 8. Custo
 
-![Figura 7 — Custo estimado e custo final por item (dados fictícios)](img/importacao-7.jpg)
+![Figura 8 — Custo estimado e custo final por item (dados fictícios)](img/importacao-7.jpg)
 
 A aba **Custo** tem dois cálculos.
 
@@ -150,7 +173,7 @@ A base do ICMS na importação muda de estado para estado e conforme benefícios
 
 ## 9. Receber no estoque
 
-![Figura 8 — Recebimento: quantidade, lote e o custo que vai para o estoque (dados fictícios)](img/importacao-8.jpg)
+![Figura 9 — Recebimento: quantidade, lote e o custo que vai para o estoque (dados fictícios)](img/importacao-8.jpg)
 
 Com o processo desembaraçado:
 
@@ -174,6 +197,10 @@ Depois de liquidar o câmbio e pagar as despesas, **Avançar: Encerrado** fecha 
 - Processo com pagamento ou recebimento não é excluído, só cancelado.
 - Título já baixado direto no financeiro não é alterado pela tela.
 - A Central de Decisões (regra 29) mostra câmbio vencido ou a vencer sem contrato, chegada atrasada, contêiner a devolver, embarque não confirmado e carga parada no porto há mais de 5 dias.
+- Processo por meio de terceiro exige o intermediário e não aceita pagamento de câmbio; importação direta não aceita repasse.
+- Um adiantamento só pode estar em um processo. Só entram adiantamentos do intermediário do processo.
+- Com repasse lançado, a modalidade e o intermediário do processo não mudam: exclua os repasses antes.
+- Desvincular um repasse não apaga o adiantamento do financeiro.
 - Tudo fica na Auditoria.
 
 ## 11. Perguntas frequentes e erros comuns
@@ -194,10 +221,15 @@ Depois de liquidar o câmbio e pagar as despesas, **Avançar: Encerrado** fecha 
 
 **O Banco Central não devolveu a cotação.** Em feriado ou antes do fechamento do dia não há PTAX nova. Digite a cotação na mesma janela.
 
+**"Nenhum adiantamento livre para este fornecedor".** O pagamento ainda não foi lançado como adiantamento a esse fornecedor, ou já está em outro processo. Lance em Créditos e adiantamentos (ou em Pagamentos Antecipados) e volte.
+
+**O total informado não bate com a proforma.** O total em reais inclui câmbio, tributos e despesas do intermediário. Peça a ele a memória de cálculo e compare a "Mercadoria ainda não abatida" com o saldo em moeda que ele informa.
+
 **Preço CIF ou CFR.** O frete (e o seguro, no CIF) já está no preço do exportador: não lance de novo como despesa.
 
 ## 12. Histórico de alterações
 
 | Versão | Data | O que mudou |
 |---|---|---|
+| 1.1 | 13/11/2026 | Importação por meio de terceiro: intermediário, total informado e aba Repasses, ligada aos adiantamentos a fornecedor do financeiro. |
 | 1.0 | 13/11/2026 | Primeira versão: processo com etapas, itens, câmbio com títulos no financeiro e exposição cambial, despesas e impostos, custo estimado e final, documentos, recebimento com entrada no estoque, parâmetros e alertas. |

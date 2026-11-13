@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { estimar, custoFinal, coberturaCambio, exposicao, alertas, lerSgs, proximaEtapa, faltaParaEtapa, freteNoPreco, seguroNoPreco, numeroProcesso, CATEGORIAS, ETAPAS } from '../js/lib/importacao.js';
+import { estimar, custoFinal, coberturaCambio, exposicao, alertas, lerSgs, proximaEtapa, faltaParaEtapa, freteNoPreco, seguroNoPreco, numeroProcesso, CATEGORIAS, ETAPAS, MODALIDADES, resumoRepasses } from '../js/lib/importacao.js';
 
 const itens = [{ id: 'a', descricao: 'RESINA PEBD', unidade: 'KG', quantidade: 20000, valor_unitario: 1.2, aliq_ii: 12.6, aliq_ipi: 0, aliq_pis: 2.1, aliq_cofins: 9.65, aliq_icms: 18 },
   { id: 'b', descricao: 'MASTERBATCH', unidade: 'KG', quantidade: 5000, valor_unitario: 2, aliq_ii: 12.6, aliq_ipi: 5, aliq_pis: 2.1, aliq_cofins: 9.65, aliq_icms: 18 }];
@@ -62,4 +62,15 @@ test('cotações do Banco Central, etapas e conferências', () => {
   assert.equal(faltaParaEtapa({}, itens, 'registro').length, 2); assert.equal(faltaParaEtapa({ declaracao: '1', taxa_di: 5 }, itens, 'registro').length, 0);
   assert.equal(faltaParaEtapa({}, [], 'pedido').length, 1); assert.equal(faltaParaEtapa({}, [{ quantidade: 10, qtd_recebida: 4 }], 'encerrado').length, 1);
   assert.ok(Object.values(CATEGORIAS).every(c => c.length === 3)); assert.equal(CATEGORIAS.icms[2], false);
+});
+
+test('importação por meio de terceiro: repasses contra o total informado e a mercadoria em moeda', () => {
+  const it = [{ id: 'a', unidade: 'KG', quantidade: 40000, valor_unitario: 1.2 }, { id: 'b', unidade: 'KG', quantidade: 60000, valor_unitario: 1.5 }];
+  const reps = [{ valor: 150000, valor_moeda: 30000, confirmado: true, data: '2026-09-22' }, { valor: 180000, confirmado: true, data: '2026-11-13' }, { valor: 50000, confirmado: false, data: null }];
+  const r = resumoRepasses({ total_informado_brl: 700000 }, reps, it);
+  assert.equal(r.repassado, 380000); assert.equal(r.confirmado, 330000); assert.equal(r.a_confirmar, 50000); assert.equal(r.sem_data, 1);
+  assert.equal(r.saldo, 320000); assert.ok(Math.abs(r.pct - 54.2857) < 1e-3);
+  assert.equal(r.fob_moeda, 138000); assert.equal(r.abatido_moeda, 30000); assert.equal(r.saldo_moeda, 108000); assert.equal(r.taxa_media, 5);
+  const s = resumoRepasses({}, [], it); assert.equal(s.informado, null); assert.equal(s.saldo, null); assert.equal(s.pct, null); assert.equal(s.taxa_media, null);
+  assert.deepEqual(Object.keys(MODALIDADES), ['direta', 'terceiro']);
 });
