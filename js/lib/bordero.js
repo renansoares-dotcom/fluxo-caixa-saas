@@ -65,7 +65,10 @@ export function parseBordero(t, fundo, arquivo = '') {
   let T = [];
   const F = fundo.toUpperCase();
   if (F.startsWith('FS')) {
+    // número = Termo Aditivo; a partir do contrato 000002 (21/10/2026) a FS numera termo/contrato: 000008/000002 (contrato 000001 fica só o termo, como na base)
     o.bordero = g(/Termo Aditivo n\.º\s*(\d+)/, t, null, str);
+    const contrato = g(/Termo Aditivo n\.º\s*\d+ ao contrato[^\n]*?n\.º\s*(\d+)/, t, null, str);
+    if (o.bordero && contrato && +contrato > 1) o.bordero += '/' + contrato;
     o.data = g(/Operação[^\n]*?(\d\d\/\d\d\/\d{4})/, t, null, str) || g(/CREDITO REF\. OPERAÇÃO \S+ (\d\d\/\d\d\/\d{4})/, t, null, str);
     o.valor_face = g(/\(\+\) Face\s+R\$\s+([\d.,]+)/, t);
     o.desagio = g(/\(-\) Diferencial\s+R\$\s+([\d.,]+)/, t);

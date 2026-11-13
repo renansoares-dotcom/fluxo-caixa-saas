@@ -430,10 +430,13 @@ function abaPropostas(c, root) {
         <div class="kpi"><div class="k-label">Valor de face</div><div class="k-value">${money0(S('valor_face'))}</div><div class="k-sub">${S('qtd_titulos')} títulos</div></div>
         <div class="kpi"><div class="k-label">Custo</div><div class="k-value">${money0(S('custo_total'))}</div><div class="k-sub">${S('valor_face') ? pct(S('custo_total') / S('valor_face'), 2) : '—'} da face</div></div>
         <div class="kpi"><div class="k-label">Líquido</div><div class="k-value">${money0(S('liquido'))}</div><div class="k-sub">${S('recompras') ? `recompras ${money0(S('recompras'))}` : '&nbsp;'}</div></div></div></div>
-    <div class="card flush"><div class="card-head"><h2>Propostas de borderô</h2><span class="muted small">Clique para ver os títulos, as notas e os recebimentos${ehDiretor() ? ' e aprovar' : ''}. Borderôs que vieram da base FIDC têm a marca <span class="badge">base FIDC</span>.</span></div>
+    <div class="card flush"><div class="card-head"><h2>Propostas de borderô</h2><span class="muted small">Clique para ver os títulos, as notas e os recebimentos${ehDiretor() ? ' e aprovar' : ''}. Borderôs que vieram da base FIDC têm a marca <span class="badge">base FIDC</span>; os montados aqui e conferidos com o arquivo do fundo, <span class="badge pago">conferido</span>.</span></div>
     <div class="table-wrap" style="max-height:62vh">${L.length ? `<table id="tprop"><thead><tr><th>Nº</th><th>Status</th><th>Fundo</th><th>Borderô</th><th>Data op.</th><th class="num">Títulos</th><th class="num">Face</th><th class="num">Custo</th><th class="num">Líquido</th><th class="num">Taxa a.m.</th><th class="num">Prazo</th></tr></thead><tbody>
       ${L.map(p => `<tr class="clickable" data-id="${p.id}"><td>${p.numero}</td><td><span class="badge ${STATUS_CLS[p.status]}">${p.status}</span></td><td>${esc(fuById[p.fundo_id]?.nome || '')}</td>
-        <td>${p.origem === 'base_fidc' ? `${esc(bord(p))} <span class="badge">base FIDC</span>` : p.comparativo ? `<span class="badge ${p.comparativo.recusados || p.comparativo.extras || p.comparativo.divergentes ? 'aberto' : 'pago'}">nº ${esc(bord(p))}</span>` : p.status === 'Aprovada' ? '<span class="muted small">a comparar</span>' : ''}</td>
+        <td>${p.origem === 'base_fidc' ? `${esc(bord(p))} <span class="badge">base FIDC</span>`
+          : p.comparativo ? `${esc(bord(p))} <span class="badge ${p.comparativo.recusados || p.comparativo.extras || p.comparativo.divergentes ? 'aberto' : 'pago'}" title="${p.comparativo.recusados || p.comparativo.extras || p.comparativo.divergentes ? 'Conferido com o borderô do fundo: há diferenças' : 'Conferido com o borderô do fundo, sem diferença'}">conferido</span>`
+          : p.analise?.espelho?.bordero ? `${esc(p.analise.espelho.bordero)} <span class="badge pago" title="Valores ajustados ao borderô do fundo">ajustado</span>`
+          : p.status === 'Aprovada' ? '<span class="muted small">a comparar</span>' : ''}</td>
         <td>${dateBR(p.data_operacao)}</td><td class="num">${p.qtd_titulos}</td><td class="num">${money0(p.valor_face)}</td><td class="num">${money0(p.custo_total)}</td><td class="num">${money0(p.liquido)}</td><td class="num">${pct(p.taxa_am / 100, 2)}</td><td class="num">${num1(p.prazo_medio)} d</td></tr>`).join('')}
       <tr style="font-weight:600"><td colspan="5">Total</td><td class="num">${S('qtd_titulos')}</td><td class="num">${money0(S('valor_face'))}</td><td class="num">${money0(S('custo_total'))}</td><td class="num">${money0(S('liquido'))}</td><td colspan="2"></td></tr></tbody></table>` : '<div class="empty">Nenhuma proposta com esses filtros.</div>'}</div></div>`;
   $('#pf', c).onchange = (e) => { if (e.target.name && e.target.name !== 'busca') { f[e.target.name] = e.target.value; abaPropostas(c, root); } };
@@ -641,7 +644,7 @@ async function compararBordero(p, fu, itens, root) {
   cands = cands.filter(o => !/^P\d+$/.test(o.bordero)); // as operações P<nº> são as próprias propostas aprovadas
   const m = modal({
     title: `Comparar proposta nº ${p.numero} com o borderô original`, wide: true,
-    body: `<p class="small muted" style="margin-top:0">Escolha o borderô do ${esc(fu.nome)} já registrado na base FIDC, ou leia o arquivo enviado pelo fundo (.htm ou .pdf). O registro oficial continua sendo a proposta aprovada (operação P${p.numero} na base FIDC); o borderô serve só de conferência e não é gravado na base.</p>
+    body: `<p class="small muted" style="margin-top:0">Escolha o borderô do ${esc(fu.nome)} já registrado na base FIDC, ou leia o arquivo enviado pelo fundo (.htm ou .pdf). O registro oficial continua sendo a proposta aprovada; o borderô serve de conferência e dá o número da operação na base FIDC.</p>
       ${cands.length ? `<div class="table-wrap"><table><thead><tr><th></th><th>Data</th><th>Borderô</th><th class="num">Títulos</th><th class="num">Face</th><th class="num">Líquido</th></tr></thead><tbody>
         ${cands.map(o => `<tr><td><input type="radio" name="op" value="${o.id}" ${p.operacao_id === o.id ? 'checked' : ''}></td><td>${dateBR(o.data)}</td><td>${esc(o.bordero)}</td><td class="num">${o.qtd_titulos}</td><td class="num">${money0(o.valor_face)}</td><td class="num">${money0(o.liquido)}</td></tr>`).join('')}</tbody></table></div>`
         : '<p class="small">Nenhum borderô desse fundo na base FIDC perto da data da operação.</p>'}
@@ -684,6 +687,15 @@ async function compararBordero(p, fu, itens, root) {
         prop: { n: itens.length, face: +p.valor_face, desagio: +p.desagio, outros: +p.ad_valorem + +p.tarifas + +p.iof, custo: +p.custo_total, recompra: +p.recompras, liquido: +p.liquido, taxa: +p.taxa_am / 100 },
         real: { n: tits.length, face: +op.valor_face, desagio: (+op.desagio || 0) + (+op.encargos || 0), outros: (+op.ad_valorem || 0) + (+op.tarifas || 0) + (+op.iof || 0), custo: custoReal, recompra: +op.recompra || 0, liquido: +op.liquido, taxa: taxaReal } };
       await q(sb.from('fidc_propostas').update({ comparativo: cp }).eq('id', p.id));
+      // proposta já aprovada com a operação P<nº> na base: a operação passa a levar o número do borderô do fundo (sem duplicar)
+      if (cp.bordero && p.operacao_id && !lido?.erro) {
+        const [opP] = await q(sb.from('fidc_operacoes').select('id,bordero').eq('id', p.operacao_id));
+        const outra = await q(sb.from('fidc_operacoes').select('id').eq('empresa_id', state.empresa.id).eq('fundo', fu.nome).eq('bordero', cp.bordero).neq('id', p.operacao_id));
+        if (opP && opP.bordero === 'P' + p.numero && !outra.length) {
+          await q(sb.from('fidc_operacoes').update({ bordero: cp.bordero }).eq('id', opP.id));
+          await q(sb.from('fidc_titulos').update({ bordero: cp.bordero }).eq('operacao_id', opP.id));
+        }
+      }
       for (const i of itens) await q(sb.from('fidc_proposta_itens').update({ situacao_bordero: sit[i.id] }).eq('id', i.id));
       toast('Comparação registrada'); m.close(); await carregar();
       detalhe(propostas.find(x => x.id === p.id), root);

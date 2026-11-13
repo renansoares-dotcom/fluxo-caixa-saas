@@ -1,8 +1,8 @@
 ---
 titulo: FIDC — propostas de borderô e análise
 tela: Financeiro › Análise FIDC (FIN017) e Propostas de Borderô (FIN018)
-versao: 1.5
-atualizado: 2026-11-08
+versao: 1.6
+atualizado: 2026-11-13
 ---
 ## 1. Para que serve
 
@@ -68,11 +68,26 @@ Na aba **Propostas**, filtre por status, fundo e mês. Ao abrir uma proposta:
 
 Quando o diretor aprova, a operação é registrada na base FIDC e os títulos passam a **Pago na conta do fundo**. Proposta rejeitada volta com o motivo e pode ser editada e enviada de novo.
 
+A operação entra na base com o **número do borderô do fundo** quando a proposta foi ajustada ou comparada ao borderô. Sem o borderô do fundo, ela entra como **P** mais o número da proposta (ex.: P412).
+
+> Na FS, o número do borderô é o do termo aditivo seguido do contrato: **000008/000002** é o termo 8 do contrato 2, vigente desde 21/10/2026. Os borderôs do contrato 1 ficam só com o termo (ex.: 001226).
+
 ### 3.5 Comparar com o borderô original
 
 Na proposta aprovada, clique em **Comparar com borderô original**. Escolha o borderô do fundo já registrado na base FIDC, ou leia o arquivo enviado pelo fundo (.htm ou .pdf).
 
-A tela mostra a proposta e o borderô lado a lado: os títulos aceitos, os da proposta que ficaram fora e os que vieram no borderô sem estar na proposta. O borderô serve só de conferência: o registro oficial continua sendo a proposta aprovada.
+A tela mostra a proposta e o borderô lado a lado: os títulos aceitos, os da proposta que ficaram fora e os que vieram no borderô sem estar na proposta. O registro oficial continua sendo a proposta aprovada.
+
+Se a operação dessa proposta ainda estiver como **P** mais o número, ela passa a levar o número do borderô do fundo, junto com os títulos.
+
+Na lista de propostas, a coluna **Borderô** mostra sempre o número do fundo, com uma marca:
+
+| Marca | Quer dizer |
+|---|---|
+| base FIDC | O borderô foi registrado primeiro na base FIDC e a proposta veio dele. |
+| conferido (verde) | Proposta montada aqui e comparada com o arquivo do fundo, sem diferença. |
+| conferido (laranja) | Comparada com o arquivo do fundo, com diferenças: abra a proposta para ver. |
+| ajustado | Valores ajustados ao borderô do fundo antes da aprovação. |
 
 ### 3.6 Condições dos fundos
 
@@ -175,3 +190,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.3 | 31/10/2026 | Nova figura: análise fidc: custo e prazo por fundo. |
 | 1.4 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Títulos disponíveis com a emissão e a NF / parcela na 2ª linha. Figuras refeitas. |
 | 1.5 | 08/11/2026 | Melhor divisão do lote entre os fundos com limite livre, prazo aceito e junção de borderôs (Montar). Aba Comparador de fundos: custo efetivo realizado, CET, × CDI, série mensal, curva por prazo, tabela de preço atual e parâmetros. |
+| 1.6 | 13/11/2026 | Número do borderô no padrão do fundo (FS: termo/contrato) na lista, na comparação e na operação aprovada; marcas base FIDC, conferido e ajustado. |
