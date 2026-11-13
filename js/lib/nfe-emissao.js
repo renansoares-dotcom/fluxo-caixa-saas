@@ -162,7 +162,7 @@ export function dadosDanfe(nota, emit, cfg = {}) {
     transp: { mod: String(t.modalidade ?? 9), nome: t.nome || '', doc: so(t.documento), ie: so(t.ie), ender: t.endereco || '', mun: t.municipio || '', uf: t.uf || '', placa: t.placa || '', placa_uf: t.placa_uf || '', qvol: t.volumes ? String(t.volumes) : '', esp: t.especie || '', marca: t.marca || '', nvol: t.numeracao || '', pesoL: n(t.peso_liquido) || null, pesoB: n(t.peso_bruto) || null },
     infCpl: nota.info_complementar || '', infFisco: nota.info_fisco || '',
     itens: C.itens.map(i => ({ cod: i.codigo, desc: i.descricao, ncm: so(i.ncm), cst: String(i.icms_origem ?? '0') + String(i.icms_cst || ''), cfop: String(i.cfop || ''), un: i.unidade, qtd: n(i.quantidade), vun: n(i.valor_unitario), vtot: i.valor_bruto,
-      bc: i.icms_base, vicms: i.icms_valor, picms: i.icms_base ? n(i.icms_aliquota) : 0, vipi: i.ipi_valor, pipi: i.ipi_base ? n(i.ipi_aliquota) : 0, info: i.info || '',
+      bc: i.icms_base, vicms: i.icms_valor, picms: i.icms_base ? n(i.icms_aliquota) : 0, bcipi: i.ipi_base || null, vipi: i.ipi_valor, pipi: i.ipi_base ? n(i.ipi_aliquota) : 0, info: i.info || '',
       rtc: String(i.ibs_cbs_cst || '').trim() ? { classTrib: so(i.ibs_cbs_classificacao), cst: i.ibs_cbs_cst, bc: i.ibs_cbs_base, pIBSUF: n(i.ibs_uf_aliquota), vIBSUF: i.ibs_uf_valor, pIBSMun: n(i.ibs_mun_aliquota), vIBSMun: i.ibs_mun_valor, pCBS: n(i.cbs_aliquota), vCBS: i.cbs_valor, bcIS: null, pIS: null, vIS: null } : null })),
   };
 }

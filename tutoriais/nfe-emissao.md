@@ -1,7 +1,7 @@
 ---
 titulo: Emissão de NF-e pela Focus NFe e o novo DANFE
 tela: CPD › Emissão de NF-e (FIS005)
-versao: 1.1
+versao: 1.2
 atualizado: 2026-11-13
 ---
 ## 1. Para que serve
@@ -148,16 +148,18 @@ O que mudou em relação ao DANFE anterior:
 | Itens | Um item por linha, com as colunas **Bases de cálculo**, **Alíquotas** e **Valor dos tributos**, onde ICMS, IPI, IBS UF, IBS Município, CBS e IS aparecem empilhados; a **classificação tributária (cClassTrib)** fica junto do código e do NCM |
 | Dados adicionais | Espaço reservado ao **QR Code**, à direita |
 
-Regras seguidas:
+Regras seguidas (itens 4.3 a 4.5 da nota técnica):
 
 - só é impresso o que existe no XML; nada é calculado ou suposto na impressão;
-- campos condicionais (FCP, ICMS da UF de destino, ICMS desonerado e monofásico, IBS e CBS monofásicos, cálculo do ISSQN) aparecem só quando a nota tem esses valores;
-- quando há redução de alíquota, aparece a alíquota efetiva;
+- campos e quadros condicionais aparecem só quando a nota tem a informação: FCP, FCP retido por ST, DIFAL e FCP na UF de destino, ICMS monofásico, IBS e CBS monofásicos, cálculo do ISSQN, fatura/duplicatas e QR Code;
+- quando há redução de alíquota ou compra governamental, aparece a alíquota efetiva do IBS UF, do IBS Município e da CBS;
+- o "Tipo de regime de apuração do IBS e da CBS" fica sem conteúdo, como a nota técnica determina, até a definição da origem da informação;
+- o QR Code é impresso quando o XML traz o campo `qrCode`; a nota técnica que vai regular o seu uso no DANFE retrato ainda será publicada, então por enquanto o quadro sai vazio;
 - nota sem o grupo da Reforma sai com o bloco do IBS/CBS/IS em branco e traço nos tributos novos de cada item.
 
 O mesmo gerador é usado no Portal do Cliente e nas notas recebidas, que passam a sair no leiaute novo.
 
-O desenho segue o modelo de referência da nota técnica: os mesmos quadros, na mesma ordem. A nota técnica não fixa medidas, e os rótulos dos campos condicionais do ICMS foram reproduzidos a partir de uma imagem do modelo, então a redação de algum rótulo pode diferir em detalhe. O espaço do QR Code fica vazio: o conteúdo dele depende de nota técnica futura.
+O desenho e os rótulos seguem o modelo de referência principal da NT 2026.010 (retrato). A nota técnica traz também um modelo alternativo em paisagem, com os mesmos campos, que a plataforma não gera. No modelo, o azul com borda tracejada só identifica o que é condicional; não é impresso.
 
 ## 8. Regras e travas
 
@@ -195,3 +197,4 @@ O desenho segue o modelo de referência da nota técnica: os mesmos quadros, na 
 |---|---|---|
 | 1.0 | 12/11/2026 | Primeira versão: implantação do ambiente da Focus NFe, parâmetros, naturezas de operação, nota avulsa com impostos calculados, prévia, emissão, consulta, cancelamento, carta de correção, e-mail, inutilização e DANFE no leiaute da NT 2026.010. |
 | 1.1 | 13/11/2026 | DANFE redesenhado conforme o modelo de referência da NT 2026.010: linha do regime tributário, três blocos de totais, itens com bases, alíquotas e valores empilhados, campos condicionais e espaço do QR Code. |
+| 1.2 | 13/11/2026 | DANFE conferido com o texto da NT 2026.010: rótulos iguais aos do modelo de referência, duplicatas em três por linha, base do IPI no item, ICMS monofásico pela quantidade, QR Code impresso quando o XML traz o campo. |
