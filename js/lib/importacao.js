@@ -35,7 +35,8 @@ export const SGS = { USD: { venda: 1, compra: 10813 }, EUR: { venda: 21619, comp
 export const CATEGORIAS = {
   frete_internacional: ['Frete internacional', 'Logística', true], seguro: ['Seguro internacional', 'Logística', true],
   ii: ['Imposto de Importação (II)', 'Impostos', true], ipi: ['IPI', 'Impostos', false], pis: ['PIS-Importação', 'Impostos', false], cofins: ['COFINS-Importação', 'Impostos', false],
-  icms: ['ICMS', 'Impostos', false], siscomex: ['Taxa Siscomex', 'Impostos', true], afrmm: ['AFRMM (marinha mercante)', 'Impostos', true],
+  icms: ['ICMS', 'Impostos', false], antidumping: ['Direito antidumping', 'Impostos', true], siscomex: ['Taxa Siscomex', 'Impostos', true], afrmm: ['AFRMM (marinha mercante)', 'Impostos', true],
+  suframa: ['Taxa Suframa', 'Impostos', true], taxa_bl: ['Taxas do conhecimento (BL)', 'Porto', true],
   capatazia: ['Capatazia / THC', 'Porto', true], armazenagem: ['Armazenagem', 'Porto', true], demurrage: ['Demurrage (atraso do contêiner)', 'Porto', false],
   despachante: ['Despachante aduaneiro', 'Serviços', true], frete_interno: ['Frete do porto à fábrica', 'Logística', true],
   bancaria: ['Despesa bancária do câmbio', 'Financeiro', false], multa: ['Multa', 'Financeiro', false], outras: ['Outras despesas', 'Outras', true],
@@ -43,6 +44,8 @@ export const CATEGORIAS = {
 export const DOCS = { proforma: 'Proforma', invoice: 'Fatura comercial (invoice)', packing: 'Romaneio (packing list)', conhecimento: 'Conhecimento de embarque (BL / AWB / CRT)', origem: 'Certificado de origem',
   declaracao: 'Declaração de importação (DI / DUIMP)', comprovante: 'Comprovante de importação', cambio: 'Contrato de câmbio', nota: 'Nota fiscal de entrada', laudo: 'Laudo / certificado de análise', outro: 'Outro' };
 export const CAMBIO_TIPO = { adiantamento: 'Adiantamento', parcela: 'Parcela', saldo: 'Saldo' };
+// quem importa: a própria empresa (fecha o câmbio e paga o exportador) ou um intermediário que recebe repasses em reais
+export const MODALIDADES = { direta: 'Importação direta', terceiro: 'Por meio de terceiro' };
 export const CAMBIO_STATUS = { previsto: ['Previsto', 'muted'], contratado: ['Contratado', 'warn'], liquidado: ['Liquidado', 'pos'] };
 
 const n = (v) => +v || 0, r2 = (v) => Math.round((v + Number.EPSILON) * 100) / 100, r6 = (v) => Math.round(v * 1e6) / 1e6;
@@ -109,6 +112,26 @@ export function coberturaCambio(itens, cambios) {
   const fob = r2(fobTotal(itens)), por = (s) => r2(cambios.filter(c => c.status === s).reduce((a, c) => a + n(c.valor_moeda), 0));
   const previsto = por('previsto'), contratado = por('contratado'), liquidado = por('liquidado');
   return { fob, previsto, contratado, liquidado, programado: r2(previsto + contratado + liquidado), sem_programar: r2(fob - previsto - contratado - liquidado) };
+}
+
+/**
+ * Importação por meio de terceiro: o que já foi repassado ao intermediário contra o total que ele informou.
+ * repasses com { valor, valor_moeda, confirmado, data }; "confirmado" é o que tem lançamento pago no financeiro.
+ * Em moeda: quanto da mercadoria o intermediário diz já ter abatido e o que ainda falta, pelo valor dos itens.
+ * Conferência do total informado: o que já foi pago da mercadoria (repasses com o abatido em moeda, pelo valor em reais deles)
+ * + o saldo da mercadoria em moeda pela taxa do processo + as despesas lançadas = apurado; a diferença é o que o intermediário precisa justificar.
+ */
+export function resumoRepasses(proc, repasses = [], itens = [], despesas = []) {
+  const soma = (L, k = 'valor') => r2(L.reduce((s, x) => s + n(x[k]), 0));
+  const conf = repasses.filter(x => x.confirmado), pend = repasses.filter(x => !x.confirmado);
+  const informado = proc.total_informado_brl == null || proc.total_informado_brl === '' ? null : n(proc.total_informado_brl);
+  const repassado = soma(repasses), fob = r2(fobTotal(itens)), abatido = soma(repasses, 'valor_moeda');
+  const comMoeda = repasses.filter(x => n(x.valor_moeda) > 0), brlComMoeda = soma(comMoeda);
+  return { informado, repassado, confirmado: soma(conf), a_confirmar: soma(pend), sem_data: pend.filter(x => !x.data).length,
+    saldo: informado == null ? null : r2(informado - repassado), pct: informado ? Math.min(100, repassado / informado * 100) : null,
+    fob_moeda: fob, abatido_moeda: abatido, saldo_moeda: r2(fob - abatido), taxa_media: abatido > 0 ? r6(brlComMoeda / abatido) : null,
+    ...(() => { const taxa = n(proc.taxa_di) || n(proc.taxa_prevista), desp = soma(despesas), saldoBrl = r2(Math.max(0, fob - abatido) * taxa), apurado = taxa > 0 ? r2(brlComMoeda + saldoBrl + desp) : null;
+      return { taxa_saldo: taxa || null, pago_mercadoria: brlComMoeda, saldo_mercadoria_brl: saldoBrl, despesas: desp, apurado, diferenca: informado == null || apurado == null ? null : r2(informado - apurado) }; })() };
 }
 
 /**
