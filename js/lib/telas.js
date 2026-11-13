@@ -13,7 +13,7 @@ export const TELAS = {
   // Comercial
   'comercial': 'COM001', 'comercial/carteira': 'COM002', 'comercial/funil': 'COM003', 'comercial/vendedores': 'COM004', 'comercial/mapa': 'COM007', 'comercial/comissoes': 'COM008', 'preimpressao': 'COM005', 'preimpressao/artes': 'COM006',
   // Compras
-  'compras': 'CMP001', 'compras/requisicoes': 'CMP002', 'compras/pedidos': 'CMP003', 'compras/recebimentos': 'CMP004',
+  'compras': 'CMP001', 'compras/requisicoes': 'CMP002', 'compras/pedidos': 'CMP003', 'compras/recebimentos': 'CMP004', 'compras/importacao': 'CMP005',
   // Estoque
   'estoque': 'EST001', 'estoque/kardex': 'EST002', 'estoque/produtos': 'EST003', 'estoque/depara': 'EST004', 'estoque/parametros': 'EST005', 'estoque/cadastro-notas': 'EST006', 'estoque/implantacao': 'EST007', 'estoque/reposicao': 'EST008', 'estoque/inventario': 'EST009',
   // Produção

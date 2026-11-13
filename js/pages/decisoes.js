@@ -58,8 +58,9 @@ async function carregar() {
   const arte = temArea('com') || temArea('prd') ? await import(`./preimpressao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const cheq = temArea('fin') ? await import(`./cheques.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const imp = temArea('fin') ? await import(`./importacao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const recup = temArea('prd') ? await import(`../lib/rec-decisoes.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd, fech, recup, cheq };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd, fech, recup, cheq, imp };
 }
 
 // ---------------------------------------------------------------- regras
@@ -268,6 +269,13 @@ function regras(D) {
     desc: cq.map(a => a.titulo).join(' · '), impacto: cq.reduce((s, a) => s + (a.valor || 0), 0), impactoTxt: null,
     regra: 'Cheque de cliente em carteira com o prazo de apresentação vencido ou a 5 dias de vencer, cheque devolvido sem reapresentação, resgate ou cobrança, cheque em carteira que já passou do "bom para" e cheque próprio a compensar nos próximos 7 dias. Os prazos ficam nos Parâmetros dos cheques.',
     acao: 'Abrir os cheques', rota: cq.some(a => a.k === 'devolvidos') ? 'cheques?aba=devolvidos' : 'cheques' });
+
+  // 29. importação: câmbio a vencer sem contrato ou vencido, chegada atrasada, contêiner a devolver e carga parada no porto
+  const ipz = (D.imp || []).filter(a => a.nivel !== 'baixo');
+  if (ipz.length) out.push({ k: 'importacao', origem: 'Compras', urg: ipz.some(a => a.nivel === 'alto') ? 'alta' : 'media', titulo: 'Acompanhar os prazos das importações',
+    desc: ipz.slice(0, 4).map(a => a.texto).join(' · ') + (ipz.length > 4 ? ` · e mais ${ipz.length - 4}` : ''), impacto: 0, impactoTxt: `${ipz.length} prazo(s)`,
+    regra: 'Processo de importação com câmbio vencido ou a vencer nos próximos dias sem contrato, chegada prevista atrasada, prazo de devolução do contêiner vencendo, embarque previsto não confirmado ou carga no porto há mais de 5 dias sem declaração. Os prazos ficam nos Parâmetros da importação.',
+    acao: 'Abrir a importação', rota: ipz.some(a => a.k === 'cambio') ? 'compras/importacao?aba=cambio' : 'compras/importacao' });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

@@ -30,6 +30,7 @@ const routes = {
   'compras/requisicoes': () => import(`./pages/compras-requisicoes.js?v=${V}`),
   'compras/pedidos': () => import(`./pages/compras-pedidos.js?v=${V}`),
   'compras/recebimentos': () => import(`./pages/compras-recebimentos.js?v=${V}`),
+  'compras/importacao': () => import(`./pages/importacao.js?v=${V}`),
   'estoque': () => import(`./pages/estoque.js?v=${V}`),
   'estoque/produtos': () => import(`./pages/produtos.js?v=${V}`),
   'estoque/depara': () => import(`./pages/produtos-depara.js?v=${V}`),

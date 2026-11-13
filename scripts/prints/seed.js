@@ -2441,3 +2441,67 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
   ];
   window.RPC.nfe_pode = () => true; window.RPC.nfe_naturezas_padrao = () => 0;
 }
+
+// ---------------------------------------------------------------- Importação de matéria-prima (SQL 158) — dados fictícios
+{
+  const hoje = new Date().toISOString().slice(0, 10), dd = (n) => new Date(Date.parse(hoje + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+  const fv = (id, nome) => { if (!DB.favorecidos.some(f => f.id === id)) DB.favorecidos.push({ id, empresa_id: E, tipo: 'FORNECEDORES', nome, documento: '', ativo: true, tipo_pessoa: 'J', municipio: '', uf: 'EX' }); return id; };
+  const X1 = fv('fvx1', 'PETROCHEM EXEMPLO LLC'), X2 = fv('fvx2', 'POLYMERS EXEMPLO CO. LTD'), X3 = fv('fvx3', 'QUÍMICA EXEMPLO S.A.'), DSP = fv('fvx4', 'DESPACHOS ADUANEIROS EXEMPLO LTDA'), AGE = fv('fvx5', 'AGENTE DE CARGAS EXEMPLO LTDA');
+  for (const [codigo, descricao] of [['MP-003', 'RESINA PEAD FILME'], ['MP-004', 'RESINA PP HOMOPOLÍMERO']]) if (!DB.produtos.some(p => p.codigo === codigo)) DB.produtos.push({ id: 'pr-' + codigo, empresa_id: E, codigo, descricao, tipo: 'materia_prima', unidade: 'KG', ncm: '39012029', ativo: true, origem: 'manual' });
+  const pid = (c) => DB.produtos.find(p => p.codigo === c)?.id || null, conta = DB.contas[0]?.id || null;
+  DB.imp_config = [{ empresa_id: E, papeis: ['financeiro', 'diretor', 'compras'], moeda_padrao: 'USD', rateio: 'valor', recupera_icms: true, recupera_ipi: true, recupera_pis_cofins: true, gerar_titulos: true,
+    plano_mercadoria_id: null, plano_impostos_id: null, plano_despesas_id: null, plano_bancarias_id: null, centro_custo_id: null, local_id: null, tipo_movimento_id: null, free_time_padrao: 14, dias_aviso_chegada: 7, dias_aviso_cambio: 5, dias_aviso_freetime: 3, avisar: true }];
+  DB.imp_ptax = [[0, 5.4018, 5.4012], [-1, 5.3871, 5.3865], [-2, 5.4102, 5.4096], [-3, 5.3954, 5.3948]].map(([d, v, c]) => ({ moeda: 'USD', data: dd(d), venda: v, compra: c, fonte: 'Banco Central (PTAX)' }))
+    .concat([{ moeda: 'EUR', data: dd(0), venda: 6.2431, compra: 6.2419, fonte: 'Banco Central (PTAX)' }]);
+  const P = (n, status, fav, ref, x = {}) => ({ id: 'imp' + n, empresa_id: E, numero: n, referencia: ref, favorecido_id: fav, pais_origem: 'Estados Unidos', incoterm: 'FOB', moeda: 'USD', taxa_prevista: 5.4, taxa_di: null, modal: 'maritimo',
+    local_embarque: 'Houston', local_destino: 'Porto de Suape', status, data_pedido: null, embarque_previsto: null, data_embarque: null, chegada_prevista: null, data_chegada: null, data_registro: null, data_desembaraco: null, data_recebimento: null,
+    data_encerramento: null, proforma: 'PF-' + (2200 + n), invoice: null, conhecimento: null, navio: null, containers: null, declaracao: null, canal: null, despachante_id: DSP, agente_id: AGE, free_time_dias: 14, data_devolucao_container: null,
+    peso_liquido: null, peso_bruto: null, rateio: null, estimativa: {}, pedido_id: null, nfe_nota_id: null, observacao: null, motivo_cancelamento: null, criado_em: dd(-60), ...x });
+  DB.imp_processos = [
+    P(6, 'negociacao', X2, 'RFQ-0931', { pais_origem: 'China', local_embarque: 'Ningbo', incoterm: 'CIF', embarque_previsto: dd(25) }),
+    P(5, 'pedido', X1, 'PO-7812', { data_pedido: dd(-6), embarque_previsto: dd(12), chegada_prevista: dd(40) }),
+    P(4, 'embarcado', X1, 'PO-7790', { data_pedido: dd(-48), data_embarque: dd(-21), chegada_prevista: dd(6), invoice: 'INV-55871', conhecimento: 'HLCUHOU2611047', navio: 'MV ATLÂNTICO EXEMPLO', containers: 'HLXU 310447-2 · HLXU 310448-8' }),
+    P(3, 'chegada', X3, 'OC-4410', { pais_origem: 'Argentina', local_embarque: 'Buenos Aires', incoterm: 'CFR', data_pedido: dd(-40), data_embarque: dd(-19), chegada_prevista: dd(-10), data_chegada: dd(-12), data_devolucao_container: dd(2),
+      invoice: 'FC-A-00098213', conhecimento: 'MEDUBA4471902', navio: 'MSC EXEMPLO', containers: 'MSCU 771204-5' }),
+    P(2, 'desembaracado', X1, 'PO-7744', { data_pedido: dd(-75), data_embarque: dd(-47), chegada_prevista: dd(-20), data_chegada: dd(-19), data_registro: dd(-12), data_desembaraco: dd(-3), data_devolucao_container: dd(-5), taxa_di: 5.38,
+      invoice: 'INV-55102', conhecimento: 'HLCUHOU2609981', navio: 'MV NORDESTE EXEMPLO', containers: 'HLXU 298811-0 · HLXU 298812-6', declaracao: '26/1840377-2', canal: 'verde', peso_liquido: 50000, peso_bruto: 50900,
+      estimativa: { taxa: 5.4, frete: 4200, seguro: 310, siscomex: 154.23, afrmm_pct: 8, despesas: 14500 } }),
+    P(1, 'encerrado', X1, 'PO-7701', { data_pedido: dd(-150), data_embarque: dd(-120), chegada_prevista: dd(-95), data_chegada: dd(-96), data_registro: dd(-90), data_desembaraco: dd(-86), data_recebimento: dd(-84), data_encerramento: dd(-70), taxa_di: 5.29,
+      invoice: 'INV-54310', conhecimento: 'HLCUHOU2606120', declaracao: '26/1422915-0', canal: 'verde' }),
+  ];
+  const I = (id, p, cod, desc, ncm, q, vu, x = {}) => ({ id, empresa_id: E, processo_id: 'imp' + p, produto_id: pid(cod), descricao: desc, ncm, unidade: 'KG', quantidade: q, valor_unitario: vu, peso_liquido: null,
+    aliq_ii: 12.6, aliq_ipi: 0, aliq_pis: 2.1, aliq_cofins: 9.65, aliq_icms: 18, lote: null, qtd_recebida: 0, custo_unitario: null, ordem: +id.slice(-1), ...x });
+  DB.imp_itens = [
+    I('ii61', 6, 'MP-002', 'MASTERBATCH BRANCO 70% TiO2', '32061910', 12000, 2.35, { aliq_ipi: 5 }),
+    I('ii51', 5, 'MP-001', 'RESINA PEBD LINEAR BUTENO', '39011010', 48000, 1.18),
+    I('ii41', 4, 'MP-001', 'RESINA PEBD LINEAR BUTENO', '39011010', 50000, 1.21), I('ii42', 4, 'MP-003', 'RESINA PEAD FILME', '39012029', 25000, 1.16),
+    I('ii31', 3, 'MP-004', 'RESINA PP HOMOPOLÍMERO', '39021020', 26000, 1.09, { aliq_ii: 0 }),
+    I('ii21', 2, 'MP-001', 'RESINA PEBD LINEAR BUTENO', '39011010', 40000, 1.2), I('ii22', 2, 'MP-002', 'MASTERBATCH BRANCO 70% TiO2', '32061910', 10000, 2.3, { aliq_ipi: 5 }),
+    I('ii11', 1, 'MP-001', 'RESINA PEBD LINEAR BUTENO', '39011010', 50000, 1.15, { qtd_recebida: 50000, custo_unitario: 6.9412, lote: 'LT-54310' }),
+  ];
+  const C = (id, p, tipo, v, venc, status, x = {}) => ({ id, empresa_id: E, processo_id: 'imp' + p, tipo, valor_moeda: v, vencimento: venc, status, contrato: null, banco: null, data_contratacao: null, taxa: null, data_liquidacao: null, valor_brl: null, conta_id: null, lancamento_id: null, observacao: null, criado_em: dd(-30), ...x });
+  DB.imp_cambios = [
+    C('ic51', 5, 'adiantamento', 16992, dd(3), 'previsto'), C('ic52', 5, 'saldo', 39648, dd(45), 'previsto'),
+    C('ic41', 4, 'adiantamento', 26850, dd(-45), 'liquidado', { contrato: 'CC-2611-0144', banco: 'BANCO ALFA', data_contratacao: dd(-46), taxa: 5.31, data_liquidacao: dd(-45), valor_brl: 142573.5, conta_id: conta }),
+    C('ic42', 4, 'saldo', 62650, dd(14), 'contratado', { contrato: 'CC-2611-0207', banco: 'BANCO ALFA', data_contratacao: dd(-4), taxa: 5.39 }),
+    C('ic31', 3, 'saldo', 28340, dd(20), 'previsto'),
+    C('ic21', 2, 'adiantamento', 21300, dd(-72), 'liquidado', { contrato: 'CC-2609-0098', banco: 'BANCO ALFA', data_contratacao: dd(-73), taxa: 5.27, data_liquidacao: dd(-72), valor_brl: 112251, conta_id: conta }),
+    C('ic22', 2, 'saldo', 49700, dd(-10), 'liquidado', { contrato: 'CC-2611-0031', banco: 'BANCO ALFA', data_contratacao: dd(-14), taxa: 5.42, data_liquidacao: dd(-10), valor_brl: 269374, conta_id: conta }),
+    C('ic11', 1, 'saldo', 57500, dd(-80), 'liquidado', { contrato: 'CC-2608-0412', banco: 'BANCO ALFA', data_contratacao: dd(-82), taxa: 5.33, data_liquidacao: dd(-80), valor_brl: 306475, conta_id: conta }),
+  ];
+  const D2 = (id, cat, v, x = {}) => ({ id, empresa_id: E, processo_id: 'imp2', item_id: null, categoria: cat, descricao: null, favorecido_id: null, documento: null, valor: v, valor_moeda: null, taxa: null, vencimento: dd(-12), pago: true, data_pagamento: dd(-12), conta_id: conta,
+    compoe_custo: !['icms', 'ipi', 'pis', 'cofins', 'bancaria', 'demurrage', 'multa'].includes(cat), lancamento_id: null, criado_em: dd(-12), ...x });
+  DB.imp_despesas = [
+    D2('id21', 'frete_internacional', 22596, { valor_moeda: 4200, taxa: 5.38, favorecido_id: AGE, documento: 'BL HLCUHOU2609981', vencimento: dd(-18), data_pagamento: dd(-18) }), D2('id22', 'seguro', 1667.8, { valor_moeda: 310, taxa: 5.38, vencimento: dd(-18), data_pagamento: dd(-18) }),
+    D2('id23', 'ii', 50538.28, { documento: '26/1840377-2' }), D2('id24', 'ipi', 7005.71, { documento: '26/1840377-2' }), D2('id25', 'pis', 8423.05, { documento: '26/1840377-2' }), D2('id26', 'cofins', 38705.91, { documento: '26/1840377-2' }),
+    D2('id27', 'icms', 111950.42, { documento: '26/1840377-2' }), D2('id28', 'siscomex', 154.23, { documento: '26/1840377-2' }), D2('id29', 'afrmm', 1807.68, { documento: '26/1840377-2' }),
+    D2('id2a', 'capatazia', 3980, { favorecido_id: AGE, vencimento: dd(-8), data_pagamento: dd(-8) }), D2('id2b', 'armazenagem', 2640, { vencimento: dd(-3), pago: false, data_pagamento: null, conta_id: null }),
+    D2('id2c', 'despachante', 2900, { favorecido_id: DSP, documento: 'NFS-e 4471', vencimento: dd(4), pago: false, data_pagamento: null, conta_id: null }),
+    D2('id2d', 'frete_interno', 5200, { descricao: 'Suape → fábrica, 2 contêineres', vencimento: dd(7), pago: false, data_pagamento: null, conta_id: null }),
+    D2('id2e', 'demurrage', 1850, { descricao: '5 dias além do prazo livre', vencimento: dd(10), pago: false, data_pagamento: null, conta_id: null }), D2('id2f', 'bancaria', 480, { descricao: 'tarifas dos dois contratos', vencimento: dd(-10), data_pagamento: dd(-10) }),
+  ];
+  DB.imp_eventos = [['negociacao', -82], ['pedido', -75], ['producao', -68], ['embarcado', -47], ['chegada', -19], ['registro', -12], ['desembaracado', -3]].map(([etapa, d], i) => ({ id: 'ie' + i, empresa_id: E, processo_id: 'imp2', etapa, data: dd(d), texto: null, em: dd(d) + 'T14:20:00Z' }));
+  DB.imp_anexos = [['proforma', 'PF-2202.pdf'], ['invoice', 'INV-55102.pdf'], ['packing', 'Packing list INV-55102.pdf'], ['conhecimento', 'BL HLCUHOU2609981.pdf'], ['declaracao', 'Extrato DI 26-1840377-2.pdf'], ['cambio', 'Contrato CC-2609-0098.pdf']]
+    .map(([tipo, nome], i) => ({ id: 'ia' + i, empresa_id: E, processo_id: 'imp2', tipo, nome, caminho: `${E}/imp2/${nome}`, tamanho: 180000, em: dd(-70 + i * 10) + 'T10:00:00Z' }));
+  window.RPC.imp_pode = () => true; window.RPC.imp_receber = () => ({ movimentos: 2, registrados: 0, faltam: 0 }); window.RPC.imp_ptax_gravar = () => 0;
+}

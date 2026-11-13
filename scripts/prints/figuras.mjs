@@ -336,4 +336,12 @@ export const FIGS = [
   ['nfe-emissao', 'notas/emissao', '### 3.3', 'Naturezas de operação: CFOP, CST e alíquotas de cada tipo de nota', 'click:#nf-nat'],
   ['nfe-emissao', 'notas/emissao', '## 5.', 'Nota em rascunho: destinatário, itens com os impostos calculados e totais', 'click:[data-a="abrir"]'],
   ['nfe-emissao', 'notas/emissao', '## 6.', 'Nota autorizada: e-mail, carta de correção e cancelamento', 'click:[data-a="mais"]'],
+  ['importacao', 'compras/importacao', '## 4.', 'Painel da importação: indicadores, prazos e os processos em cada etapa'],
+  ['importacao', 'compras/importacao', '## 3.', 'Parâmetros da importação: quem opera, custo, financeiro, estoque e prazos', 'click:#im-par'],
+  ['importacao', 'compras/importacao', '## 5.', 'Processo aberto: etapas, alertas e os dados do embarque e da declaração', 'click:.im-card[data-p="imp2"]'],
+  ['importacao', 'compras/importacao', '### 6.1', 'Câmbio do processo: adiantamento e saldo, contratados e liquidados', 'click:.im-card[data-p="imp4"]|click:[data-paba="cambio"]'],
+  ['importacao', 'compras/importacao', '### 6.2', 'Exposição cambial e pagamentos ao exterior em aberto', 'click:#im-abas [data-aba="cambio"]'],
+  ['importacao', 'compras/importacao', '## 7.', 'Despesas e impostos da nacionalização, com o que entra e o que fica fora do custo', 'click:.im-card[data-p="imp2"]|click:[data-paba="despesas"]'],
+  ['importacao', 'compras/importacao', '## 8.', 'Custo estimado e custo final por item', 'click:.im-card[data-p="imp2"]|click:[data-paba="custo"]'],
+  ['importacao', 'compras/importacao', '## 9.', 'Recebimento: quantidade, lote e o custo que vai para o estoque', 'click:.im-card[data-p="imp2"]|click:#im-rec'],
 ];
