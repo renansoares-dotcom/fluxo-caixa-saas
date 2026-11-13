@@ -1,8 +1,8 @@
 ---
 titulo: Emissão de NF-e pela Focus NFe e o novo DANFE
 tela: CPD › Emissão de NF-e (FIS005)
-versao: 1.0
-atualizado: 2026-11-12
+versao: 1.1
+atualizado: 2026-11-13
 ---
 ## 1. Para que serve
 
@@ -137,25 +137,27 @@ Na linha da nota: **DANFE** (PDF no leiaute novo), **XML** e **Mais**, que abre:
 
 ## 7. O novo DANFE (NT 2026.010)
 
-![Figura 6 — DANFE no leiaute da NT 2026.010: regime tributário, total do IBS/CBS/IS e os tributos da Reforma em cada item (dados fictícios)](img/nfe-emissao-danfe.jpg)
+![Figura 6 — DANFE no modelo da NT 2026.010: regime tributário, os três blocos de totais, os tributos empilhados em cada item e o espaço do QR Code (dados fictícios)](img/nfe-emissao-danfe.jpg)
 
 O que mudou em relação ao DANFE anterior:
 
 | Onde | O que entrou |
 |---|---|
-| Quadro do emitente | **Código do regime tributário (CRT)** e uma área reservada para o regime de apuração do IBS/CBS, que fica vazia até a nota técnica que vai defini-la |
-| Depois do cálculo do imposto | Bloco **Total do IBS / CBS / IS**: valor da CBS, do IBS UF, do IBS Município e do Imposto Seletivo; os valores monofásicos aparecem só quando existem na nota |
-| Itens | **Classificação tributária (cClassTrib)** junto do NCM e, abaixo do item, base, alíquota e valor de IBS UF, IBS Município e CBS, e do Imposto Seletivo quando houver |
+| Abaixo da inscrição estadual | Linha própria com o **código do regime tributário (CRT)** e, ao lado, a área "Tipo de regime de apuração do IBS e da CBS", que fica vazia até a nota técnica que vai defini-la |
+| Totais | Três blocos: **Total dos produtos e total da nota**, **Total do ICMS / IPI** e **Total do IBS / CBS / IS** (CBS, IBS UF, IBS Município e Imposto Seletivo) |
+| Itens | Um item por linha, com as colunas **Bases de cálculo**, **Alíquotas** e **Valor dos tributos**, onde ICMS, IPI, IBS UF, IBS Município, CBS e IS aparecem empilhados; a **classificação tributária (cClassTrib)** fica junto do código e do NCM |
+| Dados adicionais | Espaço reservado ao **QR Code**, à direita |
 
 Regras seguidas:
 
 - só é impresso o que existe no XML; nada é calculado ou suposto na impressão;
+- campos condicionais (FCP, ICMS da UF de destino, ICMS desonerado e monofásico, IBS e CBS monofásicos, cálculo do ISSQN) aparecem só quando a nota tem esses valores;
 - quando há redução de alíquota, aparece a alíquota efetiva;
-- nota sem o grupo da Reforma sai com o bloco de totais em branco e sem a linha extra nos itens.
+- nota sem o grupo da Reforma sai com o bloco do IBS/CBS/IS em branco e traço nos tributos novos de cada item.
 
 O mesmo gerador é usado no Portal do Cliente e nas notas recebidas, que passam a sair no leiaute novo.
 
-A nota técnica traz os campos obrigatórios e dois modelos de referência, sem medidas exatas. O DANFE da plataforma segue os campos e a ordem dos quadros; a posição fina de cada campo pode diferir do modelo de referência. O QR Code no quadro de dados adicionais depende de nota técnica futura e ainda não é impresso.
+O desenho segue o modelo de referência da nota técnica: os mesmos quadros, na mesma ordem. A nota técnica não fixa medidas, e os rótulos dos campos condicionais do ICMS foram reproduzidos a partir de uma imagem do modelo, então a redação de algum rótulo pode diferir em detalhe. O espaço do QR Code fica vazio: o conteúdo dele depende de nota técnica futura.
 
 ## 8. Regras e travas
 
@@ -192,3 +194,4 @@ A nota técnica traz os campos obrigatórios e dois modelos de referência, sem 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 12/11/2026 | Primeira versão: implantação do ambiente da Focus NFe, parâmetros, naturezas de operação, nota avulsa com impostos calculados, prévia, emissão, consulta, cancelamento, carta de correção, e-mail, inutilização e DANFE no leiaute da NT 2026.010. |
+| 1.1 | 13/11/2026 | DANFE redesenhado conforme o modelo de referência da NT 2026.010: linha do regime tributário, três blocos de totais, itens com bases, alíquotas e valores empilhados, campos condicionais e espaço do QR Code. |
