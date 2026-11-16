@@ -82,7 +82,7 @@ test('fechamento do banco: meses cobertos, contas que faltam e extrato conciliad
   const e = extratoConta('2026-04-01', contas[0], L, pl, { c: 'CLIENTE A' }, 100, { ate: '2026-04-30', saldo_banco: 650, por: 'Renan', em: '2026-05-04', pendentes: 0 }, 'EXEMPLO');
   assert.deepEqual(e.totais, { saldo_inicial: 100, entradas: 1050, saidas: 500, saldo_final: 650, qtd: 4, diferenca: 0 });
   assert.deepEqual(e.tabelas[2].linhas.map(l => l[6]), [1100, 800, 600, 650]); assert.equal(e.tabelas[2].linhas[0][1], 'CLIENTE A — NF 10'); assert.match(e.tabelas[2].linhas[3][1], /Transferência recebida/);
-  assert.equal(e.notas.length, 1); assert.equal(e.periodo, 'BRADESCO — 01/04/2026 a 30/04/2026'); assert.equal(e.tabelas[0].linhas[1][1], 'Conciliada e fechada até 30/04/2026');
+  assert.equal(e.notas.length, 1); assert.equal(e.periodo, 'BRADESCO — 01/04/2026 a 30/04/2026'); assert.equal(e.tabelas[0].linhas[1][1], 'Conciliado e fechado');
   const d = extratoConta('2026-04-01', contas[0], L, pl, {}, 100, { ate: '2026-04-30', saldo_banco: 640 }); assert.equal(d.totais.diferenca, -10); assert.equal(d.notas.length, 2);
   const o = extratoConta('2026-04-01', contas[0], L, pl, {}, 100, { ate: '2026-10-31', saldo_banco: 5 }); assert.equal(o.totais.diferenca, null); assert.equal(o.tabelas[0].linhas.length, 3);
   assert.match(extratoConta('2026-07-01', contas[0], [], pl, {}, 30).tabelas[2].linhas[0][1], /Sem movimento/);

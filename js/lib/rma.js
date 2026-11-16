@@ -185,11 +185,11 @@ export function extratoConta(mes, conta, lancs, planos, favs = {}, saldoInicial 
   const ent = soma(L.filter(x => x.sinal > 0), x => x.sinal), sai = soma(L.filter(x => x.sinal < 0), x => -x.sinal), final = r2(n(saldoInicial) + ent - sai);
   const banco = [conta.instituicao, conta.agencia && `agência ${conta.agencia}`, conta.numero && `conta ${conta.numero}`].filter(Boolean).join(' · ');
   const noMes = fecho && fecho.ate === fim, dif = noMes && fecho.saldo_banco != null ? r2(n(fecho.saldo_banco) - final) : null;
-  const quadro = [['Conta', conta.nome + (banco ? ` (${banco})` : '')], ['Situação', fecho ? `Conciliada e fechada até ${br(fecho.ate)}` : 'Conta ainda não fechada neste mês'],
+  const quadro = [['Conta', conta.nome + (banco ? ` (${banco})` : '')], ['Situação', fecho ? 'Conciliado e fechado' : 'Conta ainda não fechada neste mês'],
     ['Saldo da plataforma em ' + br(fim), final]];
   if (noMes && fecho.saldo_banco != null) quadro.push(['Saldo conferido no banco em ' + br(fim), r2(n(fecho.saldo_banco))], ['Diferença', dif]);
   if (fecho?.pendentes) quadro.push([`Movimentos do extrato do banco sem conciliar no mês (${fecho.pendentes})`, r2(n(fecho.valorPendente))]);
-  if (fecho?.por || fecho?.em) quadro.push(['Fechada por', [fecho.por, fecho.em && br(fecho.em)].filter(Boolean).join(' em ')]);
+  if (fecho?.por) quadro.push(['Fechado por', fecho.por]);
   if (fecho?.observacao) quadro.push(['Observação do fechamento', fecho.observacao]);
   return { ...cab('Extrato conciliado da conta', mes, empresa), periodo: `${conta.nome} — ${br(ini)} a ${br(fim)}`, tabelas: [
     { nome: 'Fechamento da conta', cab: ['', 'Informação'], num: [1], linhas: quadro },

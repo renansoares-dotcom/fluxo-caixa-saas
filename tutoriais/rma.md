@@ -1,7 +1,7 @@
 ---
 titulo: RMA — Relatório Mensal de Atividades da recuperação judicial
 tela: Financeiro › RMA — Recuperação Judicial (FIN026)
-versao: 1.1
+versao: 1.2
 atualizado: 2026-11-16
 ---
 ## 1. Para que serve
@@ -41,7 +41,7 @@ Com a função desligada, o item some do menu de todos, menos do administrador, 
 1. Abra Financeiro › RMA — Recuperação Judicial e clique em **Ativar o RMA para esta empresa** (só o administrador).
 2. Informe a **sigla** que começa o nome dos arquivos e o **primeiro mês de competência** a entregar.
 3. Informe o **dia de entrega**, que é do mês seguinte ao de competência (o RMA de outubro vence em novembro), e com quantos dias de antecedência a tela avisa. Confirme o prazo com quem recebe.
-4. Preencha o número do processo e o juízo: eles saem no cabeçalho dos relatórios gerados.
+4. Preencha o número do processo e o juízo, para referência.
 5. Informe quem recebe o RMA (escritório ou Administrador Judicial), o contato e o e-mail.
 6. Marque quem opera, além do administrador.
 7. Em **Automático pelo fechamento do banco**, deixe marcado o que a plataforma deve fazer sozinha (item 5.1) e marque as contas que **não** entram no RMA.
@@ -131,7 +131,7 @@ O que observar:
 | 10 Vendas | Vendas por cliente, da maior para a menor, com a participação de cada um | Mesma base do faturamento |
 | 12 Contratos | Contratos firmados, alterados, encerrados ou rescindidos no mês | Cadastros › Contratos |
 
-Cada PDF sai com o nome da empresa, "Em recuperação judicial", o número do processo, a competência e a data em que foi gerado.
+Cada PDF sai com o nome da empresa, a competência e a data em que foi gerado.
 
 Confira antes de enviar:
 
@@ -189,3 +189,4 @@ A tela só registra o envio com todos os documentos obrigatórios prontos ou mar
 |---|---|---|
 | 1.0 | 16/11/2026 | Primeira versão: ativação por empresa, parâmetros, lista de documentos, pacote mensal, seis relatórios gerados em PDF e Excel, anexos com nome padronizado, pacote .zip, registro do envio, reabertura e alertas. |
 | 1.1 | 16/11/2026 | Automático pelo fechamento do banco: o extrato conciliado de cada conta entra no documento 06 ao fechar e travar a conta, e os demais relatórios são gerados quando todas as contas do mês estão fechadas; parâmetros do automático e contas fora do RMA; documento 05 (conciliações) na lista padrão. |
+| 1.2 | 16/11/2026 | PDFs do RMA sem a linha do processo abaixo do nome da empresa; no extrato, a situação passa a "Conciliado e fechado", sem data. |

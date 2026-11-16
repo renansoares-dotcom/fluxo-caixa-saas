@@ -12,15 +12,15 @@ export function pdfDe(rel, cfg) {
   const { jsPDF } = window.jspdf, largo = rel.tabelas.some(t => t.cab.length > 6), doc = new jsPDF({ orientation: largo ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 12;
   const topo = () => { doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(30); doc.text(String(rel.empresa || ''), M, 13);
-    doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(90); doc.text('Em recuperação judicial' + (cfg.processo ? ` — Processo nº ${cfg.processo}` : '') + (cfg.vara ? ` — ${cfg.vara}` : ''), M, 17.5);
-    doc.text('RMA — Relatório Mensal de Atividades', W - M, 13, { align: 'right' }); doc.setDrawColor(160); doc.line(M, 20, W - M, 20); };
-  topo(); doc.setTextColor(20); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(rel.titulo, M, 28); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.text(rel.periodo, M, 33.5);
-  let y = 39;
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(90);
+    doc.text('RMA — Relatório Mensal de Atividades', W - M, 13, { align: 'right' }); doc.setDrawColor(160); doc.line(M, 16.5, W - M, 16.5); };
+  topo(); doc.setTextColor(20); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(rel.titulo, M, 25); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.text(rel.periodo, M, 30.5);
+  let y = 36;
   for (const t of rel.tabelas) {
     if (y > H - 40) { doc.addPage(); y = 26; }
     doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(20); doc.text(t.nome, M, y); y += 2;
     const fmt = (row) => row.map((v, i) => (t.num || []).includes(i) && typeof v === 'number' ? (Number.isInteger(v) && /Notas|notas/.test(t.cab[i]) ? String(v) : nv(v)) : (v ?? ''));
-    doc.autoTable({ startY: y, margin: { left: M, right: M, top: 24, bottom: 14 }, head: [t.cab], body: t.linhas.map(fmt), foot: t.total ? [fmt(t.total)] : undefined, theme: 'grid', showFoot: 'lastPage',
+    doc.autoTable({ startY: y, margin: { left: M, right: M, top: 21, bottom: 14 }, head: [t.cab], body: t.linhas.map(fmt), foot: t.total ? [fmt(t.total)] : undefined, theme: 'grid', showFoot: 'lastPage',
       styles: { fontSize: largo ? 6.6 : 8, cellPadding: 1.1, lineColor: 200, lineWidth: 0.1, textColor: 20, overflow: 'linebreak' }, headStyles: { fillColor: [43, 85, 152], textColor: 255, fontStyle: 'bold' }, footStyles: { fillColor: 235, textColor: 20, fontStyle: 'bold' },
       columnStyles: Object.fromEntries((t.num || []).map(i => [i, { halign: 'right' }])), didParseCell: (c) => { if ((t.num || []).includes(c.column.index)) c.cell.styles.halign = 'right'; }, didDrawPage: (d) => { if (d.pageNumber > 1) topo(); } });
     y = doc.lastAutoTable.finalY + 8;
