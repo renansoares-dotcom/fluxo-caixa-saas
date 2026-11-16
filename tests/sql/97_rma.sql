@@ -86,3 +86,23 @@ insert into rma_arquivos(empresa_id, entrega_id, nome, caminho, origem, conta_id
 select pg_temp.ok((select count(*) = 1 from rma_arquivos where entrega_id = :'E06' and conta_id is not null), 'arquivo do extrato ligado à conta');
 select pg_temp.falha($q$update rma_documentos set fonte = 'outra' where empresa_id = 'e000000a-0000-0000-0000-000000000000' and codigo = '06'$q$, 'origem inválida');
 reset role;
+
+-- ---------- diário de comentários por documento (SQL 164) ----------
+select pg_temp.entrar(:FIN);
+insert into rma_comentarios(empresa_id, entrega_id, texto, por, por_nome) values (:E, :'E06', '  Extrato do Bradesco conferido com o banco.  ', 'a0000000-0000-0000-0000-00000000000a', 'outro nome');
+insert into rma_comentarios(empresa_id, entrega_id, texto) values (:E, :'E06', 'Escritório pediu o extrato emitido pelo banco.');
+select pg_temp.ok((select count(*) = 2 and bool_and(por = 'd0000000-0000-0000-0000-00000000000d') and min(texto) = 'Escritório pediu o extrato emitido pelo banco.' from rma_comentarios where entrega_id = :'E06'), 'vários comentários por documento; o autor é quem está logado');
+select pg_temp.ok((select por_nome is not distinct from (select nome from membros where empresa_id = :E and user_id = 'd0000000-0000-0000-0000-00000000000d') from rma_comentarios where entrega_id = :'E06' limit 1), 'nome do autor vem do cadastro');
+select pg_temp.falha(format($q$insert into rma_comentarios(empresa_id, entrega_id, texto) values ('e000000a-0000-0000-0000-000000000000', %L, '   ')$q$, :'E06'), 'comentário vazio');
+update rma_comentarios set texto = 'x' where entrega_id = :'E06';
+select pg_temp.ok((select count(*) = 0 from rma_comentarios where texto = 'x'), 'comentário não é editado');
+select rma_enviar(:E, :M);
+insert into rma_comentarios(empresa_id, entrega_id, texto) values (:E, :'E06', 'Devolvido para correção em 20/11.');
+select pg_temp.ok((select count(*) = 3 from rma_comentarios where entrega_id = :'E06'), 'o diário continua aberto depois do envio do mês');
+select pg_temp.entrar(:LEI);
+select pg_temp.ok((select count(*) = 3 from rma_comentarios where entrega_id = :'E06'), 'leitura lê o diário');
+select pg_temp.falha(format($q$insert into rma_comentarios(empresa_id, entrega_id, texto) values ('e000000a-0000-0000-0000-000000000000', %L, 'x')$q$, :'E06'), 'leitura não comenta');
+select pg_temp.entrar(:ADM);
+delete from rma_comentarios where entrega_id = :'E06' and texto like 'Devolvido%';
+select pg_temp.ok((select count(*) = 2 from rma_comentarios where entrega_id = :'E06'), 'administrador apaga comentário');
+reset role;

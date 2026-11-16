@@ -22,6 +22,9 @@ const CSS = `<style>
   .rm-mes.on{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 25%,transparent)}.rm-mes b{display:block;font-size:14px;text-transform:capitalize}
   .rm-bar{height:6px;border-radius:6px;background:var(--surface-2);overflow:hidden;margin:6px 0 4px}.rm-bar i{display:block;height:100%;background:var(--pos)}
   .rm-arq{display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0}.rm-arq a{overflow-wrap:anywhere}.rm-arq button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 4px}
+  .rm-menu{position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:4px;min-width:190px}
+  .rm-menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:7px;font:inherit;color:var(--text);cursor:pointer}.rm-menu button:hover{background:var(--surface-2)}
+  .rm-pt{font-size:20px;font-weight:700;line-height:1;padding:2px 10px;letter-spacing:1px;color:var(--text)}.rm-com{border-left:3px solid var(--border);padding:4px 0 4px 10px;margin:0 0 10px}.rm-com small{color:var(--muted)}
   .rm-g{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.rm-g .c2{grid-column:span 2}.rm-g .c3{grid-column:span 3}.rm-g .c4{grid-column:span 4}.rm-g .c6{grid-column:span 6}
   @media(max-width:800px){.rm-g{grid-template-columns:1fr 1fr}.rm-g .c3,.rm-g .c4,.rm-g .c6{grid-column:span 2}}
   .modal label.chk{flex-direction:row;align-items:center;gap:8px;font-weight:400;font-size:13px}.modal label.chk input{width:auto;min-height:0}
@@ -36,7 +39,8 @@ async function dados(e) {
   const C = await contexto(e), cfg = { ...CFG0, ...(C.cfg || {}), _existe: !!C.cfg };
   if (!cfg.ativo) return { ...C, cfg, pode: false };
   C.meses.sort((a, b) => b.mes.localeCompare(a.mes));
-  return { ...C, cfg, pode: !!(await q(sb.rpc('rma_pode', { p_empresa: e }))) };
+  const [pode, coms] = await Promise.all([q(sb.rpc('rma_pode', { p_empresa: e })), q(sb.from('rma_comentarios').select('*').eq('empresa_id', e).order('em')).catch(() => null)]);
+  return { ...C, cfg, pode: !!pode, coms: coms || [], diario: coms !== null };
 }
 
 /** alertas para a Central de Decisões (regra 30) */
@@ -80,7 +84,7 @@ export async function render(root) {
   const k = ui.mes, mes = M[k], r = R(k), enviado = mes?.status === 'enviado', edita = pode && mes && !enviado;
   const ents = entDe(k).map(x => ({ ...x, doc: docDe(x.documento_id) })).filter(x => x.doc).sort((a, b) => a.doc.ordem - b.doc.ordem);
   const contasRma = contasDoRma(state.cad?.contas || [], cfg), abertasNoMes = contasAbertasNoMes(k, state.cad?.contas || [], travasAtivas(D), cfg), bancosOk = contasRma.length > 0 && !abertasNoMes.length;
-  const arqDe = (id) => D.arqs.filter(a => a.entrega_id === id);
+  const arqDe = (id) => D.arqs.filter(a => a.entrega_id === id), comDe = (id) => D.coms.filter(c => c.entrega_id === id);
   const grupos = [...new Set(ents.map(x => x.doc.grupo))];
   const enviados = mesesK.filter(x => M[x]?.status === 'enviado').length, atras = mesesK.filter(x => R(x).situacao === 'atrasado' || (!M[x] && prazoMes(x, cfg.dia_entrega) < hoje)).length;
 
@@ -100,12 +104,12 @@ export async function render(root) {
     ${!mes ? `<div class="card" style="margin-top:12px"><div class="empty">O pacote de ${esc(mesNome(k))} ainda não foi aberto.${pode ? ' Abra para criar a lista de documentos do mês.' : ''}</div></div>` : `
     <div class="card flush" style="margin-top:12px"><div class="table-wrap"><table><thead><tr><th style="width:44px">Nº</th><th>Documento</th><th>De onde vem</th><th>Arquivos</th><th>Situação</th><th></th></tr></thead><tbody>
     ${grupos.map(g => `<tr><td colspan="6" class="small muted" style="background:var(--surface-2)"><b>${esc(g)}</b></td></tr>` + ents.filter(x => x.doc.grupo === g).map(x => { const A = arqDe(x.id), ger = x.doc.fonte !== 'anexo';
-      return `<tr><td><b>${esc(x.doc.codigo)}</b></td><td class="wrap"><b>${esc(x.doc.nome)}</b>${x.doc.obrigatorio ? '' : ' <span class="small muted">(opcional)</span>'}${x.doc.orientacao ? `<div class="small muted">${esc(x.doc.orientacao)}</div>` : ''}${x.observacao ? `<div class="small">Obs.: ${esc(x.observacao)}</div>` : ''}</td>
+      return `<tr><td><b>${esc(x.doc.codigo)}</b></td><td class="wrap"><b>${esc(x.doc.nome)}</b>${x.doc.obrigatorio ? '' : ' <span class="small muted">(opcional)</span>'}${x.doc.orientacao ? `<div class="small muted">${esc(x.doc.orientacao)}</div>` : ''}${x.observacao ? `<div class="small">Obs.: ${esc(x.observacao)}</div>` : ''}${comDe(x.id).length ? `<div class="small"><a href="#" data-com="${x.id}">${comDe(x.id).length} comentário(s)</a> <span class="muted">· ${esc(comDe(x.id).at(-1).texto.slice(0, 70))}${comDe(x.id).at(-1).texto.length > 70 ? '…' : ''}</span></div>` : ''}</td>
         <td class="small wrap" style="width:180px">${x.doc.fonte === 'extrato_conta' ? `<span class="rm-st info">Automático ao fechar o banco</span><div class="muted">${contasRma.length - abertasNoMes.length} de ${contasRma.length} conta(s) fechada(s) no mês</div>${abertasNoMes.length ? `<div class="warn">falta: ${esc(abertasNoMes.slice(0, 4).map(c => c.nome).join(', '))}${abertasNoMes.length > 4 ? ` e mais ${abertasNoMes.length - 4}` : ''}</div>` : ''}<div><a href="#/fechamento">abrir o Fechamento do Mês</a></div>`
           : ger ? `<span class="rm-st info">Gerado pela plataforma</span><div class="muted">${esc(FONTES[x.doc.fonte])}</div>` : `Anexo${x.doc.tela ? `<div><a href="#/${esc(x.doc.tela)}">abrir a tela de origem</a></div>` : ''}`}<div class="muted">${esc(x.doc.formatos.map(f => f.toUpperCase()).join(' e '))}</div></td>
         <td class="wrap" style="overflow-wrap:anywhere">${A.map(a => `<div class="rm-arq"><a href="#" data-abrir="${esc(a.caminho)}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${edita ? `<button data-xa="${a.id}" title="Excluir o arquivo">✕</button>` : ''}</div>`).join('') || (x.status === 'nao_aplica' ? `<span class="small muted">${esc(x.justificativa || '')}</span>` : '<span class="small muted">nenhum arquivo</span>')}</td>
         <td><span class="rm-st ${STATUS[x.status][1]}">${STATUS[x.status][0]}</span></td>
-        <td class="wrap" style="width:140px">${edita ? `${ger ? `<button class="btn small" data-ger="${x.id}">Gerar</button> ` : ''}<button class="btn ghost small" data-anx="${x.id}">Anexar</button> <button class="btn ghost small" data-mais="${x.id}">${x.status === 'nao_aplica' ? 'Voltar a pendente' : 'Não se aplica'}</button>` : ''}</td></tr>`; }).join('')).join('')}
+        <td style="width:52px;text-align:right">${edita || D.diario ? `<button class="btn ghost small rm-pt" data-menu="${x.id}" title="Opções deste documento" aria-label="Opções deste documento">⋯</button>` : ''}</td></tr>`; }).join('')).join('')}
     </tbody></table></div></div><input type="file" id="rm-file" multiple hidden accept=".pdf,.xlsx,.xls,.csv,.txt,.zip,.png,.jpg,.jpeg,.docx">
     <p class="small muted">Os arquivos seguem o padrão <b>${esc(nomeArquivo(cfg.sigla, k, { codigo: 'NN', arquivo: 'Documento' }, 'pdf'))}</b>: sigla da empresa, mês de competência, número e nome do documento. O anexo é renomeado para o padrão ao entrar.</p>`}`;
 
@@ -122,9 +126,9 @@ export async function render(root) {
     ev.target.disabled = true; let ok = 0; const erros = [];
     for (const x of L) { ev.target.textContent = `Gerando ${x.doc.codigo}…`; try { await gerar(x); ok++; } catch (err) { if (x.doc.fonte !== 'extrato_conta') erros.push(`${x.doc.codigo}: ${err.message || err}`); } }
     toast(`${ok} documento(s) gerado(s)${erros.length ? `; ${erros.length} com erro` : ''}.`, !!erros.length); if (erros.length) console.warn('[RMA]', erros); re(); });
-  $$('[data-ger]', corpo).forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = 'Gerando…'; try { await gerar(ents.find(x => x.id === b.dataset.ger)); toast('Documento gerado.'); re(); } catch (err) { fail(err); b.disabled = false; b.textContent = 'Gerar'; } });
+  const acaoGerar = async (x) => { toast(`Gerando o documento ${x.doc.codigo}…`); try { await gerar(x); toast('Documento gerado.'); re(); } catch (err) { fail(err); } };
   let alvo = null;
-  $$('[data-anx]', corpo).forEach(b => b.onclick = () => { alvo = ents.find(x => x.id === b.dataset.anx); $('#rm-file', corpo).value = ''; $('#rm-file', corpo).click(); });
+  const acaoAnexar = (x) => { alvo = x; $('#rm-file', corpo).value = ''; $('#rm-file', corpo).click(); };
   $('#rm-file', corpo) && ($('#rm-file', corpo).onchange = async (ev) => { const F = [...ev.target.files]; if (!F.length || !alvo) return;
     try { let seq = arqDe(alvo.id).filter(a => a.origem === 'anexo').length;
       for (const f of F) { if (f.size > 26214400) throw new Error(`"${f.name}" passa de 25 MB.`); seq++; const ext = (f.name.split('.').pop() || 'pdf').toLowerCase();
@@ -133,12 +137,36 @@ export async function render(root) {
   $$('[data-xa]', corpo).forEach(b => b.onclick = async () => { const a = D.arqs.find(x => x.id === b.dataset.xa); if (!await confirmDialog(`Excluir "${a.nome}"?`)) return;
     try { await sb.storage.from('rma').remove([a.caminho]); await q(sb.from('rma_arquivos').delete().eq('id', a.id)); re(); } catch (err) { fail(err); } });
   $$('[data-abrir]', corpo).forEach(a => a.onclick = async (ev) => { ev.preventDefault(); const { data, error } = await sb.storage.from('rma').createSignedUrl(a.dataset.abrir, 600, { download: a.dataset.nome }); if (error) return fail(error); window.open(data.signedUrl, '_blank', 'noopener'); });
-  $$('[data-mais]', corpo).forEach(b => b.onclick = () => { const x = ents.find(y => y.id === b.dataset.mais);
+  const acaoNaoAplica = (x) => {
     if (x.status === 'nao_aplica') return q(sb.from('rma_entregas').update({ status: arqDe(x.id).length ? 'pronto' : 'pendente' }).eq('id', x.id)).then(re).catch(fail);
     modal({ title: `${x.doc.codigo} — não se aplica em ${mesCurto(k)}`, narrow: true, body: `<p class="small muted">${esc(x.doc.nome)}</p><label>Motivo (vai junto com o pacote)<textarea id="rm-just" rows="3" placeholder="Ex.: sem constrições judiciais no período."></textarea></label>`,
       foot: '<button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="rm-sj">Salvar</button>',
       onMount: (m, close) => { $('#rm-sj', m).onclick = async () => { const t = $('#rm-just', m).value.trim(); if (!t) return toast('Informe o motivo.', true);
-        try { await q(sb.from('rma_entregas').update({ status: 'nao_aplica', justificativa: t }).eq('id', x.id)); close(); re(); } catch (err) { fail(err); } }; } }); });
+        try { await q(sb.from('rma_entregas').update({ status: 'nao_aplica', justificativa: t }).eq('id', x.id)); close(); re(); } catch (err) { fail(err); } }; } }); };
+  // três pontinhos: as opções do documento num menu só
+  const fecharMenu = () => document.querySelectorAll('.rm-menu').forEach(m => m.remove());
+  $$('[data-menu]', corpo).forEach(b => b.onclick = (ev) => { ev.stopPropagation(); const aberto = document.querySelector(`.rm-menu[data-de="${b.dataset.menu}"]`); fecharMenu(); if (aberto) return;
+    const x = ents.find(y => y.id === b.dataset.menu), ger = x.doc.fonte !== 'anexo', n = comDe(x.id).length, ops = [];
+    if (edita && ger) ops.push(['Gerar', () => acaoGerar(x)]);
+    if (edita) ops.push(['Anexar arquivo', () => acaoAnexar(x)], [x.status === 'nao_aplica' ? 'Voltar a pendente' : 'Não se aplica', () => acaoNaoAplica(x)]);
+    if (D.diario) ops.push([`Comentários${n ? ` (${n})` : ''}`, () => diario(x)]);
+    const m = document.createElement('div'); m.className = 'rm-menu'; m.dataset.de = x.id; m.innerHTML = ops.map((o, i) => `<button data-i="${i}">${esc(o[0])}</button>`).join('');
+    document.body.appendChild(m); const r = b.getBoundingClientRect(), h = m.offsetHeight; m.style.left = Math.max(8, r.right - m.offsetWidth) + 'px'; m.style.top = (r.bottom + h + 8 > innerHeight ? r.top - h - 4 : r.bottom + 4) + 'px';
+    m.querySelectorAll('button').forEach(o => o.onclick = () => { fecharMenu(); ops[+o.dataset.i][1](); });
+    setTimeout(() => { const fora = () => { fecharMenu(); document.removeEventListener('click', fora); window.removeEventListener('hashchange', fora); }; document.addEventListener('click', fora); window.addEventListener('hashchange', fora); }, 0); });
+  $$('[data-com]', corpo).forEach(a => a.onclick = (ev) => { ev.preventDefault(); diario(ents.find(y => y.id === a.dataset.com)); });
+  // diário do documento: vários comentários, do mais antigo para o mais novo, com autor, data e hora
+  function diario(x) { let mudou = false;
+    modal({ title: `${x.doc.codigo} — ${x.doc.nome}`, body: `<p class="small muted">Diário de ${esc(mesNome(k))}. Uso interno da equipe: não vai no pacote enviado. Continua aberto depois do envio do mês.</p><div id="rm-cl"></div>
+        ${pode ? '<label>Novo comentário<textarea id="rm-ct" rows="3" maxlength="4000" placeholder="O que foi conferido, o que falta, o que o escritório pediu…"></textarea></label>' : ''}`,
+      foot: `<button class="btn ghost" data-close>Fechar</button>${pode ? '<button class="btn primary" id="rm-ca">Adicionar comentário</button>' : ''}`,
+      onMount: (m, close) => { const uid = state.user?.id;
+        const pintar = () => { const L = comDe(x.id); $('#rm-cl', m).innerHTML = L.map(c => `<div class="rm-com"><small><b>${esc(c.por_nome || (c.por === uid ? 'Você' : 'Alguém da equipe'))}</b> · ${new Date(c.em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${pode && (c.por === uid || admin) ? ` · <a href="#" data-xc="${c.id}">excluir</a>` : ''}</small><div style="white-space:pre-wrap">${esc(c.texto)}</div></div>`).join('') || '<p class="empty">Nenhum comentário ainda.</p>';
+          $$('[data-xc]', m).forEach(a => a.onclick = async (ev) => { ev.preventDefault(); if (!await confirmDialog('Excluir este comentário?')) return; try { await q(sb.from('rma_comentarios').delete().eq('id', a.dataset.xc)); D.coms = D.coms.filter(c => c.id !== a.dataset.xc); mudou = true; pintar(); } catch (err) { fail(err); } }); };
+        pintar();
+        $('#rm-ca', m) && ($('#rm-ca', m).onclick = async () => { const t = $('#rm-ct', m).value.trim(); if (!t) return toast('Escreva o comentário.', true);
+          try { const r = await q(sb.from('rma_comentarios').insert({ empresa_id: e, entrega_id: x.id, texto: t }).select('*')); if (r[0]) D.coms.push(r[0]); $('#rm-ct', m).value = ''; mudou = true; pintar(); $('#rm-ct', m).focus(); } catch (err) { fail(err); } });
+        m.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { if (mudou) re(); })); } }); }
   on('#rm-zip', async (ev) => { ev.target.disabled = true; ev.target.textContent = 'Montando…';
     try { const JSZip = await carregarZip(), zip = new JSZip(), pasta = zip.folder(`${cfg.sigla.toUpperCase()}_RMA_${k.slice(0, 7)}`), linhas = [`RMA — ${empresaNome}`, `Competência: ${mesNome(k)}`, cfg.processo ? `Processo nº ${cfg.processo}` : '', ''];
       for (const x of ents) { const A = arqDe(x.id); linhas.push(`${x.doc.codigo} ${x.doc.nome}: ${x.status === 'nao_aplica' ? 'NÃO SE APLICA — ' + (x.justificativa || '') : A.length ? A.map(a => a.nome).join(', ') : 'PENDENTE'}`);

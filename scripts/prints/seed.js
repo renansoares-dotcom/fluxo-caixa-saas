@@ -2554,6 +2554,8 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
     if (pronto) for (const ext of d.codigo === '06' ? CT.map(() => 'pdf') : d.formatos) { const seq = DB.rma_arquivos.filter(a => a.entrega_id === id).length, nome = d.codigo === '06' ? `EXEMPLO_RMA_${mes.slice(0, 7)}_06_Extrato_${CT[seq].nome.replace(/\s+/g, '_')}.pdf` : `EXEMPLO_RMA_${mes.slice(0, 7)}_${d.codigo}_${d.arquivo}.${ext}`;
       DB.rma_arquivos.push({ id: `ra${id}${seq}`, conta_id: d.codigo === '06' ? CT[seq].id : null, empresa_id: E, entrega_id: id, nome, caminho: `${E}/${mes.slice(0, 7)}/${nome}`, tamanho: 90000, origem: d.fonte === 'anexo' ? 'anexo' : 'gerado', em: prazo(mes).slice(0, 8) + '12T10:00:00Z' }); }
   }
+  DB.rma_comentarios = [['re1006', 'Extratos do Banco Alfa e do Banco Beta conferidos com o banco.', 'Ana Financeiro', '2026-11-10T14:12:00Z'], ['re1006', 'Falta fechar o Caixa para liberar os demais relatórios.', 'Ana Financeiro', '2026-11-12T09:40:00Z'],
+    ['re1001', 'Balancete pedido à contabilidade em 05/11; prometido para o dia 18.', 'Carlos Diretor', '2026-11-05T16:05:00Z']].map(([entrega_id, texto, por_nome, em], i) => ({ id: 'rc' + i, empresa_id: E, entrega_id, texto, por: null, por_nome, em }));
   DB.contas_travas = DB.contas.filter(c => c.ativo !== false).map((c, i) => ({ id: 'tv' + i, empresa_id: E, conta_id: c.id, ate: i < 2 ? '2026-10-31' : '2026-09-30', saldo_banco: null, saldo_sistema: null, observacao: 'conciliado e batendo', ativo: true, criado_em: '2026-11-10T14:00:00Z' }));
   window.RPC.rma_pode = () => true; window.RPC.rma_abrir_mes = () => 14; window.RPC.rma_enviar = () => null; window.RPC.rma_reabrir = () => null; window.RPC.rma_documentos_padrao = () => 13;
 }

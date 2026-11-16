@@ -1,7 +1,7 @@
 ---
 titulo: RMA — Relatório Mensal de Atividades da recuperação judicial
 tela: Financeiro › RMA — Recuperação Judicial (FIN026)
-versao: 1.2
+versao: 1.3
 atualizado: 2026-11-16
 ---
 ## 1. Para que serve
@@ -93,9 +93,11 @@ Em **Documentos pedidos** o administrador muda nome, grupo, trecho do nome do ar
 ## 5. Montar o pacote do mês
 
 1. Escolha o mês e clique em **Abrir o pacote do mês**. A tela cria uma linha para cada documento da lista.
-2. Clique em **Gerar os relatórios da plataforma**. Os documentos 04, 07, 08, 09, 10 e 12 são gerados em PDF e Excel e já ficam prontos, e o 06 recebe o extrato das contas já fechadas no mês. **Gerar**, em cada linha, refaz só aquele; o arquivo novo substitui o anterior.
-3. Nos demais, clique em **Anexar** e escolha um ou mais arquivos (até 25 MB cada). O arquivo é renomeado para o padrão. O link "abrir a tela de origem" leva à tela de onde o documento costuma sair.
-4. Quando um documento não existe no mês (balanço não encerrado, nenhuma constrição), use **Não se aplica** e escreva o motivo. Ele vai junto no índice do pacote.
+Em cada linha, o botão **⋯** (três pontinhos) abre as opções daquele documento: **Gerar**, **Anexar arquivo**, **Não se aplica** e **Comentários**.
+
+2. Clique em **Gerar os relatórios da plataforma**. Os documentos 04, 07, 08, 09, 10 e 12 são gerados em PDF e Excel e já ficam prontos, e o 06 recebe o extrato das contas já fechadas no mês. **⋯ › Gerar**, em cada linha, refaz só aquele; o arquivo novo substitui o anterior.
+3. Nos demais, use **⋯ › Anexar arquivo** e escolha um ou mais arquivos (até 25 MB cada). O arquivo é renomeado para o padrão. O link "abrir a tela de origem" leva à tela de onde o documento costuma sair.
+4. Quando um documento não existe no mês (balanço não encerrado, nenhuma constrição), use **⋯ › Não se aplica** e escreva o motivo. Ele vai junto no índice do pacote.
 
 Um documento fica **Pronto** quando tem ao menos um arquivo.
 
@@ -113,11 +115,23 @@ Com o automático ligado nos Parâmetros, você não precisa vir a esta tela par
 O que observar:
 
 - o nome do arquivo leva a conta: `SIGLA_RMA_2026-04_06_Extrato_Bradesco.pdf`;
-- fechar de novo a mesma conta refaz o extrato do último mês coberto; os meses anteriores que já têm arquivo ficam como estão. Para refazer um deles, use **Gerar** na linha do documento 06;
+- fechar de novo a mesma conta refaz o extrato do último mês coberto; os meses anteriores que já têm arquivo ficam como estão. Para refazer um deles, use **⋯ › Gerar** na linha do documento 06;
 - mês com o envio já registrado não é alterado;
 - a faixa **Bancos do mês**, no alto do pacote, mostra quantas contas estão fechadas e quais faltam;
 - as contas de cheques (em carteira e emitidos) são de controle interno e não entram. Outras contas que não devem entrar são marcadas nos Parâmetros;
 - a geração acontece na tela de quem fecha a conta. Se a pessoa não opera o RMA, a conta é fechada normalmente e o extrato fica para ser gerado aqui.
+
+### 5.2 Diário do documento
+
+![Figura 5 — Diário do documento: comentários da equipe com autor, data e hora (dados fictícios)](img/rma-5.jpg)
+
+Cada documento do mês tem um diário de comentários:
+
+1. Na linha do documento, clique em **⋯ › Comentários**.
+2. Escreva e clique em **Adicionar comentário**. Pode adicionar quantos quiser; eles ficam em ordem, com quem escreveu, a data e a hora.
+3. A linha do documento passa a mostrar quantos comentários há e o começo do último. Clicar ali abre o diário.
+
+O diário é de uso interno: **não vai no pacote enviado**. Ele continua aberto depois do envio do mês, para anotar o que quem recebe devolveu ou pediu. Comentário não é editado; quem escreveu (ou o administrador) pode excluir.
 
 ## 6. O que cada relatório gerado traz
 
@@ -190,3 +204,4 @@ A tela só registra o envio com todos os documentos obrigatórios prontos ou mar
 | 1.0 | 16/11/2026 | Primeira versão: ativação por empresa, parâmetros, lista de documentos, pacote mensal, seis relatórios gerados em PDF e Excel, anexos com nome padronizado, pacote .zip, registro do envio, reabertura e alertas. |
 | 1.1 | 16/11/2026 | Automático pelo fechamento do banco: o extrato conciliado de cada conta entra no documento 06 ao fechar e travar a conta, e os demais relatórios são gerados quando todas as contas do mês estão fechadas; parâmetros do automático e contas fora do RMA; documento 05 (conciliações) na lista padrão. |
 | 1.2 | 16/11/2026 | PDFs do RMA sem a linha do processo abaixo do nome da empresa; no extrato, a situação passa a "Conciliado e fechado", sem data. |
+| 1.3 | 16/11/2026 | Opções de cada documento reunidas no botão ⋯ (três pontinhos) e diário de comentários por documento, com vários comentários, autor, data e hora. |

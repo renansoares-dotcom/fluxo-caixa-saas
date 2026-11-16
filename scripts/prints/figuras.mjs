@@ -348,5 +348,6 @@ export const FIGS = [
   ['rma', 'rma', '### 3.1', 'Parâmetros do RMA: ativação, sigla dos arquivos, primeiro mês, prazo, processo e quem recebe', 'click:#rm-par'],
   ['rma', 'rma', '### 3.2', 'Documentos pedidos: a lista que forma o pacote de cada mês', 'click:#rm-docs'],
   ['rma', 'rma', '## 7.', 'Registrar o envio do mês, com protocolo e comentários da administração', 'click:.rm-mes[data-mes="2026-09-01"]|click:#rm-enviar'],
+  ['rma', 'rma', '### 5.2', 'Diário do documento: comentários da equipe com autor, data e hora', 'click:.rm-mes[data-mes="2026-10-01"]|click:[data-com="re1006"]'],
   ['importacao', 'compras/importacao', '### 6.3', 'Importação por meio de terceiro: repasses ao intermediário contra o total informado', 'click:.im-card[data-p="imp7"]|click:[data-paba="cambio"]'],
 ];
