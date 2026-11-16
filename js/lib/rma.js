@@ -11,7 +11,7 @@ export const iniMes = (m) => `${m.slice(0, 7)}-01`;
 export const fimMes = (m) => `${m.slice(0, 7)}-${String(new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate()).padStart(2, '0')}`;
 const br = (s) => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '';
 export const STATUS = { pendente: ['Pendente', 'warn'], pronto: ['Pronto', 'pos'], nao_aplica: ['Não se aplica', ''] };
-export const FONTES = { anexo: 'Anexado pela equipe', fluxo_caixa: 'Fluxo de caixa do mês', titulos: 'Contas a pagar e a receber', faturamento: 'Faturamento do mês', notas_emitidas: 'Notas fiscais emitidas', vendas: 'Vendas por cliente', contratos: 'Contratos do período' };
+export const FONTES = { anexo: 'Anexado pela equipe', fluxo_caixa: 'Fluxo de caixa do mês', titulos: 'Contas a pagar e a receber', faturamento: 'Faturamento do mês', notas_emitidas: 'Notas fiscais emitidas', vendas: 'Vendas por cliente', contratos: 'Contratos do período', extrato_conta: 'Extrato da conta, ao fechar o banco' };
 
 /** meses de competência do RMA, do primeiro mês até o último mês encerrado (o mês corrente não entra), do mais novo para o mais antigo */
 export function mesesDevidos(inicio, hoje) {
@@ -48,6 +48,22 @@ export function alertas(cfg, meses, entregas, docs, hoje) {
   }
   return out;
 }
+
+/** meses de competência inteiramente cobertos pelo fechamento de uma conta (fechada até `ate`), do mais antigo para o mais novo */
+export function mesesCobertos(inicio, ate) {
+  const out = []; let a = +inicio.slice(0, 4), m = +inicio.slice(5, 7);
+  for (let i = 0; i < 240; i++) { const k = `${a}-${String(m).padStart(2, '0')}-01`; if (fimMes(k) > ate) break; out.push(k); m++; if (m === 13) { m = 1; a++; } }
+  return out;
+}
+/** contas que entram no RMA: ativas, fora da lista de exclusão dos parâmetros; as contas de cheques (carteira e emitidos) são de controle interno e nunca entram */
+export const contasDoRma = (contas, cfg) => contas.filter(c => c.ativo !== false && c.tipo !== 'Cheques' && !(cfg?.contas_fora || []).includes(c.id));
+/** o mês está com todos os bancos fechados? travas: [{ conta_id, ate }] ativas. Devolve as contas que ainda faltam. */
+export function contasAbertasNoMes(mes, contas, travas, cfg) {
+  const T = Object.fromEntries(travas.map(t => [t.conta_id, t.ate])), fim = fimMes(mes);
+  return contasDoRma(contas, cfg).filter(c => !(T[c.id] && T[c.id] >= fim));
+}
+/** nome do arquivo do extrato de uma conta: SIGLA_RMA_2026-04_06_Extrato_Bradesco.pdf */
+export const nomeExtrato = (sigla, mes, doc, conta, ext = 'pdf') => nomeArquivo(sigla, mes, { codigo: doc.codigo, arquivo: 'Extrato_' + String(conta.nome || 'conta').trim().replace(/\s+/g, '_') }, ext);
 
 // ---------------------------------------------------------------- relatórios gerados
 const soma = (L, f) => r2(L.reduce((s, x) => s + n(f(x)), 0));
@@ -148,6 +164,40 @@ export function contratosPeriodo(mes, contratos, empresa = '') {
   return { ...cab('Relação de contratos firmados, alterados ou rescindidos', mes, empresa), tabelas: [
     { nome: 'Contratos do período', cab: ['Ocorrência', 'Data', 'Número', 'Parte', 'Objeto', 'Natureza', 'Valor (R$)', 'Periodicidade', 'Início', 'Fim'], num: [6], linhas: linhas.length ? linhas : [['Sem contratos firmados, alterados ou rescindidos no período', '', '', '', '', '', '', '', '', '']] },
   ], notas: ['Fonte: Cadastros › Contratos. "Alterado" são contratos vigentes modificados no mês (reajuste, valor, prazo ou parte).'], totais: { firmados: firmados.length, alterados: alt.length, encerrados: enc.length } };
+}
+
+/**
+ * Extrato conciliado de uma conta no mês: quadro do fechamento (saldo da plataforma × saldo conferido no banco), resumo e cada
+ * lançamento pago com o saldo corrente. Transferência entra nas duas contas (sai de conta_id, entra em conta_destino_id).
+ * lancs: pagos do mês em que a conta é origem ou destino; planos com natureza C|D; fecho: { ate, saldo_banco, saldo_sistema, observacao, por, em, pendentes, valorPendente }.
+ */
+export function extratoConta(mes, conta, lancs, planos, favs = {}, saldoInicial = 0, fecho = null, empresa = '') {
+  const P = Object.fromEntries(planos.map(p => [p.id, p])), ini = iniMes(mes), fim = fimMes(mes);
+  const L = lancs.filter(l => l.status === 'Pago' && l.data >= ini && l.data <= fim && (l.conta_id === conta.id || l.conta_destino_id === conta.id))
+    .flatMap(l => { const out = [];
+      if (l.conta_id === conta.id) out.push({ l, sinal: (P[l.plano_id]?.natureza === 'C' ? 1 : -1) * n(l.valor), transf: l.conta_destino_id ? 'Transferência enviada' : '' });
+      if (l.conta_destino_id === conta.id) out.push({ l, sinal: n(l.valor), transf: 'Transferência recebida' });
+      return out; })
+    .sort((a, b) => a.l.data.localeCompare(b.l.data) || String(a.l.created_at || '').localeCompare(String(b.l.created_at || '')));
+  let s = r2(n(saldoInicial)); const linhas = [];
+  for (const x of L) { s = r2(s + x.sinal); const p = P[x.l.plano_id];
+    linhas.push([br(x.l.data), [favs[x.l.favorecido_id], x.l.descricao, x.transf].filter(Boolean).join(' — ') || (p?.nome || ''), p ? `${p.codigo} ${p.nome}` : '', x.l.documento || '', x.sinal > 0 ? r2(x.sinal) : '', x.sinal < 0 ? r2(-x.sinal) : '', s]); }
+  const ent = soma(L.filter(x => x.sinal > 0), x => x.sinal), sai = soma(L.filter(x => x.sinal < 0), x => -x.sinal), final = r2(n(saldoInicial) + ent - sai);
+  const banco = [conta.instituicao, conta.agencia && `agência ${conta.agencia}`, conta.numero && `conta ${conta.numero}`].filter(Boolean).join(' · ');
+  const noMes = fecho && fecho.ate === fim, dif = noMes && fecho.saldo_banco != null ? r2(n(fecho.saldo_banco) - final) : null;
+  const quadro = [['Conta', conta.nome + (banco ? ` (${banco})` : '')], ['Situação', fecho ? `Conciliada e fechada até ${br(fecho.ate)}` : 'Conta ainda não fechada neste mês'],
+    ['Saldo da plataforma em ' + br(fim), final]];
+  if (noMes && fecho.saldo_banco != null) quadro.push(['Saldo conferido no banco em ' + br(fim), r2(n(fecho.saldo_banco))], ['Diferença', dif]);
+  if (fecho?.pendentes) quadro.push([`Movimentos do extrato do banco sem conciliar no mês (${fecho.pendentes})`, r2(n(fecho.valorPendente))]);
+  if (fecho?.por || fecho?.em) quadro.push(['Fechada por', [fecho.por, fecho.em && br(fecho.em)].filter(Boolean).join(' em ')]);
+  if (fecho?.observacao) quadro.push(['Observação do fechamento', fecho.observacao]);
+  return { ...cab('Extrato conciliado da conta', mes, empresa), periodo: `${conta.nome} — ${br(ini)} a ${br(fim)}`, tabelas: [
+    { nome: 'Fechamento da conta', cab: ['', 'Informação'], num: [1], linhas: quadro },
+    { nome: 'Resumo do mês', cab: ['Saldo inicial', '(+) Entradas', '(-) Saídas', '(=) Saldo final'], num: [0, 1, 2, 3], linhas: [[r2(n(saldoInicial)), ent, sai, final]] },
+    { nome: 'Movimentos', cab: ['Data', 'Histórico', 'Conta do plano', 'Documento', 'Entrada', 'Saída', 'Saldo'], num: [4, 5, 6], linhas: linhas.length ? linhas : [['', 'Sem movimento no período', '', '', '', '', final]], total: ['', `${L.length} lançamento(s)`, '', '', ent, sai, final] },
+  ], notas: ['Lançamentos pagos e recebidos da conta na plataforma, os mesmos conferidos com o extrato do banco na conciliação. Transferências entre contas da empresa aparecem nas duas contas.',
+    dif != null && Math.abs(dif) > 0.05 ? `Atenção: o saldo conferido no banco difere do saldo da plataforma em ${dif.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.` : null].filter(Boolean),
+    totais: { saldo_inicial: r2(n(saldoInicial)), entradas: ent, saidas: sai, saldo_final: final, qtd: L.length, diferenca: dif } };
 }
 
 export const GERADORES = { fluxo_caixa: fluxoCaixa, titulos: titulosAbertos, faturamento, notas_emitidas: notasEmitidas, vendas: vendasPorCliente, contratos: contratosPeriodo };

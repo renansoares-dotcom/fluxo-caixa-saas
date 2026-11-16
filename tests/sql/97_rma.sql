@@ -31,20 +31,20 @@ select pg_temp.entrar(:ADM);
 insert into rma_config(empresa_id, ativo, sigla, mes_inicio, dia_entrega) values (:E, false, 'EXEMPLO', '2026-04-01', 15);
 select pg_temp.falha($q$select rma_abrir_mes('e000000a-0000-0000-0000-000000000000', '2026-10-01')$q$, 'desligado não abre mês');
 update rma_config set ativo = true where empresa_id = :E;
-select pg_temp.ok(rma_documentos_padrao(:E) = 13, 'lista padrão com os 13 documentos pedidos');
+select pg_temp.ok(rma_documentos_padrao(:E) = 14, 'lista padrão com os 14 documentos pedidos');
 select pg_temp.ok(rma_documentos_padrao(:E) = 0, 'lista padrão não duplica');
 select pg_temp.falha($q$update rma_documentos set formatos = array['doc'] where empresa_id = 'e000000a-0000-0000-0000-000000000000' and codigo = '01'$q$, 'formato fora de pdf e xlsx');
 select pg_temp.entrar(:CMP);
 select pg_temp.ok(not rma_pode(:E) and (select ativo from rma_config where empresa_id = :E), 'compras não opera, mas enxerga que o módulo está ligado');
 select pg_temp.ok((select count(*) = 0 from rma_documentos where empresa_id = :E), 'compras não vê os documentos');
 select pg_temp.entrar(:LEI);
-select pg_temp.ok(not rma_pode(:E) and (select count(*) = 13 from rma_documentos where empresa_id = :E), 'leitura consulta');
+select pg_temp.ok(not rma_pode(:E) and (select count(*) = 14 from rma_documentos where empresa_id = :E), 'leitura consulta');
 
 -- ---------- pacote do mês ----------
 select pg_temp.entrar(:FIN);
 select pg_temp.falha($q$select rma_abrir_mes('e000000a-0000-0000-0000-000000000000', '2026-03-01')$q$, 'antes do primeiro mês');
 select pg_temp.falha($q$select rma_abrir_mes('e000000a-0000-0000-0000-000000000000', (date_trunc('month', current_date) + interval '1 month')::date)$q$, 'mês futuro');
-select pg_temp.ok(rma_abrir_mes(:E, '2026-10-17') = 13, 'abre o mês com uma entrega por documento');
+select pg_temp.ok(rma_abrir_mes(:E, '2026-10-17') = 14, 'abre o mês com uma entrega por documento');
 select pg_temp.ok((select prazo = '2026-11-15' and status = 'aberto' from rma_meses where empresa_id = :E and mes = :M), 'prazo no dia configurado do mês seguinte');
 select pg_temp.ok(rma_abrir_mes(:E, :M) = 0, 'abrir de novo não duplica');
 select id as "E04" from rma_entregas e where e.empresa_id = :E and e.mes = :M and e.documento_id = (select id from rma_documentos where empresa_id = :E and codigo = '04') \gset
@@ -75,3 +75,14 @@ update rma_entregas set observacao = 'ok' where id = :'E04';
 reset role;
 select pg_temp.ok((select count(*) >= 1 from notificacoes where tipo = 'rma' and user_id = 'a0000000-0000-0000-0000-00000000000a'), 'envio avisa a equipe');
 select pg_temp.ok((select count(*) from auditoria where tabela = 'rma_entregas') > 0, 'auditoria gravada');
+
+-- ---------- RMA automático (SQL 163) ----------
+select pg_temp.ok((select auto_extrato and auto_relatorios and contas_fora = '{}' from rma_config where empresa_id = :E), 'automático ligado por padrão');
+select pg_temp.ok((select fonte = 'extrato_conta' and tela = 'fechamento' from rma_documentos where empresa_id = :E and codigo = '06'), 'extratos passam a sair do fechamento do banco');
+select pg_temp.ok((select fonte = 'anexo' from rma_documentos where empresa_id = :E and codigo = '05'), 'lista padrão traz o 05 (conciliações)');
+select pg_temp.entrar(:FIN);
+select id as "E06" from rma_entregas e where e.empresa_id = :E and e.mes = :M and e.documento_id = (select id from rma_documentos where empresa_id = :E and codigo = '06') \gset
+insert into rma_arquivos(empresa_id, entrega_id, nome, caminho, origem, conta_id) values (:E, :'E06', 'EXEMPLO_RMA_2026-10_06_Extrato_BANCO.pdf', 'e000000a-0000-0000-0000-000000000000/2026-10/ext.pdf', 'gerado', 'c000000a-0000-0000-0000-000000000000');
+select pg_temp.ok((select count(*) = 1 from rma_arquivos where entrega_id = :'E06' and conta_id is not null), 'arquivo do extrato ligado à conta');
+select pg_temp.falha($q$update rma_documentos set fonte = 'outra' where empresa_id = 'e000000a-0000-0000-0000-000000000000' and codigo = '06'$q$, 'origem inválida');
+reset role;

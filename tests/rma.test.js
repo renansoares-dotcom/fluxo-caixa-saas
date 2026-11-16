@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mesesDevidos, prazoMes, nomeArquivo, resumoMes, alertas, fimMes, mesNome, fluxoCaixa, titulosAbertos, notasEmitidas, faturamento, vendasPorCliente, contratosPeriodo, paraPlanilhas, GERADORES } from '../js/lib/rma.js';
+import { mesesDevidos, prazoMes, nomeArquivo, resumoMes, alertas, fimMes, mesNome, fluxoCaixa, titulosAbertos, notasEmitidas, faturamento, vendasPorCliente, contratosPeriodo, paraPlanilhas, GERADORES, mesesCobertos, contasAbertasNoMes, contasDoRma, nomeExtrato, extratoConta } from '../js/lib/rma.js';
 
 test('meses, prazo e nome padronizado do arquivo', () => {
   assert.deepEqual(mesesDevidos('2026-04-01', '2026-11-16'), ['2026-10-01', '2026-09-01', '2026-08-01', '2026-07-01', '2026-06-01', '2026-05-01', '2026-04-01']);
@@ -66,4 +66,24 @@ test('contratos do período e planilhas', () => {
   assert.match(contratosPeriodo('2026-07-01', C).tabelas[0].linhas[0][0], /Sem contratos/);
   const P = paraPlanilhas(fluxoCaixa('2026-10-01', [], planos, [], [], 'EXEMPLO')); assert.equal(P.length, 4); assert.equal(P[0].linhas[0][0], 'EXEMPLO'); assert.deepEqual(P[1].linhas[4], ['Código', 'Conta', 'Grupo', 'Valor (R$)']);
   assert.deepEqual(Object.keys(GERADORES), ['fluxo_caixa', 'titulos', 'faturamento', 'notas_emitidas', 'vendas', 'contratos']);
+});
+test('fechamento do banco: meses cobertos, contas que faltam e extrato conciliado da conta', () => {
+  assert.deepEqual(mesesCobertos('2026-04-01', '2026-06-30'), ['2026-04-01', '2026-05-01', '2026-06-01']);
+  assert.deepEqual(mesesCobertos('2026-04-01', '2026-06-29'), ['2026-04-01', '2026-05-01']); assert.deepEqual(mesesCobertos('2026-04-01', '2026-04-15'), []);
+  const contas = [{ id: 'b', nome: 'BRADESCO' }, { id: 'i', nome: 'ITAÚ' }, { id: 'x', nome: 'BLOQUEIO JUDICIAL' }, { id: 'z', nome: 'VELHA', ativo: false }], cfg = { contas_fora: ['x'] };
+  assert.deepEqual(contasDoRma(contas, cfg).map(c => c.id), ['b', 'i']);
+  assert.deepEqual(contasAbertasNoMes('2026-04-01', contas, [{ conta_id: 'b', ate: '2026-04-30' }, { conta_id: 'i', ate: '2026-04-29' }], cfg).map(c => c.id), ['i']);
+  assert.deepEqual(contasAbertasNoMes('2026-04-01', contas, [{ conta_id: 'b', ate: '2026-10-31' }, { conta_id: 'i', ate: '2026-04-30' }], cfg), []);
+  assert.equal(nomeExtrato('IPLAMM', '2026-04-01', { codigo: '06' }, { nome: 'Bradesco  Conta Movimento' }), 'IPLAMM_RMA_2026-04_06_Extrato_Bradesco_Conta_Movimento.pdf');
+  const pl = [{ id: 'r', codigo: '1.01', nome: 'VENDAS', natureza: 'C' }, { id: 'f', codigo: '2.01', nome: 'FORNECEDORES', natureza: 'D' }, { id: 't', codigo: '9', nome: 'TRANSFERÊNCIA', natureza: 'D' }];
+  const L = [{ plano_id: 'r', status: 'Pago', data: '2026-04-02', valor: 1000, conta_id: 'b', favorecido_id: 'c', descricao: 'NF 10', created_at: '1' }, { plano_id: 'f', status: 'Pago', data: '2026-04-02', valor: 300, conta_id: 'b', created_at: '2' },
+    { plano_id: 't', status: 'Pago', data: '2026-04-10', valor: 200, conta_id: 'b', conta_destino_id: 'i' }, { plano_id: 't', status: 'Pago', data: '2026-04-11', valor: 50, conta_id: 'i', conta_destino_id: 'b' },
+    { plano_id: 'r', status: 'Em aberto', data: '2026-04-12', valor: 999, conta_id: 'b' }, { plano_id: 'r', status: 'Pago', data: '2026-05-01', valor: 999, conta_id: 'b' }, { plano_id: 'r', status: 'Pago', data: '2026-04-05', valor: 999, conta_id: 'i' }];
+  const e = extratoConta('2026-04-01', contas[0], L, pl, { c: 'CLIENTE A' }, 100, { ate: '2026-04-30', saldo_banco: 650, por: 'Renan', em: '2026-05-04', pendentes: 0 }, 'EXEMPLO');
+  assert.deepEqual(e.totais, { saldo_inicial: 100, entradas: 1050, saidas: 500, saldo_final: 650, qtd: 4, diferenca: 0 });
+  assert.deepEqual(e.tabelas[2].linhas.map(l => l[6]), [1100, 800, 600, 650]); assert.equal(e.tabelas[2].linhas[0][1], 'CLIENTE A — NF 10'); assert.match(e.tabelas[2].linhas[3][1], /Transferência recebida/);
+  assert.equal(e.notas.length, 1); assert.equal(e.periodo, 'BRADESCO — 01/04/2026 a 30/04/2026'); assert.equal(e.tabelas[0].linhas[1][1], 'Conciliada e fechada até 30/04/2026');
+  const d = extratoConta('2026-04-01', contas[0], L, pl, {}, 100, { ate: '2026-04-30', saldo_banco: 640 }); assert.equal(d.totais.diferenca, -10); assert.equal(d.notas.length, 2);
+  const o = extratoConta('2026-04-01', contas[0], L, pl, {}, 100, { ate: '2026-10-31', saldo_banco: 5 }); assert.equal(o.totais.diferenca, null); assert.equal(o.tabelas[0].linhas.length, 3);
+  assert.match(extratoConta('2026-07-01', contas[0], [], pl, {}, 30).tabelas[2].linhas[0][1], /Sem movimento/);
 });

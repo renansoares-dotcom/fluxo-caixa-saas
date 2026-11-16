@@ -263,6 +263,10 @@ function fecharConta(R, contaId, root) {
       if (x.trava) await q(sb.from('contas_travas').update({ ativo: false, desfeito_por: state.user?.id, desfeito_em: new Date().toISOString() }).eq('id', x.trava.id));
       await q(sb.from('contas_travas').insert({ empresa_id: state.empresa.id, conta_id: contaId, ate: info.data, saldo_sistema: +info.saldo.toFixed(2), saldo_banco: v == null ? null : +v.toFixed(2), observacao: obs }));
       toast(`${x.ct.nome} fechada até ${dateBR(info.data)}`); m.close(); carregar(root);
+      // RMA da recuperação judicial (SQL 163): o extrato conciliado da conta entra sozinho no pacote de cada mês coberto
+      import(`../lib/rma-gerar.js?v=${Date.now()}`).then(r => r.aoFecharConta(state.empresa.id, contaId, info.data)).then(r => {
+        if (r && (r.extratos || r.relatorios)) toast(`RMA: ${r.extratos ? `extrato de ${x.ct.nome} em ${r.extratos} mês(es)` : ''}${r.extratos && r.relatorios ? ' e ' : ''}${r.relatorios ? `${r.relatorios} relatório(s) gerado(s)` : ''}.`);
+      }).catch(e => { console.warn('[RMA]', e); toast('A conta foi fechada, mas o extrato não entrou no RMA. Gere pela tela do RMA.', true); });
     } catch (e) { fail(e); }
   };
 }

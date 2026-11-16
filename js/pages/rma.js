@@ -3,13 +3,14 @@
 // lista de documentos pedidos pelo escritório que acompanha a recuperação: os que a plataforma gera (fluxo de caixa, contas a
 // pagar e a receber, faturamento, notas emitidas, vendas e contratos) saem em PDF e Excel com nome padronizado; os demais são
 // anexados. Situação de cada documento, prazo, pacote em .zip, registro do envio e reabertura. Pedido do Renan em 16/11/2026.
-import { sb, state, q, fetchAll, loadCadastros } from '../lib/data.js';
+import { sb, state, q, loadCadastros } from '../lib/data.js';
 import { $, $$, esc, toast, fail, modal, dateBR, today, confirmDialog } from '../lib/ui.js';
 import { kpiGrid } from '../lib/componentes.js';
-import { STATUS, FONTES, GERADORES, mesNome, mesCurto, iniMes, fimMes, mesesDevidos, prazoMes, nomeArquivo, resumoMes, alertas, paraPlanilhas } from '../lib/rma.js';
+import { STATUS, FONTES, mesNome, mesCurto, fimMes, mesesDevidos, prazoMes, nomeArquivo, resumoMes, alertas, contasDoRma, contasAbertasNoMes } from '../lib/rma.js';
+import { contexto, guardar as guardarArq, gerarDocumento, gerarExtratos, travasAtivas } from '../lib/rma-gerar.js';
 
 export const title = 'RMA — Recuperação Judicial';
-const CFG0 = { ativo: false, papeis: ['financeiro', 'diretor'], sigla: '', processo: '', vara: '', escritorio: '', contato_nome: '', contato_email: '', mes_inicio: null, dia_entrega: 20, dias_aviso: 5, avisar: true };
+const CFG0 = { ativo: false, auto_extrato: true, auto_relatorios: true, contas_fora: [], papeis: ['financeiro', 'diretor'], sigla: '', processo: '', vara: '', escritorio: '', contato_nome: '', contato_email: '', mes_inicio: null, dia_entrega: 20, dias_aviso: 5, avisar: true };
 const ui = { mes: null };
 const SIT = { nao_aberto: ['Não aberto', ''], andamento: ['Em andamento', 'warn'], pronto: ['Pronto para enviar', 'info'], atrasado: ['Atrasado', 'neg'], enviado: ['Enviado', 'pos'] };
 const CSS = `<style>
@@ -32,56 +33,16 @@ const carregarZip = () => globalThis.JSZip ? Promise.resolve(globalThis.JSZip) :
 const nv = (v) => (+v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 async function dados(e) {
-  const Cf = await q(sb.from('rma_config').select('*').eq('empresa_id', e));
-  const cfg = { ...CFG0, ...(Cf[0] || {}), _existe: !!Cf[0] };
-  if (!cfg.ativo) return { cfg, docs: [], meses: [], ent: [], arqs: [], pode: false };
-  const [docs, meses, ent, arqs, pode] = await Promise.all([
-    q(sb.from('rma_documentos').select('*').eq('empresa_id', e).order('ordem')),
-    q(sb.from('rma_meses').select('*').eq('empresa_id', e).order('mes', { ascending: false })),
-    fetchAll(() => sb.from('rma_entregas').select('*').eq('empresa_id', e)),
-    fetchAll(() => sb.from('rma_arquivos').select('*').eq('empresa_id', e).order('em')),
-    q(sb.rpc('rma_pode', { p_empresa: e })),
-  ]);
-  return { cfg, docs, meses, ent, arqs, pode: !!pode };
+  const C = await contexto(e), cfg = { ...CFG0, ...(C.cfg || {}), _existe: !!C.cfg };
+  if (!cfg.ativo) return { ...C, cfg, pode: false };
+  C.meses.sort((a, b) => b.mes.localeCompare(a.mes));
+  return { ...C, cfg, pode: !!(await q(sb.rpc('rma_pode', { p_empresa: e }))) };
 }
 
 /** alertas para a Central de Decisões (regra 30) */
 export async function alertasDecisao() {
   try { const D = await dados(state.empresa.id); return alertas(D.cfg, D.meses, D.ent, D.docs, today()); } catch { return []; }
 }
-
-// ---------------------------------------------------------------- arquivos gerados
-function pdfDe(rel, cfg) {
-  if (!window.jspdf) throw new Error('Biblioteca de PDF ainda carregando; tente de novo em instantes.');
-  const { jsPDF } = window.jspdf, largo = rel.tabelas.some(t => t.cab.length > 6), doc = new jsPDF({ orientation: largo ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
-  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 12;
-  const topo = () => { doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(30); doc.text(String(rel.empresa || ''), M, 13);
-    doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(90); doc.text('Em recuperação judicial' + (cfg.processo ? ` — Processo nº ${cfg.processo}` : '') + (cfg.vara ? ` — ${cfg.vara}` : ''), M, 17.5);
-    doc.text('RMA — Relatório Mensal de Atividades', W - M, 13, { align: 'right' }); doc.setDrawColor(160); doc.line(M, 20, W - M, 20); };
-  topo(); doc.setTextColor(20); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(rel.titulo, M, 28); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.text(rel.periodo, M, 33.5);
-  let y = 39;
-  for (const t of rel.tabelas) {
-    if (y > H - 40) { doc.addPage(); y = 26; }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(20); doc.text(t.nome, M, y); y += 2;
-    const fmt = (row) => row.map((v, i) => (t.num || []).includes(i) && typeof v === 'number' ? (Number.isInteger(v) && /Notas|notas/.test(t.cab[i]) ? String(v) : nv(v)) : (v ?? ''));
-    doc.autoTable({ startY: y, margin: { left: M, right: M, top: 24, bottom: 14 }, head: [t.cab], body: t.linhas.map(fmt), foot: t.total ? [fmt(t.total)] : undefined, theme: 'grid', showFoot: 'lastPage',
-      styles: { fontSize: largo ? 6.6 : 8, cellPadding: 1.1, lineColor: 200, lineWidth: 0.1, textColor: 20, overflow: 'linebreak' }, headStyles: { fillColor: [43, 85, 152], textColor: 255, fontStyle: 'bold' }, footStyles: { fillColor: 235, textColor: 20, fontStyle: 'bold' },
-      columnStyles: Object.fromEntries((t.num || []).map(i => [i, { halign: 'right' }])), didParseCell: (c) => { if ((t.num || []).includes(c.column.index)) c.cell.styles.halign = 'right'; }, didDrawPage: (d) => { if (d.pageNumber > 1) topo(); } });
-    y = doc.lastAutoTable.finalY + 8;
-  }
-  if (rel.notas?.length) { if (y > H - 30) { doc.addPage(); y = 28; } doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90);
-    for (const nt of rel.notas) { const L = doc.splitTextToSize(nt, W - 2 * M); doc.text(L, M, y); y += L.length * 3.4 + 1.5; } }
-  const tot = doc.getNumberOfPages(), ger = `Gerado pela plataforma em ${new Date().toLocaleString('pt-BR')}`;
-  for (let i = 1; i <= tot; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(120); doc.text(ger, M, H - 7); doc.text(`Página ${i} de ${tot}`, W - M, H - 7, { align: 'right' }); }
-  return doc.output('blob');
-}
-function xlsxDe(rel) {
-  if (!window.XLSX) throw new Error('Biblioteca de Excel ainda carregando; tente de novo em instantes.');
-  const wb = XLSX.utils.book_new(), usados = new Set();
-  for (const p of paraPlanilhas(rel)) { let nome = p.nome, k = 2; while (usados.has(nome)) nome = `${p.nome.slice(0, 28)} ${k++}`; usados.add(nome); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(p.linhas), nome); }
-  return new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-}
-const MIME = { pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 
 export async function render(root) {
   const e = state.empresa.id, hoje = today(), admin = state.papel === 'admin';
@@ -118,6 +79,7 @@ export async function render(root) {
 
   const k = ui.mes, mes = M[k], r = R(k), enviado = mes?.status === 'enviado', edita = pode && mes && !enviado;
   const ents = entDe(k).map(x => ({ ...x, doc: docDe(x.documento_id) })).filter(x => x.doc).sort((a, b) => a.doc.ordem - b.doc.ordem);
+  const contasRma = contasDoRma(state.cad?.contas || [], cfg), abertasNoMes = contasAbertasNoMes(k, state.cad?.contas || [], travasAtivas(D), cfg), bancosOk = contasRma.length > 0 && !abertasNoMes.length;
   const arqDe = (id) => D.arqs.filter(a => a.entrega_id === id);
   const grupos = [...new Set(ents.map(x => x.doc.grupo))];
   const enviados = mesesK.filter(x => M[x]?.status === 'enviado').length, atras = mesesK.filter(x => R(x).situacao === 'atrasado' || (!M[x] && prazoMes(x, cfg.dia_entrega) < hoje)).length;
@@ -132,15 +94,18 @@ export async function render(root) {
         <div style="display:flex;gap:8px;flex-wrap:wrap">${!mes && pode ? '<button class="btn primary" id="rm-abrir">Abrir o pacote do mês</button>' : ''}
           ${edita ? '<button class="btn" id="rm-gerar">Gerar os relatórios da plataforma</button>' : ''}${mes && D.arqs.some(a => ents.some(x => x.id === a.entrega_id)) ? '<button class="btn ghost" id="rm-zip">Baixar o pacote (.zip)</button>' : ''}
           ${edita ? `<button class="btn primary" id="rm-enviar" ${r.faltam ? 'title="Ainda há documento obrigatório pendente"' : ''}>Registrar o envio</button>` : ''}${pode && enviado ? '<button class="btn ghost" id="rm-reabrir">Reabrir o mês</button>' : ''}</div></div>
+      ${mes && contasRma.length ? `<p class="small" style="margin:8px 0 0"><b>Bancos do mês:</b> ${bancosOk ? `<span class="pos">todas as ${contasRma.length} conta(s) fechadas até ${dateBR(fimMes(k))}</span>` : `${contasRma.length - abertasNoMes.length} de ${contasRma.length} conta(s) fechadas até ${dateBR(fimMes(k))}; em aberto: ${esc(abertasNoMes.map(c => c.nome).join(', '))}`}.
+        ${cfg.auto_extrato ? ' O extrato entra aqui sozinho quando a conta é fechada.' : ''}${cfg.auto_relatorios ? ' Os demais relatórios são gerados quando todas estiverem fechadas.' : ''}</p>` : ''}
       ${mes?.comentario ? `<p class="small" style="white-space:pre-wrap;margin:8px 0 0"><b>Comentários da administração:</b> ${esc(mes.comentario)}</p>` : ''}</div>
     ${!mes ? `<div class="card" style="margin-top:12px"><div class="empty">O pacote de ${esc(mesNome(k))} ainda não foi aberto.${pode ? ' Abra para criar a lista de documentos do mês.' : ''}</div></div>` : `
     <div class="card flush" style="margin-top:12px"><div class="table-wrap"><table><thead><tr><th style="width:44px">Nº</th><th>Documento</th><th>De onde vem</th><th>Arquivos</th><th>Situação</th><th></th></tr></thead><tbody>
     ${grupos.map(g => `<tr><td colspan="6" class="small muted" style="background:var(--surface-2)"><b>${esc(g)}</b></td></tr>` + ents.filter(x => x.doc.grupo === g).map(x => { const A = arqDe(x.id), ger = x.doc.fonte !== 'anexo';
       return `<tr><td><b>${esc(x.doc.codigo)}</b></td><td class="wrap"><b>${esc(x.doc.nome)}</b>${x.doc.obrigatorio ? '' : ' <span class="small muted">(opcional)</span>'}${x.doc.orientacao ? `<div class="small muted">${esc(x.doc.orientacao)}</div>` : ''}${x.observacao ? `<div class="small">Obs.: ${esc(x.observacao)}</div>` : ''}</td>
-        <td class="small" style="max-width:150px">${ger ? `<span class="rm-st info">Gerado pela plataforma</span><div class="muted">${esc(FONTES[x.doc.fonte])}</div>` : `Anexo${x.doc.tela ? `<div><a href="#/${esc(x.doc.tela)}">abrir a tela de origem</a></div>` : ''}`}<div class="muted">${esc(x.doc.formatos.map(f => f.toUpperCase()).join(' e '))}</div></td>
-        <td style="min-width:170px">${A.map(a => `<div class="rm-arq"><a href="#" data-abrir="${esc(a.caminho)}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${edita ? `<button data-xa="${a.id}" title="Excluir o arquivo">✕</button>` : ''}</div>`).join('') || (x.status === 'nao_aplica' ? `<span class="small muted">${esc(x.justificativa || '')}</span>` : '<span class="small muted">nenhum arquivo</span>')}</td>
+        <td class="small wrap" style="width:180px">${x.doc.fonte === 'extrato_conta' ? `<span class="rm-st info">Automático ao fechar o banco</span><div class="muted">${contasRma.length - abertasNoMes.length} de ${contasRma.length} conta(s) fechada(s) no mês</div>${abertasNoMes.length ? `<div class="warn">falta: ${esc(abertasNoMes.slice(0, 4).map(c => c.nome).join(', '))}${abertasNoMes.length > 4 ? ` e mais ${abertasNoMes.length - 4}` : ''}</div>` : ''}<div><a href="#/fechamento">abrir o Fechamento do Mês</a></div>`
+          : ger ? `<span class="rm-st info">Gerado pela plataforma</span><div class="muted">${esc(FONTES[x.doc.fonte])}</div>` : `Anexo${x.doc.tela ? `<div><a href="#/${esc(x.doc.tela)}">abrir a tela de origem</a></div>` : ''}`}<div class="muted">${esc(x.doc.formatos.map(f => f.toUpperCase()).join(' e '))}</div></td>
+        <td class="wrap" style="overflow-wrap:anywhere">${A.map(a => `<div class="rm-arq"><a href="#" data-abrir="${esc(a.caminho)}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${edita ? `<button data-xa="${a.id}" title="Excluir o arquivo">✕</button>` : ''}</div>`).join('') || (x.status === 'nao_aplica' ? `<span class="small muted">${esc(x.justificativa || '')}</span>` : '<span class="small muted">nenhum arquivo</span>')}</td>
         <td><span class="rm-st ${STATUS[x.status][1]}">${STATUS[x.status][0]}</span></td>
-        <td style="min-width:150px">${edita ? `${ger ? `<button class="btn small" data-ger="${x.id}">Gerar</button> ` : ''}<button class="btn ghost small" data-anx="${x.id}">Anexar</button> <button class="btn ghost small" data-mais="${x.id}">${x.status === 'nao_aplica' ? 'Voltar a pendente' : 'Não se aplica'}</button>` : ''}</td></tr>`; }).join('')).join('')}
+        <td class="wrap" style="width:140px">${edita ? `${ger ? `<button class="btn small" data-ger="${x.id}">Gerar</button> ` : ''}<button class="btn ghost small" data-anx="${x.id}">Anexar</button> <button class="btn ghost small" data-mais="${x.id}">${x.status === 'nao_aplica' ? 'Voltar a pendente' : 'Não se aplica'}</button>` : ''}</td></tr>`; }).join('')).join('')}
     </tbody></table></div></div><input type="file" id="rm-file" multiple hidden accept=".pdf,.xlsx,.xls,.csv,.txt,.zip,.png,.jpg,.jpeg,.docx">
     <p class="small muted">Os arquivos seguem o padrão <b>${esc(nomeArquivo(cfg.sigla, k, { codigo: 'NN', arquivo: 'Documento' }, 'pdf'))}</b>: sigla da empresa, mês de competência, número e nome do documento. O anexo é renomeado para o padrão ao entrar.</p>`}`;
 
@@ -155,7 +120,7 @@ export async function render(root) {
   on('#rm-abrir', async () => { try { const n = await q(sb.rpc('rma_abrir_mes', { p_empresa: e, p_mes: k })); toast(`Pacote aberto com ${n} documento(s).`); re(); } catch (err) { fail(err); } });
   on('#rm-gerar', async (ev) => { const L = ents.filter(x => x.doc.fonte !== 'anexo' && x.status !== 'nao_aplica'); if (!L.length) return toast('Nenhum documento desta lista é gerado pela plataforma.', true);
     ev.target.disabled = true; let ok = 0; const erros = [];
-    for (const x of L) { ev.target.textContent = `Gerando ${x.doc.codigo}…`; try { await gerar(x); ok++; } catch (err) { erros.push(`${x.doc.codigo}: ${err.message || err}`); } }
+    for (const x of L) { ev.target.textContent = `Gerando ${x.doc.codigo}…`; try { await gerar(x); ok++; } catch (err) { if (x.doc.fonte !== 'extrato_conta') erros.push(`${x.doc.codigo}: ${err.message || err}`); } }
     toast(`${ok} documento(s) gerado(s)${erros.length ? `; ${erros.length} com erro` : ''}.`, !!erros.length); if (erros.length) console.warn('[RMA]', erros); re(); });
   $$('[data-ger]', corpo).forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = 'Gerando…'; try { await gerar(ents.find(x => x.id === b.dataset.ger)); toast('Documento gerado.'); re(); } catch (err) { fail(err); b.disabled = false; b.textContent = 'Gerar'; } });
   let alvo = null;
@@ -191,28 +156,12 @@ export async function render(root) {
   on('#rm-reabrir', () => modal({ title: `Reabrir o RMA de ${mesCurto(k)}`, narrow: true, body: '<label>Motivo<textarea id="rm-mot" rows="3"></textarea></label>', foot: '<button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="rm-sr">Reabrir</button>',
     onMount: (m, close) => { $('#rm-sr', m).onclick = async () => { try { await q(sb.rpc('rma_reabrir', { p_empresa: e, p_mes: k, p_motivo: $('#rm-mot', m).value })); close(); toast('Mês reaberto.'); re(); } catch (err) { fail(err); } }; } }));
 
-  // grava o arquivo na pasta do mês e liga à entrega (o gerado substitui o anterior de mesmo nome)
-  async function guardar(x, blob, nome, origem, tipo) {
-    const path = `${e}/${k.slice(0, 7)}/${nome}`;
-    const { error } = await sb.storage.from('rma').upload(path, blob, { contentType: tipo, upsert: true }); if (error) throw error;
-    const ja = D.arqs.find(a => a.entrega_id === x.id && a.caminho === path);
-    if (ja) await q(sb.from('rma_arquivos').update({ tamanho: blob.size, origem }).eq('id', ja.id)).catch(() => {});
-    else { const r = await q(sb.from('rma_arquivos').insert({ empresa_id: e, entrega_id: x.id, nome, caminho: path, tamanho: blob.size, origem }).select('*')); if (r[0]) D.arqs.push(r[0]); }
-  }
+  const guardar = (x, blob, nome, origem, tipo) => guardarArq(D, x, k, blob, nome, origem, tipo);
   async function gerar(x) {
-    const ini = iniMes(k), fim = fimMes(k), vesp = new Date(Date.parse(ini + 'T12:00:00Z') - 864e5).toISOString().slice(0, 10), f = x.doc.fonte;
-    const planos = async () => q(sb.from('plano_contas').select('id,codigo,nome,tipo,pai_id').eq('empresa_id', e));
-    let rel;
-    if (f === 'fluxo_caixa') { const [L, P, s0, s1] = await Promise.all([fetchAll(() => sb.from('lancamentos').select('plano_id,status,data,valor,conta_id').eq('empresa_id', e).eq('status', 'Pago').gte('data', ini).lte('data', fim)), planos(),
-        q(sb.rpc('saldos_contas', { p_empresa: e, p_ate: vesp })), q(sb.rpc('saldos_contas', { p_empresa: e, p_ate: fim }))]); rel = GERADORES.fluxo_caixa(k, L, P, s0, s1, empresaNome); }
-    else if (f === 'titulos') { const cols = 'plano_id,status,data,emissao,created_at,valor,descricao,documento,favorecido_id';
-      const [A, Pg, P] = await Promise.all([fetchAll(() => sb.from('lancamentos').select(cols).eq('empresa_id', e).eq('status', 'Em aberto')), fetchAll(() => sb.from('lancamentos').select(cols).eq('empresa_id', e).eq('status', 'Pago').gt('data', fim)), planos()]);
-      rel = GERADORES.titulos(k, [...A, ...Pg], P, Object.fromEntries(Object.values(state.cad?.favById || {}).map(v => [v.id, v.nome])), empresaNome); }
-    else if (['faturamento', 'notas_emitidas', 'vendas'].includes(f)) { const N = await fetchAll(() => sb.from('nfe_notas').select('tipo,emissao_propria,situacao,finalidade,cfops,numero,serie,emissao,natureza,dest_nome,dest_doc,dest_uf,v_nf,v_icms,v_st,v_ipi,v_pis,v_cofins,v_ibs,v_cbs,chave')
-        .eq('empresa_id', e).eq('tipo', 'saida').gte('emissao', ini).lte('emissao', fim + 'T23:59:59')); rel = GERADORES[f](k, N, empresaNome); }
-    else if (f === 'contratos') { const C = await fetchAll(() => sb.from('contratos').select('numero,status,natureza,objeto,parte_nome,valor,periodicidade,inicio,fim,encerrado_em,criado_em,atualizado_em').eq('empresa_id', e)); rel = GERADORES.contratos(k, C, empresaNome); }
-    else throw new Error('Este documento é anexado, não gerado.');
-    for (const ext of x.doc.formatos) await guardar(x, ext === 'pdf' ? pdfDe(rel, cfg) : xlsxDe(rel), nomeArquivo(cfg.sigla, k, x.doc, ext), 'gerado', MIME[ext]);
+    if (x.doc.fonte !== 'extrato_conta') return gerarDocumento(D, x, x.doc, k);
+    const r = await gerarExtratos(D, x, x.doc, k);
+    if (!r.gerados.length) throw new Error(`Nenhuma conta está fechada até ${dateBR(fimMes(k))}. Feche o banco em Financeiro › Fechamento do Mês.`);
+    return r;
   }
 
   // ------------------------------------------------------------ lista de documentos e parâmetros
@@ -244,13 +193,17 @@ export async function render(root) {
         <label class="c3">Número do processo<input name="processo" value="${d('processo')}"></label><label class="c3">Juízo / vara<input name="vara" value="${d('vara')}"></label>
         <label class="c2">Quem recebe (escritório ou Administrador Judicial)<input name="escritorio" value="${d('escritorio')}"></label><label class="c2">Contato<input name="contato_nome" value="${d('contato_nome')}"></label><label class="c2">E-mail<input type="email" name="contato_email" value="${d('contato_email')}"></label>
         <div class="c6"><b class="small">Quem opera, além do administrador</b></div>${PAP.map(([p, r]) => `<label class="chk c2"><input type="checkbox" name="papel" value="${p}" ${cfg.papeis.includes(p) ? 'checked' : ''}> ${r}</label>`).join('')}
-        ${ck('avisar', 'Avisar a equipe quando o envio for registrado', cfg.avisar)}</div></form>
+        ${ck('avisar', 'Avisar a equipe quando o envio for registrado', cfg.avisar)}
+        <div class="c6"><b class="small">Automático pelo fechamento do banco</b></div>
+        ${ck('auto_extrato', 'Ao conciliar e fechar o banco, gerar o extrato da conta no RMA', cfg.auto_extrato)}${ck('auto_relatorios', 'Com todos os bancos fechados no mês, gerar os demais relatórios', cfg.auto_relatorios)}
+        <div class="c6 small muted">Contas que <b>não</b> entram no RMA (não geram extrato nem seguram os demais relatórios):</div>
+        ${(state.cad?.contas || []).filter(c => c.ativo !== false && c.tipo !== 'Cheques').map(c => `<label class="chk c2"><input type="checkbox" name="fora" value="${c.id}" ${(cfg.contas_fora || []).includes(c.id) ? 'checked' : ''}> ${esc(c.nome)}</label>`).join('')}</div></form>
         <p class="small muted">O dia de entrega é do mês seguinte ao de competência (o RMA de outubro vence em novembro). Confirme o prazo com quem recebe.${ativar ? ' Ao ativar, a lista padrão de documentos é criada; ajuste em "Documentos pedidos".' : ''}</p>`,
       foot: '<button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="rm-sp">Salvar</button>',
       onMount: (m, close) => { $('#rm-sp', m).onclick = async () => { const f = $('#rm-fp', m);
         const row = { empresa_id: e, ativo: f.ativo.checked, sigla: f.sigla.value.trim().replace(/[^A-Za-z0-9]/g, ''), mes_inicio: f.mes_inicio.value ? f.mes_inicio.value + '-01' : null, dia_entrega: +f.dia_entrega.value || 20, dias_aviso: +f.dias_aviso.value || 0,
           processo: f.processo.value.trim() || null, vara: f.vara.value.trim() || null, escritorio: f.escritorio.value.trim() || null, contato_nome: f.contato_nome.value.trim() || null, contato_email: f.contato_email.value.trim() || null,
-          papeis: $$('[name=papel]:checked', m).map(x => x.value), avisar: f.avisar.checked, atualizado_em: new Date().toISOString() };
+          papeis: $$('[name=papel]:checked', m).map(x => x.value), avisar: f.avisar.checked, auto_extrato: f.auto_extrato.checked, auto_relatorios: f.auto_relatorios.checked, contas_fora: $$('[name=fora]:checked', m).map(x => x.value), atualizado_em: new Date().toISOString() };
         if (row.sigla.length < 2 || !row.mes_inicio) return toast('Informe a sigla e o primeiro mês de competência.', true);
         try { await q(sb.from('rma_config').upsert(row)); if (row.ativo && !D.docs.length) await q(sb.rpc('rma_documentos_padrao', { p_empresa: e }));
           close(); toast(row.ativo ? 'RMA ativado.' : 'Parâmetros salvos.'); document.dispatchEvent(new Event('rma-config')); re(); } catch (err) { fail(err); } }; } });

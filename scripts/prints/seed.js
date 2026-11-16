@@ -2530,7 +2530,8 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
     ['02', 'Departamento Contábil', 'Demonstração de Resultado do Exercício (DRE)', 'DRE', 'anexo', 'contab/dre', ['pdf'], 'DRE contábil do mês, emitida pela contabilidade.'],
     ['03', 'Departamento Contábil', 'Balanço patrimonial (quando encerrado o período)', 'Balanco_Patrimonial', 'anexo', 'contab/balanco', ['pdf'], 'Só nos meses em que há balanço encerrado.'],
     ['04', 'Departamento Financeiro', 'Fluxo de caixa', 'Fluxo_de_Caixa', 'fluxo_caixa', 'fluxo-mensal', ['pdf', 'xlsx'], 'Gerado pela plataforma: entradas e saídas pagas no mês e saldo das contas.'],
-    ['06', 'Departamento Financeiro', 'Extratos bancários completos de todas as contas de titularidade da recuperanda', 'Extratos_Bancarios', 'anexo', 'conciliacao', ['pdf'], 'Um extrato por conta, do primeiro ao último dia do mês.'],
+    ['05', 'Departamento Financeiro', 'Conciliações bancárias', 'Conciliacao_Bancaria', 'anexo', 'conciliacao', ['pdf'], 'Uma por conta: saldo do extrato × saldo da plataforma no último dia do mês.'],
+    ['06', 'Departamento Financeiro', 'Extratos bancários completos de todas as contas de titularidade da recuperanda', 'Extratos_Bancarios', 'extrato_conta', 'fechamento', ['pdf'], 'Gerado ao fechar o banco no Fechamento do Mês: extrato conciliado de cada conta, com o saldo conferido.'],
     ['07', 'Departamento Financeiro', 'Relatórios de contas a pagar e a receber', 'Contas_a_Pagar_e_Receber', 'titulos', 'contas', ['pdf', 'xlsx'], 'Gerado pela plataforma: títulos em aberto no último dia do mês.'],
     ['08', 'Departamento Financeiro', 'Relatório de faturamento mensal', 'Faturamento_Mensal', 'faturamento', 'notas', ['pdf', 'xlsx'], 'Gerado pela plataforma a partir das notas de saída do mês.'],
     ['09', 'Relatórios', 'Relação de notas fiscais emitidas', 'Notas_Fiscais_Emitidas', 'notas_emitidas', 'notas', ['pdf', 'xlsx'], 'Gerado pela plataforma: todas as notas emitidas no mês.'],
@@ -2540,17 +2541,19 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
     ['13', 'Geral', 'Relação atualizada de processos judiciais e administrativos', 'Processos_Judiciais', 'anexo', null, ['pdf'], 'Relação fornecida pelo jurídico.'],
     ['14', 'Geral', 'Informações sobre constrições judiciais eventualmente existentes', 'Constricoes_Judiciais', 'anexo', null, ['pdf'], 'Bloqueios, penhoras e arrestos do mês.']];
   DB.rma_config = [{ empresa_id: E, ativo: true, papeis: ['financeiro', 'diretor'], sigla: 'EXEMPLO', processo: '0001234-56.2026.8.17.0001', vara: 'Vara Regional Empresarial', escritorio: 'Escritório Exemplo Advogados', contato_nome: 'Dra. Marina Exemplo',
-    contato_email: 'rma@exemplo.adv.br', mes_inicio: '2026-04-01', dia_entrega: 20, dias_aviso: 5, avisar: true }];
+    contato_email: 'rma@exemplo.adv.br', mes_inicio: '2026-04-01', dia_entrega: 20, dias_aviso: 5, avisar: true, auto_extrato: true, auto_relatorios: true, contas_fora: [] }];
   DB.rma_documentos = DOCS.map(([codigo, grupo, nome, arquivo, fonte, tela, formatos, orientacao], i) => ({ id: 'rd' + codigo, empresa_id: E, codigo, grupo, nome, arquivo, fonte, tela, formatos, obrigatorio: true, orientacao, ordem: (i + 1) * 10, ativo: true }));
   const MS = ['2026-04-01', '2026-05-01', '2026-06-01', '2026-07-01', '2026-08-01', '2026-09-01', '2026-10-01'], prazo = (m) => { const a = +m.slice(0, 4), x = +m.slice(5, 7); return `${x === 12 ? a + 1 : a}-${String(x === 12 ? 1 : x + 1).padStart(2, '0')}-20`; };
   DB.rma_meses = MS.map((mes, i) => ({ empresa_id: E, mes, prazo: prazo(mes), status: i < 5 ? 'enviado' : 'aberto', enviado_em: i < 5 ? prazo(mes).slice(0, 8) + '18T15:30:00Z' : null, enviado_por: null, protocolo: i < 5 ? `E-mail de 18/${prazo(mes).slice(5, 7)}/2026, 15h30` : null, comentario: null }));
   DB.rma_entregas = []; DB.rma_arquivos = [];
-  const prontosOut = new Set(['04', '07', '08', '09', '10', '12', '06']);
+  const prontosOut = new Set(['06']);
   for (const mes of MS) for (const d of DB.rma_documentos) {
     const out = mes === '2026-10-01', na = d.codigo === '03' || (d.codigo === '14' && !out), pronto = !na && (!out || prontosOut.has(d.codigo)), id = `re${mes.slice(5, 7)}${d.codigo}`;
     DB.rma_entregas.push({ id, empresa_id: E, mes, documento_id: d.id, status: na ? 'nao_aplica' : pronto ? 'pronto' : 'pendente', justificativa: na ? (d.codigo === '03' ? 'Sem balanço encerrado no mês.' : 'Sem constrições judiciais no período.') : null, observacao: null });
-    if (pronto) for (const ext of d.codigo === '06' ? ['pdf', 'pdf', 'pdf'] : d.formatos) { const seq = DB.rma_arquivos.filter(a => a.entrega_id === id).length, nome = `EXEMPLO_RMA_${mes.slice(0, 7)}_${d.codigo}_${d.arquivo}${d.codigo === '06' ? '_' + (seq + 1) : ''}.${ext}`;
-      DB.rma_arquivos.push({ id: `ra${id}${seq}`, empresa_id: E, entrega_id: id, nome, caminho: `${E}/${mes.slice(0, 7)}/${nome}`, tamanho: 90000, origem: d.fonte === 'anexo' ? 'anexo' : 'gerado', em: prazo(mes).slice(0, 8) + '12T10:00:00Z' }); }
+    const CT = DB.contas.filter(c => c.ativo !== false).slice(0, out ? 2 : 99);
+    if (pronto) for (const ext of d.codigo === '06' ? CT.map(() => 'pdf') : d.formatos) { const seq = DB.rma_arquivos.filter(a => a.entrega_id === id).length, nome = d.codigo === '06' ? `EXEMPLO_RMA_${mes.slice(0, 7)}_06_Extrato_${CT[seq].nome.replace(/\s+/g, '_')}.pdf` : `EXEMPLO_RMA_${mes.slice(0, 7)}_${d.codigo}_${d.arquivo}.${ext}`;
+      DB.rma_arquivos.push({ id: `ra${id}${seq}`, conta_id: d.codigo === '06' ? CT[seq].id : null, empresa_id: E, entrega_id: id, nome, caminho: `${E}/${mes.slice(0, 7)}/${nome}`, tamanho: 90000, origem: d.fonte === 'anexo' ? 'anexo' : 'gerado', em: prazo(mes).slice(0, 8) + '12T10:00:00Z' }); }
   }
-  window.RPC.rma_pode = () => true; window.RPC.rma_abrir_mes = () => 13; window.RPC.rma_enviar = () => null; window.RPC.rma_reabrir = () => null; window.RPC.rma_documentos_padrao = () => 13;
+  DB.contas_travas = DB.contas.filter(c => c.ativo !== false).map((c, i) => ({ id: 'tv' + i, empresa_id: E, conta_id: c.id, ate: i < 2 ? '2026-10-31' : '2026-09-30', saldo_banco: null, saldo_sistema: null, observacao: 'conciliado e batendo', ativo: true, criado_em: '2026-11-10T14:00:00Z' }));
+  window.RPC.rma_pode = () => true; window.RPC.rma_abrir_mes = () => 14; window.RPC.rma_enviar = () => null; window.RPC.rma_reabrir = () => null; window.RPC.rma_documentos_padrao = () => 13;
 }
