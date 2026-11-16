@@ -344,5 +344,9 @@ export const FIGS = [
   ['importacao', 'compras/importacao', '## 7.', 'Despesas e impostos da nacionalização, com o que entra e o que fica fora do custo', 'click:.im-card[data-p="imp2"]|click:[data-paba="despesas"]'],
   ['importacao', 'compras/importacao', '## 8.', 'Custo estimado e custo final por item', 'click:.im-card[data-p="imp2"]|click:[data-paba="custo"]'],
   ['importacao', 'compras/importacao', '## 9.', 'Recebimento: quantidade, lote e o custo que vai para o estoque', 'click:.im-card[data-p="imp2"]|click:#im-rec'],
+  ['rma', 'rma', '## 4.', 'RMA: meses de competência, prazos e os documentos do mês com a situação de cada um'],
+  ['rma', 'rma', '### 3.1', 'Parâmetros do RMA: ativação, sigla dos arquivos, primeiro mês, prazo, processo e quem recebe', 'click:#rm-par'],
+  ['rma', 'rma', '### 3.2', 'Documentos pedidos: a lista que forma o pacote de cada mês', 'click:#rm-docs'],
+  ['rma', 'rma', '## 7.', 'Registrar o envio do mês, com protocolo e comentários da administração', 'click:.rm-mes[data-mes="2026-09-01"]|click:#rm-enviar'],
   ['importacao', 'compras/importacao', '### 6.3', 'Importação por meio de terceiro: repasses ao intermediário contra o total informado', 'click:.im-card[data-p="imp7"]|click:[data-paba="cambio"]'],
 ];

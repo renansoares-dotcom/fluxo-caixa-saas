@@ -31,6 +31,7 @@ const routes = {
   'compras/pedidos': () => import(`./pages/compras-pedidos.js?v=${V}`),
   'compras/recebimentos': () => import(`./pages/compras-recebimentos.js?v=${V}`),
   'compras/importacao': () => import(`./pages/importacao.js?v=${V}`),
+  'rma': () => import(`./pages/rma.js?v=${V}`),
   'estoque': () => import(`./pages/estoque.js?v=${V}`),
   'estoque/produtos': () => import(`./pages/produtos.js?v=${V}`),
   'estoque/depara': () => import(`./pages/produtos-depara.js?v=${V}`),
@@ -346,6 +347,15 @@ async function aplicarRecuperadora(empresa, papel) {
   const sec = $('#nav .nav-sec-rec'); if (sec) sec.hidden = !links.some(a => !a.hidden);
 }
 document.addEventListener('rec-config', () => { if (state.empresa) aplicarRecuperadora(state.empresa.id, state.papel).catch(() => {}); });
+// RMA da recuperação judicial (SQL 162): função ligada por empresa; desligada, só o administrador vê o link (para poder ativar)
+async function aplicarRma(empresa, papel) {
+  const a = $('#nav a.nav-rma'); if (!a) return;
+  let ativo = false; try { ativo = !!(await q(sb.from('rma_config').select('ativo').eq('empresa_id', empresa).maybeSingle()))?.ativo; } catch {}
+  if (state.empresa?.id !== empresa) return;
+  const ocultar = !ativo && papel !== 'admin';
+  if (ocultar && !a.hidden) { a.hidden = true; a.dataset.rmaOculto = '1'; } else if (!ocultar && a.dataset.rmaOculto) { a.hidden = false; delete a.dataset.rmaOculto; }
+}
+document.addEventListener('rma-config', () => { if (state.empresa) aplicarRma(state.empresa.id, state.papel).catch(() => {}); });
 // primeira tela liberada no menu (para onde vai quem não tem o Financeiro)
 function primeiraRota() {
   const a = $$('#nav a[data-route]').find(x => !x.hidden && !x.closest('.nav-area')?.hidden && x.dataset.route !== 'conversas');
@@ -392,6 +402,7 @@ async function entrarEmpresa(emp, papel, areas) {
   $$('#nav .nav-admin').forEach(el => el.hidden = papel !== 'admin');
   await aplicarPerfil(emp.id, papel);
   aplicarRecuperadora(emp.id, papel).catch(() => {});
+  aplicarRma(emp.id, papel).catch(() => {});
   setTimeout(() => iniciarTour().catch(() => {}), 1500);   // tour de boas-vindas (melhoria 10.5): só na primeira vez
   if (papel === 'compras') { if (!rotaDeCompras(location.hash.replace(/^#\//, ''))) location.hash = '#/compras'; else render(); return; }
   if (papel === 'vendas') { if (!rotaDeVendas(location.hash.replace(/^#\//, ''))) location.hash = '#/comercial'; else render(); return; }

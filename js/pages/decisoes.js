@@ -59,8 +59,9 @@ async function carregar() {
   const manut = temArea('prd') ? await import(`./manutencao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const cheq = temArea('fin') ? await import(`./cheques.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const imp = temArea('fin') ? await import(`./importacao.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
+  const rma = temArea('fin') ? await import(`./rma.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
   const recup = temArea('prd') ? await import(`../lib/rec-decisoes.js?v=${Date.now()}`).then(m => m.alertasDecisao()).catch(() => []) : [];
-  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd, fech, recup, cheq, imp };
+  return { hoje, ano, rec90, abertosRec, props, fundos, resumo, budget, extratos, semConta, nec, estq, com, prorrog, contratos, frota, cedida, ndeb, imob, manut, qual, tint, arte, recomp, paPrest, audAl, lgpd, fech, recup, cheq, imp, rma };
 }
 
 // ---------------------------------------------------------------- regras
@@ -276,6 +277,13 @@ function regras(D) {
     desc: ipz.slice(0, 4).map(a => a.texto).join(' · ') + (ipz.length > 4 ? ` · e mais ${ipz.length - 4}` : ''), impacto: 0, impactoTxt: `${ipz.length} prazo(s)`,
     regra: 'Processo de importação com câmbio vencido ou a vencer nos próximos dias sem contrato, chegada prevista atrasada, prazo de devolução do contêiner vencendo, embarque previsto não confirmado ou carga no porto há mais de 5 dias sem declaração. Os prazos ficam nos Parâmetros da importação.',
     acao: 'Abrir a importação', rota: ipz.some(a => a.k === 'cambio') ? 'compras/importacao?aba=cambio' : 'compras/importacao' });
+
+  // 30. RMA da recuperação judicial: pacote mensal com prazo vencido ou chegando (só para a empresa que ativou a função)
+  const rm = D.rma || [];
+  if (rm.length) out.push({ k: 'rma', origem: 'Financeiro', urg: rm.some(a => a.nivel === 'alto') ? 'alta' : 'media', titulo: 'Entregar o RMA da recuperação judicial',
+    desc: rm.slice(0, 4).map(a => a.texto).join(' · ') + (rm.length > 4 ? ` · e mais ${rm.length - 4}` : ''), impacto: 0, impactoTxt: `${rm.length} mês(es)`,
+    regra: 'Empresa com o RMA ativado e mês de competência encerrado cujo pacote não foi enviado: prazo vencido (alta) ou dentro dos dias de aviso (média). O dia de entrega e os dias de aviso ficam nos Parâmetros do RMA.',
+    acao: 'Abrir o RMA', rota: `rma?mes=${rm[0].mes.slice(0, 7)}` });
 
   return out.sort((a, b) => URG[a.urg] - URG[b.urg] || b.impacto - a.impacto);
 }

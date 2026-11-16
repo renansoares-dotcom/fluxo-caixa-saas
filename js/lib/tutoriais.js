@@ -127,6 +127,8 @@ export const MANUAIS = [
     resumo: 'Aging por faixa e por cliente, régua automática por e-mail e WhatsApp com PIX copia e cola, pausas, histórico e Cobrar agora; PIX também no Portal.' },
   { id: 'importacao', titulo: 'Importação de matéria-prima — do pedido ao estoque', area: 'Compras', rotas: ['compras/importacao'],
     resumo: 'Processo de importação com etapas, câmbio (adiantamento, contratação e liquidação), despesas e impostos da nacionalização, custo final por item e entrada no estoque.' },
+  { id: 'rma', titulo: 'RMA — Relatório Mensal de Atividades da recuperação judicial', area: 'Financeiro', rotas: ['rma'],
+    resumo: 'Função ativada por empresa: pacote mensal com os documentos pedidos na recuperação judicial, relatórios gerados pela plataforma, anexos, prazo e registro do envio.' },
   { id: 'cheques', titulo: 'Controle de Cheques — terceiros e próprios', area: 'Financeiro', rotas: ['cheques'],
     resumo: 'Cheques de clientes (carteira, depósito, devolução, cobrança, repasse e FIDC) e cheques próprios (talões, emissão, compensação), com agenda e histórico do emitente.' },
   { id: 'whatsapp', titulo: 'WhatsApp da Plataforma — modelos, aceite e fila', area: 'Cadastros', rotas: ['config/whatsapp'],
