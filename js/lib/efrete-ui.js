@@ -3,9 +3,11 @@
 // As credenciais (usuário, senha, hash, certificado) ficam como segredos do servidor: a tela só mostra se estão cadastradas.
 import { sb, state, q, isAdmin } from './data.js';
 import { $, $$, esc, money, toast, fail, modal, confirmDialog } from './ui.js';
+import { PARAM_PADRAO, calcRetencoes } from './frete-retencoes.js';
 
 export const AMBIENTES = { homologacao: 'Homologação (testes)', producao: 'Produção (vale de verdade)' };
 export const PAGAMENTOS = { eFRETE: 'Cartão e-frete (meio de pagamento)', TransferenciaBancaria: 'Transferência bancária', DepositoAgendado: 'Depósito agendado (conta ou Pix)' };
+export const RETENCAO_PAG = { liquido: 'Parcelas pelo líquido (a plataforma já desconta o retido)', bruto: 'Parcelas pelo bruto (o e-frete desconta os impostos informados)' };
 export const ENTREGA_DOC = { RedeCredenciada: 'No posto da rede credenciada', Cliente: 'No cliente (exige registrar a descarga)' };
 export const EMBALAGENS = ['Pallet', 'Bigbag', 'Granel', 'Container', 'Saco', 'Caixa', 'Unitario', 'Fardo'];
 export const CALCULOS = { SemQuebra: 'Sem quebra (não desconta)', QuebraSomenteUltrapassado: 'Desconta só o que passar da tolerância', QuebraIntegral: 'Desconta toda a diferença' };
@@ -14,7 +16,7 @@ export const CODIGOS_ANTT = { 1: 'Granel sólido', 2: 'Granel líquido', 3: 'Fri
   7: 'Perigosa (granel sólido)', 8: 'Perigosa (granel líquido)', 9: 'Perigosa (frigorificada ou aquecida)', 10: 'Perigosa (conteinerizada)', 11: 'Perigosa (carga geral)', 12: 'Granel pressurizada' };
 export const CONFIG_PADRAO = { ambiente: 'homologacao', tipo_viagem: 'Padrao', tipo_pagamento: 'eFRETE', pct_adiantamento: 0, dias_liberacao_quitacao: 0, prazo_viagem_horas: 48,
   docs_credenciado: ['Canhoto da NF-e assinado pelo destinatario', 'Comprovante de entrega da carga'], entrega_documentacao: 'RedeCredenciada', qtd_saques: null, qtd_transferencias: null,
-  tipo_embalagem: 'Pallet', unidade_medida: 'Kg', tipo_calculo: 'SemQuebra', tolerancia_tipo: 'Nenhum', tolerancia_valor: 0, ncm_padrao: '', contratante_endereco: {}, observacoes_transportador: [] };
+  tipo_embalagem: 'Pallet', unidade_medida: 'Kg', tipo_calculo: 'SemQuebra', tolerancia_tipo: 'Nenhum', tolerancia_valor: 0, ncm_padrao: '', contratante_endereco: {}, observacoes_transportador: [], retencao_pagamento: 'liquido' };
 
 const soDig = (s) => String(s ?? '').replace(/\D/g, '');
 const opts = (o, v) => Object.entries(o).map(([k, t]) => `<option value="${esc(k)}" ${String(v) === String(k) ? 'selected' : ''}>${esc(t)}</option>`).join('');
@@ -44,7 +46,7 @@ export const lerEndereco = (pfx, raiz) => {
 // ------------------------------------------------------------------ Parâmetros do e-frete (aba de Frota e parâmetros)
 export async function parametrosEfrete(corpo, rerender) {
   const e = state.empresa.id, pode = isAdmin(), dis = pode ? '' : 'disabled';
-  let C, T, st, emp, trib;
+  let C, T, st, emp, trib, RP = null;
   try {
     [C, T, emp, trib] = await Promise.all([
       q(sb.from('efrete_config').select('*').eq('empresa_id', e).maybeSingle()),
@@ -53,7 +55,10 @@ export async function parametrosEfrete(corpo, rerender) {
       q(sb.from('empresa_tributacao').select('municipio_ibge').eq('empresa_id', e).order('vigencia_inicio', { ascending: false }).limit(1)).catch(() => []),
     ]);
   } catch (err) { fail(err); corpo.innerHTML = '<p class="neg">Não foi possível ler os parâmetros do e-frete.</p>'; return; }
+  try { RP = await q(sb.from('log_retencao_param').select('*').eq('empresa_id', e).order('vigencia', { ascending: false })); } catch { RP = null; /* SQL 159 ainda não rodou */ }
   const c = { ...CONFIG_PADRAO, ...(C || {}) };
+  const rp = RP?.[0] || null, n2 = (v) => (v == null ? '' : String(v).replace('.', ','));
+  const faixasTxt = (fs) => (fs || []).map(f => [f.ate == null ? '' : n2(f.ate), n2(f.aliq), n2(f.deduzir)].join(';')).join('\n');
   if (!c.contratante_endereco?.rua && emp?.logradouro) {
     const [rua, resto] = String(emp.logradouro).split(/,\s*/);
     c.contratante_endereco = { rua: rua || '', numero: (resto || '').match(/\d+/)?.[0] || '', bairro: '', cep: soDig(emp.cep), cmun: trib?.[0]?.municipio_ibge || '' };
@@ -79,7 +84,28 @@ export async function parametrosEfrete(corpo, rerender) {
       <label>Tolerância de perda<select id="ef-tt" ${dis} data-nobusca>${opts(TOLERANCIAS, c.tolerancia_tipo)}</select></label>
       <label>Valor da tolerância<input id="ef-tv" value="${esc(c.tolerancia_valor)}" ${dis}></label>
       <label>NCM padrão (quando a NF-e não traz)<input id="ef-ncm" value="${esc(c.ncm_padrao || '')}" ${dis}></label>
+      ${RP ? `<label class="span2">Retenções do autônomo no pagamento<select id="ef-rpg" ${dis} data-nobusca>${opts(RETENCAO_PAG, c.retencao_pagamento)}</select><span class="small muted">A confirmar com o e-frete: se ele desconta do motorista os impostos informados no CIOT, use "bruto"; se não desconta, use "líquido".</span></label>` : ''}
     </div>
+    ${RP ? `<h3 style="margin:14px 0 4px">Retenções do autônomo pessoa física (INSS, SEST/SENAT e IRRF)</h3>
+    <p class="small muted" style="margin-top:0">Valem para contratado com CPF. Contratado com CNPJ não tem retenção. ${rp ? `Vigência em uso: desde <b>${esc(rp.vigencia.split('-').reverse().join('/'))}</b>${RP.length > 1 ? ` (${RP.length} vigências gravadas)` : ''}.` : ''}
+      ${rp && !rp.conferido ? '<b class="warn">Valores iniciais, ainda não conferidos pela contabilidade.</b>' : ''}</p>
+    <div class="grid-form">
+      <label>Vigência (a partir de)<input type="date" id="rt-vig" value="${esc(rp?.vigencia || PARAM_PADRAO.vigencia)}" ${dis}><span class="small muted">Mude a data para gravar uma nova vigência sem apagar a anterior.</span></label>
+      <label>INSS (%)<input id="rt-inss" value="${n2(rp?.inss_pct ?? PARAM_PADRAO.inss_pct)}" ${dis}></label>
+      <label>Base do INSS (% do frete)<input id="rt-inssb" value="${n2(rp?.inss_base_pct ?? PARAM_PADRAO.inss_base_pct)}" ${dis}></label>
+      <label>Teto do INSS (R$)<input id="rt-teto" value="${n2(rp?.inss_teto ?? PARAM_PADRAO.inss_teto)}" ${dis}></label>
+      <label>SEST/SENAT (%)<input id="rt-sest" value="${n2(rp?.sest_senat_pct ?? PARAM_PADRAO.sest_senat_pct)}" ${dis}></label>
+      <label class="chk" style="flex-direction:row;align-items:center;gap:8px;align-self:end"><input type="checkbox" id="rt-sestt" style="width:auto" ${(rp?.sest_senat_teto ?? true) ? 'checked' : ''} ${dis}> SEST/SENAT limitado ao teto do INSS</label>
+      <label>Base do IRRF (% do frete)<input id="rt-irb" value="${n2(rp?.irrf_base_pct ?? PARAM_PADRAO.irrf_base_pct)}" ${dis}></label>
+      <label>IRRF: dedução por dependente (R$)<input id="rt-dep" value="${n2(rp?.irrf_dependente ?? PARAM_PADRAO.irrf_dependente)}" ${dis}></label>
+      <label>IRRF: desconto simplificado (R$)<input id="rt-simp" value="${n2(rp?.irrf_simplificado ?? PARAM_PADRAO.irrf_simplificado)}" ${dis}></label>
+      <label>IRRF: retenção dispensada até (R$)<input id="rt-min" value="${n2(rp?.irrf_minimo ?? PARAM_PADRAO.irrf_minimo)}" ${dis}></label>
+      <label class="span2">Tabela progressiva mensal do IRRF (uma faixa por linha: até R$;alíquota %;parcela a deduzir — a última sem o "até")<textarea id="rt-fx" rows="5" ${dis}>${esc(faixasTxt(rp?.irrf_faixas || PARAM_PADRAO.irrf_faixas))}</textarea></label>
+      <label class="span2">Redução mensal do IRRF (isento até R$;redução máxima;limite R$;constante;fator) — vazio = sem redução<input id="rt-red" value="${esc((() => { const r = rp ? rp.irrf_reducao : PARAM_PADRAO.irrf_reducao; return r ? [r.isento_ate, r.valor_max, r.limite, r.a, r.b].map(n2).join(';') : ''; })())}" ${dis}></label>
+      <label class="span2">Observação<input id="rt-obs" value="${esc(rp?.observacao || '')}" ${dis}></label>
+      <label class="chk full" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="rt-conf" style="width:auto" ${rp?.conferido ? 'checked' : ''} ${dis}> Valores conferidos pela contabilidade</label>
+    </div>
+    <p class="small muted" id="rt-ex"></p>` : ''}
     <h3 style="margin:14px 0 4px">Endereço da empresa contratante</h3>
     <div class="grid-form">${camposEndereco('ef-ce', c.contratante_endereco, dis)}</div>
     <h3 style="margin:14px 0 4px">Tipo de carga × código da ANTT</h3>
@@ -88,6 +114,12 @@ export async function parametrosEfrete(corpo, rerender) {
       ${tiposPlataforma.map(tc => { const cur = (T || []).find(x => x.tipo_carga === tc)?.codigo; return `<tr><td>${esc(tc)}</td><td><select class="ef-tc" data-tc="${esc(tc)}" ${dis} data-nobusca><option value="">—</option>${Object.entries(CODIGOS_ANTT).map(([k, t]) => `<option value="${k}" ${+cur === +k ? 'selected' : ''}>${k} · ${esc(t)}</option>`).join('')}</select></td></tr>`; }).join('')}
     </tbody></table></div>
     ${pode ? '<div style="margin-top:12px"><button class="btn primary" id="ef-ok">Salvar parâmetros do e-frete</button></div>' : ''}</div>`;
+
+  const exemplo = () => { const el = $('#rt-ex', corpo); if (!el) return;
+    try { const P = lerRetencao(corpo), r = calcRetencoes({ valor: 3000, transp: { documento: '00000000000' } }, P);
+      el.innerHTML = `Exemplo com estes valores — frete de ${money(3000)} a pessoa física, sem outro frete no mês: INSS ${money(r.inss)} · SEST/SENAT ${money(r.sest_senat)} · IRRF ${money(r.irrf)} · líquido ${money(r.liquido)}.`;
+    } catch (err) { el.innerHTML = `<span class="neg">${esc(err.message)}</span>`; } };
+  if (RP) { corpo.addEventListener('input', exemplo); exemplo(); }
 
   efrete('status').then(s => {
     const el = $('#ef-status', corpo); if (!el) return;
@@ -111,13 +143,41 @@ export async function parametrosEfrete(corpo, rerender) {
       tolerancia_tipo: v('ef-tt'), tolerancia_valor: nnum('ef-tv') ?? 0, ncm_padrao: soDig(v('ef-ncm')) || null, contratante_endereco: lerEndereco('ef-ce', corpo),
       atualizado_em: new Date().toISOString() };
     const tipos = $$('.ef-tc', corpo).filter(s => s.value).map(s => ({ empresa_id: e, tipo_carga: s.dataset.tc, codigo: +s.value }));
+    let retRow = null;
+    if (RP) {
+      row.retencao_pagamento = v('ef-rpg') || 'liquido';
+      try { retRow = { empresa_id: e, ...lerRetencao(corpo), atualizado_em: new Date().toISOString() }; } catch (err) { return toast(err.message, true); }
+    }
     ev.target.disabled = true;
     try {
       await q(sb.from('efrete_config').upsert(row, { onConflict: 'empresa_id' }));
       if (tipos.length) await q(sb.from('efrete_tipos_carga').upsert(tipos, { onConflict: 'empresa_id,tipo_carga' }));
+      if (retRow) await q(sb.from('log_retencao_param').upsert(retRow, { onConflict: 'empresa_id,vigencia' }));
       toast('Parâmetros do e-frete salvos'); rerender();
     } catch (err) { fail(err); ev.target.disabled = false; }
   });
+}
+
+/** lê os campos de retenção da tela e valida; lança Error com a mensagem para o usuário */
+export function lerRetencao(raiz) {
+  const v = (id) => ($('#' + id, raiz)?.value || '').trim(), n = (s) => { const t = String(s).trim(); if (t === '') return NaN; const x = +(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t); return Number.isFinite(x) ? x : NaN; };
+  const num = (id, nome, min = 0, max = Infinity) => { const x = n(v(id)); if (!(x >= min && x <= max)) throw new Error(`Retenções: confira "${nome}"`); return x; };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v('rt-vig'))) throw new Error('Retenções: informe a vigência');
+  const linhas = v('rt-fx').split(/\n+/).map(l => l.trim()).filter(Boolean).map(l => l.split(';').map(x => x.trim()));
+  if (!linhas.length) throw new Error('Retenções: informe a tabela do IRRF');
+  const faixas = linhas.map(([ate, aliq, ded], i) => { const f = { ate: ate === '' || ate == null ? null : n(ate), aliq: n(aliq || '0'), deduzir: n(ded || '0') };
+    if ((f.ate !== null && !(f.ate > 0)) || !(f.aliq >= 0 && f.aliq <= 100) || !(f.deduzir >= 0)) throw new Error(`Retenções: faixa ${i + 1} da tabela do IRRF inválida`);
+    if (f.ate === null && i !== linhas.length - 1) throw new Error('Retenções: só a última faixa do IRRF fica sem o "até"');
+    return f; });
+  if (faixas[faixas.length - 1].ate !== null) throw new Error('Retenções: a última faixa do IRRF não tem "até"');
+  if (faixas.some((f, i) => i > 0 && f.ate !== null && f.ate <= faixas[i - 1].ate)) throw new Error('Retenções: as faixas do IRRF devem estar em ordem crescente');
+  let red = null;
+  if (v('rt-red')) { const p = v('rt-red').split(';').map(x => n(x.trim())); if (p.length !== 5 || p.some(x => !(x >= 0))) throw new Error('Retenções: a redução do IRRF tem 5 valores separados por ";"');
+    red = { isento_ate: p[0], valor_max: p[1], limite: p[2], a: p[3], b: p[4] }; }
+  return { vigencia: v('rt-vig'), inss_pct: num('rt-inss', 'INSS (%)', 0, 100), inss_base_pct: num('rt-inssb', 'Base do INSS', 0, 100), inss_teto: num('rt-teto', 'Teto do INSS', 0.01),
+    sest_senat_pct: num('rt-sest', 'SEST/SENAT (%)', 0, 100), sest_senat_teto: !!$('#rt-sestt', raiz)?.checked, irrf_base_pct: num('rt-irb', 'Base do IRRF', 0, 100),
+    irrf_dependente: num('rt-dep', 'dedução por dependente'), irrf_simplificado: num('rt-simp', 'desconto simplificado'), irrf_minimo: num('rt-min', 'retenção dispensada'),
+    irrf_faixas: faixas, irrf_reducao: red, observacao: v('rt-obs') || null, conferido: !!$('#rt-conf', raiz)?.checked };
 }
 
 // ------------------------------------------------------------------ CIOT do frete
@@ -170,7 +230,8 @@ export async function janelaCiot(f, depois) {
       <table style="margin-top:8px">${linha('Contratado', esc(R.contratado || '—'))}${linha('Motorista', esc(R.motorista || '—'))}${linha('Veículos', esc((R.placas || []).join(', ') || '—'))}
         ${linha('Rota', `${esc(R.origem || '?')} → ${esc(R.destino || '?')}`)}${linha('NF-e', esc((R.notas || []).join(', ') || '—') + ` · ${esc(String(R.peso || 0))} kg`)}
         ${linha('Tipo de carga', `${esc(R.tipo_carga || '')} · código ANTT ${esc(String(R.codigo_antt ?? '—'))}`)}
-        ${linha('Valor', `${money(R.valor)} · adiantamento ${money(R.adiantamento)} · quitação ${money(R.quitacao)} · ${esc(PAGAMENTOS[R.pagamento] || R.pagamento || '')}`)}</table>
+        ${linha('Valor', `${money(R.valor)} · adiantamento ${money(R.adiantamento)} · quitação ${money(R.quitacao)} · ${esc(PAGAMENTOS[R.pagamento] || R.pagamento || '')}`)}
+        ${R.retencoes ? linha('Retenções (pessoa física)', `INSS ${money(R.retencoes.inss)} · SEST/SENAT ${money(R.retencoes.sest_senat)} · IRRF ${money(R.retencoes.irrf)} = <b>${money(R.retencoes.total)}</b> · líquido ${money(R.liquido)} · ${R.paga_liquido ? 'parcelas pelo líquido' : 'parcelas pelo bruto (o e-frete desconta)'}`) : ''}</table>
       <div class="grid2" style="margin-top:8px"><label>Início previsto<input type="datetime-local" id="ec-ini" value="${paraInput(r.inicio)}"></label><label>Fim previsto<input type="datetime-local" id="ec-fim" value="${paraInput(r.fim)}"></label></div>
       <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="ec-conf">Conferir de novo</button>${r.faltas?.length ? '' : '<button class="btn primary" id="ec-emit">Emitir CIOT</button>'}</div><div id="ec-out" style="margin-top:10px"></div>`;
     $('#ec-conf', c).onclick = () => { c.innerHTML = '<div class="loading">Conferindo…</div>'; previa(deInput($('#ec-ini', md.el)?.value || paraInput(r.inicio)), deInput($('#ec-fim', md.el)?.value || paraInput(r.fim))); };

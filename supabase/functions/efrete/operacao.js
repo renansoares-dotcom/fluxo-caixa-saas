@@ -39,7 +39,8 @@ export function tipoPix(p) {
 
 /**
  * Monta a operação (sem Integrador/Token) e os cadastros que o e-frete exige antes (proprietário, veículos, motorista).
- * @param x {frete, transp, empresa:{cnpj, razao_social, nome}, config, tipos:{tipo_carga: codigo}, notas:[...], inicio, fim, idOperacao}
+ * @param x {frete, transp, empresa:{cnpj, razao_social, nome}, config, tipos:{tipo_carga: codigo}, notas:[...], inicio, fim, idOperacao, retencoes}
+ *   retencoes: resultado de calcRetencoes (retencoes.js) — só pessoa física; vai em Impostos e sai das parcelas (config.retencao_pagamento)
  *   notas: [{numero, serie, emissao, v_nf, peso_kg, ncm, emit_doc, dest_doc, dest_nome, dest_end:{rua,numero,bairro,cep,cmun}}]
  * @returns {{ faltas: {onde, txt}[], op, cadastros }}
  */
@@ -98,7 +99,12 @@ export function montarOperacao(x) {
   const valor = r2(f?.valor);
   if (!(valor > 0)) falta('frete', 'valor do frete');
   if (f?.lotacao && f?.piso != null && valor < r2(f.piso) - 0.005) falta('frete', `frete abaixo do piso mínimo (${r2(f.piso).toFixed(2)}): o e-frete não gera o CIOT de lotação`);
-  const adiant = r2(valor * (+cfg.pct_adiantamento || 0) / 100), quit = r2(valor - adiant);
+  // retenções do autônomo pessoa física (calculadas por retencoes.js e passadas em x.retencoes); CNPJ: tudo zero
+  const ret = x.retencoes?.aplica ? x.retencoes : null, retTotal = ret ? r2(ret.total) : 0;
+  const pagaLiquido = cfg.retencao_pagamento !== 'bruto';   // 'liquido' (padrão): as parcelas saem já sem o retido; 'bruto': o e-frete desconta
+  const aPagar = pagaLiquido ? r2(valor - retTotal) : valor;
+  const adiant = Math.min(r2(valor * (+cfg.pct_adiantamento || 0) / 100), Math.max(aPagar, 0)), quit = r2(aPagar - adiant);
+  if (retTotal > 0 && !(aPagar > 0)) falta('frete', 'as retenções são maiores que o frete: confira o valor e os parâmetros de retenção');
   const tp = cfg.tipo_pagamento || 'eFRETE';
   let banco = null;
   if (tp !== 'eFRETE') {
@@ -144,7 +150,7 @@ export function montarOperacao(x) {
           QuantidadeDaMercadoriaNoEmbarque: q, ToleranciaDePerdaDeMercadoria: tol };
       }),
     }],
-    Impostos: { IRRF: 0, SestSenat: 0, INSS: 0, ISSQN: 0, OutrosImpostos: 0 },
+    Impostos: { IRRF: ret ? r2(ret.irrf) : 0, SestSenat: ret ? r2(ret.sest_senat) : 0, INSS: ret ? r2(ret.inss) : 0, ISSQN: 0, OutrosImpostos: 0 },
     Pagamentos: [...(adiant > 0 ? [pag('Adiantamento', adiant, ini ? dataLocal(ini) : null, 1)] : []), pag('Quitacao', quit, liberaQuit, adiant > 0 ? 2 : 1)],
     Contratado: { CpfOuCnpj: docT, RNTRC: rntrc },
     Motorista: mot ? { CpfOuCnpj: dig(mot.cpf), CNH: dig(mot.cnh), Celular: celular(mot.ddd, mot.celular) } : null,
@@ -167,6 +173,7 @@ export function montarOperacao(x) {
       Nome: mot.nome || '', Telefones: { Celular: celular(mot.ddd, mot.celular) } } : null,
   };
   return { faltas, op, cadastros, resumo: { contratado: t?.nome, motorista: mot?.nome, placas, origem: carga.xmun, destino: descargas[descargas.length - 1]?.xmun, valor, adiantamento: adiant, quitacao: quit,
+    retencoes: ret ? { inss: r2(ret.inss), sest_senat: r2(ret.sest_senat), irrf: r2(ret.irrf), total: retTotal } : null, liquido: r2(valor - retTotal), paga_liquido: pagaLiquido,
     pagamento: tp, notas: notas.map(n => n.numero), peso: pesoTotal, tipo_carga: f?.tipo_carga, codigo_antt: codTipo || null, inicio: op.DataInicioViagem, fim: op.DataFimViagem } };
 }
 

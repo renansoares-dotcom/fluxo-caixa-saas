@@ -71,3 +71,43 @@ test('auxiliares', () => {
   assert.deepEqual(enderecoDest(xml), { rua: 'RUA A', numero: '5', complemento: '', bairro: 'B', cep: '50000000', cmun: '2611606' });
   assert.equal(pesoNota(xml), 12.5);
 });
+
+// ---- retenções do autônomo pessoa física no CIOT (SQL 159)
+import { calcRetencoes, PARAM_PADRAO } from '../supabase/functions/efrete/retencoes.js';
+
+test('sem retenções (CNPJ ou não informadas): impostos zerados e parcelas pelo valor cheio', () => {
+  const { op, resumo } = montarOperacao(base);
+  assert.deepEqual(op.Impostos, { IRRF: 0, SestSenat: 0, INSS: 0, ISSQN: 0, OutrosImpostos: 0 });
+  assert.equal(resumo.retencoes, null);
+  assert.equal(resumo.liquido, 2500);
+});
+
+test('pessoa física: impostos no CIOT e parcelas pelo líquido', () => {
+  const retencoes = calcRetencoes({ valor: 2500, transp }, PARAM_PADRAO);   // INSS 55,00 · SEST/SENAT 12,50 · IRRF 0
+  const { faltas, op, resumo } = montarOperacao({ ...base, retencoes });
+  assert.deepEqual(faltas, []);
+  assert.deepEqual(op.Impostos, { IRRF: 0, SestSenat: 12.5, INSS: 55, ISSQN: 0, OutrosImpostos: 0 });
+  const V = op.Viagens[0].Valores;
+  assert.equal(V.TotalOperacao, 2500);
+  assert.equal(V.TotalDeAdiantamento, 1000);          // 40% do frete bruto
+  assert.equal(V.TotalDeQuitacao, 1432.5);            // 2.500 − 67,50 − 1.000
+  assert.equal(op.Pagamentos.reduce((s, p) => s + p.Valor, 0), 2432.5);
+  assert.deepEqual(resumo.retencoes, { inss: 55, sest_senat: 12.5, irrf: 0, total: 67.5 });
+  assert.equal(resumo.liquido, 2432.5);
+  assert.equal(resumo.paga_liquido, true);
+});
+
+test('parâmetro "bruto": impostos informados e parcelas pelo valor cheio (o e-frete desconta)', () => {
+  const retencoes = calcRetencoes({ valor: 2500, transp }, PARAM_PADRAO);
+  const { op, resumo } = montarOperacao({ ...base, config: { ...cfg, retencao_pagamento: 'bruto' }, retencoes });
+  assert.equal(op.Impostos.INSS, 55);
+  assert.equal(op.Pagamentos.reduce((s, p) => s + p.Valor, 0), 2500);
+  assert.equal(resumo.paga_liquido, false);
+});
+
+test('adiantamento não passa do líquido', () => {
+  const retencoes = { aplica: true, inss: 300, sest_senat: 100, irrf: 200, total: 600 };
+  const { op } = montarOperacao({ ...base, config: { ...cfg, pct_adiantamento: 100 }, retencoes });
+  assert.equal(op.Viagens[0].Valores.TotalDeAdiantamento, 1900);
+  assert.equal(op.Viagens[0].Valores.TotalDeQuitacao, 0);
+});

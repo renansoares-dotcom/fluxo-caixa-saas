@@ -12,6 +12,7 @@ import { gerarXMLMDFe } from '../lib/mdfe-xml.js';
 import { pedidoCIOT, faltasCIOT, empresaGeraCIOT } from '../lib/ipef.js';
 import { TIPOS_TRANSP, TIPO_CURTO, ehAutonomo, TIPOS_ANEXO, VINCULO, calcPiso, coefDe, pendencias, pendenciasTransp, tipoPeloDoc, lerVeiculos, veiculosTxt, lerMotoristas, motoristasTxt } from '../lib/fretes.js';
 import { janelaCiot, situacaoCiot, camposEndereco, lerEndereco } from '../lib/efrete-ui.js';
+import { calcRetencoes, paramVigente, anterioresDoMes, resumoRetencoes, vencimentoRecolhimento } from '../lib/frete-retencoes.js';
 
 export const title = 'Fretes e CIOT';
 const ui = { aba: 'fretes', mes: today().slice(0, 7), busca: '' };
@@ -43,11 +44,29 @@ async function carregar() {
   for (let i = 0; i < ids.length; i += 150) for (const l of await q(sb.from('lancamentos').select('id,status,data,valor,conta_id').in('id', ids.slice(i, i + 150)))) L.set(l.id, l);
   // NF-e de clientes que autorizaram esta empresa a usar as notas no transporte (SQL 081)
   const NC = await q(sb.from('nfe_compartilhamento').select('empresa_origem, desde').eq('empresa_destino', e).eq('ativo', true)).catch(() => []);
-  B = { T, F, A, C, K, L, P, NC, semMdfe, parId, tById: Object.fromEntries(T.map(t => [t.id, t])), plano: state.cad.contasPlano.find(p => p.codigo === PLANO_FRETE) };
+  // parâmetros das retenções do autônomo pessoa física (SQL 159); sem a migração, a ficha não calcula retenção
+  let R = [], temRet = true;
+  try { R = await q(sb.from('log_retencao_param').select('*').eq('empresa_id', e).order('vigencia', { ascending: false })); } catch { temRet = false; }
+  B = { T, F, A, C, K, L, P, NC, R, temRet, semMdfe, parId, tById: Object.fromEntries(T.map(t => [t.id, t])), plano: state.cad.contasPlano.find(p => p.codigo === PLANO_FRETE) };
   return B;
 }
 const anexosDe = (f) => B.A.filter(a => (f.id && a.frete_id === f.id) || (a.transportador_id && a.transportador_id === f.transportador_id && a.tipo === 'contrato'));
 const pendDe = (f) => pendencias(f, B.tById[f.transportador_id], B.A);
+/** retenções do frete: com CIOT emitido vale o que foi enviado ao e-frete; antes disso, calcula com o parâmetro vigente e o acumulado do mês */
+function retencoesDe(f) {
+  const t = B.tById[f.transportador_id];
+  if (!B.temRet || !t) return null;
+  if (f.ciot_dados?.situacao === 'emitido' && f.retencoes?.total != null) return { aplica: true, travado: true, ...f.retencoes };
+  return calcRetencoes({ valor: f.valor, transp: t, anteriores: anterioresDoMes(B.F, f) }, paramVigente(B.R, f.data));
+}
+function retencoesHTML(r) {
+  if (!r) return '';
+  if (!r.aplica) return r.motivo && !/CNPJ/.test(r.motivo) ? `<span class="warn">${esc(r.motivo)}</span>` : '<span class="muted">Contratado com CNPJ: sem retenção de INSS, SEST/SENAT e IRRF.</span>';
+  const m = r.memoria || {};
+  return `<b>Retenções (pessoa física):</b> INSS ${money(r.inss)} · SEST/SENAT ${money(r.sest_senat)} · IRRF ${money(r.irrf)} = <b>${money(r.total)}</b> · <b>líquido a pagar ${money(r.liquido)}</b>
+    <div class="muted">Base do INSS ${money(r.base_inss)} (20% do frete)${m.teto_aplicado ? ' — limitada ao teto no mês' : ''} · base do IRRF ${money(r.base_irrf)} (10% do frete)${m.fretes_anteriores ? ` · acumulado com ${m.fretes_anteriores} frete(s) anterior(es) do mês` : ''}
+      ${r.travado ? ' · valores enviados no CIOT' : ''}${paramVigente(B.R, null) && B.R.some(p => p.vigencia === r.vigencia && !p.conferido) ? ' · <span class="warn">parâmetros ainda não conferidos pela contabilidade</span>' : ''}</div>`;
+}
 function situacao(f) {
   const l = B.L.get(f.lancamento_id), p = pendDe(f), t = B.tById[f.transportador_id];
   if (f.status === 'cancelado') return '<span class="badge">Cancelado</span>';
@@ -148,6 +167,7 @@ function ficha(f0, root, pre = {}) {
       <label class="xs">Km de retorno<input id="fr-kr" value="${inp(f.km_retorno)}" ${dis}></label>
       <label>Valor do frete (R$) *<input required id="fr-v" value="${inp(f.valor)}" ${dis}></label>
       <div class="c8 small" id="fr-piso" style="align-self:end"></div>
+      <div class="full small" id="fr-ret"></div>
     </div></fieldset>
     <fieldset><legend>Veículo, CIOT e MDF-e</legend><div class="grid-form">
       <label class="xs">Placa<input id="fr-pl" value="${esc(f.placa || '')}" list="fr-placas" ${dis}><datalist id="fr-placas"></datalist></label>
@@ -193,6 +213,7 @@ function ficha(f0, root, pre = {}) {
       : x.piso == null ? `<span class="small muted">Piso: informe km e eixos${x.eixos && !c ? ' (sem coeficiente para esses eixos na tabela)' : ''}.</span>`
       : `<span class="small">Piso mínimo: <b>${money(x.piso)}</b> = ${(+x.km).toLocaleString('pt-BR')} km × ${(+c.ccd).toLocaleString('pt-BR', { minimumFractionDigits: 4 })} + ${money(c.cc)}${x.retorno_vazio && +x.km_retorno ? ` + retorno 0,92 × CCD × ${x.km_retorno} km` : ''}
           ${x.valor != null ? (+x.valor < x.piso - 0.005 ? ` · <b class="neg">frete ${money(x.valor)} está ${money(x.piso - x.valor)} abaixo do piso</b>` : ' · <span class="pos">frete acima do piso</span>') : ''}</span>`;
+    g('fr-ret').innerHTML = retencoesHTML(retencoesDe({ ...x, id: f0?.id, numero: f0?.numero, ciot_dados: f0?.ciot_dados, retencoes: f0?.retencoes }));
     const p = pendencias(x, t, f0 ? B.A : B.A.filter(a => a.transportador_id === x.transportador_id));
     g('fr-pend').innerHTML = !t ? '' : p.length ? `<div class="${ehAutonomo(t) ? 'neg' : 'warn'} small"><b>${ehAutonomo(t) ? 'Pagamento travado (autônomo)' : 'Avisos'}:</b> falta ${esc(p.join(', '))}.</div>` : '<div class="pos small"><b>Conforme.</b></div>';
     if (ehAutonomo(t) && !g('fr-cp').value) g('fr-cp').value = 'iplamm';
@@ -209,6 +230,10 @@ function ficha(f0, root, pre = {}) {
   g('fr-novo-t') && (g('fr-novo-t').onclick = (e) => { e.preventDefault(); editarTransp(null, root, async (novo) => { md.close(); await carregar(); ficha(f0 ? { ...f0, ...ler(), transportador_id: novo.id } : null, root, f0 ? {} : { ...ler(), transportador_id: novo.id }); }); });
   const salvar = async () => {
     const x = ler(); x.piso = calcPiso({ ...f, ...x }, B.C);
+    if (B.temRet && f0?.ciot_dados?.situacao !== 'emitido') {   // com CIOT emitido, as retenções ficam como foram enviadas
+      const r = retencoesDe({ ...f, ...x, id: f0?.id, numero: f0?.numero });
+      x.retencoes = { ...resumoRetencoes(r), ...(f0?.retencoes?.lancamentos ? { lancamentos: f0.retencoes.lancamentos } : {}) };
+    }
     if (!x.transportador_id) throw new Error('Escolha o transportador');
     if (!x.data) throw new Error('Informe a data');
     if (x.mdfe_chave && x.mdfe_chave.length !== 44) throw new Error('A chave do MDF-e tem 44 dígitos');
@@ -242,20 +267,40 @@ function ficha(f0, root, pre = {}) {
 function programar(f, root) {
   const t = B.tById[f.transportador_id], p = pendDe(f);
   if (!B.plano) return toast(`Plano ${PLANO_FRETE} (fretes) não encontrado`, true);
+  const r = retencoesDe(f), ret = r?.aplica && r.total > 0 ? r : null;
+  const saidas = state.cad.contasPlano.filter(x => x.natureza === 'D' && x.tipo !== 'T');
+  const achar = (re) => saidas.find(x => re.test(norm(x.nome || x.label || '')))?.id || '';
+  const TRIB = ret ? [['inss', 'INSS retido do autônomo', ret.inss, achar(/inss|previd/)], ['sest_senat', 'SEST/SENAT retido do autônomo', ret.sest_senat, achar(/sest|senat/) || achar(/inss|previd/)], ['irrf', 'IRRF retido do autônomo', ret.irrf, achar(/irrf|imposto de renda/)]].filter(x => x[2] > 0) : [];
+  const venc = vencimentoRecolhimento(f.data);
   const md = modal({ title: `Programar pagamento — frete nº ${f.numero}`, body: `
     <p class="small muted" style="margin-top:0">${esc(t?.nome || '')} · ${money(f.valor)}. Cria o lançamento <b>Em aberto</b> no plano ${esc(B.plano.label)}; ele entra no fluxo e na autorização de pagamentos.
       ${ehAutonomo(t) ? '<br><b>Autônomo:</b> o pagamento deve sair pela IPEF que gerou o CIOT, na conta indicada pelo autônomo. O lançamento só pode ser baixado como pago sem pendências.' : ''}</p>
     ${p.length ? `<p class="${ehAutonomo(t) ? 'neg' : 'warn'} small">Pendências agora: ${esc(p.join(', '))}.</p>` : ''}
-    <div class="grid2"><label>Vencimento<input type="date" id="pg-d" value="${f.data}"></label><label class="grow">Conta<select id="pg-c">${options(state.cad.contas, { empty: '—' })}</select></label></div>`,
+    <div class="grid2"><label>Vencimento<input type="date" id="pg-d" value="${f.data}"></label><label class="grow">Conta<select id="pg-c">${options(state.cad.contas, { empty: '—' })}</select></label></div>
+    ${ret ? `<fieldset style="margin-top:10px"><legend>Retenções do autônomo (pessoa física)</legend>
+      <p class="small" style="margin:0 0 6px">Frete ${money(f.valor)} − retenções ${money(ret.total)} = <b>líquido ao autônomo ${money(ret.liquido)}</b>. O que foi retido vira conta a pagar da empresa, para recolher na guia.</p>
+      <div class="table-wrap"><table><thead><tr><th>Retenção</th><th class="num">Valor</th><th>Plano de contas</th></tr></thead><tbody>
+      ${TRIB.map(([k, nome, v, pl]) => `<tr><td>${esc(nome)}</td><td class="num">${money(v)}</td><td><select class="pg-pl" data-k="${k}">${options(saidas, { label: 'label', selected: pl, empty: 'Escolha o plano' })}</select></td></tr>`).join('')}</tbody></table></div>
+      <div class="grid2" style="margin-top:6px"><label>Vencimento do recolhimento<input type="date" id="pg-dr" value="${venc || f.data}"></label>
+        <label class="chk"><input type="checkbox" id="pg-rt" checked> Criar as contas a pagar das retenções</label></div></fieldset>` : ''}`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pg-ok">Criar lançamento</button>' });
   $('#pg-ok', md.el).onclick = async (ev) => {
     if (!(+f.valor > 0)) return toast('Informe o valor do frete na ficha', true);
+    const criarRet = ret && $('#pg-rt', md.el).checked, planos = Object.fromEntries($$('.pg-pl', md.el).map(x => [x.dataset.k, x.value]));
+    if (criarRet && TRIB.some(([k]) => !planos[k])) return toast('Escolha o plano de contas de cada retenção', true);
     ev.target.disabled = true;
     try {
+      const doc = f.cte_chave ? `CT-e ${f.cte_chave.slice(25, 34)}` : `FRETE ${f.numero}`;
       const [l] = await q(sb.from('lancamentos').insert({ empresa_id: state.empresa.id, data: $('#pg-d', md.el).value, plano_id: B.plano.id, conta_id: $('#pg-c', md.el).value || null, favorecido_id: t?.favorecido_id || null,
-        valor: +f.valor, status: 'Em aberto', descricao: `Frete nº ${f.numero} — ${t?.nome || ''}${f.destino ? ' → ' + f.destino : ''}${f.ciot ? ' · CIOT ' + f.ciot : ''}`.slice(0, 250), documento: f.cte_chave ? `CT-e ${f.cte_chave.slice(25, 34)}` : `FRETE ${f.numero}`, origem: 'frete' }).select('id'));
-      await q(sb.from('log_fretes').update({ lancamento_id: l.id }).eq('id', f.id));
-      md.close(); toast('Pagamento programado'); render(root);
+        valor: ret ? +ret.liquido : +f.valor, status: 'Em aberto', descricao: `Frete nº ${f.numero} — ${t?.nome || ''}${f.destino ? ' → ' + f.destino : ''}${f.ciot ? ' · CIOT ' + f.ciot : ''}${ret ? ` · líquido (retido ${money(ret.total)})` : ''}`.slice(0, 250), documento: doc, origem: 'frete' }).select('id'));
+      let ids = [];
+      if (criarRet) {
+        const rows = TRIB.map(([k, nome, v]) => ({ empresa_id: state.empresa.id, data: $('#pg-dr', md.el).value || venc, plano_id: planos[k], conta_id: $('#pg-c', md.el).value || null, valor: +v, status: 'Em aberto',
+          descricao: `${nome} — frete nº ${f.numero} — ${t?.nome || ''}`.slice(0, 250), documento: doc, origem: 'frete_retencao' }));
+        ids = (await q(sb.from('lancamentos').insert(rows).select('id'))).map(x => x.id);
+      }
+      await q(sb.from('log_fretes').update({ lancamento_id: l.id, ...(B.temRet && ret ? { retencoes: { ...resumoRetencoes(ret), lancamentos: ids } } : {}) }).eq('id', f.id));
+      md.close(); toast(criarRet ? 'Pagamento e retenções programados' : 'Pagamento programado'); render(root);
     } catch (err) { fail(err); ev.target.disabled = false; }
   };
 }
@@ -302,6 +347,7 @@ function editarTransp(t, root, depois = null) {
       <label>Tipo *<select required id="ct-t" ${dis} data-nobusca>${Object.entries(TIPOS_TRANSP).map(([k, v]) => `<option value="${k}" ${(t?.tipo || 'etc') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       <label class="grow">Favorecido no cadastro (pagamentos)<select id="ct-f" ${dis}><option value="">—</option>${favs.map(f => `<option value="${f.id}" ${f.id === t?.favorecido_id ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
       <label>RNTRC<input id="ct-r" value="${esc(t?.rntrc || '')}" ${dis}></label><label>RNTRC válido até<input type="date" id="ct-rv" value="${t?.rntrc_validade || ''}" ${dis}></label>
+      ${B.temRet ? `<label>Dependentes para o IRRF (só pessoa física)<input id="ct-dep" type="number" min="0" max="30" value="${esc(t?.dependentes ?? 0)}" ${dis}><span class="small muted">Com CPF, a plataforma retém INSS, SEST/SENAT e IRRF no frete. Com CNPJ não há retenção.</span></label>` : ''}
       <label class="span2">Veículos (uma linha por veículo: placa;eixos;tipo;renavam;chassi)<textarea id="ct-vs" rows="3" ${dis} placeholder="ABC1D23;5;carreta;12345678901;9BM384078KB123456">${esc(veiculosTxt(t?.veiculos))}</textarea>
         <span class="small muted">RENAVAM e chassi (17 caracteres) são exigidos pelo e-frete para emitir o CIOT.</span></label>
       <label class="span2">Motoristas (uma linha por motorista: CPF;nome;CNH;nascimento dd/mm/aaaa;celular com DDD)<textarea id="ct-ms" rows="2" ${dis} placeholder="12345678909;JOSE DA SILVA;01234567890;15/06/1985;81999990000">${esc(motoristasTxt(t?.motoristas))}</textarea>
@@ -328,7 +374,8 @@ function editarTransp(t, root, depois = null) {
     const row = { nome: g('ct-n').value.trim().toUpperCase(), documento: doc || null, tipo: g('ct-t').value, favorecido_id: g('ct-f').value || null, rntrc: g('ct-r').value.trim() || null, rntrc_validade: g('ct-rv').value || null,
       veiculos: lerVeiculos(g('ct-vs').value).map(v => ({ ...((t?.veiculos || []).find(o => o.placa === v.placa) || {}), ...Object.fromEntries(Object.entries(v).filter(([, x]) => x != null)) })), conta_banco: g('ct-b').value.trim() || null, conta_agencia: g('ct-ag').value.trim() || null, conta_numero: g('ct-c').value.trim() || null, conta_pix: g('ct-px').value.trim() || null,
       motoristas: lerMotoristas(g('ct-ms').value, t?.motoristas || []), endereco: lerEndereco('ct-en', md.el),
-      conta_titular: g('ct-ti').value.trim() || null, conta_vinculo: g('ct-vi').value || null, ipef: g('ct-ip').value.trim() || null, contrato_validade: g('ct-cv').value || null, observacao: g('ct-o').value.trim() || null, ativo: g('ct-at').checked };
+      conta_titular: g('ct-ti').value.trim() || null, conta_vinculo: g('ct-vi').value || null, ipef: g('ct-ip').value.trim() || null, contrato_validade: g('ct-cv').value || null, observacao: g('ct-o').value.trim() || null, ativo: g('ct-at').checked,
+      ...(g('ct-dep') ? { dependentes: Math.min(30, Math.max(0, Math.trunc(+g('ct-dep').value || 0))) } : {}) };
     ev.target.disabled = true;
     try {
       let r; if (t) { await q(sb.from('log_transportadores').update(row).eq('id', t.id)); r = { ...t, ...row }; } else { [r] = await q(sb.from('log_transportadores').insert({ ...row, empresa_id: state.empresa.id }).select()); }

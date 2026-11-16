@@ -10,6 +10,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import https from 'node:https';
 import { montarOperacao, ciot12, periodoPadrao, enderecoDest, pesoNota } from './operacao.js';
+import { calcRetencoes, paramVigente, anterioresDoMes, resumoRetencoes } from './retencoes.js';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -214,13 +215,23 @@ async function dadosDoFrete(freteId: string) {
         dest_end: enderecoDest(n.xml as string), peso_kg: pesoNota(n.xml as string), ncm: it?.ncm || '' };
     });
   }
-  return { f, t, emp, tipos, notas, chaves };
+  // retenções do autônomo pessoa física (SQL 159): parâmetro vigente na data do frete + fretes anteriores do mês
+  let retencoes: Record<string, unknown> | null = null;
+  try {
+    const { data: ps, error: e1 } = await adm.from('log_retencao_param').select('*').eq('empresa_id', ctx.empresa).lte('vigencia', f.data).order('vigencia', { ascending: false }).limit(1);
+    if (e1) throw e1;
+    const mes = String(f.data).slice(0, 7), [a, m] = mes.split('-').map(Number);
+    const { data: fs } = await adm.from('log_fretes').select('id, numero, data, valor, status, transportador_id, retencoes').eq('empresa_id', ctx.empresa)
+      .eq('transportador_id', f.transportador_id).gte('data', `${mes}-01`).lt('data', new Date(Date.UTC(a, m, 1)).toISOString().slice(0, 10));
+    retencoes = calcRetencoes({ valor: f.valor, transp: t, anteriores: anterioresDoMes(fs ?? [], f) }, paramVigente(ps ?? [], f.data));
+  } catch { /* SQL 159 ainda não rodou: segue sem retenção */ }
+  return { f, t, emp, tipos, notas, chaves, retencoes };
 }
 
 async function ciotDoFrete(acao: string, body: Record<string, unknown>, cfg: Record<string, unknown>) {
   const ambiente = AMB.atual;
   if (!ctx.adm || !ctx.empresa) return json({ erro: 'A empresa do e-frete não está na plataforma.' }, 400);
-  const { f, t, emp, tipos, notas } = await dadosDoFrete(String(body.frete_id || ''));
+  const { f, t, emp, tipos, notas, retencoes } = await dadosDoFrete(String(body.frete_id || ''));
   const cd = (f.ciot_dados || {}) as Record<string, unknown>;
 
   if (acao === 'ciot_previa' || acao === 'ciot_emitir') {
@@ -228,8 +239,9 @@ async function ciotDoFrete(acao: string, body: Record<string, unknown>, cfg: Rec
     const p = periodoPadrao(f.data, +(cfg.prazo_viagem_horas as number) || 48);
     const inicio = String(body.inicio || p.inicio), fim = String(body.fim || p.fim);
     const idOperacao = `F${f.numero}-${Date.now().toString(36).toUpperCase()}`;
-    const m = montarOperacao({ frete: f, transp: t, empresa: emp, config: cfg, tipos, notas, inicio, fim, idOperacao });
-    if (acao === 'ciot_previa' || m.faltas.length) return json({ ambiente, faltas: m.faltas, resumo: m.resumo, inicio, fim, notas_encontradas: notas.length }, m.faltas.length && acao === 'ciot_emitir' ? 400 : 200);
+    const m = montarOperacao({ frete: f, transp: t, empresa: emp, config: cfg, tipos, notas, inicio, fim, idOperacao, retencoes });
+    if (retencoes && (retencoes as { aplica?: boolean }).aplica === false && String((retencoes as { motivo?: string }).motivo || '').startsWith('Sem parâmetros')) m.faltas.push({ onde: 'parametros', txt: 'parâmetros de retenção do autônomo vigentes na data do frete' });
+    if (acao === 'ciot_previa' || m.faltas.length) return json({ ambiente, faltas: m.faltas, resumo: m.resumo, retencoes, inicio, fim, notas_encontradas: notas.length }, m.faltas.length && acao === 'ciot_emitir' ? 400 : 200);
     if (Date.parse(inicio) < Date.now() - 60e3) return json({ erro: 'O início da viagem não pode ser antes de agora (o e-frete recusa).' }, 400);
 
     const L = await login();
@@ -245,8 +257,9 @@ async function ciotDoFrete(acao: string, body: Record<string, unknown>, cfg: Rec
     const codigo = (r.dados as { CodigoIdentificacaoOperacao?: string } | null)?.CodigoIdentificacaoOperacao || null;
     if (!codigo) return await fim_(400);
     const dados = { provedor: 'efrete', ambiente, codigo, id_operacao: idOperacao, protocolo: (r.dados as { ProtocoloServico?: number }).ProtocoloServico, situacao: 'emitido',
-      emitido_em: new Date().toISOString(), emitido_por: ctx.uid, inicio: m.op.DataInicioViagem, fim: m.op.DataFimViagem, valor: m.resumo.valor, historico: [...((cd.historico as unknown[]) || [])] };
+      emitido_em: new Date().toISOString(), emitido_por: ctx.uid, inicio: m.op.DataInicioViagem, fim: m.op.DataFimViagem, valor: m.resumo.valor, retencoes: m.resumo.retencoes, liquido: m.resumo.liquido, historico: [...((cd.historico as unknown[]) || [])] };
     await adm().from('log_fretes').update({ ciot: codigo, ciot_por: 'iplamm', ciot_dados: dados }).eq('id', f.id);
+    if (retencoes) { try { await adm().from('log_fretes').update({ retencoes: resumoRetencoes(retencoes) }).eq('id', f.id); } catch { /* SQL 159 */ } }
     (f as Record<string, unknown>).ciot_novo = codigo;
     // PDF obrigatório na emissão: guarda nos anexos do frete
     const pr = passo('Baixar PDF do CIOT', await consultar('/Services/Pef/ObterOperacaoTransportePdf', { ...I, Versao: 1, CodigoIdentificacaoOperacao: codigo }));

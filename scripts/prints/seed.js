@@ -425,6 +425,10 @@ Object.assign(window.RPC, {
 DB.efrete_config = [{ empresa_id: E, ambiente: 'homologacao', tipo_viagem: 'Padrao', tipo_pagamento: 'eFRETE', pct_adiantamento: 40, dias_liberacao_quitacao: 2, prazo_viagem_horas: 48,
   docs_credenciado: ['Canhoto da NF-e assinado pelo destinatario', 'Comprovante de entrega da carga'], entrega_documentacao: 'RedeCredenciada', tipo_embalagem: 'Pallet', unidade_medida: 'Kg',
   tipo_calculo: 'SemQuebra', tolerancia_tipo: 'Nenhum', tolerancia_valor: 0, contratante_endereco: { rua: 'RUA DO EXEMPLO', numero: '100', bairro: 'CENTRO', cep: '55000000', cmun: '2604106' }, observacoes_transportador: [] }];
+// retenções do autônomo pessoa física (SQL 159) — valores iniciais de 2026
+DB.log_retencao_param = [{ empresa_id: E, vigencia: '2026-01-01', inss_pct: 11, inss_base_pct: 20, inss_teto: 8475.55, sest_senat_pct: 2.5, sest_senat_teto: true, irrf_base_pct: 10, irrf_dependente: 189.59,
+  irrf_simplificado: 607.20, irrf_minimo: 10, irrf_faixas: [{ ate: 2428.80, aliq: 0, deduzir: 0 }, { ate: 2826.65, aliq: 7.5, deduzir: 182.16 }, { ate: 3751.05, aliq: 15, deduzir: 394.16 }, { ate: 4664.68, aliq: 22.5, deduzir: 675.49 }, { ate: null, aliq: 27.5, deduzir: 908.73 }],
+  irrf_reducao: { isento_ate: 5000, valor_max: 312.89, limite: 7350, a: 978.62, b: 0.133145 }, conferido: false, observacao: 'Valores iniciais de 2026 — a confirmar com a contabilidade.' }];
 DB.efrete_tipos_carga = [['granel sólido', 1], ['granel líquido', 2], ['frigorificada', 3], ['conteinerizada', 4], ['geral', 5], ['neogranel', 6], ['perigosa granel sólido', 7], ['perigosa granel líquido', 8],
   ['perigosa frigorificada', 9], ['perigosa conteinerizada', 10], ['perigosa geral', 11], ['granel pressurizada', 12]].map(([tipo_carga, codigo]) => ({ empresa_id: E, tipo_carga, codigo }));
 // respostas FICTÍCIAS da função e-frete para as figuras do manual

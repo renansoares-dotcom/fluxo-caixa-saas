@@ -1,8 +1,8 @@
 ---
 titulo: Fretes e CIOT
 tela: Logística › Fretes e CIOT (LOG002)
-versao: 1.8
-atualizado: 2026-11-05
+versao: 1.9
+atualizado: 2026-11-16
 ---
 ## 1. Para que serve
 
@@ -177,7 +177,45 @@ Para emitir:
 
 Depois de emitido, o mesmo botão abre o **PDF do CIOT** e o **Cancelar CIOT** (com motivo). Na carga lotação o CIOT não pode ser corrigido: cancele (e o MDF-e, se já emitido) e emita de novo.
 
-> **Atenção:** no ambiente **Produção** cada CIOT é real e o pagamento pelo e-frete é cobrado. Use **Homologação** para testar. Os impostos retidos do autônomo (INSS, SEST/SENAT e IRRF) ainda vão zerados no CIOT: confira com a contabilidade antes da produção.
+> **Atenção:** no ambiente **Produção** cada CIOT é real e o pagamento pelo e-frete é cobrado. Use **Homologação** para testar.
+
+### 4.8 Retenções do autônomo pessoa física
+
+Quando o contratado tem **CPF**, a empresa retém na fonte o INSS, o SEST/SENAT e o IRRF do frete. A plataforma calcula sozinha. Quando o contratado tem **CNPJ** (transportadora, autônomo equiparado ou cooperativa), não há retenção e nada muda.
+
+**Como a plataforma calcula**
+
+| Retenção | Regra |
+|---|---|
+| INSS | 11% sobre 20% do frete, até o teto do mês. |
+| SEST/SENAT | 2,5% sobre os mesmos 20% do frete. |
+| IRRF | Tabela mensal sobre 10% do frete, menos o INSS e os dependentes (ou o desconto simplificado, o que for maior), com a redução de 2026. Até R$ 10,00 não se retém. |
+
+O INSS e o IRRF são **do mês**: os fretes anteriores do mesmo autônomo no mês entram na conta, e o frete atual paga só a diferença. Exemplo: frete de R$ 3.000,00 → INSS R$ 66,00, SEST/SENAT R$ 15,00, IRRF zero, líquido R$ 2.919,00.
+
+**Onde aparece**
+
+1. **Ficha do frete**: abaixo do piso mínimo, a linha **Retenções (pessoa física)** mostra cada valor, o total e o **líquido a pagar**. Ela muda quando você altera o valor do frete.
+
+![Ficha do frete de um autônomo com CPF: retenções e líquido a pagar](img/fretes-ciot-retencoes-ficha.jpg)
+
+2. **CIOT pelo e-frete**: a conferência mostra as retenções. Elas vão no CIOT como impostos, e as parcelas (adiantamento e quitação) saem pelo **líquido**. Depois de emitido o CIOT, as retenções do frete ficam como foram enviadas.
+3. **Programar pagamento**: o lançamento do frete sai pelo **líquido**. A plataforma cria também uma conta a pagar para cada retenção, com vencimento no dia 20 do mês seguinte. Escolha o plano de contas de cada uma.
+
+![Programar pagamento: frete pelo líquido e contas a pagar das retenções](img/fretes-ciot-retencoes-pagamento.jpg)
+
+**Parâmetros** (só o administrador): em **Logística › Frota e Parâmetros › e-frete (CIOT)**, no bloco **Retenções do autônomo pessoa física**:
+
+- Percentuais, teto do INSS, tabela do IRRF, dedução por dependente, desconto simplificado e redução mensal.
+- **Vigência**: para mudar os valores a partir de uma data, troque a data e salve. A vigência anterior continua valendo para os fretes antigos.
+- **Valores conferidos pela contabilidade**: marque depois da conferência. Enquanto estiver desmarcado, a ficha do frete avisa.
+- **Retenções do autônomo no pagamento**: *líquido* (a plataforma desconta o retido das parcelas) ou *bruto* (o e-frete desconta os impostos informados). Confirme com o e-frete qual usar.
+
+![Parâmetros das retenções do autônomo pessoa física](img/fretes-ciot-retencoes-parametros.jpg)
+
+No **cadastro do transportador** com CPF, informe os **dependentes para o IRRF**.
+
+> **Atenção:** os valores de 2026 foram gravados pela plataforma como ponto de partida. Peça à contabilidade para conferir o teto do INSS e a tabela do IRRF antes de usar em produção.
 
 ## 5. Regras e travas
 
@@ -191,6 +229,7 @@ Depois de emitido, o mesmo botão abre o **PDF do CIOT** e o **Cancelar CIOT** (
   - vale-pedágio (ou rota sem pedágio);
   - valor igual ou maior que o piso.
 - **Transportadora**: as mesmas faltas aparecem como **aviso**, sem travar o pagamento. O CIOT e o MDF-e são gerados por ela; peça os números e anexe.
+- **Retenções** (INSS, SEST/SENAT e IRRF): só para contratado com **CPF**. O piso mínimo é comparado com o frete **bruto**, antes das retenções. Com o CIOT emitido, as retenções do frete não mudam mais; para corrigir, cancele o CIOT e emita de novo.
 - A chave do MDF-e tem **44 dígitos**.
 - **CIOT no MDF-e**: obrigatório quando a IPLAMM emite o MDF-e com veículo de terceiro. O CIOT tem 12 dígitos e o RNTRC tem 8.
 - As chaves de NF-e são conferidas pelo dígito verificador. Uma chave não entra duas vezes no mesmo manifesto.
@@ -234,3 +273,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.6 | 04/11/2026 | **NF-e do cliente**: a transportadora do grupo escolhe as NF-e do cliente na ficha do frete e no MDF-e, sem importar de novo (autorização IPLAMM → KRATOS). |
 | 1.7 | 04/11/2026 | **CIOT pelo e-frete** na ficha do frete (conferência, emissão, PDF e cancelamento) e **parâmetros do e-frete** em Frota e parâmetros; motoristas, endereço, RENAVAM e chassi no cadastro do transportador. |
 | 1.8 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código. Ficha do frete em seções, com Pagamento e Anexos. Figuras refeitas. |
+| 1.9 | 16/11/2026 | **Retenções do autônomo pessoa física** (INSS, SEST/SENAT e IRRF): cálculo na ficha do frete, envio no CIOT, pagamento pelo líquido, contas a pagar das retenções e parâmetros por vigência. |
