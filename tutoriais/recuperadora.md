@@ -1,7 +1,7 @@
 ---
 titulo: Recuperadora — balança, processamento, qualidade, custo, balanço de massa, ambiental e créditos fiscais
 tela: Produção › Recuperadora (REC001 a REC010)
-versao: 1.4
+versao: 1.5
 atualizado: 2026-11-17
 ---
 A Recuperadora controla o material plástico que entra para ser reprocessado (moído, lavado, aglutinado e granulado). Ela serve a três tipos de empresa:
@@ -38,6 +38,9 @@ Em **Produção › Recuperadora › Parâmetros da Recuperadora** (REC009), que
 | Prazo de pagamento (dias) | Vencimento do título, contado a partir da data da pesagem |
 | Conta do adiantamento | Conta do título a pagar gerado pelo adiantamento a fornecedor |
 | Abater o adiantamento | Ao fechar o ticket, o saldo de adiantamento do fornecedor abate a compra |
+| Conta da venda de material reciclado | Conta do título a receber gerado ao expedir (seção 9.1). Vazia, a expedição não gera título |
+| Prazo de recebimento (dias) | Vencimento do título a receber, contado a partir da data da expedição |
+| Exigir a nota fiscal para expedir | A expedição só é concluída com o número da nota |
 | Lançar a compra no Kardex | O material ligado a um produto entra no estoque, no local escolhido (padrão: aparas, APA) |
 | Prefixos | Prefixo do código dos lotes de entrada (LE) e dos lotes de apara (AP) |
 | Tolerância do balanço (%) | Perda não explicada aceita no balanço de massa, em % da entrada nas ordens (seção 11) |
@@ -396,6 +399,32 @@ Na ficha do lote, **Dar saída** registra o destino:
 
 O custo da saída é o custo médio do lote. Só sai lote **disponível**: o bloqueado precisa do ensaio aprovado ou da liberação.
 
+### 9.1 Expedição com romaneio
+
+Em **Expedição** (REC011), a venda sai num documento só, com vários lotes, o transporte e o romaneio para assinar. Serve para o grão e para o lote separado por densidade.
+
+![Figura 18 — Expedição: as expedições do período com o cliente, a nota, o peso, o valor e a margem (dados fictícios)](img/recuperadora-24.jpg)
+
+1. Clique em **+ Nova expedição**.
+2. Informe a data, o **cliente** (cadastrado em Favorecidos), a nota fiscal, o transportador, a placa e o motorista.
+3. Em **Lotes que embarcam**, escolha o lote pela lista ou leia a etiqueta. Informe os kg (vazio = todo o saldo), os volumes, a embalagem e o **R$/kg**.
+4. **Romaneio** imprime a relação dos lotes com espaço para a conferência e as assinaturas. Antes de expedir, ele sai marcado como prévia.
+5. **Expedir** conclui a expedição.
+
+![Figura 19 — Expedição aberta: cliente, transporte, lotes com volumes, embalagem e preço, e o resumo com a margem (dados fictícios)](img/recuperadora-25.jpg)
+
+Ao expedir, a plataforma:
+
+- dá a **saída de venda** em cada lote, com a nota (ou o número da expedição) no documento;
+- grava o peso, os volumes, o valor, o custo dos lotes e a margem;
+- gera o **título a receber** do cliente, na conta e no prazo dos parâmetros. Lote sem preço fica fora do título.
+
+A expedição não acontece quando falta o cliente, falta a nota exigida, um lote não tem saldo ou um lote **não está disponível**. O lote bloqueado pela qualidade não embarca: libere pelo ensaio (seção 8) ou tire da expedição. Se um lote falhar, nada é baixado.
+
+**Cancelar a expedição** pede o motivo. A aberta é só cancelada. A já expedida devolve os kg aos lotes e exclui o título em aberto; só administrador, financeiro ou diretor faz. Com o título já recebido, estorne o recebimento antes.
+
+A saída avulsa pela ficha do lote (acima) continua valendo para venda sem romaneio. A expedição não emite a nota fiscal nem movimenta o Kardex.
+
 ## 10. Rendimento e custo
 
 **Rendimento e Custo** (REC005) junta as ordens concluídas no período.
@@ -415,7 +444,7 @@ O custo da saída é o custo médio do lote. Só sai lote **disponível**: o blo
 - **Grão produzido:** custo por kg do material e do processo, preço da resina virgem e economia, por grão.
 - **Material de entrada:** rendimento de cada material, separando a apara interna e o grão reprocessado.
 
-![Figura 18 — Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu](img/recuperadora-13.jpg)
+![Figura 20 — Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu](img/recuperadora-13.jpg)
 
 ### 10.1 Aditivos
 
@@ -426,7 +455,7 @@ Com a receita e aditivos em uso, a tela ganha:
 - o **conteúdo reciclado do grão** no período: o reciclado dividido por tudo o que entrou nas ordens;
 - a lista das ordens com item **fora do desvio** aceito.
 
-![Figura 19 — Aditivos no Rendimento e Custo: previsto contra usado, custo por item e o conteúdo reciclado do grão (dados fictícios)](img/recuperadora-22.jpg)
+![Figura 21 — Aditivos no Rendimento e Custo: previsto contra usado, custo por item e o conteúdo reciclado do grão (dados fictícios)](img/recuperadora-22.jpg)
 
 No **Balanço de Massa**, a linha "Entrada nas ordens" mostra quanto é reciclado e quanto é aditivo.
 
@@ -439,7 +468,7 @@ O **Balanço de Massa** (REC007) fecha o mês em quilos e mostra se o material q
 - **Grão:** estoque inicial, produção, saídas por destino e estoque final.
 - **Resíduos:** rejeito apontado nas etapas, o que foi destinado no mês por tipo (com e sem CDF) e o total destinado sem CDF.
 
-![Figura 20 — Balanço de Massa do mês: material, processo com a perda não explicada, grão e resíduos](img/recuperadora-15.jpg)
+![Figura 22 — Balanço de Massa do mês: material, processo com a perda não explicada, grão e resíduos](img/recuperadora-15.jpg)
 
 **Relatório de material reciclado** imprime, para o período escolhido:
 
@@ -462,13 +491,13 @@ Em **Ambiental** (REC008), quem configura a produção registra os resíduos e o
 
 Com custo e a conta de resíduos nos parâmetros, o registro gera o título a pagar. O envio sem CDF fica marcado "aguardando". Passados 30 dias, ele vira alerta.
 
-![Figura 21 — Destinação de resíduos com MTR, CDF, transportador, destinador e custo](img/recuperadora-16.jpg)
+![Figura 23 — Destinação de resíduos com MTR, CDF, transportador, destinador e custo](img/recuperadora-16.jpg)
 
 **Licenças e documentos.** Cada licença ou documento ambiental registra o tipo, o número, o órgão, a emissão, a validade, a antecedência do aviso, as condicionantes e os anexos. Exemplos: LO, LI, LP, CTF/IBAMA, outorga de água, licença de efluentes, AVCB, alvará.
 
 A situação aparece como vencida, a vencer ou em dia. O administrador e o diretor recebem um aviso quando a licença entra na antecedência e outro quando ela vence. A rotina roda nos dias úteis às 8h35.
 
-![Figura 22 — Licenças e documentos ambientais com a validade e a situação](img/recuperadora-17.jpg)
+![Figura 24 — Licenças e documentos ambientais com a validade e a situação](img/recuperadora-17.jpg)
 
 ## 13. Créditos fiscais
 
@@ -481,7 +510,7 @@ O percentual de cada ticket é o da vigência na data da pesagem. Os **parâmetr
 
 Os valores são estimativas para o planejamento. Confira os percentuais com a contabilidade; a apuração oficial é feita no sistema fiscal. O alerta amarelo mostra as compras sem percentual vigente na data.
 
-![Figura 23 — Créditos Fiscais da Recuperadora: compras por enquadramento, créditos estimados e parâmetros por vigência com a fonte](img/recuperadora-18.jpg)
+![Figura 25 — Créditos Fiscais da Recuperadora: compras por enquadramento, créditos estimados e parâmetros por vigência com a fonte](img/recuperadora-18.jpg)
 
 ## 14. Central de Decisões e avisos
 
@@ -522,3 +551,4 @@ A regra 27 da Central de Decisões traz as pendências da recuperadora na área 
 | 1.2 | 09/11/2026 | Recuperadora, parte 3. Inclui balanço de massa do mês, relatório de material reciclado, destinação de resíduos com MTR, CDF e título a pagar, licenças com aviso, créditos fiscais (CBS e IBS presumidos do coletor incentivado, PIS/COFINS de pessoa jurídica) com parâmetros por vigência, alertas na Central de Decisões e no Painel, e novos parâmetros de alerta. |
 | 1.3 | 17/11/2026 | Receita do grão e aditivos (masterbatch, antioxidante, deslizante, carga mineral, resina virgem): parâmetro para ligar, receitas com dosagem em % do reciclado, previsto contra usado na ordem, baixa no estoque na conclusão, custo dos aditivos separado no kg de grão, conteúdo reciclado e itens fora do desvio. |
 | 1.4 | 17/11/2026 | Separação por densidade na ordem de reprocesso: o material que afunda ou flutua no tanque vira lote próprio, deixa a entrada da ordem e leva o custo pelo peso (parâmetro). O balanço de massa do material passa a somar os lotes separados e a tirar as saídas diretas de lote. |
+| 1.5 | 17/11/2026 | Expedição (REC011): venda de vários lotes num documento, com cliente, nota, transporte, volumes, embalagem e preço; romaneio para impressão; saída de venda nos lotes; título a receber pelos parâmetros; margem sobre o custo dos lotes; cancelamento com devolução dos kg. |

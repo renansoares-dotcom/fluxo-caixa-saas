@@ -127,6 +127,7 @@ const routes = {
   'recuperadora/balanco': () => import(`./pages/rec-balanco.js?v=${V}`),
   'recuperadora/ambiental': () => import(`./pages/rec-ambiental.js?v=${V}`),
   'recuperadora/fiscal': () => import(`./pages/rec-fiscal.js?v=${V}`),
+  'recuperadora/expedicao': () => import(`./pages/rec-expedicao.js?v=${V}`),
   'estoque/reposicao': () => import(`./pages/estoque-reposicao.js?v=${V}`),
   'estoque/inventario': () => import(`./pages/estoque-inventario.js?v=${V}`),
   'contab/dre': () => import(`./pages/contab-dre.js?v=${V}`),

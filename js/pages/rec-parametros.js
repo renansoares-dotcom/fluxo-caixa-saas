@@ -25,9 +25,11 @@ const recarregar = (root) => { limparCacheRec(); document.dispatchEvent(new Cust
 
 async function geral(c, R, root) {
   const pode = podeConfig(), dis = pode ? '' : 'disabled', e = state.empresa.id;
-  const [PL, LOC] = await Promise.all([
+  const [PL, LOC, PLE] = await Promise.all([
     q(sb.from('plano_contas').select('id,codigo,nome').eq('empresa_id', e).eq('tipo', 'S').eq('nivel', 2).order('codigo')).catch(() => []),
-    q(sb.from('est_locais').select('id,codigo,nome').eq('empresa_id', e).order('codigo')).catch(() => [])]);
+    q(sb.from('est_locais').select('id,codigo,nome').eq('empresa_id', e).order('codigo')).catch(() => []),
+    q(sb.from('plano_contas').select('id,codigo,nome').eq('empresa_id', e).eq('tipo', 'E').eq('nivel', 2).order('codigo')).catch(() => [])]);
+  const temExp = R.cfg && 'prazo_recebimento_dias' in R.cfg;   // SQL 167 aplicado
   const p = { modo: 'desligado', aparas_auto: true, apara_custo_kg: 0, tolerancia_kg: 1, desconto_max_pct: 30, exigir_foto: false, prazo_pagamento_dias: 0, abater_adiantamento: true,
     integrar_estoque: false, balanca_baud: 9600, prefixo_entrada: 'LE', prefixo_apara: 'AP', ...(R.cfg || {}) };
   const optPl = (sel) => `<option value="">— não gerar —</option>${PL.map(x => `<option value="${x.id}" ${sel === x.id ? 'selected' : ''}>${esc(x.codigo)} · ${esc(x.nome)}</option>`).join('')}`;
@@ -51,6 +53,11 @@ async function geral(c, R, root) {
       <label>Prazo de pagamento (dias depois da pesagem)<input type="number" name="prz" min="0" max="120" value="${p.prazo_pagamento_dias}" ${dis}></label>
       <label>Conta do adiantamento a fornecedor<select name="pla" ${dis}>${optPl(p.plano_adiantamento_id)}</select></label>
       <label class="chk"><input type="checkbox" name="abt" ${p.abater_adiantamento ? 'checked' : ''} ${dis}> Abater o adiantamento em aberto do fornecedor ao fechar o ticket</label></div>
+    ${temExp ? `<h3 style="margin:20px 0 8px">Venda e expedição</h3>
+    <div class="grid2"><label>Conta da venda de material reciclado (título a receber)<select name="plv" ${dis}><option value="">— não gerar —</option>${PLE.map(x => `<option value="${x.id}" ${p.plano_venda_id === x.id ? 'selected' : ''}>${esc(x.codigo)} · ${esc(x.nome)}</option>`).join('')}</select>
+        <span class="small muted">gerado ao expedir, pelo valor dos lotes com preço</span></label>
+      <label>Prazo de recebimento (dias depois da expedição)<input type="number" name="przr" min="0" max="365" value="${p.prazo_recebimento_dias ?? 0}" ${dis}></label>
+      <label class="chk"><input type="checkbox" name="xnf" ${p.expedicao_exigir_nf ? 'checked' : ''} ${dis}> Exigir o número da nota fiscal para expedir</label></div>` : ''}
     <h3 style="margin:20px 0 8px">Alertas e ambiental</h3>
     <div class="grid2"><label>Tolerância da perda não explicada no balanço (% da entrada)<input name="btol" inputmode="decimal" value="${num(p.balanco_tolerancia_pct ?? 2)}" ${dis}></label>
       <label>Avisar as licenças com (dias de antecedência)<input type="number" name="lant" min="1" max="365" value="${p.licenca_antecedencia_dias ?? 60}" ${dis}></label>
@@ -72,7 +79,8 @@ async function geral(c, R, root) {
         balanca_baud: +f.baud.value || 9600, prefixo_entrada: f.pe.value.trim() || 'LE', plano_compra_id: f.plc.value || null, prazo_pagamento_dias: Math.max(0, Math.min(120, +f.prz.value || 0)),
         plano_adiantamento_id: f.pla.value || null, abater_adiantamento: f.abt.checked, integrar_estoque: f.est.checked, est_local_id: f.loc.value || null,
         balanco_tolerancia_pct: Math.min(50, parseNum(f.btol.value) || 0), licenca_antecedencia_dias: Math.max(1, Math.min(365, +f.lant.value || 60)), ensaio_alerta_dias: Math.max(0, Math.min(60, +f.eal.value || 0)),
-        adiant_alerta_dias: Math.max(1, Math.min(365, +f.aal.value || 30)), plano_residuos_id: f.plr.value || null, avisar_licencas: f.alic.checked, atualizado_em: new Date().toISOString() }).eq('empresa_id', e));
+        adiant_alerta_dias: Math.max(1, Math.min(365, +f.aal.value || 30)), plano_residuos_id: f.plr.value || null, avisar_licencas: f.alic.checked, atualizado_em: new Date().toISOString(),
+        ...(temExp ? { plano_venda_id: f.plv.value || null, prazo_recebimento_dias: Math.max(0, Math.min(365, +f.przr.value || 0)), expedicao_exigir_nf: f.xnf.checked } : {}) }).eq('empresa_id', e));
       toast('Parâmetros salvos'); recarregar(root);
     } catch (err) { fail(err); }
   };

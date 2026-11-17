@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { precoVigente, calcTicket, abatimento, saldosAdiant, estoquePorMaterial, placa, COLETOR_SUGERIDO, dosarReceita, resumoAditivos, resumoOrdem as resumoOrdemAdt } from '../js/lib/recuperadora.js';
+import { precoVigente, calcTicket, abatimento, saldosAdiant, estoquePorMaterial, placa, COLETOR_SUGERIDO, dosarReceita, resumoAditivos, resumoExpedicao, resumoOrdem as resumoOrdemAdt } from '../js/lib/recuperadora.js';
 
 const PRECOS = [
   { material_id: 'm1', classe_id: null, vigencia: '2026-01-01', preco_kg: 1.5 },
@@ -115,4 +115,14 @@ test('separação por densidade: o separado deixa a entrada e leva o custo pelo 
   const B = { tolerancia_pct: 2, material: { estoque_inicial: 100, comprado: 50, aparas: 0, outras: 0, separados: 15, consumido: 100, saidas: 10, estoque_final: 55 }, processo: { entrada: 85, nao_explicada: 0 }, grao: { estoque_inicial: 0, produzido: 76.5, saidas: {}, estoque_final: 76.5 } };
   assert.equal(conferirBalanco(B).materialFecha, true);
   assert.equal(conferirBalanco({ ...B, material: { ...B.material, separados: 0 } }).materialFecha, false);
+});
+
+test('expedição: peso, valor só dos itens com preço, custo dos lotes e margem', () => {
+  const L = { peso_kg: 540, custo_total: 1280, situacao: 'disponivel' };
+  const S = resumoExpedicao([{ kg: 200, volumes: 8, preco_kg: 6.5, lote: L }, { kg: 5, volumes: 1, preco_kg: null, lote: { peso_kg: 15, custo_total: 15, situacao: 'bloqueado' } }]);
+  assert.deepEqual([S.lotes, S.kg, S.volumes, S.valor, S.semPreco, S.indisponiveis], [2, 205, 9, 1300, 1, 1]);
+  assert.equal(S.custo, 479.07); assert.equal(S.margem, 820.93);
+  // depois de expedida, vale o custo gravado no item e o lote vendido não conta como indisponível
+  const E = resumoExpedicao([{ kg: 100, preco_kg: 7, custo: 237.04, saida_id: 's1', lote: { peso_kg: 540, custo_total: 1280, situacao: 'vendido' } }]);
+  assert.equal(E.custo, 237.04); assert.equal(E.indisponiveis, 0); assert.equal(E.margem, 462.96);
 });

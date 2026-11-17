@@ -13,6 +13,19 @@ export const COLETOR_SUGERIDO = (tipo) => ['catador_pf', 'cooperativa', 'associa
 export const SIT_TICKET = { aberto: ['Aberto', 'aberto'], fechado: ['Fechado', 'pago'], cancelado: ['Cancelado', 'vencido'] };
 export const SIT_LOTE = { disponivel: ['Disponível', 'pago'], em_processo: ['Em processo', 'aberto'], consumido: ['Consumido', ''], bloqueado: ['Bloqueado', 'negoc'], vendido: ['Vendido', ''], cancelado: ['Cancelado', 'vencido'] };
 export const TIPOS_LOTE = { entrada: 'Entrada', apara: 'Apara interna', grao: 'Grão', separado: 'Separado por densidade' };
+export const SIT_EXPEDICAO = { aberta: ['Aberta', 'aberto'], expedida: ['Expedida', 'pago'], cancelada: ['Cancelada', 'vencido'] };
+export const EMBALAGENS = ['Big bag', 'Saco de 25 kg', 'Saco de 30 kg', 'Fardo', 'Granel'];
+/** resumo da expedição: peso, volumes, valor (itens com preço), custo dos lotes embarcados e margem */
+export function resumoExpedicao(itens) {
+  const r = { lotes: 0, kg: 0, volumes: 0, valor: 0, custo: 0, semPreco: 0, indisponiveis: 0 };
+  for (const i of itens || []) { const l = i.lote || {}, k = +i.kg || 0;
+    r.lotes++; r.kg += k; r.volumes += +i.volumes || 0;
+    if (i.preco_kg == null || i.preco_kg === '') r.semPreco++; else r.valor += Math.round(k * +i.preco_kg * 100) / 100;
+    r.custo += i.custo != null ? +i.custo : (+l.peso_kg ? Math.round(k * +l.custo_total / +l.peso_kg * 100) / 100 : 0);
+    if (l.situacao && l.situacao !== 'disponivel' && i.saida_id == null) r.indisponiveis++; }
+  r.kg = Math.round(r.kg * 1000) / 1000; r.valor = Math.round(r.valor * 100) / 100; r.custo = Math.round(r.custo * 100) / 100; r.margem = Math.round((r.valor - r.custo) * 100) / 100;
+  return r;
+}
 export const FRACOES = { afundou: 'Afundou', flutuou: 'Flutuou', outro: 'Outro' };
 
 export const placa = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
