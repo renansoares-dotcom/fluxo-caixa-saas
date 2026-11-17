@@ -1146,6 +1146,20 @@ table.metas-grade td.sticky{min-width:150px;white-space:normal}
   body.nav-modo-painel .nav-corpo a[data-route]{padding:6px 8px;border-radius:7px}
   body.nav-modo-painel .nav-corpo a[data-route]:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
   /* busca: os resultados aparecem na própria lista, sem painel */
+  /* cascata (17/11/2026): o painel da área mostra só os grupos; as telas de cada grupo abrem num segundo painel ao lado */
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-area.painel>.nav-corpo{width:236px;overflow:visible;columns:auto}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec{margin:0}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec.vazia{display:none}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec>summary{cursor:pointer;pointer-events:auto;padding:8px 8px;border-radius:7px;font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--text)}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec>summary::after{display:block!important;width:6px;height:6px;transform:rotate(-45deg);opacity:.55;margin-right:2px}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec>summary:hover,body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec.cascata>summary{background:color-mix(in srgb,var(--area) 10%,transparent);color:var(--area)}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec.cascata>summary::after{opacity:1}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec:has(a.active)>summary{color:var(--area);font-weight:650}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec>summary:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec>.nav-itens{display:none}
+  body.nav-modo-painel #nav:not(.nav-filtrando) .nav-corpo .nav-sec.cascata>.nav-itens{display:flex;position:fixed;z-index:61;width:280px;overflow:auto;margin:0;padding:8px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 18px 48px rgba(16,24,40,.18),0 2px 6px rgba(16,24,40,.08);animation:nav-painel .1s ease-out}
+  @media (prefers-reduced-motion:reduce){body.nav-modo-painel .nav-corpo .nav-sec.cascata>.nav-itens{animation:none}}
   body.nav-modo-painel .nav-filtrando .nav-area.tem-achado>.nav-corpo{display:block;position:static;width:auto;box-shadow:none;border:0;padding:0;columns:auto;animation:none}
   body.nav-modo-painel .nav-filtrando .nav-corpo-tit{display:none}
   body.nav-modo-painel .nav-filtrando .nav-corpo .nav-itens{margin-left:18px;padding:1px 0 4px 6px;border-left:1px solid var(--border)}

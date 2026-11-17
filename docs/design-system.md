@@ -35,7 +35,7 @@ Toda tela tem um código fixo, como no Iniflex, registrado em `js/lib/telas.js`:
 | AJU | Ajuda e Comunicação |
 
 ## 3. Menu lateral
-- **Computador (> 900 px), desde 06/11/2026:** a lista de áreas fica parada. Clicar (ou Enter / → ) numa área abre um **painel ao lado**, por cima da tela, com todos os grupos abertos e o código de cada tela; com mais de 9 telas o painel usa 2 colunas. Nada no menu se move. Com um painel aberto, passar o mouse em outra área troca o painel (como numa barra de menus). Fecha ao escolher a tela, ao clicar fora, no Esc ou na ←. Setas ↑ ↓ andam entre as telas.
+- **Computador (> 900 px), em cascata desde 17/11/2026 (pedido do Renan):** a lista de áreas fica parada. Clicar (ou Enter / →) numa área abre um **painel ao lado** só com os **grupos** da área (Movimento, Pagamentos, Fechamento…); passar o mouse ou clicar num grupo abre um **segundo painel** com as telas dele e o código de cada uma. Um nível por vez: área › grupo › tela. Áreas sem grupos (Painéis, Comunicação) mostram as telas direto no primeiro painel. Grupo sem tela liberada para quem usa não aparece. Com um painel aberto, passar o mouse em outra área troca o painel. Fecha ao escolher a tela, ao clicar fora ou no Esc. Teclado: ↑ ↓ andam no nível, → entra no grupo, ← volta. (De 06/11 a 16/11 o painel mostrava todos os grupos abertos, em até 2 colunas.)
 - **Celular (até 900 px):** áreas em acordeão, uma por vez, e dentro dela um grupo por vez.
 - A busca no menu mostra os resultados na própria lista (sem painel).
 - Cada área tem ícone e cor. Cada item mostra o código da tela, em cinza.

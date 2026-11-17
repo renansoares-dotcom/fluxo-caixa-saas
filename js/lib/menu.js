@@ -3,6 +3,7 @@
 // abre por cima ao passar o mouse). O acordeão de áreas e grupos continua em app.js.
 // 06/11/2026: no computador (> 900 px) as áreas ficam paradas e cada uma abre num painel ao lado, por cima da tela,
 // sem empurrar os itens de baixo (decisão do Renan, opção B). No celular continua o acordeão.
+// 17/11/2026: o painel passou a abrir em cascata (pedido do Renan): área › grupos › telas do grupo, um nível por vez.
 // Favoritos e Recentes ficam fora do #nav (data-r, não data-route) para não confundir as rotinas que leem o menu.
 import { state } from './data.js';
 import { $, $$, esc } from './ui.js';
@@ -113,16 +114,27 @@ function montarPainel(nav) {
     // com um painel aberto, passar o mouse em outra área troca o painel (como numa barra de menus)
     tit.addEventListener('mouseenter', () => { if (aberta && aberta !== ar && modoPainel() && !nav.classList.contains('nav-filtrando')) abrirPainel(ar); });
   });
-  // no painel os grupos ficam todos abertos e o título do grupo é só um rótulo
-  nav.addEventListener('click', (e) => { const s = e.target.closest('summary'); if (s && modoPainel() && !nav.classList.contains('nav-filtrando')) e.preventDefault(); }, true);
+  // no painel, cada grupo abre as suas telas num segundo painel ao lado (cascata); o <details> fica sempre aberto e quem mostra é a classe
+  const emCascata = () => modoPainel() && !nav.classList.contains('nav-filtrando');
+  nav.addEventListener('click', (e) => { const s = e.target.closest('summary'); if (!s || !emCascata()) return; e.preventDefault(); const sec = s.parentElement;
+    if (sec.classList.contains('cascata') && e.detail) fecharGrupo(); else abrirGrupo(sec, !e.detail); }, true);
+  let espera = null;
+  $$('.nav-sec>summary', nav).forEach(sm => { sm.setAttribute('aria-haspopup', 'menu');
+    sm.addEventListener('mouseenter', () => { if (!emCascata()) return; clearTimeout(espera); const sec = sm.parentElement; if (sec === grupo) return; espera = setTimeout(() => abrirGrupo(sec), grupo ? 160 : 60); });
+    sm.addEventListener('mouseleave', () => clearTimeout(espera)); });
   document.addEventListener('mousedown', (e) => { if (aberta && !aberta.contains(e.target)) fecharPainel(); });
   document.addEventListener('keydown', (e) => {
     if (!aberta) return;
     const corpo = $('.nav-corpo', aberta);
-    if (e.key === 'Escape') { e.preventDefault(); const t = $('.nav-area-tit', aberta); fecharPainel(); t?.focus(); return; }
-    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) && corpo.contains(document.activeElement)) {
+    const foco = document.activeElement, noGrupo = grupo && $('.nav-itens', grupo)?.contains(foco);
+    if (e.key === 'Escape') { e.preventDefault(); if (noGrupo) { const sm = $('summary', grupo); fecharGrupo(); sm?.focus(); return; } const t = $('.nav-area-tit', aberta); fecharPainel(); t?.focus(); return; }
+    if (e.key === 'ArrowRight' && foco?.matches?.('.nav-sec>summary') && corpo.contains(foco)) { e.preventDefault(); abrirGrupo(foco.parentElement, true); return; }
+    if (e.key === 'ArrowLeft' && noGrupo) { e.preventDefault(); const sm = $('summary', grupo); fecharGrupo(); sm?.focus(); return; }
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) && corpo.contains(foco)) {
       e.preventDefault();
-      const ls = $$('a[data-route]', corpo).filter(a => a.offsetParent); const i = ls.indexOf(document.activeElement);
+      // um nível por vez: dentro do grupo aberto, as telas dele; fora, os grupos e as telas soltas da área
+      const ls = noGrupo ? $$('a[data-route]', grupo).filter(a => a.offsetParent) : [...corpo.querySelectorAll('.nav-sec>summary, a[data-route]')].filter(x => x.offsetParent && !(x.matches('a') && x.closest('.nav-sec')));
+      const i = ls.indexOf(foco);
       const j = e.key === 'Home' ? 0 : e.key === 'End' ? ls.length - 1 : e.key === 'ArrowDown' ? Math.min(ls.length - 1, i + 1) : Math.max(0, i - 1);
       ls[j]?.focus();
     }
@@ -152,10 +164,31 @@ function abrirPainel(ar, focar = false) {
   $('.nav-area-tit', ar)?.setAttribute('aria-expanded', 'true');
   document.body.classList.add('nav-painel-aberto');
   const corpo = $('.nav-corpo', ar);
-  const n = $$('a[data-route]', corpo).filter(a => !a.hidden && getComputedStyle(a).display !== 'none').length;
-  corpo.classList.toggle('duas-col', n > 9);
+  const vis = (a) => !a.hidden && getComputedStyle(a).display !== 'none';
+  // grupo sem nenhuma tela liberada para quem usa não aparece
+  $$('.nav-sec', corpo).forEach(sec => { const n = $$('a[data-route]', sec).filter(vis).length; sec.classList.toggle('vazia', !n); $('summary', sec).dataset.n = n; });
   posicionar(ar);
-  if (focar) ($('a[data-route].active', corpo) || $$('a[data-route]', corpo).find(a => a.offsetParent))?.focus();
+  if (focar) ($('.nav-sec:has(a.active)>summary', corpo) || [...corpo.querySelectorAll('.nav-sec:not(.vazia)>summary, a[data-route]')].find(x => x.offsetParent))?.focus();
+}
+
+// segundo nível da cascata: as telas de um grupo, num painel ao lado do painel da área
+let grupo = null;
+function abrirGrupo(sec, focar = false) {
+  if (!aberta || !aberta.contains(sec)) return;
+  if (grupo && grupo !== sec) fecharGrupo();
+  grupo = sec; sec.classList.add('cascata'); $('summary', sec).setAttribute('aria-expanded', 'true');
+  posicionarGrupo();
+  if (focar) ($('a[data-route].active', sec) || $$('a[data-route]', sec).find(a => a.offsetParent))?.focus();
+}
+function fecharGrupo() { if (!grupo) return; grupo.classList.remove('cascata'); $('summary', grupo).setAttribute('aria-expanded', 'false'); grupo = null; }
+function posicionarGrupo() {
+  if (!grupo || !aberta) return;
+  const it = $('.nav-itens', grupo), rc = $('.nav-corpo', aberta).getBoundingClientRect(), rs = $('summary', grupo).getBoundingClientRect();
+  it.style.maxHeight = (innerHeight - 16) + 'px';
+  const w = it.offsetWidth, h = it.offsetHeight;
+  // abre à direita do painel; sem espaço, por cima dele, encostado na borda da janela
+  it.style.left = Math.round(Math.min(rc.right + 4, innerWidth - w - 8)) + 'px';
+  it.style.top = Math.round(Math.max(8, Math.min(rs.top - 9, innerHeight - h - 8))) + 'px';
 }
 
 function posicionar(ar) {
@@ -165,10 +198,12 @@ function posicionar(ar) {
   corpo.style.maxHeight = (innerHeight - 16) + 'px';
   const h = corpo.offsetHeight;
   corpo.style.top = Math.round(Math.max(8, Math.min(rt.top - 10, innerHeight - h - 8))) + 'px';
+  posicionarGrupo();
 }
 
 export function fecharPainel() {
   if (!aberta) return;
+  fecharGrupo();
   aberta.classList.remove('painel'); $('.nav-area-tit', aberta)?.setAttribute('aria-expanded', 'false');
   aberta = null; document.body.classList.remove('nav-painel-aberto');
 }
