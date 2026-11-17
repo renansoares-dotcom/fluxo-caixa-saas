@@ -1,7 +1,7 @@
 ---
 titulo: Recuperadora — balança, processamento, qualidade, custo, balanço de massa, ambiental e créditos fiscais
 tela: Produção › Recuperadora (REC001 a REC010)
-versao: 1.3
+versao: 1.4
 atualizado: 2026-11-17
 ---
 A Recuperadora controla o material plástico que entra para ser reprocessado (moído, lavado, aglutinado e granulado). Ela serve a três tipos de empresa:
@@ -91,6 +91,14 @@ Na aba **Processo e custos** ficam:
 - **preço da resina virgem** por polímero, com vigência e fonte: é a base da economia (seção 10).
 
 ![Figura 3 — Processo e custos: energia, água, mão de obra, máquina, meta de rendimento, ensaio, etapas e resina virgem](img/recuperadora-14.jpg)
+
+Na mesma aba fica a **separação por densidade**, desligada por padrão:
+
+| Parâmetro | O que faz |
+|---|---|
+| Usar separação por densidade | Mostra o bloco **Separação por densidade** nas ordens de reprocesso (seção 7.3) |
+| Custo do lote separado | O lote separado leva o custo do material pelo peso, ou nasce sem custo e tudo fica no grão |
+| Prefixo dos lotes separados | Prefixo do código dos lotes separados (SP) |
 
 ### 1.6 Receitas e aditivos
 
@@ -305,16 +313,33 @@ O resumo avisa quando a entrada, a saída e as perdas apontadas não fecham. O a
 
 ![Figura 13 — Ordem aberta: lotes que entram, etapas com horas e perdas, custos e o resumo com o rendimento e o custo do kg de grão](img/recuperadora-10.jpg)
 
-### 7.3 Receita e aditivos
+### 7.3 Separação por densidade e aditivos
 
-Este bloco aparece quando **Usar receita e aditivos** está ligado (seção 1.6).
+**Separação por densidade.** O bloco aparece quando **Usar separação por densidade** está ligado (seção 1.5). Use para o material que afunda ou flutua no tanque de lavagem e sai como outro material, por exemplo PET no meio do polietileno.
+
+1. Cadastre antes o material separado na aba Materiais dos parâmetros (ex.: PET-S).
+2. Na ordem, escolha o material separado, a fração (afundou, flutuou ou outro) e os kg, e clique em **+ Separação**.
+
+![Figura 14 — Separação por densidade na ordem: o material que afundou no tanque vira lote próprio ao concluir (dados fictícios)](img/recuperadora-23.jpg)
+
+Ao concluir a ordem:
+
+- cada separação vira um **lote próprio**, com código SP + data + número da ordem (ex.: SP-261109-6-1), disponível em Lotes da Recuperadora para outra ordem ou para venda;
+- o que foi separado **deixa a entrada** da ordem. O rendimento do grão é calculado sobre o que sobrou;
+- o custo do material vai junto pelo peso, ou fica todo no grão, conforme o parâmetro;
+- no **Rendimento e Custo**, o fornecedor é medido sobre o que entregou: material misturado baixa o rendimento dele;
+- no **Balanço de Massa**, os lotes separados entram na conta do material.
+
+A separação não pode ser igual ou maior que o material que entrou. A separação não movimenta o Kardex.
+
+**Receita e aditivos.** Este bloco aparece quando **Usar receita e aditivos** está ligado (seção 1.6).
 
 1. Inclua primeiro os lotes que entram: a receita é calculada sobre o peso deles.
 2. Escolha a receita e clique em **Aplicar a receita**. A plataforma lança cada item com o **previsto** (reciclado × dosagem).
 3. Na coluna **Usado**, corrija para o que foi de fato dosado. É o usado que vale para o peso, o custo e a baixa do estoque.
 4. **+ Item** inclui um item fora da receita. **✕** tira um item.
 
-![Figura 14 — Receita e aditivos na ordem: previsto pela receita, usado de fato, desvio e custo (dados fictícios)](img/recuperadora-21.jpg)
+![Figura 15 — Receita e aditivos na ordem: previsto pela receita, usado de fato, desvio e custo (dados fictícios)](img/recuperadora-21.jpg)
 
 O item com o usado fora do desvio aceito aparece com a diferença em vermelho. O custo mostrado com "prev." usa o custo médio do estoque de hoje; o valor final é gravado na conclusão.
 
@@ -338,7 +363,7 @@ Se os parâmetros pedirem, o grão fica **bloqueado** até o ensaio. Se a opçã
 
 Em **Qualidade do Grão** (REC006), a aba **Lotes de grão e ensaios** mostra os lotes aguardando ensaio, os reprovados, a taxa de aprovação e o grão liberado.
 
-![Figura 15 — Qualidade do Grão: lotes aguardando ensaio, reprovados e liberados, com o último ensaio](img/recuperadora-11.jpg)
+![Figura 16 — Qualidade do Grão: lotes aguardando ensaio, reprovados e liberados, com o último ensaio](img/recuperadora-11.jpg)
 
 **Ensaio** registra estas medidas:
 
@@ -354,7 +379,7 @@ A plataforma compara as medidas com a **especificação** do material e mostra o
 - **fora da especificação:** registrar mantém o lote bloqueado e grava os motivos. **Reprovar** bloqueia mesmo dentro da especificação;
 - **Liberar por concessão:** libera fora da especificação. Só administrador, financeiro ou diretor faz, e com a justificativa.
 
-![Figura 16 — Ensaio fora da especificação: a prévia mostra os motivos antes de registrar](img/recuperadora-12.jpg)
+![Figura 17 — Ensaio fora da especificação: a prévia mostra os motivos antes de registrar](img/recuperadora-12.jpg)
 
 A aba **Especificações** guarda os limites de cada grão. Campo vazio não é verificado. A aba **Limite de reciclado por produto** guarda o percentual máximo de reciclado que cada produto acabado aceita, em relação ao peso da OP.
 
@@ -390,7 +415,7 @@ O custo da saída é o custo médio do lote. Só sai lote **disponível**: o blo
 - **Grão produzido:** custo por kg do material e do processo, preço da resina virgem e economia, por grão.
 - **Material de entrada:** rendimento de cada material, separando a apara interna e o grão reprocessado.
 
-![Figura 17 — Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu](img/recuperadora-13.jpg)
+![Figura 18 — Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu](img/recuperadora-13.jpg)
 
 ### 10.1 Aditivos
 
@@ -401,7 +426,7 @@ Com a receita e aditivos em uso, a tela ganha:
 - o **conteúdo reciclado do grão** no período: o reciclado dividido por tudo o que entrou nas ordens;
 - a lista das ordens com item **fora do desvio** aceito.
 
-![Figura 18 — Aditivos no Rendimento e Custo: previsto contra usado, custo por item e o conteúdo reciclado do grão (dados fictícios)](img/recuperadora-22.jpg)
+![Figura 19 — Aditivos no Rendimento e Custo: previsto contra usado, custo por item e o conteúdo reciclado do grão (dados fictícios)](img/recuperadora-22.jpg)
 
 No **Balanço de Massa**, a linha "Entrada nas ordens" mostra quanto é reciclado e quanto é aditivo.
 
@@ -414,7 +439,7 @@ O **Balanço de Massa** (REC007) fecha o mês em quilos e mostra se o material q
 - **Grão:** estoque inicial, produção, saídas por destino e estoque final.
 - **Resíduos:** rejeito apontado nas etapas, o que foi destinado no mês por tipo (com e sem CDF) e o total destinado sem CDF.
 
-![Figura 19 — Balanço de Massa do mês: material, processo com a perda não explicada, grão e resíduos](img/recuperadora-15.jpg)
+![Figura 20 — Balanço de Massa do mês: material, processo com a perda não explicada, grão e resíduos](img/recuperadora-15.jpg)
 
 **Relatório de material reciclado** imprime, para o período escolhido:
 
@@ -437,13 +462,13 @@ Em **Ambiental** (REC008), quem configura a produção registra os resíduos e o
 
 Com custo e a conta de resíduos nos parâmetros, o registro gera o título a pagar. O envio sem CDF fica marcado "aguardando". Passados 30 dias, ele vira alerta.
 
-![Figura 20 — Destinação de resíduos com MTR, CDF, transportador, destinador e custo](img/recuperadora-16.jpg)
+![Figura 21 — Destinação de resíduos com MTR, CDF, transportador, destinador e custo](img/recuperadora-16.jpg)
 
 **Licenças e documentos.** Cada licença ou documento ambiental registra o tipo, o número, o órgão, a emissão, a validade, a antecedência do aviso, as condicionantes e os anexos. Exemplos: LO, LI, LP, CTF/IBAMA, outorga de água, licença de efluentes, AVCB, alvará.
 
 A situação aparece como vencida, a vencer ou em dia. O administrador e o diretor recebem um aviso quando a licença entra na antecedência e outro quando ela vence. A rotina roda nos dias úteis às 8h35.
 
-![Figura 21 — Licenças e documentos ambientais com a validade e a situação](img/recuperadora-17.jpg)
+![Figura 22 — Licenças e documentos ambientais com a validade e a situação](img/recuperadora-17.jpg)
 
 ## 13. Créditos fiscais
 
@@ -456,7 +481,7 @@ O percentual de cada ticket é o da vigência na data da pesagem. Os **parâmetr
 
 Os valores são estimativas para o planejamento. Confira os percentuais com a contabilidade; a apuração oficial é feita no sistema fiscal. O alerta amarelo mostra as compras sem percentual vigente na data.
 
-![Figura 22 — Créditos Fiscais da Recuperadora: compras por enquadramento, créditos estimados e parâmetros por vigência com a fonte](img/recuperadora-18.jpg)
+![Figura 23 — Créditos Fiscais da Recuperadora: compras por enquadramento, créditos estimados e parâmetros por vigência com a fonte](img/recuperadora-18.jpg)
 
 ## 14. Central de Decisões e avisos
 
@@ -496,3 +521,4 @@ A regra 27 da Central de Decisões traz as pendências da recuperadora na área 
 | 1.1 | 09/11/2026 | Recuperadora, parte 2. Inclui processo e custos nos parâmetros (etapas, energia, água, mão de obra, máquina, meta de rendimento, exigir ensaio, resina virgem), ordem de reprocesso com lotes, etapas e perdas, conclusão com o lote de grão e o custo, qualidade do grão (ensaio, especificação, concessão, limite de reciclado), saída dos lotes, e rendimento e custo por fornecedor e por grão com a economia contra a resina virgem. |
 | 1.2 | 09/11/2026 | Recuperadora, parte 3. Inclui balanço de massa do mês, relatório de material reciclado, destinação de resíduos com MTR, CDF e título a pagar, licenças com aviso, créditos fiscais (CBS e IBS presumidos do coletor incentivado, PIS/COFINS de pessoa jurídica) com parâmetros por vigência, alertas na Central de Decisões e no Painel, e novos parâmetros de alerta. |
 | 1.3 | 17/11/2026 | Receita do grão e aditivos (masterbatch, antioxidante, deslizante, carga mineral, resina virgem): parâmetro para ligar, receitas com dosagem em % do reciclado, previsto contra usado na ordem, baixa no estoque na conclusão, custo dos aditivos separado no kg de grão, conteúdo reciclado e itens fora do desvio. |
+| 1.4 | 17/11/2026 | Separação por densidade na ordem de reprocesso: o material que afunda ou flutua no tanque vira lote próprio, deixa a entrada da ordem e leva o custo pelo peso (parâmetro). O balanço de massa do material passa a somar os lotes separados e a tirar as saídas diretas de lote. |

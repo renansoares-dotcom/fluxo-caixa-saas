@@ -318,6 +318,7 @@ export const FIGS = [
   ['recuperadora', 'recuperadora/parametros', '### 1.6', 'Receita do grão: itens com o tipo e a dosagem em % do reciclado', 'receitas|click:tr[data-id="rr1"]'],
   ['recuperadora', 'recuperadora/processamento', '### 7.3', 'Receita e aditivos na ordem: previsto pela receita, usado de fato, desvio e custo', 'click:tr[data-id="ro6"]|scroll:#or-rc'],
   ['recuperadora', 'recuperadora/rendimento', '### 10.1', 'Aditivos no Rendimento e Custo: previsto contra usado, custo por item e o conteúdo reciclado do grão', 'scroll:#rr-at'],
+  ['recuperadora', 'recuperadora/processamento', '### 7.3', 'Separação por densidade na ordem: o material que afundou no tanque vira lote próprio ao concluir', 'click:tr[data-id="ro6"]|scroll:#or-sh'],
   ['cheques', 'cheques', '## 3.', 'Cheques: avisos, indicadores e a carteira com o próximo passo de cada cheque'],
   ['cheques', 'cheques', '## 4.', 'Receber cheques: cliente, títulos pagos, leitura do CMC-7 e os cheques', 'click:#cq-rec|select:#cr-f=ATACADO SERTÃO|click:#cr-t input|fill:.cq-linha [data-k="banco"]=237|fill:.cq-linha [data-k="agencia"]=0456|fill:.cq-linha [data-k="conta"]=77120-9|fill:.cq-linha [data-k="numero"]=118830|fill:.cq-linha [data-k="valor"]=10.750,00|fill:.cq-linha [data-k="emitente_doc"]=06.990.590/0001-23|click:#cr-rep'],
   ['cheques', 'cheques', '## 5.', 'Depósitos: cheques a compensar e os borderôs de depósito', 'click:[data-f="depositos"]'],

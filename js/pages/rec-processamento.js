@@ -4,7 +4,7 @@
 import { sb, state, q } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, today, toast, fail, modal, parseNum, exportXLSX, confirmDialog } from '../lib/ui.js';
 import { carregarRec, podeOperar, kpi, kg, kg0, rkg, semSQL, avisoSQL, desligada, avisoDesligada, nomeMat, optMats } from '../lib/rec-ui.js';
-import { resumoOrdem, resumoAditivos, horasEtapa, PERDAS, TIPOS_LOTE, TIPOS_ADITIVO } from '../lib/recuperadora.js';
+import { resumoOrdem, resumoAditivos, horasEtapa, PERDAS, TIPOS_LOTE, TIPOS_ADITIVO, FRACOES } from '../lib/recuperadora.js';
 import { cadProducao } from '../lib/producao.js';
 
 export const title = 'Processamento';
@@ -82,6 +82,9 @@ async function abrir(B, id, root) {
     const ids = [...new Set(AD.map(a => a.produto_id))];
     if (ids.length) CM = Object.fromEntries((await q(sb.from('est_custos').select('produto_id, quantidade, valor, custo_medio').in('produto_id', ids))).map(c => [c.produto_id, +c.quantidade > 0 ? c.valor / c.quantidade : +c.custo_medio]));
   } catch { /* sem o SQL 165 */ } }
+  // separação por densidade (SQL 166): só com o parâmetro ligado, ou quando a ordem já tem separação
+  let SEP = []; try { SEP = await q(sb.from('rec_ordem_separacoes').select('*, lote:rec_lotes(codigo)').eq('ordem_id', id).order('criado_em')); } catch { SEP = []; }
+  const comSep = !!R.cfg.usar_separacao || SEP.length > 0;
   const adt = () => comAdt ? resumoAditivos(AD, (pid) => CM[pid] || 0, R.cfg.aditivo_desvio_pct ?? 20) : null;
   const recSel = o.receita_id || RECS.find(r => r.padrao)?.id || RECS[0]?.id || '';
   const ets = ET.map(x => ({ ...x, ordem: B.etById[x.etapa_id]?.ordem ?? 0 }));
@@ -106,6 +109,14 @@ async function abrir(B, id, root) {
       <label class="c4">kg entrada<input name="ke" inputmode="decimal"></label><label class="c4">kg saída<input name="ks" inputmode="decimal"></label>
       ${Object.entries(PERDAS).map(([k, t]) => `<label class="c4">Perda: ${t.toLowerCase()} (kg)<input name="${k}" inputmode="decimal"></label>`).join('')}
       <div class="c4" style="align-self:end"><button class="btn" id="or-ea">+ Apontar etapa</button></div></form>` : ''}
+    ${comSep ? `<h3 id="or-sh" style="margin:14px 0 6px">Separação por densidade</h3>
+    <p class="small muted" style="margin:0 0 6px">O que afundou ou flutuou no tanque como outro material. Cada linha vira um lote próprio ao concluir a ordem e deixa de contar na entrada${(R.cfg.separacao_custo ?? 'peso') === 'peso' ? ', levando o custo pelo peso' : ', sem levar custo'}.</p>
+    <div class="table-wrap"><table class="small"><thead><tr><th>Material separado</th><th>Fração</th><th class="num">kg</th><th>Lote</th><th></th></tr></thead><tbody>
+      ${SEP.map(x => `<tr><td>${esc(nomeMat(R, x.material_id))}</td><td>${esc(FRACOES[x.fracao] || x.fracao)}</td><td class="num">${kg(x.kg)}</td><td>${x.lote?.codigo ? `<b>${esc(x.lote.codigo)}</b>` : '<span class="muted">ao concluir</span>'}</td>
+        <td>${pode ? `<button class="btn ghost sm" data-sdel="${x.id}">✕</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhuma separação nesta ordem.</td></tr>'}</tbody></table></div>
+    ${pode ? `<div class="toolbar" style="margin-top:6px"><label class="grow small">Material separado<select id="or-sm">${optMats(R, null, m => m.id !== o.material_saida_id)}</select></label>
+      <label class="small">Fração<select id="or-sf">${Object.entries(FRACOES).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label>
+      <label class="small">kg<input id="or-sk" inputmode="decimal" style="width:100px"></label><button class="btn" id="or-sa">+ Separação</button></div>` : ''}` : ''}
     ${comAdt ? `<h3 style="margin:14px 0 6px">Receita e aditivos</h3>
     ${pode ? `<div class="toolbar"><label class="grow small">Receita do grão<select id="or-rc">${RECS.map(r => `<option value="${r.id}" ${r.id === recSel ? 'selected' : ''}>${esc(r.nome)}${r.padrao ? ' (padrão)' : ''} · ${r.itens.length} item(ns), ${n3(r.itens.reduce((s, i) => s + +i.dosagem_pct, 0))}%</option>`).join('') || '<option value="">— nenhuma receita para este grão —</option>'}</select></label>
       <button class="btn" id="or-ra" ${RECS.length ? '' : 'disabled'}>Aplicar a receita</button></div>
@@ -128,12 +139,12 @@ async function abrir(B, id, root) {
   const atual = () => pode ? { ...o, energia_kwh: parseNum($('#or-kwh', el).value) || 0, agua_m3: parseNum($('#or-agua', el).value) || 0, quimicos_valor: parseNum($('#or-qui', el).value) || 0,
     mo_horas: parseNum($('#or-mo', el).value) || 0, outros_valor: parseNum($('#or-out', el).value) || 0, maquina_id: $('#or-q', el).value || null } : o;
   const resumo = () => {
-    const A = adt(), S = resumoOrdem(atual(), ENT, ets, R.cfg, B.custoHora, null, A), P = S.processo;
+    const A = adt(), S = resumoOrdem(atual(), ENT, ets, R.cfg, B.custoHora, null, A, comSep ? SEP : null), P = S.processo;
     if (comAdt) $('#or-at', el).innerHTML = A.itens.map(a => `<tr><td><b>${esc(a.produto?.codigo || '')}</b> ${esc(a.produto?.descricao || '')}</td><td>${esc(TIPOS_ADITIVO[a.tipo] || a.tipo)}</td><td class="num">${a.previsto == null ? '–' : n3(a.previsto)}</td>
         <td class="num">${pode ? `<input data-akg="${a.id}" inputmode="decimal" value="${n3(a.kg)}" style="width:90px;text-align:right">` : n3(a.kg)}${a.fora ? ` <span class="badge vencido" title="Fora do desvio aceito nos parâmetros">${a.desvio > 0 ? '+' : ''}${String(a.desvio).replace('.', ',')}%</span>` : ''}</td>
         <td class="num">${S.reciclado ? (a.kg / S.reciclado * 100).toFixed(2).replace('.', ',') + '%' : '–'}</td><td class="num">${money(a.custo)}${a.custo_unitario == null && aberta ? ' <span class="muted" title="Pelo custo médio do estoque de hoje; o valor final é gravado na conclusão">prev.</span>' : ''}</td>
         <td>${pode ? `<button class="btn ghost sm" data-adel="${a.id}">✕</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhum aditivo nesta ordem.</td></tr>';
-    $('#or-res', el).innerHTML = `<div class="kpis">${kpi('Entrou', kg(S.entrada), comAdt && S.aditivosKg ? `${kg(S.reciclado)} de reciclado (${pctf(S.recicladoPct)}) + ${kg(S.aditivosKg)} de aditivos` : money(S.material) + ' de material')}${kpi(aberta ? 'Saída prevista' : 'Grão produzido', kg(S.kgSaida), aberta ? 'última etapa ou entrada − perdas' : '')}
+    $('#or-res', el).innerHTML = `<div class="kpis">${kpi('Entrou', kg(S.entrada), [S.separadoKg ? `${kg(S.bruto)} dos lotes − ${kg(S.separadoKg)} separados` : '', comAdt && S.aditivosKg ? `${kg(S.reciclado)} de reciclado (${pctf(S.recicladoPct)}) + ${kg(S.aditivosKg)} de aditivos` : ''].filter(Boolean).join(' · ') || money(S.material) + ' de material')}${kpi(aberta ? 'Saída prevista' : 'Grão produzido', kg(S.kgSaida), aberta ? 'última etapa ou entrada − perdas' : '')}
       ${kpi('Rendimento', pctf(S.rendimento), `meta ${pctf(meta)}`, S.rendimento == null ? '' : S.rendimento >= meta ? 'pos' : 'neg')}${kpi('Custo do processo', money(P.total), `energia ${money(P.energia)} · água ${money(P.agua)} · químicos ${money(P.quimicos)} · MO ${money(P.mao_obra)} · máquina ${money(P.maquina)}${P.outros ? ' · outros ' + money(P.outros) : ''}`)}
       ${kpi('Custo do kg de grão', S.custoKg == null ? '–' : rkg(S.custoKg), comAdt && S.aditivosKg ? `material ${money(S.material)} · aditivos ${money(S.aditivosCusto)} · processo ${money(P.total)}` : money(S.total) + ' no total')}</div>
       ${Math.abs(S.naoExplicado) > 0.5 && ets.length ? `<p class="small warn">${kg(Math.abs(S.naoExplicado))} ${S.naoExplicado > 0 ? 'não explicados pelas perdas apontadas' : 'a mais que a entrada menos as perdas'}: confira os pesos das etapas.</p>` : ''}`;
@@ -170,6 +181,15 @@ async function abrir(B, id, root) {
     if (v.kg_entrada != null && v.kg_saida != null && v.kg_saida > v.kg_entrada) return toast('A saída da etapa passou da entrada', true);
     try { await salvar(); await q(sb.from('rec_ordem_etapas').insert(v)); reabrir(); } catch (err) { fail(err); } };
   $$('[data-del]', el).forEach(b => b.onclick = async () => { try { await q(sb.from('rec_ordem_etapas').delete().eq('id', b.dataset.del)); reabrir(); } catch (err) { fail(err); } });
+  if (comSep) {
+    $('#or-sa', el).onclick = async () => { const k = parseNum($('#or-sk', el).value), mid = $('#or-sm', el).value, tot = ENT.reduce((s, x) => s + +x.kg, 0), ja = SEP.reduce((s, x) => s + +x.kg, 0);
+      if (!mid) return toast('Cadastre o material separado nos Parâmetros (aba Materiais)', true);
+      if (!(k > 0)) return toast('Informe os kg separados', true);
+      if (!tot) return toast('Inclua primeiro os lotes que entram', true);
+      if (ja + k >= tot) return toast('A separação não pode ser igual ou maior que o material que entrou', true);
+      try { await salvar(); await q(sb.from('rec_ordem_separacoes').insert({ empresa_id: e, ordem_id: o.id, material_id: mid, fracao: $('#or-sf', el).value, kg: k })); reabrir(); } catch (err) { fail(err); } };
+    $$('[data-sdel]', el).forEach(b => b.onclick = async () => { try { await salvar(); await q(sb.from('rec_ordem_separacoes').delete().eq('id', b.dataset.sdel)); reabrir(); } catch (err) { fail(err); } });
+  }
   if (comAdt) {
     $('#or-ra', el).onclick = async () => { const rid = $('#or-rc', el).value; if (!rid) return;
       if (AD.length && !await confirmDialog('Aplicar a receita substitui os itens já lançados nesta ordem. Continuar?')) return;
@@ -185,7 +205,7 @@ async function abrir(B, id, root) {
     $('#oc-ok', m2.el).onclick = async () => { try { await q(sb.rpc('rec_ordem_cancelar', { p_ordem: o.id, p_motivo: $('#oc-m', m2.el).value })); m2.close(); md.close(); toast('Ordem cancelada'); render(root); } catch (err) { fail(err); } }; };
   $('#or-ok', el).onclick = async () => {
     const S = resumo();
-    const m2 = modal({ title: 'Concluir a ordem', narrow: true, body: `<p class="small">Entrou ${kg(S.entrada)}${comAdt && S.aditivosKg ? ` (${kg(S.reciclado)} de reciclado + ${kg(S.aditivosKg)} de aditivos${R.cfg.aditivo_baixar_estoque !== false ? ', que saem do estoque agora' : ''})` : ''}. Informe o grão pesado na saída: ele vira o lote de grão${R.cfg.exigir_ensaio ? ', bloqueado até o ensaio' : ''}.</p>
+    const m2 = modal({ title: 'Concluir a ordem', narrow: true, body: `<p class="small">${S.separadoKg ? `${kg(S.separadoKg)} separados viram ${SEP.length} lote(s) próprio(s). ` : ''}Entrou ${kg(S.entrada)}${comAdt && S.aditivosKg ? ` (${kg(S.reciclado)} de reciclado + ${kg(S.aditivosKg)} de aditivos${R.cfg.aditivo_baixar_estoque !== false ? ', que saem do estoque agora' : ''})` : ''}. Informe o grão pesado na saída: ele vira o lote de grão${R.cfg.exigir_ensaio ? ', bloqueado até o ensaio' : ''}.</p>
         <label>Grão produzido (kg)<input id="oc-k" inputmode="decimal" value="${n3(S.kgSaida)}"></label>`, foot: '<button class="btn" data-close>Voltar</button><button class="btn primary" id="oc-ok">Concluir</button>' });
     $('#oc-ok', m2.el).onclick = async (ev) => { ev.target.disabled = true;
       try { await salvar(); const r = await q(sb.rpc('rec_ordem_concluir', { p_ordem: o.id, p_kg_saida: parseNum($('#oc-k', m2.el).value) }));

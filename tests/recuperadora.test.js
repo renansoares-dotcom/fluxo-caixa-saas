@@ -103,3 +103,16 @@ test('receita e aditivos: dosagem sobre o reciclado, desvio do previsto e custo 
   const S0 = resumoOrdemAdt({ quimicos_valor: 50 }, [{ kg: 500, custo: 500 }], [], {}, () => 0, 450);
   assert.equal(S0.entrada, 500); assert.equal(S0.total, 550); assert.equal(S0.rendimento, 0.9);
 });
+
+test('separação por densidade: o separado deixa a entrada e leva o custo pelo peso (ou nenhum)', () => {
+  // 100 kg a R$ 100; 15 kg afundam → entrada 85, material 85; saída 76,5 → 90%
+  const S = resumoOrdemAdt({}, [{ kg: 100, custo: 100 }], [], { separacao_custo: 'peso' }, () => 0, 76.5, null, [{ kg: 15 }]);
+  assert.equal(S.bruto, 100); assert.equal(S.separadoKg, 15); assert.equal(S.entrada, 85); assert.equal(S.material, 85); assert.equal(S.rendimento, 0.9); assert.equal(S.custoKg, Math.round(85 / 76.5 * 10000) / 10000);
+  // custo zero no separado: os R$ 100 ficam no grão
+  const Z = resumoOrdemAdt({}, [{ kg: 100, custo: 100 }], [], { separacao_custo: 'zero' }, () => 0, 76.5, null, [{ kg: 15 }]);
+  assert.equal(Z.material, 100); assert.equal(Z.entrada, 85);
+  // balanço: separados somam e saídas diretas saem da conta do material
+  const B = { tolerancia_pct: 2, material: { estoque_inicial: 100, comprado: 50, aparas: 0, outras: 0, separados: 15, consumido: 100, saidas: 10, estoque_final: 55 }, processo: { entrada: 85, nao_explicada: 0 }, grao: { estoque_inicial: 0, produzido: 76.5, saidas: {}, estoque_final: 76.5 } };
+  assert.equal(conferirBalanco(B).materialFecha, true);
+  assert.equal(conferirBalanco({ ...B, material: { ...B.material, separados: 0 } }).materialFecha, false);
+});

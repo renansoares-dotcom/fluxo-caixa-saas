@@ -12,7 +12,8 @@ export const TIPOS_FORN = { catador_pf: 'Catador (pessoa física)', cooperativa:
 export const COLETOR_SUGERIDO = (tipo) => ['catador_pf', 'cooperativa', 'associacao'].includes(tipo);
 export const SIT_TICKET = { aberto: ['Aberto', 'aberto'], fechado: ['Fechado', 'pago'], cancelado: ['Cancelado', 'vencido'] };
 export const SIT_LOTE = { disponivel: ['Disponível', 'pago'], em_processo: ['Em processo', 'aberto'], consumido: ['Consumido', ''], bloqueado: ['Bloqueado', 'negoc'], vendido: ['Vendido', ''], cancelado: ['Cancelado', 'vencido'] };
-export const TIPOS_LOTE = { entrada: 'Entrada', apara: 'Apara interna', grao: 'Grão' };
+export const TIPOS_LOTE = { entrada: 'Entrada', apara: 'Apara interna', grao: 'Grão', separado: 'Separado por densidade' };
+export const FRACOES = { afundou: 'Afundou', flutuou: 'Flutuou', outro: 'Outro' };
 
 export const placa = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -115,16 +116,21 @@ export function resumoAditivos(aditivos, custoMedio = () => 0, desvioPct = 20) {
 /**
  * resumo da ordem: entrada, perdas apontadas, rendimento e custo por kg (com a saída informada ou prevista pela última etapa).
  * Com aditivos (SQL 165), a entrada é o reciclado + os aditivos e o custo soma o deles: `adt` = resumoAditivos(...)
+ * Com separação por densidade (SQL 166), o que foi separado deixa a ordem: `sep` = lista de { kg }; o custo vai junto
+ * pelo peso quando cfg.separacao_custo = 'peso'.
  */
-export function resumoOrdem(o, entradas, etapas, cfg, custoHora, saida = null, adt = null) {
-  const reciclado = r3((entradas || []).reduce((s, e) => s + (+e.kg || 0), 0)), material = r2((entradas || []).reduce((s, e) => s + (+e.custo || 0), 0));
+export function resumoOrdem(o, entradas, etapas, cfg, custoHora, saida = null, adt = null, sep = null) {
+  const bruto = r3((entradas || []).reduce((s, e) => s + (+e.kg || 0), 0)), matBruto = r2((entradas || []).reduce((s, e) => s + (+e.custo || 0), 0));
+  const separadoKg = r3((sep || []).reduce((s, x) => s + (+x.kg || 0), 0));
+  const separadoCusto = separadoKg && bruto && (cfg?.separacao_custo ?? 'peso') === 'peso' ? r2((sep || []).reduce((s, x) => s + r2((+x.kg || 0) * matBruto / bruto), 0)) : 0;
+  const reciclado = r3(bruto - separadoKg), material = r2(matBruto - separadoCusto);
   const aditivosKg = adt ? adt.kg : 0, aditivosCusto = adt ? adt.custo : 0, entrada = r3(reciclado + aditivosKg);
   const perdas = Object.fromEntries(Object.keys(PERDAS).map(k => [k, r3((etapas || []).reduce((s, e) => s + (+e[k] || 0), 0))]));
   const perdaTotal = r3(Object.values(perdas).reduce((s, v) => s + v, 0));
   const ult = [...(etapas || [])].filter(e => e.kg_saida != null && e.kg_saida !== '').sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0)).at(-1);
   const kgSaida = saida != null ? +saida : (o.peso_saida != null ? +o.peso_saida : (ult ? +ult.kg_saida : r3(entrada - perdaTotal)));
   const proc = custoProcesso(o, etapas, cfg, custoHora), total = r2(material + aditivosCusto + proc.total);
-  return { entrada, reciclado, aditivosKg, aditivosCusto, recicladoPct: entrada ? reciclado / entrada : null, material, perdas, perdaTotal, kgSaida, rendimento: entrada ? kgSaida / entrada : null, processo: proc, total, custoKg: kgSaida ? Math.round(total / kgSaida * 10000) / 10000 : null,
+  return { entrada, bruto, separadoKg, separadoCusto, reciclado, aditivosKg, aditivosCusto, recicladoPct: entrada ? reciclado / entrada : null, material, perdas, perdaTotal, kgSaida, rendimento: entrada ? kgSaida / entrada : null, processo: proc, total, custoKg: kgSaida ? Math.round(total / kgSaida * 10000) / 10000 : null,
     naoExplicado: r3(entrada - kgSaida - perdaTotal) };
 }
 
@@ -168,7 +174,7 @@ export function situacaoLicenca(l, hoje, antecedenciaPadrao = 60) {
 /** confere as contas do balanço: devolve as linhas de cada bloco e se o processo fecha dentro da tolerância */
 export function conferirBalanco(B) {
   const m = B.material, p = B.processo, g = B.grao;
-  const calcM = (+m.estoque_inicial) + (+m.comprado) + (+m.aparas) + (+m.outras) - (+m.consumido);
+  const calcM = (+m.estoque_inicial) + (+m.comprado) + (+m.aparas) + (+m.outras) + (+m.separados || 0) - (+m.consumido) - (+m.saidas || 0);
   const saidas = Object.values(g.saidas || {}).reduce((s, v) => s + +v, 0), calcG = (+g.estoque_inicial) + (+g.produzido) - saidas;
   const pct = p.entrada ? Math.abs(+p.nao_explicada) / +p.entrada * 100 : 0;
   return { materialFecha: Math.abs(calcM - +m.estoque_final) < 0.01, grao: { saidas, fecha: Math.abs(calcG - +g.estoque_final) < 0.01 },

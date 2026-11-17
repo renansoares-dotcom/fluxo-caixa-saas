@@ -30,7 +30,7 @@ export async function render(root) {
       <div class="grid2" style="margin-top:12px;align-items:start">
         <div class="card"><h3 style="margin:0 0 8px">Material (antes do processo)</h3><table class="small"><tbody>
           ${linha('Estoque inicial em lotes', kg0(m.estoque_inicial))}${linha('Compra pesada na balança', sinal(m.pesado))}${linha('Desconto da classe (umidade e impureza)', sinal(-m.desconto), '', 'não é pago nem entra nos lotes')}
-          ${linha('Apara interna', sinal(m.aparas))}${+m.outras ? linha('Doação e transferência', sinal(m.outras)) : ''}${linha('Consumido no processamento', sinal(-m.consumido))}
+          ${linha('Apara interna', sinal(m.aparas))}${+m.outras ? linha('Doação e transferência', sinal(m.outras)) : ''}${+m.separados ? linha('Separado por densidade', sinal(m.separados), '', 'saiu das ordens como outro material e virou lote') : ''}${linha('Consumido no processamento', sinal(-m.consumido))}${+m.saidas ? linha('Saída direta de lote (venda, perda, ajuste)', sinal(-m.saidas)) : ''}
           ${linha('Estoque final em lotes', `<b>${kg0(m.estoque_final)}</b>`, 'row-sec')}</tbody></table>
           <p class="small ${C.materialFecha ? 'pos' : 'neg'}" style="margin:6px 0 0">${C.materialFecha ? 'A conta fecha com o saldo dos lotes.' : 'A conta não fecha com o saldo dos lotes: algum lote foi alterado fora do fluxo.'}</p></div>
         <div class="card"><h3 style="margin:0 0 8px">Processo (ordens concluídas no mês)</h3><table class="small"><tbody>

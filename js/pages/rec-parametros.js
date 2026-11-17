@@ -186,7 +186,8 @@ async function aparas(c, R, root) {
 async function processo(c, R, root) {
   const pode = podeConfig(), dis = pode ? '' : 'disabled', e = state.empresa.id;
   const [ET, RV] = await Promise.all([q(sb.from('rec_etapas').select('*').eq('empresa_id', e).order('ordem')), q(sb.from('rec_resina_virgem').select('*').eq('empresa_id', e).order('vigencia', { ascending: false }))]);
-  const p = { custo_kwh: 0, custo_m3_agua: 0, custo_hora_mo: 0, custo_hora_maquina: 0, meta_rendimento_pct: 85, exigir_ensaio: true, prefixo_grao: 'GR', ...(R.cfg || {}) };
+  const p = { custo_kwh: 0, custo_m3_agua: 0, custo_hora_mo: 0, custo_hora_maquina: 0, meta_rendimento_pct: 85, exigir_ensaio: true, prefixo_grao: 'GR', usar_separacao: false, separacao_custo: 'peso', prefixo_separado: 'SP', ...(R.cfg || {}) };
+  const temSep = R.cfg && 'usar_separacao' in R.cfg;   // SQL 166 aplicado
   $('#rp-acoes', root).innerHTML = pode ? '<button class="btn" id="rp-net">+ Etapa</button> <button class="btn" id="rp-nrv">+ Preço da resina virgem</button>' : '';
   c.innerHTML = `<form id="pc-f" class="card"><h3 style="margin:0 0 8px">Custos do processamento</h3><div class="grid2">
       <label>Energia (R$ por kWh)<input name="kwh" inputmode="decimal" value="${num(p.custo_kwh)}" ${dis}></label><label>Água (R$ por m³)<input name="agua" inputmode="decimal" value="${num(p.custo_m3_agua)}" ${dis}></label>
@@ -196,6 +197,11 @@ async function processo(c, R, root) {
       <label>Meta de rendimento (%)<input name="meta" inputmode="decimal" value="${num(p.meta_rendimento_pct)}" ${dis}><span class="small muted">grão ÷ material que entrou na ordem</span></label>
       <label>Prefixo dos lotes de grão<input name="pg" maxlength="6" value="${esc(p.prefixo_grao)}" ${dis}></label>
       <label class="chk"><input type="checkbox" name="ens" ${p.exigir_ensaio ? 'checked' : ''} ${dis}> O lote de grão nasce bloqueado até o ensaio aprovado (Qualidade do Grão)</label></div>
+    ${temSep ? `<h3 style="margin:20px 0 8px">Separação por densidade</h3><div class="grid2">
+      <label class="chk"><input type="checkbox" name="sep" ${p.usar_separacao ? 'checked' : ''} ${dis}> Usar separação por densidade nas ordens de reprocesso</label>
+      <div class="small muted">Para quem separa no tanque de lavagem o material que afunda ou flutua (ex.: PET no meio do polietileno). Cada separação vira um lote próprio ao concluir a ordem.</div>
+      <label>Custo do lote separado<select name="sepc" ${dis}><option value="peso" ${p.separacao_custo === 'peso' ? 'selected' : ''}>Leva o custo do material pelo peso</option><option value="zero" ${p.separacao_custo === 'zero' ? 'selected' : ''}>Nasce sem custo (tudo fica no grão)</option></select></label>
+      <label>Prefixo dos lotes separados<input name="psp" maxlength="6" value="${esc(p.prefixo_separado)}" ${dis}></label></div>` : ''}
     ${pode ? '<button class="btn primary" style="margin-top:12px">Salvar</button>' : ''}</form>
     <div class="grid2" style="margin-top:12px;align-items:start">
       <div class="card flush"><div style="padding:12px 12px 0"><h3 style="margin:0">Etapas do processo</h3></div><div class="table-wrap"><table><thead><tr><th>Ordem</th><th>Código</th><th>Etapa</th><th>Ativa</th></tr></thead><tbody>
@@ -208,7 +214,8 @@ async function processo(c, R, root) {
   $('#pc-f', c).onsubmit = async (ev) => { ev.preventDefault(); if (!pode) return; const f = ev.target;
     try { if (!R.cfg?.empresa_id || !ET.length) await q(sb.rpc('rec_configurar_padrao', { p_empresa: e }));
       await q(sb.from('rec_config').update({ custo_kwh: parseNum(f.kwh.value) || 0, custo_m3_agua: parseNum(f.agua.value) || 0, custo_hora_mo: parseNum(f.mo.value) || 0, custo_hora_maquina: parseNum(f.maq.value) || 0,
-        meta_rendimento_pct: Math.min(100, parseNum(f.meta.value) || 85), prefixo_grao: f.pg.value.trim() || 'GR', exigir_ensaio: f.ens.checked, atualizado_em: new Date().toISOString() }).eq('empresa_id', e));
+        meta_rendimento_pct: Math.min(100, parseNum(f.meta.value) || 85), prefixo_grao: f.pg.value.trim() || 'GR', exigir_ensaio: f.ens.checked, atualizado_em: new Date().toISOString(),
+        ...(temSep ? { usar_separacao: f.sep.checked, separacao_custo: f.sepc.value, prefixo_separado: f.psp.value.trim() || 'SP' } : {}) }).eq('empresa_id', e));
       toast('Salvo'); recarregar(root); } catch (err) { fail(err); } };
   const abrirEt = (x = {}) => {
     const md = modal({ title: x.id ? 'Editar etapa' : 'Nova etapa', narrow: true, body: `<form id="tf" class="grid2"><label>Código *<input name="c" required maxlength="6" value="${esc(x.codigo || '')}"></label><label>Ordem<input type="number" name="o" value="${x.ordem ?? ET.length + 1}"></label>
