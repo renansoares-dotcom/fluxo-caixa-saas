@@ -2,8 +2,8 @@
 // (atribuição proporcional), quanto custa o kg de grão vindo de cada um, preço equivalente pelo rendimento e economia contra a resina virgem.
 import { sb, state, q } from '../lib/data.js';
 import { $, esc, money, dateBR, today, chart, CORES, exportXLSX } from '../lib/ui.js';
-import { carregarRec, kpi, kg0, rkg, semSQL, avisoSQL, desligada, avisoDesligada } from '../lib/rec-ui.js';
-import { precoEquivalente, PERDAS, TIPOS_FORN } from '../lib/recuperadora.js';
+import { carregarRec, kpi, kg, kg0, rkg, semSQL, avisoSQL, desligada, avisoDesligada } from '../lib/rec-ui.js';
+import { precoEquivalente, PERDAS, TIPOS_FORN, TIPOS_ADITIVO } from '../lib/recuperadora.js';
 
 export const title = 'Rendimento e Custo';
 const mesIni = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10); };
@@ -16,13 +16,14 @@ export async function render(root) {
     const R = await carregarRec();
     if (desligada(R)) { root.innerHTML = avisoDesligada(); return; }
     const D = await q(sb.rpc('rec_rendimento', { p_empresa: state.empresa.id, p_de: ui.de, p_ate: ui.ate }));
+    const ADT = R.cfg.usar_aditivos || +D.total?.aditivos > 0 ? await q(sb.rpc('rec_aditivos_resumo', { p_empresa: state.empresa.id, p_de: ui.de, p_ate: ui.ate })).catch(() => null) : null, comAdt = !!ADT;
     const T = D.total, meta = (+D.meta_pct || 85) / 100, cor = (r) => r == null ? '' : r >= meta ? 'pos' : r >= meta - 0.1 ? 'neg warn' : 'neg';
     const F = D.fornecedores || [], comp = F.filter(f => f.fornecedor_id), mediaPes = comp.reduce((s, f) => s + +f.grao, 0) / (comp.reduce((s, f) => s + +f.pesado, 0) || 1);
     const eco = (D.grao || []).reduce((s, g) => s + (+g.economia || 0), 0), perdas = Object.fromEntries(Object.keys(PERDAS).map(k => [k, +(D.perdas || {})[k.replace('perda_', '')] || 0])), totPerda = Object.keys(PERDAS).reduce((s, k) => s + (+perdas[k] || 0), 0);
     root.innerHTML = `<div class="card toolbar"><label class="small">De <input type="date" id="rr-de" value="${ui.de}"></label><label class="small">Até <input type="date" id="rr-ate" value="${ui.ate}"></label>
         <span class="small muted">Ordens concluídas no período.</span><span class="spacer"></span><button class="btn" id="rr-x">Excel</button></div>
       <div class="kpis" style="margin-top:12px">${kpi('Rendimento', pctf(T.rendimento), `${kg0(T.saida)} de grão de ${kg0(T.entrada)} · meta ${pctf(meta)}`, cor(T.rendimento))}
-        ${kpi('Custo do kg de grão', T.custo_kg == null ? '–' : rkg(T.custo_kg), `material ${rkg(+T.saida ? T.custo_material / T.saida : null)} · processo ${rkg(+T.saida ? T.custo_processo / T.saida : null)}`)}
+        ${kpi('Custo do kg de grão', T.custo_kg == null ? '–' : rkg(T.custo_kg), `material ${rkg(+T.saida ? T.custo_material / T.saida : null)}${comAdt ? ` · aditivos ${rkg(+T.saida ? T.custo_aditivos / T.saida : null)}` : ''} · processo ${rkg(+T.saida ? T.custo_processo / T.saida : null)}`)}
         ${kpi('Economia contra a resina virgem', money(eco), (D.grao || []).some(g => g.virgem_kg == null) ? 'cadastre o preço da resina virgem nos parâmetros' : 'preço virgem − custo do grão', eco > 0 ? 'pos' : eco < 0 ? 'neg' : '')}
         ${kpi('Perdas apontadas', kg0(totPerda), Object.entries(PERDAS).filter(([k]) => +perdas[k]).map(([k, t]) => `${t.toLowerCase()} ${kg0(perdas[k])}`).join(' · ') || 'nenhuma etapa com perda')}</div>
       <div class="grid2" style="margin-top:12px;align-items:start">
@@ -37,10 +38,16 @@ export async function render(root) {
       <p class="small muted">Rendimento sobre o pesado = grão atribuído ÷ kg pesado na balança (inclui o desconto da classe e as perdas do processo). O grão de cada lote é o kg consumido × rendimento da ordem.
         Preço equivalente = preço pago × (rendimento do fornecedor ÷ média dos fornecedores, ${pctf(mediaPes)}): ▼ o fornecedor rende menos que a média e o preço justo é menor.</p>
       <div class="card flush" style="margin-top:12px"><div style="padding:12px 12px 0"><h3 style="margin:0">Grão produzido</h3></div><div class="table-wrap" id="rr-gt"><table><thead><tr><th>Grão</th><th class="num">Ordens</th><th class="num">Entrada</th><th class="num">Saída</th><th class="num">Rendimento</th>
-        <th class="num">Material/kg</th><th class="num">Processo/kg</th><th class="num">Custo/kg</th><th class="num">Resina virgem/kg</th><th class="num">Economia</th></tr></thead><tbody>
+        <th class="num">Material/kg</th>${comAdt ? '<th class="num">Aditivos/kg</th>' : ''}<th class="num">Processo/kg</th><th class="num">Custo/kg</th><th class="num">Resina virgem/kg</th><th class="num">Economia</th></tr></thead><tbody>
         ${(D.grao || []).map(g => `<tr><td>${esc(g.material)}</td><td class="num">${g.ordens}</td><td class="num">${kg0(g.entrada)}</td><td class="num">${kg0(g.saida)}</td><td class="num ${cor(g.rendimento)}">${pctf(g.rendimento)}</td>
-          <td class="num">${rkg(g.custo_material_kg)}</td><td class="num">${rkg(g.custo_processo_kg)}</td><td class="num"><b>${rkg(g.custo_kg)}</b></td><td class="num">${rkg(g.virgem_kg)}</td><td class="num ${+g.economia > 0 ? 'pos' : +g.economia < 0 ? 'neg' : ''}">${g.economia == null ? '–' : money(g.economia)}</td></tr>`).join('')
-          || '<tr><td colspan="10" class="empty">Sem grão no período.</td></tr>'}</tbody></table></div></div>
+          <td class="num">${rkg(g.custo_material_kg)}</td>${comAdt ? `<td class="num">${rkg(g.custo_aditivos_kg)}</td>` : ''}<td class="num">${rkg(g.custo_processo_kg)}</td><td class="num"><b>${rkg(g.custo_kg)}</b></td><td class="num">${rkg(g.virgem_kg)}</td><td class="num ${+g.economia > 0 ? 'pos' : +g.economia < 0 ? 'neg' : ''}">${g.economia == null ? '–' : money(g.economia)}</td></tr>`).join('')
+          || '<tr><td colspan="11" class="empty">Sem grão no período.</td></tr>'}</tbody></table></div></div>
+      ${comAdt ? `<div class="card flush" style="margin-top:12px"><div style="padding:12px 12px 0"><h3 style="margin:0">Aditivos e demais itens da receita</h3>
+          <p class="small muted" style="margin:4px 0 8px">${kg0(ADT.total.kg)} em ${ADT.total.ordens} ordem(ns), ${money(ADT.total.custo)}. Conteúdo reciclado do grão no período: <b>${ADT.total.reciclado_pct == null ? '–' : String(ADT.total.reciclado_pct).replace('.', ',') + '%'}</b> (reciclado ÷ tudo o que entrou nas ordens).${(ADT.desvios || []).length ? ` <span class="neg">${ADT.desvios.length} item(ns) fora do desvio aceito de ${String(ADT.desvio_pct).replace('.', ',')}%.</span>` : ''}</p></div>
+        <div class="table-wrap" id="rr-at"><table><thead><tr><th>Item</th><th>Tipo</th><th class="num">Ordens</th><th class="num">Previsto</th><th class="num">Usado</th><th class="num">Diferença</th><th class="num">Custo</th><th class="num">R$/kg</th></tr></thead><tbody>
+        ${(ADT.itens || []).map(a => { const d = a.previsto ? (a.kg - a.previsto) / a.previsto * 100 : null; return `<tr><td>${esc(a.produto)}</td><td>${esc(TIPOS_ADITIVO[a.tipo] || a.tipo)}</td><td class="num">${a.ordens}</td><td class="num">${a.previsto == null ? '–' : kg(a.previsto)}</td><td class="num">${kg(a.kg)}</td>
+          <td class="num ${d != null && Math.abs(d) > +ADT.desvio_pct ? 'neg' : ''}">${d == null ? '–' : (d > 0 ? '+' : '') + d.toFixed(1).replace('.', ',') + '%'}</td><td class="num">${money(a.custo)}</td><td class="num">${rkg(a.custo_kg)}</td></tr>`; }).join('') || '<tr><td colspan="8" class="empty">Nenhum aditivo nas ordens do período.</td></tr>'}</tbody></table></div>
+        ${(ADT.desvios || []).length ? `<div style="padding:8px 12px" class="small"><b>Fora do desvio:</b> ${ADT.desvios.slice(0, 12).map(x => `ordem ${x.numero} (${dateBR(x.data)}) · ${esc(x.produto)}: ${kg(x.kg)} contra ${kg(x.previsto)} (${x.desvio_pct > 0 ? '+' : ''}${String(x.desvio_pct).replace('.', ',')}%)`).join('; ')}</div>` : ''}</div>` : ''}
       <div class="card flush" style="margin-top:12px"><div style="padding:12px 12px 0"><h3 style="margin:0">Material de entrada</h3></div><div class="table-wrap"><table><thead><tr><th>Material</th><th class="num">Consumido</th><th class="num">Grão atribuído</th><th class="num">Rendimento</th></tr></thead><tbody>
         ${(D.materiais || []).map(m => `<tr><td>${esc(m.material)} <span class="small muted">${m.tipo === 'apara' ? 'apara interna' : m.tipo === 'grao' ? 'grão reprocessado' : ''}</span></td><td class="num">${kg0(m.consumido)}</td><td class="num">${kg0(m.grao)}</td><td class="num ${cor(m.rendimento)}">${pctf(m.rendimento)}</td></tr>`).join('')
           || '<tr><td colspan="4" class="empty">—</td></tr>'}</tbody></table></div></div>`;

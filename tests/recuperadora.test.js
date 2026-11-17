@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { precoVigente, calcTicket, abatimento, saldosAdiant, estoquePorMaterial, placa, COLETOR_SUGERIDO } from '../js/lib/recuperadora.js';
+import { precoVigente, calcTicket, abatimento, saldosAdiant, estoquePorMaterial, placa, COLETOR_SUGERIDO, dosarReceita, resumoAditivos, resumoOrdem as resumoOrdemAdt } from '../js/lib/recuperadora.js';
 
 const PRECOS = [
   { material_id: 'm1', classe_id: null, vigencia: '2026-01-01', preco_kg: 1.5 },
@@ -83,4 +83,23 @@ test('licença, balanço e alertas', () => {
     { k: 'ensaio', nivel: 'medio', item: { lotes: 2, kg: 3000 } }, { k: 'adiantamento', nivel: 'medio', item: { qtd: 1, valor: 400, dias: 30 } }]);
   assert.deepEqual(A.map(a => [a.k, a.urg]), [['rec-licencas', 'alta'], ['rec-ensaio', 'media'], ['rec-adiant', 'media']]);
   assert.equal(A[2].impacto, 400); assert.ok(A.every(a => a.origem === 'Recuperadora' && a.rota && a.regra));
+});
+
+test('receita e aditivos: dosagem sobre o reciclado, desvio do previsto e custo no kg de grão', () => {
+  // 2% e 10% de 500 kg de reciclado
+  assert.deepEqual(dosarReceita([{ produto_id: 'mb', dosagem_pct: 2 }, { produto_id: 'pv', dosagem_pct: 10 }], 500).map(i => i.kg), [10, 50]);
+  // usado 14 kg contra 10 previstos = +40% (fora de 20%); custo pelo custo médio enquanto a ordem está aberta
+  const A = resumoAditivos([{ produto_id: 'mb', kg: 14, kg_previsto: 10 }, { produto_id: 'pv', kg: 50, kg_previsto: 50 }, { produto_id: 'x', kg: 1, kg_previsto: null }], (p) => ({ mb: 20, pv: 9 })[p] || 0, 20);
+  assert.equal(A.kg, 65); assert.equal(A.custo, 730); assert.equal(A.fora, 1);
+  assert.deepEqual(A.itens.map(i => [i.desvio, i.fora]), [[40, true], [0, false], [null, false]]);
+  // custo gravado na conclusão vale mais que o custo médio de hoje
+  assert.equal(resumoAditivos([{ produto_id: 'mb', kg: 14, custo: 300 }], () => 20).custo, 300);
+  // ordem: 500 kg de reciclado + 64 de aditivos; saída 540 → rendimento sobre 564, custo com os aditivos
+  const B = resumoAditivos([{ produto_id: 'mb', kg: 14, kg_previsto: 10 }, { produto_id: 'pv', kg: 50, kg_previsto: 50 }], (p) => ({ mb: 20, pv: 9 })[p], 20);
+  const S = resumoOrdemAdt({ quimicos_valor: 50 }, [{ kg: 500, custo: 500 }], [], {}, () => 0, 540, B);
+  assert.equal(S.entrada, 564); assert.equal(S.reciclado, 500); assert.equal(S.aditivosKg, 64); assert.equal(S.total, 1280);
+  assert.equal(Math.round(S.rendimento * 10000), Math.round(540 / 564 * 10000)); assert.equal(S.custoKg, Math.round(1280 / 540 * 10000) / 10000);
+  // sem aditivos, nada muda
+  const S0 = resumoOrdemAdt({ quimicos_valor: 50 }, [{ kg: 500, custo: 500 }], [], {}, () => 0, 450);
+  assert.equal(S0.entrada, 500); assert.equal(S0.total, 550); assert.equal(S0.rendimento, 0.9);
 });

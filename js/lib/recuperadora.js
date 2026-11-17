@@ -96,15 +96,35 @@ export function custoProcesso(o, etapas, cfg, custoHora = () => 0) {
   return p;
 }
 
-/** resumo da ordem: entrada, perdas apontadas, rendimento e custo por kg (com a saída informada ou prevista pela última etapa) */
-export function resumoOrdem(o, entradas, etapas, cfg, custoHora, saida = null) {
-  const entrada = r3((entradas || []).reduce((s, e) => s + (+e.kg || 0), 0)), material = r2((entradas || []).reduce((s, e) => s + (+e.custo || 0), 0));
+export const TIPOS_ADITIVO = { aditivo: 'Aditivo', pigmento: 'Pigmento / masterbatch', carga: 'Carga mineral', resina_virgem: 'Resina virgem', outro: 'Outro' };
+
+/** kg previsto de cada item da receita: material reciclado que entra na ordem × dosagem (%) */
+export const dosarReceita = (itens, recicladoKg) => (itens || []).map(i => ({ ...i, kg: r3((+recicladoKg || 0) * (+i.dosagem_pct || 0) / 100) }));
+
+/**
+ * aditivos da ordem: peso, custo (o gravado na conclusão ou kg × custo médio do estoque) e os itens fora do desvio aceito
+ * custoMedio(produto_id) devolve o custo médio do Kardex
+ */
+export function resumoAditivos(aditivos, custoMedio = () => 0, desvioPct = 20) {
+  const L = (aditivos || []).map(a => { const kg = +a.kg || 0, prev = a.kg_previsto == null ? null : +a.kg_previsto, custo = a.custo != null ? +a.custo : r2(kg * (+custoMedio(a.produto_id) || 0));
+    const desvio = prev ? (kg - prev) / prev * 100 : null;
+    return { ...a, kg, previsto: prev, custo, desvio: desvio == null ? null : Math.round(desvio * 10) / 10, fora: desvio != null && Math.abs(desvio) > (+desvioPct || 0) + 1e-9 }; });
+  return { itens: L, kg: r3(L.reduce((s, a) => s + a.kg, 0)), custo: r2(L.reduce((s, a) => s + a.custo, 0)), fora: L.filter(a => a.fora).length };
+}
+
+/**
+ * resumo da ordem: entrada, perdas apontadas, rendimento e custo por kg (com a saída informada ou prevista pela última etapa).
+ * Com aditivos (SQL 165), a entrada é o reciclado + os aditivos e o custo soma o deles: `adt` = resumoAditivos(...)
+ */
+export function resumoOrdem(o, entradas, etapas, cfg, custoHora, saida = null, adt = null) {
+  const reciclado = r3((entradas || []).reduce((s, e) => s + (+e.kg || 0), 0)), material = r2((entradas || []).reduce((s, e) => s + (+e.custo || 0), 0));
+  const aditivosKg = adt ? adt.kg : 0, aditivosCusto = adt ? adt.custo : 0, entrada = r3(reciclado + aditivosKg);
   const perdas = Object.fromEntries(Object.keys(PERDAS).map(k => [k, r3((etapas || []).reduce((s, e) => s + (+e[k] || 0), 0))]));
   const perdaTotal = r3(Object.values(perdas).reduce((s, v) => s + v, 0));
   const ult = [...(etapas || [])].filter(e => e.kg_saida != null && e.kg_saida !== '').sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0)).at(-1);
   const kgSaida = saida != null ? +saida : (o.peso_saida != null ? +o.peso_saida : (ult ? +ult.kg_saida : r3(entrada - perdaTotal)));
-  const proc = custoProcesso(o, etapas, cfg, custoHora), total = r2(material + proc.total);
-  return { entrada, material, perdas, perdaTotal, kgSaida, rendimento: entrada ? kgSaida / entrada : null, processo: proc, total, custoKg: kgSaida ? Math.round(total / kgSaida * 10000) / 10000 : null,
+  const proc = custoProcesso(o, etapas, cfg, custoHora), total = r2(material + aditivosCusto + proc.total);
+  return { entrada, reciclado, aditivosKg, aditivosCusto, recicladoPct: entrada ? reciclado / entrada : null, material, perdas, perdaTotal, kgSaida, rendimento: entrada ? kgSaida / entrada : null, processo: proc, total, custoKg: kgSaida ? Math.round(total / kgSaida * 10000) / 10000 : null,
     naoExplicado: r3(entrada - kgSaida - perdaTotal) };
 }
 

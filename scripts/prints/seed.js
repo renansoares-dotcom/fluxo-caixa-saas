@@ -2299,13 +2299,31 @@ window.RPC.ajuda_tour_pendente = () => false; window.RPC.ajuda_tour_visto = () =
   DB.rec_ordens.push({ id: 'ro6', empresa_id: E, numero: 6, data: '2026-11-09', material_saida_id: 'rm6', maquina_id: maq?.id || null, situacao: 'aberta', energia_kwh: 640, agua_m3: 5.2, quimicos_valor: 42, mo_horas: 9, outros_valor: 0, peso_entrada: null, peso_saida: null, observacao: null });
   for (const [l, kgv] of [[lotesE[0], 1600], [lotesE[1], 240]]) if (l) { DB.rec_ordem_entradas.push({ id: id('oe'), empresa_id: E, ordem_id: 'ro6', rec_ordem_id: 'ro6', lote_id: l.id, rec_lote_id: l.id, kg: kgv, custo: Math.round(kgv * l.custo_total / l.peso_kg * 100) / 100, criado_em: '2026-11-09T07:00:00Z' }); l.saldo_kg = Math.round((l.saldo_kg - kgv) * 1000) / 1000; l.situacao = 'em_processo'; }
   const mq = (c) => DB.prod_maquinas?.find(m => (m.codigo || '').toUpperCase().includes(c))?.id || null;
-  DB.rec_ordem_etapas = [['etTRI', null, 1.5, 1840, 1795, 0, 45, 0, 0, 'Severino'], ['etMOA', mq('MO'), 2.5, 1795, 1781, 0, 0, 14, 0, 'Severino'], ['etLAV', null, 3, 1781, 1702, 0, 79, 0, 0, 'Josué'], ['etSEC', null, 2, 1702, 1611, 91, 0, 0, 0, 'Josué']]
+  DB.rec_ordem_etapas = [['etTRI', null, 1.5, 1840, 1795, 0, 45, 0, 0, 'Severino'], ['etMOA', mq('MO'), 2.5, 1795, 1781, 0, 0, 14, 0, 'Severino'], ['etLAV', null, 3, 1781, 1702, 0, 79, 0, 0, 'Josué'], ['etSEC', null, 2, 1702, 1611, 91, 0, 0, 0, 'Josué'], ['etEXT', null, 4, 1884.5, 1866, 0, 0, 18.5, 0, 'Josué']]
     .map(([etapa_id, maquina_id, h, ke, ks, pu, ps, pf, pr, operador], i) => ({ id: 'oet' + i, empresa_id: E, ordem_id: 'ro6', etapa_id, maquina_id, operador, horas_maquina: h, kg_entrada: ke, kg_saida: ks, perda_umidade: pu, perda_sujeira: ps, perda_finos: pf, perda_rejeito: pr, criado_em: `2026-11-09T0${8 + i}:00:00Z` }));
+  // receita do grão e aditivos (SQL 165)
+  Object.assign(DB.rec_config[0], { usar_aditivos: true, aditivo_baixar_estoque: true, aditivo_local_id: DB.est_locais?.find(l => l.codigo === 'MP')?.id || null, aditivo_desvio_pct: 20 });
+  const ADP = [['pr-MB-PRETO', 'MB-PRETO', 'MASTERBATCH PRETO 40%', 'aditivo', 18.4], ['pr-ANTIOX', 'AD-ANTIOX', 'ANTIOXIDANTE PARA RECICLADO', 'aditivo', 31.5], ['pr-DESLIZ', 'AD-DESLIZ', 'DESLIZANTE ERUCAMIDA', 'aditivo', 27.9],
+    ['pr-CARB', 'CG-CARB', 'CARBONATO DE CÁLCIO (CARGA)', 'aditivo', 3.2], ['pr-PEBDV', 'MP-PEBD-V', 'RESINA PEBD VIRGEM', 'materia_prima', 9.8]];
+  DB.produtos = DB.produtos.concat(ADP.filter(([pid]) => !DB.produtos.some(x => x.id === pid)).map(([pid, codigo, descricao, tipo]) => ({ id: pid, empresa_id: E, codigo, descricao, tipo, unidade: 'KG', ativo: true })));
+  DB.est_custos = (DB.est_custos || []).concat(ADP.map(([pid, , , , cu]) => ({ produto_id: pid, empresa_id: E, quantidade: 1000, valor: 1000 * cu, custo_medio: cu })));
+  DB.rec_receitas = [['rr1', 'Grão preto para sacola', true, true], ['rr2', 'Grão natural com carga', false, true], ['rr3', 'Grão canela (teste)', false, false]].map(([rid, nome, padrao, ativo]) => ({ id: rid, empresa_id: E, material_id: 'rm6', nome, padrao, ativo, observacao: null }));
+  DB.rec_receita_itens = [['rr1', 'pr-MB-PRETO', 'pigmento', 2], ['rr1', 'pr-ANTIOX', 'aditivo', 0.3], ['rr1', 'pr-PEBDV', 'resina_virgem', 10], ['rr2', 'pr-CARB', 'carga', 5], ['rr2', 'pr-DESLIZ', 'aditivo', 0.15], ['rr3', 'pr-MB-PRETO', 'pigmento', 0.8]]
+    .map(([receita_id, produto_id, tipo, dosagem_pct], i) => ({ id: 'rri' + i, empresa_id: E, receita_id, rec_receita_id: receita_id, produto_id, tipo, dosagem_pct }));
+  DB.rec_ordens.find(o => o.id === 'ro6').receita_id = 'rr1';
+  DB.rec_ordem_aditivos = [['pr-MB-PRETO', 'pigmento', 38, 36.8], ['pr-ANTIOX', 'aditivo', 5.5, 5.52], ['pr-PEBDV', 'resina_virgem', 230, 184]]
+    .map(([produto_id, tipo, kgv, prev], i) => ({ id: 'oa' + i, empresa_id: E, ordem_id: 'ro6', produto_id, tipo, kg: kgv, kg_previsto: prev, custo_unitario: null, custo: null, est_movimento_id: null, criado_em: `2026-11-09T1${i}:00:00Z` }));
+  window.RPC.rec_ordem_aplicar_receita = () => 3;
+  window.RPC.rec_aditivos_resumo = () => ({ desvio_pct: 20, total: { ordens: 4, kg: 1012.4, custo: 9871.3, entrada: 10632.5, reciclado: 9620.1, reciclado_pct: 90.48 },
+    tipos: [{ tipo: 'resina_virgem', kg: 790, custo: 7742 }, { tipo: 'pigmento', kg: 196.3, custo: 3611.92 }, { tipo: 'aditivo', kg: 26.1, custo: 822.15 }],
+    itens: [{ produto: 'MP-PEBD-V — RESINA PEBD VIRGEM', tipo: 'resina_virgem', kg: 790, previsto: 742, custo: 7742, custo_kg: 9.8, ordens: 4 }, { produto: 'MB-PRETO — MASTERBATCH PRETO 40%', tipo: 'pigmento', kg: 196.3, previsto: 180.4, custo: 3611.92, custo_kg: 18.4, ordens: 4 },
+      { produto: 'AD-ANTIOX — ANTIOXIDANTE PARA RECICLADO', tipo: 'aditivo', kg: 26.1, previsto: 22.3, custo: 822.15, custo_kg: 31.5, ordens: 4 }],
+    desvios: [{ ordem_id: 'ro3', numero: 3, data: '2026-11-05', produto: 'MB-PRETO — MASTERBATCH PRETO 40%', kg: 62, previsto: 41.2, desvio_pct: 50.5 }] });
   DB.rec_lote_saidas = [{ id: 'ls1', empresa_id: E, lote_id: 'GRL1', data: '2026-11-05', destino: 'producao', kg: 1715, custo: 4573.6, documento: 'OP 2318', observacao: null }, { id: 'ls2', empresa_id: E, lote_id: 'GRL2', data: '2026-11-06', destino: 'venda', kg: 619, custo: 1127.9, documento: 'NF 10452', observacao: null }];
   const Fn = (t) => DB.favorecidos.find(f => f.nome.startsWith(t));
-  window.RPC.rec_rendimento = () => ({ meta_pct: 82, total: { ordens: 5, entrada: 10632.5, saida: 8708, rendimento: 0.819, custo_material: 14304.2, custo_processo: 7469.6, custo_kg: 2.5004 },
+  window.RPC.rec_rendimento = () => ({ meta_pct: 82, total: { ordens: 5, entrada: 10632.5, saida: 8708, rendimento: 0.819, custo_material: 14304.2, custo_processo: 7469.6, custo_aditivos: 9871.3, aditivos: 1012.4, custo_kg: 3.634 },
     perdas: { umidade: 612.4, sujeira: 978.3, finos: 186.9, rejeito: 146.9 },
-    grao: [{ material: 'GR-PEBD — Grão PEBD reciclado', polimero: 'PEBD', ordens: 5, entrada: 10632.5, saida: 8708, rendimento: 0.819, custo_material_kg: 1.6427, custo_processo_kg: 0.8578, custo_kg: 2.5004, virgem_kg: 9.8, economia: 63563.32 }],
+    grao: [{ material: 'GR-PEBD — Grão PEBD reciclado', polimero: 'PEBD', ordens: 5, entrada: 10632.5, saida: 8708, rendimento: 0.819, custo_material_kg: 1.6427, custo_processo_kg: 0.8578, custo_aditivos_kg: 1.1336, aditivos: 1012.4, custo_kg: 3.634, virgem_kg: 9.8, economia: 53693.53 }],
     fornecedores: [
       { fornecedor_id: Fn('APARAS NORDESTE').id, fornecedor: 'APARAS NORDESTE COMÉRCIO LTDA', rec_tipo: 'sucateiro_pj', pesado: 3718, consumido: 3421, grao: 2858.6, rendimento: 0.8356, rendimento_pesado: 0.7689, pago: 5134.15, custo_grao_kg: 1.796, preco_pago_kg: 1.3809 },
       { fornecedor_id: Fn('COOPERATIVA').id, fornecedor: 'COOPERATIVA RECICLA AGRESTE', rec_tipo: 'cooperativa', pesado: 2548, consumido: 2432.3, grao: 2116.1, rendimento: 0.87, rendimento_pesado: 0.8305, pago: 4348.91, custo_grao_kg: 2.0552, preco_pago_kg: 1.7068 },

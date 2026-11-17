@@ -1,8 +1,8 @@
 ---
 titulo: Recuperadora — balança, processamento, qualidade, custo, balanço de massa, ambiental e créditos fiscais
 tela: Produção › Recuperadora (REC001 a REC010)
-versao: 1.2
-atualizado: 2026-11-09
+versao: 1.3
+atualizado: 2026-11-17
 ---
 A Recuperadora controla o material plástico que entra para ser reprocessado (moído, lavado, aglutinado e granulado). Ela serve a três tipos de empresa:
 
@@ -92,6 +92,29 @@ Na aba **Processo e custos** ficam:
 
 ![Figura 3 — Processo e custos: energia, água, mão de obra, máquina, meta de rendimento, ensaio, etapas e resina virgem](img/recuperadora-14.jpg)
 
+### 1.6 Receitas e aditivos
+
+Use esta aba quando o grão leva outros itens além do material reciclado: masterbatch, antioxidante, deslizante, carga mineral ou resina virgem. Ela vem **desligada**; sem ligar, nada muda nas ordens.
+
+| Parâmetro | O que faz |
+|---|---|
+| Usar receita e aditivos | Mostra o bloco **Receita e aditivos** nas ordens de reprocesso (seção 7.3) |
+| Dar baixa no estoque | Ao concluir a ordem, os itens saem do Kardex como requisição para a produção |
+| Local de onde saem os itens | Local do estoque da baixa. Vazio, vale o local padrão de cada produto |
+| Desvio aceito (%) | Diferença tolerada entre o usado e o previsto pela receita. Acima dela, o item fica marcado |
+
+![Figura 4 — Receitas e aditivos: o parâmetro que liga o uso, a baixa no estoque, o desvio aceito e as receitas de cada grão (dados fictícios)](img/recuperadora-19.jpg)
+
+**Receitas do grão.** Cada grão pode ter várias receitas (ex.: grão preto, grão natural). **+ Nova receita** pede:
+
+- o grão que sai e o nome da receita;
+- os itens, cada um com o tipo (aditivo, pigmento / masterbatch, carga mineral, resina virgem ou outro) e a **dosagem em % do material reciclado** que entra na ordem. A tela mostra quanto isso dá para 1.000 kg;
+- se é a **receita padrão** do grão, a que a ordem sugere primeiro.
+
+![Figura 5 — Receita do grão: itens com o tipo e a dosagem em % do reciclado (dados fictícios)](img/recuperadora-20.jpg)
+
+O item precisa estar cadastrado em **Estoque › Produtos**. A receita é o ponto de partida: como a dosagem varia de lote para lote, o que vale é o que o operador registra na ordem.
+
 ## 2. Painel da Recuperadora
 
 O **Painel da Recuperadora** (REC001) mostra o mês escolhido:
@@ -107,7 +130,7 @@ Abaixo vêm o gráfico das entradas por dia, a tabela **por material** (comprado
 
 O quadro **Pendências da recuperadora** repete os alertas da Central de Decisões (seção 14), cada um com o atalho para a tela que resolve. Um aviso amarelo aparece quando há apontamentos com refugo que não viraram lote. Isso acontece quando falta o material padrão da apara ou uma regra.
 
-![Figura 4 — Painel da Recuperadora: compras, peso pago, apara interna, entradas por dia, materiais e fornecedores do mês](img/recuperadora-3.jpg)
+![Figura 6 — Painel da Recuperadora: compras, peso pago, apara interna, entradas por dia, materiais e fornecedores do mês](img/recuperadora-3.jpg)
 
 ## 3. Entradas e Balança: o ticket de pesagem
 
@@ -115,7 +138,7 @@ Em **Entradas e Balança** (REC002), a aba **Tickets da balança** lista as pesa
 
 O operador da balança (perfil Produção) usa esta tela e a de Lotes da Recuperadora. Administrador, financeiro e diretor também.
 
-![Figura 5 — Entradas e Balança: os tickets do mês, abertos e fechados, com o peso pago e o total](img/recuperadora-4.jpg)
+![Figura 7 — Entradas e Balança: os tickets do mês, abertos e fechados, com o peso pago e o total](img/recuperadora-4.jpg)
 
 ### 3.1 Abrir o ticket
 
@@ -139,7 +162,7 @@ Uma carga pode ter vários materiais. Em cada linha, informe:
 
 O resumo abaixo da tabela confere a **soma dos materiais** contra o peso líquido. Verde está dentro da tolerância; vermelho mostra a diferença. O resumo também traz o **peso pago**, o **total da compra** e, se o fornecedor tiver adiantamento em aberto, quanto vai ser abatido e quanto fica a pagar.
 
-![Figura 6 — Ticket aberto: pesagem, materiais com classe, desconto e preço da tabela, a conferência do peso e o adiantamento a abater](img/recuperadora-5.jpg)
+![Figura 8 — Ticket aberto: pesagem, materiais com classe, desconto e preço da tabela, a conferência do peso e o adiantamento a abater](img/recuperadora-5.jpg)
 
 **Salvar aberto** guarda o ticket para terminar depois. Um caso comum: a carga é descarregada e separada antes de pesar cada material.
 
@@ -202,7 +225,7 @@ Na mesma tela ficam a **chave PIX** e a marca de **coletor incentivado**.
 
 A tabela mostra o comprado nos últimos 90 dias e o adiantamento em aberto de cada fornecedor.
 
-![Figura 7 — Fornecedores de reciclável com o tipo, o coletor incentivado e os adiantamentos](img/recuperadora-6.jpg)
+![Figura 9 — Fornecedores de reciclável com o tipo, o coletor incentivado e os adiantamentos](img/recuperadora-6.jpg)
 
 ### 4.2 Adiantamentos
 
@@ -222,7 +245,7 @@ A aba **Relação para a nota de entrada** junta as compras fechadas sem nota do
 
 **Excel** baixa a relação para emitir a nota de entrada no sistema fiscal.
 
-![Figura 8 — Relação para a nota de entrada: compras sem nota por fornecedor e material, com o NCM](img/recuperadora-7.jpg)
+![Figura 10 — Relação para a nota de entrada: compras sem nota por fornecedor e material, com o NCM](img/recuperadora-7.jpg)
 
 ## 5. Lotes e etiquetas
 
@@ -240,7 +263,7 @@ A ficha do lote também mostra o **movimento**: as ordens de reprocesso que usar
 
 **Etiqueta** imprime a etiqueta de 100 × 70 mm com o código do lote em QR. Para imprimir várias, marque os lotes na lista e use **Etiquetas dos marcados**.
 
-![Figura 9 — Lotes da Recuperadora: entradas da balança e aparas internas, com o saldo e o custo por kg](img/recuperadora-8.jpg)
+![Figura 11 — Lotes da Recuperadora: entradas da balança e aparas internas, com o saldo e o custo por kg](img/recuperadora-8.jpg)
 
 ## 6. Aparas internas
 
@@ -262,7 +285,7 @@ Em **Processamento** (REC004), cada ordem de reprocesso transforma lotes de entr
 - o **rendimento**: verde na meta, amarelo até 10 pontos abaixo e vermelho abaixo disso;
 - o custo por kg e a situação.
 
-![Figura 10 — Processamento: as ordens de reprocesso com a entrada, a saída, o rendimento contra a meta e o custo do kg](img/recuperadora-9.jpg)
+![Figura 12 — Processamento: as ordens de reprocesso com a entrada, a saída, o rendimento contra a meta e o custo do kg](img/recuperadora-9.jpg)
 
 ### 7.1 Abrir a ordem e escolher os lotes
 
@@ -280,9 +303,24 @@ Para cada etapa, informe:
 
 O resumo avisa quando a entrada, a saída e as perdas apontadas não fecham. O apontamento é feito nesta tela, que funciona no celular e está liberada para o perfil Produção.
 
-![Figura 11 — Ordem aberta: lotes que entram, etapas com horas e perdas, custos e o resumo com o rendimento e o custo do kg de grão](img/recuperadora-10.jpg)
+![Figura 13 — Ordem aberta: lotes que entram, etapas com horas e perdas, custos e o resumo com o rendimento e o custo do kg de grão](img/recuperadora-10.jpg)
 
-### 7.3 Custos e conclusão
+### 7.3 Receita e aditivos
+
+Este bloco aparece quando **Usar receita e aditivos** está ligado (seção 1.6).
+
+1. Inclua primeiro os lotes que entram: a receita é calculada sobre o peso deles.
+2. Escolha a receita e clique em **Aplicar a receita**. A plataforma lança cada item com o **previsto** (reciclado × dosagem).
+3. Na coluna **Usado**, corrija para o que foi de fato dosado. É o usado que vale para o peso, o custo e a baixa do estoque.
+4. **+ Item** inclui um item fora da receita. **✕** tira um item.
+
+![Figura 14 — Receita e aditivos na ordem: previsto pela receita, usado de fato, desvio e custo (dados fictícios)](img/recuperadora-21.jpg)
+
+O item com o usado fora do desvio aceito aparece com a diferença em vermelho. O custo mostrado com "prev." usa o custo médio do estoque de hoje; o valor final é gravado na conclusão.
+
+Com aditivos, a **entrada** da ordem é o reciclado mais os aditivos. O rendimento e o balanço de massa usam essa entrada, e o resumo mostra o percentual de reciclado do grão.
+
+### 7.4 Custos e conclusão
 
 Informe os **custos da ordem**: energia (kWh), água (m³), químicos (R$), mão de obra (horas) e outros (R$). O resumo calcula na hora:
 
@@ -290,7 +328,7 @@ Informe os **custos da ordem**: energia (kWh), água (m³), químicos (R$), mão
 - o custo do material, pelo custo de cada lote consumido;
 - o rendimento previsto e o **custo do kg de grão**.
 
-**Concluir** pede o grão pesado na saída. A conclusão cria o lote de grão, com código GR + data + número da ordem e o custo total. Os lotes de entrada que zeraram passam a **consumidos**.
+**Concluir** pede o grão pesado na saída. Com aditivos, a conclusão dá baixa dos itens no estoque e soma o custo deles ao grão. Produto que controla lote sai de um lote só: o mais antigo que cobre a quantidade. Sem saldo, a ordem não conclui e nada é baixado. A conclusão cria o lote de grão, com código GR + data + número da ordem e o custo total. Os lotes de entrada que zeraram passam a **consumidos**.
 
 Se os parâmetros pedirem, o grão fica **bloqueado** até o ensaio. Se a opção do Kardex estiver ligada e o grão tiver produto, o grão entra no estoque como produção.
 
@@ -300,7 +338,7 @@ Se os parâmetros pedirem, o grão fica **bloqueado** até o ensaio. Se a opçã
 
 Em **Qualidade do Grão** (REC006), a aba **Lotes de grão e ensaios** mostra os lotes aguardando ensaio, os reprovados, a taxa de aprovação e o grão liberado.
 
-![Figura 12 — Qualidade do Grão: lotes aguardando ensaio, reprovados e liberados, com o último ensaio](img/recuperadora-11.jpg)
+![Figura 15 — Qualidade do Grão: lotes aguardando ensaio, reprovados e liberados, com o último ensaio](img/recuperadora-11.jpg)
 
 **Ensaio** registra estas medidas:
 
@@ -316,7 +354,7 @@ A plataforma compara as medidas com a **especificação** do material e mostra o
 - **fora da especificação:** registrar mantém o lote bloqueado e grava os motivos. **Reprovar** bloqueia mesmo dentro da especificação;
 - **Liberar por concessão:** libera fora da especificação. Só administrador, financeiro ou diretor faz, e com a justificativa.
 
-![Figura 13 — Ensaio fora da especificação: a prévia mostra os motivos antes de registrar](img/recuperadora-12.jpg)
+![Figura 16 — Ensaio fora da especificação: a prévia mostra os motivos antes de registrar](img/recuperadora-12.jpg)
 
 A aba **Especificações** guarda os limites de cada grão. Campo vazio não é verificado. A aba **Limite de reciclado por produto** guarda o percentual máximo de reciclado que cada produto acabado aceita, em relação ao peso da OP.
 
@@ -352,7 +390,20 @@ O custo da saída é o custo médio do lote. Só sai lote **disponível**: o blo
 - **Grão produzido:** custo por kg do material e do processo, preço da resina virgem e economia, por grão.
 - **Material de entrada:** rendimento de cada material, separando a apara interna e o grão reprocessado.
 
-![Figura 14 — Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu](img/recuperadora-13.jpg)
+![Figura 17 — Rendimento e Custo: rendimento contra a meta, custo do kg de grão, economia e o que cada fornecedor rendeu](img/recuperadora-13.jpg)
+
+### 10.1 Aditivos
+
+Com a receita e aditivos em uso, a tela ganha:
+
+- a parcela dos **aditivos** no custo do kg de grão, ao lado do material e do processo;
+- o quadro **Aditivos e demais itens da receita**: previsto contra usado, a diferença, o custo e o R$ por kg de cada item;
+- o **conteúdo reciclado do grão** no período: o reciclado dividido por tudo o que entrou nas ordens;
+- a lista das ordens com item **fora do desvio** aceito.
+
+![Figura 18 — Aditivos no Rendimento e Custo: previsto contra usado, custo por item e o conteúdo reciclado do grão (dados fictícios)](img/recuperadora-22.jpg)
+
+No **Balanço de Massa**, a linha "Entrada nas ordens" mostra quanto é reciclado e quanto é aditivo.
 
 ## 11. Balanço de massa
 
@@ -363,7 +414,7 @@ O **Balanço de Massa** (REC007) fecha o mês em quilos e mostra se o material q
 - **Grão:** estoque inicial, produção, saídas por destino e estoque final.
 - **Resíduos:** rejeito apontado nas etapas, o que foi destinado no mês por tipo (com e sem CDF) e o total destinado sem CDF.
 
-![Figura 15 — Balanço de Massa do mês: material, processo com a perda não explicada, grão e resíduos](img/recuperadora-15.jpg)
+![Figura 19 — Balanço de Massa do mês: material, processo com a perda não explicada, grão e resíduos](img/recuperadora-15.jpg)
 
 **Relatório de material reciclado** imprime, para o período escolhido:
 
@@ -386,13 +437,13 @@ Em **Ambiental** (REC008), quem configura a produção registra os resíduos e o
 
 Com custo e a conta de resíduos nos parâmetros, o registro gera o título a pagar. O envio sem CDF fica marcado "aguardando". Passados 30 dias, ele vira alerta.
 
-![Figura 16 — Destinação de resíduos com MTR, CDF, transportador, destinador e custo](img/recuperadora-16.jpg)
+![Figura 20 — Destinação de resíduos com MTR, CDF, transportador, destinador e custo](img/recuperadora-16.jpg)
 
 **Licenças e documentos.** Cada licença ou documento ambiental registra o tipo, o número, o órgão, a emissão, a validade, a antecedência do aviso, as condicionantes e os anexos. Exemplos: LO, LI, LP, CTF/IBAMA, outorga de água, licença de efluentes, AVCB, alvará.
 
 A situação aparece como vencida, a vencer ou em dia. O administrador e o diretor recebem um aviso quando a licença entra na antecedência e outro quando ela vence. A rotina roda nos dias úteis às 8h35.
 
-![Figura 17 — Licenças e documentos ambientais com a validade e a situação](img/recuperadora-17.jpg)
+![Figura 21 — Licenças e documentos ambientais com a validade e a situação](img/recuperadora-17.jpg)
 
 ## 13. Créditos fiscais
 
@@ -405,7 +456,7 @@ O percentual de cada ticket é o da vigência na data da pesagem. Os **parâmetr
 
 Os valores são estimativas para o planejamento. Confira os percentuais com a contabilidade; a apuração oficial é feita no sistema fiscal. O alerta amarelo mostra as compras sem percentual vigente na data.
 
-![Figura 18 — Créditos Fiscais da Recuperadora: compras por enquadramento, créditos estimados e parâmetros por vigência com a fonte](img/recuperadora-18.jpg)
+![Figura 22 — Créditos Fiscais da Recuperadora: compras por enquadramento, créditos estimados e parâmetros por vigência com a fonte](img/recuperadora-18.jpg)
 
 ## 14. Central de Decisões e avisos
 
@@ -444,3 +495,4 @@ A regra 27 da Central de Decisões traz as pendências da recuperadora na área 
 | 1.0 | 09/11/2026 | Primeira versão (Recuperadora, parte 1). Inclui modo do módulo, materiais, classes, preços por vigência, ticket da balança com leitura direta, fechamento com lotes, título a pagar e abatimento do adiantamento, cancelamento, comprovante, fotos, nota, importação da planilha da balança, fornecedores e coletor incentivado, adiantamentos, relação para a nota de entrada, lotes com etiqueta e aparas internas automáticas. |
 | 1.1 | 09/11/2026 | Recuperadora, parte 2. Inclui processo e custos nos parâmetros (etapas, energia, água, mão de obra, máquina, meta de rendimento, exigir ensaio, resina virgem), ordem de reprocesso com lotes, etapas e perdas, conclusão com o lote de grão e o custo, qualidade do grão (ensaio, especificação, concessão, limite de reciclado), saída dos lotes, e rendimento e custo por fornecedor e por grão com a economia contra a resina virgem. |
 | 1.2 | 09/11/2026 | Recuperadora, parte 3. Inclui balanço de massa do mês, relatório de material reciclado, destinação de resíduos com MTR, CDF e título a pagar, licenças com aviso, créditos fiscais (CBS e IBS presumidos do coletor incentivado, PIS/COFINS de pessoa jurídica) com parâmetros por vigência, alertas na Central de Decisões e no Painel, e novos parâmetros de alerta. |
+| 1.3 | 17/11/2026 | Receita do grão e aditivos (masterbatch, antioxidante, deslizante, carga mineral, resina virgem): parâmetro para ligar, receitas com dosagem em % do reciclado, previsto contra usado na ordem, baixa no estoque na conclusão, custo dos aditivos separado no kg de grão, conteúdo reciclado e itens fora do desvio. |

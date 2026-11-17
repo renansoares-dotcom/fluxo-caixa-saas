@@ -2,9 +2,9 @@
 // o apontamento por etapa (horas, kg, perdas por tipo), os custos (energia, água, químicos, mão de obra, outros, máquina)
 // e a conclusão, que cria o lote de grão com o custo total (bloqueado até o ensaio, se os parâmetros pedirem).
 import { sb, state, q } from '../lib/data.js';
-import { $, $$, esc, money, dateBR, today, toast, fail, modal, parseNum, exportXLSX } from '../lib/ui.js';
+import { $, $$, esc, money, dateBR, today, toast, fail, modal, parseNum, exportXLSX, confirmDialog } from '../lib/ui.js';
 import { carregarRec, podeOperar, kpi, kg, kg0, rkg, semSQL, avisoSQL, desligada, avisoDesligada, nomeMat, optMats } from '../lib/rec-ui.js';
-import { resumoOrdem, horasEtapa, PERDAS, TIPOS_LOTE } from '../lib/recuperadora.js';
+import { resumoOrdem, resumoAditivos, horasEtapa, PERDAS, TIPOS_LOTE, TIPOS_ADITIVO } from '../lib/recuperadora.js';
 import { cadProducao } from '../lib/producao.js';
 
 export const title = 'Processamento';
@@ -72,6 +72,18 @@ async function abrir(B, id, root) {
   const [[o], ENT, ET] = await Promise.all([q(sb.from('rec_ordens').select('*').eq('id', id)), q(sb.from('rec_ordem_entradas').select('*, lote:rec_lotes(codigo, tipo, material_id, fornecedor_id)').eq('ordem_id', id).order('criado_em')),
     q(sb.from('rec_ordem_etapas').select('*').eq('ordem_id', id).order('criado_em'))]);
   const aberta = o.situacao === 'aberta', pode = aberta && podeOperar(), dis = pode ? '' : 'disabled';
+  // receita e aditivos (SQL 165): só com o parâmetro ligado, ou quando a ordem já tem itens
+  let AD = [], RECS = [], CM = {}, PRODS = [];
+  try { AD = await q(sb.from('rec_ordem_aditivos').select('*, produto:produtos(codigo, descricao)').eq('ordem_id', id).order('criado_em')); } catch { AD = []; }
+  const comAdt = !!R.cfg.usar_aditivos || AD.length > 0;
+  if (comAdt) { try {
+    [RECS, PRODS] = await Promise.all([q(sb.from('rec_receitas').select('*, itens:rec_receita_itens(produto_id, dosagem_pct)').eq('empresa_id', e).eq('material_id', o.material_saida_id).eq('ativo', true).order('nome')),
+      pode ? q(sb.from('produtos').select('id, codigo, descricao, tipo').eq('empresa_id', e).in('tipo', ['aditivo', 'materia_prima', 'outro']).order('codigo').limit(3000)) : []]);
+    const ids = [...new Set(AD.map(a => a.produto_id))];
+    if (ids.length) CM = Object.fromEntries((await q(sb.from('est_custos').select('produto_id, quantidade, valor, custo_medio').in('produto_id', ids))).map(c => [c.produto_id, +c.quantidade > 0 ? c.valor / c.quantidade : +c.custo_medio]));
+  } catch { /* sem o SQL 165 */ } }
+  const adt = () => comAdt ? resumoAditivos(AD, (pid) => CM[pid] || 0, R.cfg.aditivo_desvio_pct ?? 20) : null;
+  const recSel = o.receita_id || RECS.find(r => r.padrao)?.id || RECS[0]?.id || '';
   const ets = ET.map(x => ({ ...x, ordem: B.etById[x.etapa_id]?.ordem ?? 0 }));
   const md = modal({ title: `Ordem de reprocesso ${o.numero} — ${nomeMat(R, o.material_saida_id)}`, wide: true, body: `
     <div class="grid-form"><label class="c4">Data<input type="date" id="or-d" value="${o.data}" ${dis}></label>
@@ -94,6 +106,14 @@ async function abrir(B, id, root) {
       <label class="c4">kg entrada<input name="ke" inputmode="decimal"></label><label class="c4">kg saída<input name="ks" inputmode="decimal"></label>
       ${Object.entries(PERDAS).map(([k, t]) => `<label class="c4">Perda: ${t.toLowerCase()} (kg)<input name="${k}" inputmode="decimal"></label>`).join('')}
       <div class="c4" style="align-self:end"><button class="btn" id="or-ea">+ Apontar etapa</button></div></form>` : ''}
+    ${comAdt ? `<h3 style="margin:14px 0 6px">Receita e aditivos</h3>
+    ${pode ? `<div class="toolbar"><label class="grow small">Receita do grão<select id="or-rc">${RECS.map(r => `<option value="${r.id}" ${r.id === recSel ? 'selected' : ''}>${esc(r.nome)}${r.padrao ? ' (padrão)' : ''} · ${r.itens.length} item(ns), ${n3(r.itens.reduce((s, i) => s + +i.dosagem_pct, 0))}%</option>`).join('') || '<option value="">— nenhuma receita para este grão —</option>'}</select></label>
+      <button class="btn" id="or-ra" ${RECS.length ? '' : 'disabled'}>Aplicar a receita</button></div>
+      <p class="small muted" style="margin:4px 0 6px">A receita calcula o previsto sobre o reciclado que entrou. Ajuste a coluna "Usado" com o que foi de fato dosado: é ela que vale para o custo, o peso e a baixa do estoque.</p>` : ''}
+    <div class="table-wrap"><table class="small"><thead><tr><th>Item</th><th>Tipo</th><th class="num">Previsto (kg)</th><th class="num">Usado (kg)</th><th class="num">% do reciclado</th><th class="num">Custo</th><th></th></tr></thead><tbody id="or-at"></tbody></table></div>
+    ${pode ? `<div class="toolbar" style="margin-top:6px"><label class="grow small">Item (código do produto)<input id="or-ap" list="or-apl" placeholder="código ou nome"><datalist id="or-apl">${PRODS.map(p => `<option value="${esc(p.codigo)}">${esc(p.descricao)}</option>`).join('')}</datalist></label>
+      <label class="small">Tipo<select id="or-at2">${Object.entries(TIPOS_ADITIVO).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label>
+      <label class="small">kg<input id="or-ak" inputmode="decimal" style="width:100px"></label><button class="btn" id="or-aa">+ Item</button></div>` : ''}` : ''}
     <h3 style="margin:14px 0 6px">Custos da ordem</h3>
     <div class="grid-form"><label class="c4">Energia (kWh)<input id="or-kwh" inputmode="decimal" value="${n3(o.energia_kwh)}" ${dis}><span class="small muted">${rkg(R.cfg.custo_kwh)}/kWh</span></label>
       <label class="c4">Água (m³)<input id="or-agua" inputmode="decimal" value="${n3(o.agua_m3)}" ${dis}><span class="small muted">${rkg(R.cfg.custo_m3_agua)}/m³</span></label>
@@ -108,13 +128,25 @@ async function abrir(B, id, root) {
   const atual = () => pode ? { ...o, energia_kwh: parseNum($('#or-kwh', el).value) || 0, agua_m3: parseNum($('#or-agua', el).value) || 0, quimicos_valor: parseNum($('#or-qui', el).value) || 0,
     mo_horas: parseNum($('#or-mo', el).value) || 0, outros_valor: parseNum($('#or-out', el).value) || 0, maquina_id: $('#or-q', el).value || null } : o;
   const resumo = () => {
-    const S = resumoOrdem(atual(), ENT, ets, R.cfg, B.custoHora), P = S.processo;
-    $('#or-res', el).innerHTML = `<div class="kpis">${kpi('Entrou', kg(S.entrada), money(S.material) + ' de material')}${kpi(aberta ? 'Saída prevista' : 'Grão produzido', kg(S.kgSaida), aberta ? 'última etapa ou entrada − perdas' : '')}
+    const A = adt(), S = resumoOrdem(atual(), ENT, ets, R.cfg, B.custoHora, null, A), P = S.processo;
+    if (comAdt) $('#or-at', el).innerHTML = A.itens.map(a => `<tr><td><b>${esc(a.produto?.codigo || '')}</b> ${esc(a.produto?.descricao || '')}</td><td>${esc(TIPOS_ADITIVO[a.tipo] || a.tipo)}</td><td class="num">${a.previsto == null ? '–' : n3(a.previsto)}</td>
+        <td class="num">${pode ? `<input data-akg="${a.id}" inputmode="decimal" value="${n3(a.kg)}" style="width:90px;text-align:right">` : n3(a.kg)}${a.fora ? ` <span class="badge vencido" title="Fora do desvio aceito nos parâmetros">${a.desvio > 0 ? '+' : ''}${String(a.desvio).replace('.', ',')}%</span>` : ''}</td>
+        <td class="num">${S.reciclado ? (a.kg / S.reciclado * 100).toFixed(2).replace('.', ',') + '%' : '–'}</td><td class="num">${money(a.custo)}${a.custo_unitario == null && aberta ? ' <span class="muted" title="Pelo custo médio do estoque de hoje; o valor final é gravado na conclusão">prev.</span>' : ''}</td>
+        <td>${pode ? `<button class="btn ghost sm" data-adel="${a.id}">✕</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhum aditivo nesta ordem.</td></tr>';
+    $('#or-res', el).innerHTML = `<div class="kpis">${kpi('Entrou', kg(S.entrada), comAdt && S.aditivosKg ? `${kg(S.reciclado)} de reciclado (${pctf(S.recicladoPct)}) + ${kg(S.aditivosKg)} de aditivos` : money(S.material) + ' de material')}${kpi(aberta ? 'Saída prevista' : 'Grão produzido', kg(S.kgSaida), aberta ? 'última etapa ou entrada − perdas' : '')}
       ${kpi('Rendimento', pctf(S.rendimento), `meta ${pctf(meta)}`, S.rendimento == null ? '' : S.rendimento >= meta ? 'pos' : 'neg')}${kpi('Custo do processo', money(P.total), `energia ${money(P.energia)} · água ${money(P.agua)} · químicos ${money(P.quimicos)} · MO ${money(P.mao_obra)} · máquina ${money(P.maquina)}${P.outros ? ' · outros ' + money(P.outros) : ''}`)}
-      ${kpi('Custo do kg de grão', S.custoKg == null ? '–' : rkg(S.custoKg), money(S.total) + ' no total')}</div>
+      ${kpi('Custo do kg de grão', S.custoKg == null ? '–' : rkg(S.custoKg), comAdt && S.aditivosKg ? `material ${money(S.material)} · aditivos ${money(S.aditivosCusto)} · processo ${money(P.total)}` : money(S.total) + ' no total')}</div>
       ${Math.abs(S.naoExplicado) > 0.5 && ets.length ? `<p class="small warn">${kg(Math.abs(S.naoExplicado))} ${S.naoExplicado > 0 ? 'não explicados pelas perdas apontadas' : 'a mais que a entrada menos as perdas'}: confira os pesos das etapas.</p>` : ''}`;
     return S;
   };
+  // os campos de "Usado" são redesenhados a cada resumo: as ações ficam na tabela (delegação)
+  if (comAdt && pode) {
+    $('#or-at', el).addEventListener('change', async (ev) => { const i = ev.target.closest('[data-akg]'); if (!i) return; const a = AD.find(x => x.id === i.dataset.akg), v = parseNum(i.value);
+      if (!(v >= 0)) { i.value = n3(a.kg); return toast('Informe os kg usados', true); }
+      try { await q(sb.from('rec_ordem_aditivos').update({ kg: v }).eq('id', a.id)); a.kg = v; resumo(); } catch (err) { fail(err); } });
+    $('#or-at', el).addEventListener('click', async (ev) => { const b = ev.target.closest('[data-adel]'); if (!b) return;
+      try { await q(sb.from('rec_ordem_aditivos').delete().eq('id', b.dataset.adel)); AD = AD.filter(x => x.id !== b.dataset.adel); resumo(); } catch (err) { fail(err); } });
+  }
   resumo();
   if (!pode) return;
   ['#or-kwh', '#or-agua', '#or-qui', '#or-mo', '#or-out', '#or-q'].forEach(s => $(s, el).addEventListener('change', resumo));
@@ -138,12 +170,22 @@ async function abrir(B, id, root) {
     if (v.kg_entrada != null && v.kg_saida != null && v.kg_saida > v.kg_entrada) return toast('A saída da etapa passou da entrada', true);
     try { await salvar(); await q(sb.from('rec_ordem_etapas').insert(v)); reabrir(); } catch (err) { fail(err); } };
   $$('[data-del]', el).forEach(b => b.onclick = async () => { try { await q(sb.from('rec_ordem_etapas').delete().eq('id', b.dataset.del)); reabrir(); } catch (err) { fail(err); } });
+  if (comAdt) {
+    $('#or-ra', el).onclick = async () => { const rid = $('#or-rc', el).value; if (!rid) return;
+      if (AD.length && !await confirmDialog('Aplicar a receita substitui os itens já lançados nesta ordem. Continuar?')) return;
+      try { await salvar(); const n = await q(sb.rpc('rec_ordem_aplicar_receita', { p_ordem: o.id, p_receita: rid })); toast(`Receita aplicada: ${n} item(ns)`); reabrir(); } catch (err) { fail(err); } };
+    $('#or-aa', el).onclick = async () => { const cod = $('#or-ap', el).value.trim().toLowerCase(), p = PRODS.find(x => x.codigo.toLowerCase() === cod) || PRODS.find(x => x.descricao.toLowerCase() === cod), k = parseNum($('#or-ak', el).value);
+      if (!p) return toast('Produto não encontrado. Cadastre o item em Estoque › Produtos.', true);
+      if (!(k > 0)) return toast('Informe os kg usados', true);
+      if (AD.some(a => a.produto_id === p.id)) return toast('Este item já está na ordem: ajuste os kg na linha dele', true);
+      try { await salvar(); await q(sb.from('rec_ordem_aditivos').insert({ empresa_id: e, ordem_id: o.id, produto_id: p.id, tipo: $('#or-at2', el).value, kg: k })); reabrir(); } catch (err) { fail(err); } };
+  }
   $('#or-sv', el).onclick = async () => { try { await salvar(); md.close(); toast('Ordem salva'); render(root); } catch (err) { fail(err); } };
   $('#or-can', el).onclick = () => { const m2 = modal({ title: 'Cancelar a ordem', narrow: true, body: '<p class="small">Os kg voltam aos lotes de entrada.</p><label>Motivo<input id="oc-m"></label>', foot: '<button class="btn" data-close>Voltar</button><button class="btn danger" id="oc-ok">Cancelar</button>' });
     $('#oc-ok', m2.el).onclick = async () => { try { await q(sb.rpc('rec_ordem_cancelar', { p_ordem: o.id, p_motivo: $('#oc-m', m2.el).value })); m2.close(); md.close(); toast('Ordem cancelada'); render(root); } catch (err) { fail(err); } }; };
   $('#or-ok', el).onclick = async () => {
     const S = resumo();
-    const m2 = modal({ title: 'Concluir a ordem', narrow: true, body: `<p class="small">Entrou ${kg(S.entrada)}. Informe o grão pesado na saída: ele vira o lote de grão${R.cfg.exigir_ensaio ? ', bloqueado até o ensaio' : ''}.</p>
+    const m2 = modal({ title: 'Concluir a ordem', narrow: true, body: `<p class="small">Entrou ${kg(S.entrada)}${comAdt && S.aditivosKg ? ` (${kg(S.reciclado)} de reciclado + ${kg(S.aditivosKg)} de aditivos${R.cfg.aditivo_baixar_estoque !== false ? ', que saem do estoque agora' : ''})` : ''}. Informe o grão pesado na saída: ele vira o lote de grão${R.cfg.exigir_ensaio ? ', bloqueado até o ensaio' : ''}.</p>
         <label>Grão produzido (kg)<input id="oc-k" inputmode="decimal" value="${n3(S.kgSaida)}"></label>`, foot: '<button class="btn" data-close>Voltar</button><button class="btn primary" id="oc-ok">Concluir</button>' });
     $('#oc-ok', m2.el).onclick = async (ev) => { ev.target.disabled = true;
       try { await salvar(); const r = await q(sb.rpc('rec_ordem_concluir', { p_ordem: o.id, p_kg_saida: parseNum($('#oc-k', m2.el).value) }));

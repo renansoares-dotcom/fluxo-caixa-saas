@@ -3,7 +3,7 @@
 import { sb, state, q } from '../lib/data.js';
 import { $, $$, esc, toast, fail, modal, parseNum, dateBR, today, confirmDialog } from '../lib/ui.js';
 import { carregarRec, limparCacheRec, podeConfig, semSQL, avisoSQL, nomeMat, optMats, rkg } from '../lib/rec-ui.js';
-import { MODOS, POLIMEROS, CONDICOES } from '../lib/recuperadora.js';
+import { MODOS, POLIMEROS, CONDICOES, TIPOS_ADITIVO } from '../lib/recuperadora.js';
 import { cadProducao } from '../lib/producao.js';
 
 export const title = 'Parâmetros da Recuperadora';
@@ -11,14 +11,14 @@ const ui = { aba: 'geral' };
 const num = (v, d = 2) => v == null || v === '' ? '' : String(+v).replace('.', ',');
 
 export async function render(root) {
-  root.innerHTML = `<div class="card toolbar"><div class="chips" id="rp-abas">${[['geral', 'Geral'], ['materiais', 'Materiais'], ['classes', 'Classes e preços'], ['aparas', 'Regras da apara interna'], ['processo', 'Processo e custos']]
+  root.innerHTML = `<div class="card toolbar"><div class="chips" id="rp-abas">${[['geral', 'Geral'], ['materiais', 'Materiais'], ['classes', 'Classes e preços'], ['aparas', 'Regras da apara interna'], ['processo', 'Processo e custos'], ['receitas', 'Receitas e aditivos']]
       .map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div><span class="spacer"></span><span id="rp-acoes"></span></div>
     <div id="rp-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#rp-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; render(root); } };
   const c = $('#rp-corpo', root);
   try {
     const R = await carregarRec(true);
-    if (ui.aba === 'geral') await geral(c, R, root); else if (ui.aba === 'materiais') materiais(c, R, root); else if (ui.aba === 'classes') classes(c, R, root); else if (ui.aba === 'aparas') await aparas(c, R, root); else await processo(c, R, root);
+    if (ui.aba === 'geral') await geral(c, R, root); else if (ui.aba === 'materiais') materiais(c, R, root); else if (ui.aba === 'classes') classes(c, R, root); else if (ui.aba === 'aparas') await aparas(c, R, root); else if (ui.aba === 'receitas') await receitas(c, R, root); else await processo(c, R, root);
   } catch (err) { c.innerHTML = semSQL(err) ? avisoSQL : `<div class="card"><div class="empty">${esc(err.message)}</div></div>`; }
 }
 const recarregar = (root) => { limparCacheRec(); document.dispatchEvent(new CustomEvent('rec-config')); render(root); };
@@ -227,4 +227,71 @@ async function processo(c, R, root) {
       catch (err) { fail(/duplicate|unique/.test(err.message) ? new Error('Já existe preço deste polímero nesta data.') : err); } };
   });
   $$('[data-drv]', c).forEach(b => b.onclick = async () => { try { await q(sb.from('rec_resina_virgem').delete().eq('id', b.dataset.drv)); render(root); } catch (err) { fail(err); } });
+}
+
+// ---------- Receitas e aditivos (SQL 165): liga o uso, de onde saem os itens e as receitas de cada grão ----------
+async function receitas(c, R, root) {
+  const pode = podeConfig(), dis = pode ? '' : 'disabled', e = state.empresa.id;
+  let REC, IT, PR, LOC;
+  try {
+    [REC, IT, PR, LOC] = await Promise.all([q(sb.from('rec_receitas').select('*').eq('empresa_id', e).order('nome')), q(sb.from('rec_receita_itens').select('*').eq('empresa_id', e)),
+      q(sb.from('produtos').select('id, codigo, descricao, tipo').eq('empresa_id', e).in('tipo', ['aditivo', 'materia_prima', 'outro']).order('codigo').limit(3000)), q(sb.from('est_locais').select('id,codigo,nome').eq('empresa_id', e).order('codigo')).catch(() => [])]);
+  } catch (err) { if (!semSQL(err)) throw err; c.innerHTML = '<div class="card"><div class="empty">Receitas e aditivos precisam do SQL 165. Avise o administrador da plataforma.</div></div>'; return; }
+  const prById = Object.fromEntries(PR.map(p => [p.id, p])), itDe = (rid) => IT.filter(i => i.receita_id === rid), p = { usar_aditivos: false, aditivo_baixar_estoque: true, aditivo_desvio_pct: 20, ...(R.cfg || {}) };
+  $('#rp-acoes', root).innerHTML = pode ? '<button class="btn primary" id="rc-n">+ Nova receita</button>' : '';
+  c.innerHTML = `<form id="rc-f" class="card"><h3 style="margin:0 0 8px">Uso de receita e aditivos no grão</h3>
+    <div class="grid2"><label class="chk"><input type="checkbox" name="usar" ${p.usar_aditivos ? 'checked' : ''} ${dis}> Usar receita e aditivos nas ordens de reprocesso</label>
+      <div class="small muted">Para quem mistura masterbatch, antioxidante, deslizante, carga mineral ou resina virgem ao material reciclado antes de granular. Desligado, nada muda nas ordens.</div>
+      <label class="chk"><input type="checkbox" name="baixa" ${p.aditivo_baixar_estoque !== false ? 'checked' : ''} ${dis}> Dar baixa dos itens no estoque (Kardex) ao concluir a ordem</label>
+      <label>Local de onde saem os itens<select name="loc" ${dis}><option value="">— o local padrão de cada produto —</option>${LOC.map(l => `<option value="${l.id}" ${p.aditivo_local_id === l.id ? 'selected' : ''}>${esc(l.codigo)} · ${esc(l.nome)}</option>`).join('')}</select></label>
+      <label>Desvio aceito entre o usado e o previsto pela receita (%)<input name="desv" inputmode="decimal" value="${num(p.aditivo_desvio_pct)}" ${dis}><span class="small muted">acima disso, o item aparece marcado na ordem e no Rendimento e Custo</span></label></div>
+    ${pode ? '<div style="margin-top:12px"><button class="btn primary">Salvar</button></div>' : ''}</form>
+    <div class="card flush" style="margin-top:12px"><div style="padding:12px 12px 0"><h3 style="margin:0">Receitas do grão</h3><p class="small muted" style="margin:4px 0 8px">A dosagem é o percentual sobre o material reciclado que entra na ordem. A receita é o ponto de partida: na ordem, o operador ajusta o que foi de fato usado.</p></div>
+      <div class="table-wrap"><table><thead><tr><th>Grão</th><th>Receita</th><th>Itens</th><th class="num">Dosagem total</th><th>Situação</th></tr></thead><tbody>
+      ${REC.map(r => { const L = itDe(r.id); return `<tr class="${pode ? 'clickable' : ''}" data-id="${r.id}"><td>${esc(nomeMat(R, r.material_id))}</td><td><b>${esc(r.nome)}</b>${r.padrao ? ' <span class="badge pago">padrão</span>' : ''}</td>
+        <td class="wrap small">${L.map(i => `${esc(prById[i.produto_id]?.codigo || '?')} ${num(i.dosagem_pct)}%`).join(' · ') || '<span class="muted">sem itens</span>'}</td><td class="num">${num(Math.round(L.reduce((s, i) => s + +i.dosagem_pct, 0) * 1000) / 1000)}%</td>
+        <td>${r.ativo ? 'Ativa' : '<span class="muted">Inativa</span>'}</td></tr>`; }).join('') || '<tr><td colspan="5" class="empty">Nenhuma receita. "+ Nova receita" escolhe o grão e os itens com a dosagem.</td></tr>'}</tbody></table></div></div>`;
+  if (!pode) return;
+  $('#rc-f', c).onsubmit = async (ev) => { ev.preventDefault(); const f = ev.target, d = parseNum(f.desv.value);
+    if (!R.cfg?.empresa_id) return toast('Ligue primeiro a Recuperadora na aba Geral.', true);
+    if (!(d >= 0 && d <= 100)) return toast('O desvio aceito vai de 0 a 100%.', true);
+    try { await q(sb.from('rec_config').update({ usar_aditivos: f.usar.checked, aditivo_baixar_estoque: f.baixa.checked, aditivo_local_id: f.loc.value || null, aditivo_desvio_pct: d }).eq('empresa_id', e)); toast('Parâmetros salvos'); recarregar(root); } catch (err) { fail(err); } };
+  const editar = (r) => {
+    const graos = R.mats.filter(m => m.ativo || m.id === r?.material_id); let L = r ? itDe(r.id).map(i => ({ ...i })) : [];
+    if (!graos.length) return toast('Cadastre o material do grão na aba Materiais (ex.: GR-PEBD).', true);
+    const md = modal({ title: r ? `Receita: ${r.nome}` : 'Nova receita do grão', wide: true, body: `<form id="re-f" class="grid2"><label>Grão que sai *<select name="m">${optMats(R, r?.material_id || graos.find(m => /^gr/i.test(m.codigo))?.id)}</select></label>
+        <label>Nome da receita *<input name="n" maxlength="60" value="${esc(r?.nome || '')}" placeholder="ex.: Grão preto para sacola"></label>
+        <label class="chk"><input type="checkbox" name="p" ${r?.padrao ? 'checked' : ''}> Receita padrão deste grão (a ordem sugere primeiro)</label><label class="chk"><input type="checkbox" name="a" ${r?.ativo !== false ? 'checked' : ''}> Ativa</label>
+        <label class="span2">Observação<input name="o" value="${esc(r?.observacao || '')}"></label></form>
+        <h3 style="margin:14px 0 6px">Itens</h3><div class="table-wrap"><table class="small"><thead><tr><th>Item</th><th>Tipo</th><th class="num">Dosagem (% do reciclado)</th><th class="num">Para 1.000 kg</th><th></th></tr></thead><tbody id="re-t"></tbody></table></div>
+        <div class="toolbar" style="margin-top:6px"><label class="grow small">Item (código do produto)<input id="re-p" list="re-pl" placeholder="código ou nome"><datalist id="re-pl">${PR.map(x => `<option value="${esc(x.codigo)}">${esc(x.descricao)}</option>`).join('')}</datalist></label>
+          <label class="small">Tipo<select id="re-tp">${Object.entries(TIPOS_ADITIVO).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label>
+          <label class="small">Dosagem (%)<input id="re-d" inputmode="decimal" style="width:90px"></label><button class="btn" id="re-add">+ Item</button></div>
+        <p class="small muted">O item precisa estar cadastrado em Estoque › Produtos (tipo aditivo, matéria-prima ou outro).</p>`,
+      foot: `${r ? '<button class="btn danger" id="re-del">Excluir</button>' : ''}<span class="spacer"></span><button class="btn" data-close>Cancelar</button><button class="btn primary" id="re-ok">Salvar</button>` });
+    const el = md.el, pintar = () => { $('#re-t', el).innerHTML = L.map((i, k) => `<tr><td><b>${esc(prById[i.produto_id]?.codigo || '')}</b> ${esc(prById[i.produto_id]?.descricao || '')}</td><td>${esc(TIPOS_ADITIVO[i.tipo] || i.tipo)}</td>
+        <td class="num"><input data-k="${k}" inputmode="decimal" value="${num(i.dosagem_pct)}" style="width:80px;text-align:right"></td><td class="num">${num(Math.round(+i.dosagem_pct * 10000) / 1000)} kg</td><td><button class="btn ghost sm" data-x="${k}">✕</button></td></tr>`).join('')
+        || '<tr><td colspan="5" class="empty">Nenhum item.</td></tr>'; };
+    pintar();
+    $('#re-t', el).addEventListener('change', (ev) => { const i = ev.target.closest('[data-k]'); if (!i) return; const v = parseNum(i.value); if (v > 0 && v <= 100) L[+i.dataset.k].dosagem_pct = v; pintar(); });
+    $('#re-t', el).addEventListener('click', (ev) => { const b = ev.target.closest('[data-x]'); if (b) { L.splice(+b.dataset.x, 1); pintar(); } });
+    $('#re-add', el).onclick = () => { const cod = $('#re-p', el).value.trim().toLowerCase(), pr = PR.find(x => x.codigo.toLowerCase() === cod) || PR.find(x => x.descricao.toLowerCase() === cod), d = parseNum($('#re-d', el).value);
+      if (!pr) return toast('Produto não encontrado. Cadastre o item em Estoque › Produtos.', true);
+      if (!(d > 0 && d <= 100)) return toast('Informe a dosagem em % (maior que 0)', true);
+      if (L.some(i => i.produto_id === pr.id)) return toast('Este item já está na receita', true);
+      L.push({ produto_id: pr.id, tipo: $('#re-tp', el).value, dosagem_pct: d }); $('#re-p', el).value = ''; $('#re-d', el).value = ''; pintar(); };
+    $('#re-ok', el).onclick = async (ev) => { const f = $('#re-f', el), nome = f.n.value.trim();
+      if (!nome) return toast('Informe o nome da receita', true);
+      if (!L.length) return toast('Inclua ao menos um item', true);
+      ev.target.disabled = true;
+      try { const v = { empresa_id: e, material_id: f.m.value, nome, padrao: f.p.checked, ativo: f.a.checked, observacao: f.o.value.trim() || null };
+        const id = r ? (await q(sb.from('rec_receitas').update(v).eq('id', r.id)), r.id) : (await q(sb.from('rec_receitas').insert(v).select('id')))[0].id;
+        await q(sb.from('rec_receita_itens').delete().eq('receita_id', id));
+        await q(sb.from('rec_receita_itens').insert(L.map(i => ({ empresa_id: e, receita_id: id, produto_id: i.produto_id, tipo: i.tipo, dosagem_pct: i.dosagem_pct }))));
+        md.close(); toast('Receita salva'); render(root); } catch (err) { ev.target.disabled = false; fail(/duplicate|unique/i.test(err.message || '') ? new Error('Já existe uma receita com este nome para este grão.') : err); } };
+    $('#re-del', el) && ($('#re-del', el).onclick = async () => { if (!await confirmDialog(`Excluir a receita "${r.nome}"? As ordens já feitas com ela não mudam.`)) return;
+      try { await q(sb.from('rec_receitas').delete().eq('id', r.id)); md.close(); toast('Receita excluída'); render(root); } catch (err) { fail(err); } });
+  };
+  $('#rc-n', root).onclick = () => editar(null);
+  c.querySelector('tbody').onclick = (ev) => { const id = ev.target.closest('tr[data-id]')?.dataset.id; if (id) editar(REC.find(x => x.id === id)); };
 }

@@ -17,6 +17,8 @@ export async function render(root) {
   try {
     const R = await carregarRec();
     if (desligada(R)) { root.innerHTML = avisoDesligada(); return; }
+    const fimMes = new Date(+ui.mes.slice(0, 4), +ui.mes.slice(5, 7), 0).getDate();
+    const ADT = R.cfg.usar_aditivos ? await q(sb.rpc('rec_aditivos_resumo', { p_empresa: state.empresa.id, p_de: ui.mes + '-01', p_ate: `${ui.mes}-${String(fimMes).padStart(2, '0')}` })).catch(() => null) : null;
     const B = await q(sb.rpc('rec_balanco', { p_empresa: state.empresa.id, p_mes: ui.mes + '-01' })), C = conferirBalanco(B), m = B.material, p = B.processo, g = B.grao, r = B.residuos;
     const pp = p.perdas || {};
     root.innerHTML = `<div class="card toolbar"><label class="small">Mês <input type="month" id="bm-m" value="${ui.mes}"></label><span class="small muted">Tolerância da perda não explicada: ${String(B.tolerancia_pct).replace('.', ',')}% da entrada (parâmetros).</span>
@@ -32,7 +34,7 @@ export async function render(root) {
           ${linha('Estoque final em lotes', `<b>${kg0(m.estoque_final)}</b>`, 'row-sec')}</tbody></table>
           <p class="small ${C.materialFecha ? 'pos' : 'neg'}" style="margin:6px 0 0">${C.materialFecha ? 'A conta fecha com o saldo dos lotes.' : 'A conta não fecha com o saldo dos lotes: algum lote foi alterado fora do fluxo.'}</p></div>
         <div class="card"><h3 style="margin:0 0 8px">Processo (ordens concluídas no mês)</h3><table class="small"><tbody>
-          ${linha('Entrada nas ordens', kg0(p.entrada))}${linha('Grão produzido', sinal(-p.produzido))}
+          ${linha('Entrada nas ordens', kg0(p.entrada), '', ADT && +ADT.total.kg ? `reciclado ${kg0(ADT.total.reciclado)} + aditivos e outros itens da receita ${kg0(ADT.total.kg)}` : '')}${linha('Grão produzido', sinal(-p.produzido))}
           ${['umidade', 'sujeira', 'finos', 'rejeito'].map(k => linha('Perda apontada: ' + k, sinal(-(+pp[k] || 0)))).join('')}
           ${linha('Perda não explicada', `<b class="${C.processoOk ? '' : 'neg'}">${kg0(p.nao_explicada)}</b>`, 'row-sec', 'entrada − grão − perdas apontadas nas etapas')}</tbody></table>
           <p class="small ${C.processoOk ? 'pos' : 'neg'}" style="margin:6px 0 0">${C.processoOk ? 'Dentro da tolerância.' : 'Acima da tolerância: confira os pesos das etapas e a balança. O alerta vai para a Central de Decisões no mês seguinte.'}</p></div>
