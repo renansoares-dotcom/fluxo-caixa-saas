@@ -4,6 +4,7 @@
 // A credencial e o token da Receita nunca vão para o navegador, para o banco nem para os logs.
 // Segredos: RFB_CBS_CHAVE (Client Id) e RFB_CBS_SEGREDO (Client Secret), gerados em Serviços da Receita Federal ›
 // Gerar Credencial de Acesso para API › Chaves Secretas. Para uma empresa específica, acrescente _<CNPJ só dígitos>.
+// Fluxo da consulta: POST /{serviço}/{cnpj8} -> tíquete · GET /situacao/{tíquete} · GET /download/{tíquete} -> urlAssinada · GET na urlAssinada (sem token).
 // Ações: testar · solicitar (debitos | creditos | pagamentos | recolhimentos) · atualizar (situação + importação) · rad_gerar (DARF).
 // rad_gerar está TRAVADA (18/11/2026): só funciona com o segredo RFB_CBS_PERMITIR_DARF = sim. Sem ele, a função só testa e consulta.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
@@ -79,7 +80,7 @@ Deno.serve(async (req) => {
       const r = await rfb(tok, 'POST', `/${api}/${cnpj.slice(0, 8)}`, { urlRetorno: '' });
       const ok = r.http === 201 && r.d?.tiqueteSolicitacao;
       const { data: s } = await adm.from('rfb_cbs_solicitacoes').insert({ empresa_id: empresa, api, tiquete: ok ? r.d.tiqueteSolicitacao : null, situacao: ok ? 'PENDENTE' : 'RECUSADA', tea_segundos: ok ? num(r.d.tEASegundos) : null,
-        codigo_erro: ok ? null : (r.d?.codigoErro || `HTTP_${r.http}`), mensagem_erro: ok ? null : String(r.d?.mensagemErro || '').slice(0, 300), solicitada_por: u.user.id, solicitada_por_nome: mb?.nome || null }).select('id').single();
+        codigo_erro: ok ? null : (r.d?.codigoErro || `HTTP_${r.http}`), mensagem_erro: ok ? null : String(r.d?.mensagemErro || '').slice(0, 300), solicitada_por: u.user.id, solicitada_por_nome: mb?.nome || u.user.email || null }).select('id').single();
       return json({ ok: !!ok, id: s?.id, http: r.http, tea_segundos: ok ? num(r.d.tEASegundos) : null, erro: ok ? undefined : (r.d?.mensagemErro || r.d?.codigoErro || `HTTP ${r.http}`) }, ok ? 200 : 502);
     }
 
@@ -88,14 +89,24 @@ Deno.serve(async (req) => {
       const { data: s } = await adm.from('rfb_cbs_solicitacoes').select('*').eq('id', b.solicitacao_id).eq('empresa_id', empresa).maybeSingle();
       if (!s?.tiquete) return json({ erro: 'Consulta não encontrada.' }, 404);
       if (s.importada_em) return json({ ok: true, situacao: s.situacao, registros: s.registros, ja: true });
-      const r = await rfb(tok, 'GET', `/situacao/${encodeURIComponent(s.tiquete)}`);
-      const sit = ['PENDENTE', 'EM_PROCESSAMENTO', 'CONCLUIDA', 'ERRO', 'EXPIRADA'].includes(r.d?.situacao) ? r.d.situacao : (r.http === 200 ? s.situacao : 'ERRO');
+      // tentar de novo depois de uma falha no download: quem já está CONCLUIDA não consulta a situação outra vez
+      const r = s.situacao === 'CONCLUIDA' ? { http: 200, d: { situacao: 'CONCLUIDA' } as any } : await rfb(tok, 'GET', `/situacao/${encodeURIComponent(s.tiquete)}`);
+      const valida = ['PENDENTE', 'EM_PROCESSAMENTO', 'CONCLUIDA', 'ERRO', 'EXPIRADA'].includes(r.d?.situacao);
+      if (!valida) {   // resposta fora do padrão (HTTP diferente de 200 ou sem o campo situacao): não muda a situação; guarda o HTTP e os NOMES dos campos
+        const msg = String(r.d?.mensagemErro || r.d?.message || r.d?.mensagem || `HTTP ${r.http}`).slice(0, 200);
+        await adm.from('rfb_cbs_solicitacoes').update({ atualizada_em: new Date().toISOString(), codigo_erro: r.d?.codigoErro || `HTTP_${r.http}`, mensagem_erro: 'Consulta da situação falhou: ' + msg, resumo: { http_situacao: r.http, campos_da_situacao: Object.keys(r.d || {}) } }).eq('id', s.id);
+        return json({ ok: false, situacao: s.situacao, erro: `A Receita não informou a situação agora (${msg}). Tente atualizar de novo em instantes.` });
+      }
+      const sit = r.d.situacao;
       const base: Record<string, unknown> = { situacao: sit, atualizada_em: new Date().toISOString(), codigo_erro: r.d?.codigoErro || null, mensagem_erro: r.d?.mensagemErro ? String(r.d.mensagemErro).slice(0, 300) : null };
       if (sit !== 'CONCLUIDA') { await adm.from('rfb_cbs_solicitacoes').update(base).eq('id', s.id); return json({ ok: sit !== 'ERRO' && sit !== 'EXPIRADA', situacao: sit, erro: r.d?.mensagemErro }); }
-      const link = urlAssinadaDe(r.d);
-      if (!link) {   // concluída, mas a resposta não trouxe o link: guarda os NOMES dos campos recebidos para ajustar a função (sem valores)
-        await adm.from('rfb_cbs_solicitacoes').update({ ...base, resumo: { campos_da_situacao: Object.keys(r.d || {}) }, mensagem_erro: 'Consulta concluída, mas o link do arquivo não veio na resposta da situação. A função precisa ser ajustada.' }).eq('id', s.id);
-        return json({ ok: false, situacao: sit, erro: 'A consulta foi concluída, mas a Receita não devolveu o link do arquivo neste retorno. Avise o suporte da plataforma: a função precisa de um ajuste.', campos: Object.keys(r.d || {}) });
+      // concluída: o link do arquivo vem de outro serviço — GET /download/{tíquete} devolve a urlAssinada (docs.receitafederal.gov.br/apuracao-cbs/download.html)
+      const dl = await rfb(tok, 'GET', `/download/${encodeURIComponent(s.tiquete)}`);
+      const link = urlAssinadaDe(dl.d);
+      if (dl.http !== 200 || !link) {   // sem link: continua CONCLUIDA para poder tentar de novo; guarda o HTTP e os NOMES dos campos (sem valores)
+        const msg = String(dl.d?.mensagemErro || dl.d?.message || `HTTP ${dl.http}`).slice(0, 200);
+        await adm.from('rfb_cbs_solicitacoes').update({ ...base, codigo_erro: dl.d?.codigoErro || `HTTP_${dl.http}`, mensagem_erro: 'Link do arquivo não obtido: ' + msg, resumo: { http_download: dl.http, campos_do_download: Object.keys(dl.d || {}) } }).eq('id', s.id);
+        return json({ ok: false, situacao: sit, erro: `A consulta foi concluída, mas a Receita não liberou o link do arquivo (${msg}). Tente atualizar de novo em instantes.` });
       }
       let arq: any = null;
       try { const g = await fetch(link); if (!g.ok) throw new Error('HTTP ' + g.status); arq = await g.json(); } catch (e) { await adm.from('rfb_cbs_solicitacoes').update({ ...base, mensagem_erro: 'Falha ao baixar o arquivo: ' + (e as Error).message.slice(0, 120) }).eq('id', s.id); return json({ ok: false, situacao: sit, erro: 'Falha ao baixar o arquivo da Receita. Tente atualizar de novo.' }); }
