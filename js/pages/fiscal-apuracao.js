@@ -2,10 +2,11 @@
 // Etapa 1: livro por CFOP/CST (item a item) e resumo dos impostos destacados. Só leitura.
 // Reforma tributária (30/10/2026): conferência IBS/CBS, simulador 2027 e alíquotas por vigência (js/lib/reforma-ui.js, SQL 072).
 // Etapa 2 (08/11/2026, SQL 141, melhoria 9.2): imposto a recolher com PRODEPE, FEEF, AD/DIPER, FECEP e créditos de PIS/COFINS pelos parâmetros (js/lib/apuracao-ui.js).
+// Apuração da CBS (17/11/2026, sem SQL): prévia de débitos, créditos e saldo pelas notas, crédito por fornecedor e compras a pagar com CBS (js/lib/reforma-ui.js pintarCbs).
 // Regime (04/11/2026, SQL 078): os textos e as regras seguem o regime vigente da empresa no mês (Cadastros › Empresa › Regime tributário).
 import { sb, state, fetchAll } from '../lib/data.js';
 import { $, esc, money, dateBR, fail, loading, exportXLSX, MESES_CURTO } from '../lib/ui.js';
-import { pintarAliquotas, pintarSimulador, pintarConferencia } from '../lib/reforma-ui.js';
+import { pintarAliquotas, pintarSimulador, pintarConferencia, pintarCbs } from '../lib/reforma-ui.js';
 import { regimeEm, descricao, ehSimples } from '../lib/regime.js';
 import { pintarApuracao, pintarParametros } from '../lib/apuracao-ui.js';
 
@@ -78,7 +79,7 @@ async function carregar(root) {
 }
 
 function pintar(root) {
-  $('#abas', root).innerHTML = [['livro', 'Livro por CFOP / CST'], ['resumo', 'Resumo dos impostos'], ['apuracao', 'Imposto a recolher'], ['conferencia', 'Conferência IBS/CBS'], ['simulador', 'Reforma: simulador 2027'], ['aliquotas', 'Alíquotas por vigência'], ['regras', 'Regras e parâmetros']]
+  $('#abas', root).innerHTML = [['livro', 'Livro por CFOP / CST'], ['resumo', 'Resumo dos impostos'], ['apuracao', 'Imposto a recolher'], ['conferencia', 'Conferência IBS/CBS'], ['cbs', 'Apuração da CBS (prévia)'], ['simulador', 'Reforma: simulador 2027'], ['aliquotas', 'Alíquotas por vigência'], ['regras', 'Regras e parâmetros']]
     .map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('');
   const c = $('#corpo', root);
   $('#exp', root).style.display = ['simulador', 'aliquotas', 'conferencia', 'apuracao', 'regras'].includes(ui.aba) ? 'none' : '';
@@ -87,6 +88,7 @@ function pintar(root) {
   if (ui.aba === 'aliquotas') return pintarAliquotas(c);
   if (ui.aba === 'simulador') return pintarSimulador(c);
   if (ui.aba === 'conferencia') return pintarConferencia(c, ui.mes);
+  if (ui.aba === 'cbs') return pintarCbs(c, ui.mes);
   if (!D) return carregar(root);
   if (ui.aba === 'livro') return livro(c, root);
   if (ui.aba === 'resumo') return resumo(c);

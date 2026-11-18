@@ -1,8 +1,8 @@
 ---
 titulo: Notas fiscais e apuração de impostos
 tela: CPD › Notas Fiscais (FIS001) e Apuração de Impostos (FIS002)
-versao: 1.6
-atualizado: 2026-11-08
+versao: 1.7
+atualizado: 2026-11-17
 ---
 ## 1. Para que serve
 
@@ -217,6 +217,39 @@ No fim da aba **Reforma: simulador 2027**, a tabela **Transição até 2033** re
 
 O PRODEPE entra pelo CFOP principal de cada nota (sem o filtro de NCM) e o FECEP fica fora; as compensações de benefícios previstas na reforma não entram. É ordem de grandeza para o planejamento.
 
+### 6.8 Apuração da CBS (prévia)
+
+A aba **Apuração da CBS (prévia)** monta, com as notas importadas, a mesma conta da Apuração Assistida da Receita Federal: débitos, créditos e saldo do mês.
+
+![Figura 9 — Apuração da CBS (prévia): débitos, créditos e saldo do mês pelas notas, com a situação dos créditos (dados fictícios)](img/notas-fiscais-9.jpg)
+
+| Linha | De onde vem |
+|---|---|
+| Débitos | CBS e IBS destacados nas notas de saída emitidas pela empresa |
+| Estorno de débitos | Devoluções de venda |
+| Créditos | CBS e IBS destacados nas notas de entrada de fornecedores |
+| Estorno de créditos | Devoluções de compra emitidas pela empresa |
+| Saldo do mês | Débitos menos créditos. Positivo é a pagar; negativo é saldo credor |
+
+As quatro visões da aba:
+
+- **Resumo**: a conta do mês e a situação dos créditos de CBS (em notas já pagas, em notas ainda a pagar e em notas sem título ligado).
+- **Débitos**: nota a nota, com a base e os valores. A nota emitida sem o grupo IBS/CBS aparece marcada.
+- **Créditos por fornecedor**: quanto de CBS e IBS cada fornecedor destacou e quanto disso está em nota ainda a pagar.
+- **Compras a pagar com CBS**: as compras do mês e dos dois meses anteriores com CBS destacada e título em aberto.
+
+**Por que olhar as compras a pagar.** O crédito de CBS só pode ser usado depois que o débito da compra é extinto. No recolhimento pelo adquirente (RAD), a empresa paga a CBS da compra por DARF e o restante ao fornecedor: o desembolso total é o mesmo e o crédito não depende de o fornecedor recolher. A coluna "Líquido ao fornecedor com o RAD" mostra quanto ele receberia.
+
+![Figura 10 — Compras a pagar com CBS destacada: onde cabe o recolhimento pelo adquirente (dados fictícios)](img/notas-fiscais-10.jpg)
+
+**Limites desta prévia**
+
+- Não é a apuração oficial e não fala com a Receita: ajustes, pagamentos e recolhimentos feitos lá não aparecem.
+- Só entram as notas importadas na plataforma, pelos valores destacados nelas. Nota sem o grupo IBS/CBS fica sem débito ou crédito (veja a seção 6.1).
+- "Paga" ou "a pagar" vem do título ligado à nota em Notas Fiscais. Nota sem título ligado aparece à parte.
+- A plataforma ainda não gera o DARF do RAD nem altera o pagamento. Combine com a contabilidade e com o fornecedor antes de abater a CBS de um pagamento.
+- Para empresa do Simples com IBS/CBS dentro do DAS, a apuração não se aplica; a aba avisa.
+
 ## 7. Regras e travas
 
 - Nota já importada (mesma chave) não entra de novo.
@@ -249,3 +282,4 @@ O PRODEPE entra pelo CFOP principal de cada nota (sem o filtro de NCM) e o FECEP
 | 1.4 | 31/10/2026 | Notas de débito de juros e multa (finalidade 6, tipo 04): fila gerada pelos recebimentos com juros, rateio pelos itens da nota de origem, registro da emissão e juros recebidos pelo fundo como "a decidir" (SQL 074). |
 | 1.5 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.6 | 08/11/2026 | Imposto a recolher (ICMS com PRODEPE, FEEF, AD/DIPER e FECEP; IPI; PIS/COFINS com créditos), ajustes e fechamento do mês; parâmetros por vigência com fonte; transição da reforma até 2033 (SQL 141, melhoria 9.2). |
+| 1.7 | 17/11/2026 | Apuração da CBS (prévia): débitos, créditos, estornos por devolução e saldo do mês pelas notas importadas; crédito por fornecedor; compras a pagar com CBS destacada (onde cabe o recolhimento pelo adquirente). |

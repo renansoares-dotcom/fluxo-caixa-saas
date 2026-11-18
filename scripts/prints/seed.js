@@ -314,6 +314,12 @@ DB.log_carga_notas = DB.log_carga_notas || [];
   if (set[1]) set[1].v_cbs = r2(set[1].v_cbs * 1.25);
   if (set[2]) { set[2].v_bc_ibscbs = null; set[2].v_cbs = null; set[2].v_ibs = null; DB.nfe_itens.filter(i => i.nota_id === set[2].id).forEach(i => { i.cst_ibscbs = null; i.v_cbs = null; i.v_ibs = null; }); }
   if (set[3]) { set[3].v_cbs = r2(set[3].v_cbs * 0.4); set[3].v_ibs = r2(set[3].v_ibs * 0.4); DB.nfe_itens.filter(i => i.nota_id === set[3].id).forEach(i => { i.cst_ibscbs = '200'; i.cclass_trib = '200034'; }); }
+  // títulos das compras de set e out/2026 ligados às notas (apuração da CBS, prévia): parte paga, parte a pagar, parte sem título
+  DB.nfe_vinculos = DB.nfe_vinculos || []; const plc = DB.plano_contas.find(x => x.tipo === 'S' && x.nivel === 2);
+  DB.nfe_notas.filter(n => !n.emissao_propria && n.finalidade === '1' && /^2026-(09|10)/.test(n.emissao)).forEach((n, k) => { if (k % 5 === 4) return;
+    const pago = k % 5 < 2, v = new Date(n.emissao + 'T12:00:00'); v.setDate(v.getDate() + 28 + (k % 3) * 14);
+    DB.lancamentos.push({ id: 'cbs-l' + k, empresa_id: E, data: v.toISOString().slice(0, 10), plano_id: plc?.id, favorecido_id: n.favorecido_id || null, valor: n.v_nf, status: pago ? 'Pago' : 'Em aberto', descricao: `NF ${n.numero} — ${n.emit_nome}`, documento: n.numero + '/1', origem: 'nfe' });
+    DB.nfe_vinculos.push({ id: 'nv-cbs' + k, empresa_id: E, nota_id: n.id, parcela_id: null, lancamento_id: 'cbs-l' + k, tipo: 'exata' }); });
   DB.trib_aliquotas = [];
 }
 // Carteira cedida: títulos cedidos a dois fundos fictícios e o relatório de pagos de um deles

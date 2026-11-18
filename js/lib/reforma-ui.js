@@ -4,7 +4,7 @@
 //  - Conferência IBS/CBS: o destacado em cada nota × a alíquota do ano da emissão
 import { sb, state, q, fetchAll, isAdmin } from './data.js';
 import { $, esc, money, pct, dateBR, fail, toast, modal, loading, exportXLSX, MESES_CURTO } from './ui.js';
-import { aliquotas, doAno, total, ibs, simular, conferir, SITUACAO, PIS_COFINS, pctBR, classeNota, baseEstimada } from './reforma.js';
+import { aliquotas, doAno, total, ibs, simular, conferir, SITUACAO, PIS_COFINS, pctBR, classeNota, baseEstimada, apurarCbs, GRUPO_CBS_TXT } from './reforma.js';
 import { carregarRegimes, vigente, ehSimples, descricao } from './regime.js';
 import { baseTransicao, transicao, paramDoMes } from './apuracao.js';
 import { carregarParams } from './apuracao-ui.js';
@@ -155,4 +155,70 @@ export async function pintarConferencia(c, mes) {
   $('#cf-lado', c).onclick = (e) => { const l = e.target.closest('[data-l]')?.dataset.l; if (l) { conf.lado = l; pintarConferencia(c, mes); } };
   $('#cf-flt', c).onclick = (e) => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { conf.filtro = f; pintarConferencia(c, mes); } };
   $('#cf-xls', c).onclick = () => exportXLSX($('#cf-tab table', c), `conferencia_ibs_cbs_${mes}`);
+}
+
+// ------------------------------------------------------------------ apuração da CBS (prévia interna, 17/11/2026)
+// Débitos, créditos e saldo da CBS pelas notas importadas; crédito por fornecedor; compras com CBS e título em aberto
+// (candidatas ao recolhimento pelo adquirente). Sem ligação com a Receita: quando a API entrar, vira a conferência.
+const ap = { chave: '', notas: [], tit: new Map(), vista: 'resumo' };
+const iniRad = (m) => { const [a, mm] = m.split('-').map(Number); return new Date(Date.UTC(a, mm - 3, 1)).toISOString().slice(0, 10); };
+const z = (v) => v || 0;   // evita o "-0,00"
+export async function pintarCbs(c, mes) {
+  loading(c);
+  if (ap.chave !== `${state.empresa.id}|${mes}`) try {
+    const notas = await fetchAll(() => sb.from('nfe_notas').select('id, chave, numero, serie, emissao, tipo, situacao, emissao_propria, finalidade, cfops, favorecido_id, dest_nome, emit_nome, emit_doc, v_nf, v_bc_ibscbs, v_ibs, v_cbs')
+      .eq('empresa_id', state.empresa.id).eq('situacao', 'autorizada').gte('emissao', iniRad(mes)).lte('emissao', fimMes(mes)).order('numero'));   // o mês e os dois anteriores (compras ainda a pagar)
+    const ids = notas.filter(x => !x.emissao_propria).map(x => x.id), tit = new Map();
+    for (let i = 0; i < ids.length; i += 150) {
+      const V = await fetchAll(() => sb.from('nfe_vinculos').select('nota_id, lancamentos!inner(id, status, valor, data)').in('nota_id', ids.slice(i, i + 150)).order('id'));
+      for (const v of V) if (v.lancamentos) (tit.get(v.nota_id) || tit.set(v.nota_id, []).get(v.nota_id)).push(v.lancamentos);
+    }
+    Object.assign(ap, { chave: `${state.empresa.id}|${mes}`, notas, tit });
+  } catch (e) { fail(e); c.innerHTML = ''; return; }
+  const RG = await carregarRegimes(state.empresa.id), rg = vigente(RG, fimMes(mes));
+  const A = apurarCbs(ap.notas.filter(x => x.emissao >= mes + '-01'), ap.tit), L = await carregarAliquotas(), a = doAno(L, +mes.slice(0, 4));
+  const RAD = apurarCbs(ap.notas.filter(x => !x.emissao_propria), ap.tit);   // compras a pagar: o mês e os dois anteriores
+  const k = (t, v, s, cls = '') => `<div class="kpi ${cls}"><div class="k-label">${t}</div><div class="k-value">${v}</div><div class="k-sub">${s}</div></div>`;
+  const saldoTxt = (t) => t.saldo > 0 ? ['a pagar', 'neg'] : t.saldo < 0 ? ['saldo credor', 'pos'] : ['zerado', ''];
+  const nNota = (n) => `${n.serie && n.serie !== '1' ? n.serie + '-' : ''}${n.numero}`;
+  const PG = { paga: ['pago', 'paga'], aberta: ['aberto', 'a pagar'], parcial: ['aberto', 'paga em parte'], sem_titulo: ['', 'sem título ligado'] };
+  const deb = A.linhas.filter(l => l.grupo === 'debito' || l.grupo === 'estorno_debito'), cre = A.linhas.filter(l => l.grupo === 'credito' || l.grupo === 'estorno_credito');
+  const linhaConta = (t, cb, ib, forte = false) => `<tr${forte ? ' style="font-weight:700"' : ''}><td>${t}</td><td class="num">${money(cb)}</td><td class="num">${money(ib)}</td></tr>`;
+  const vistas = [['resumo', 'Resumo'], ['debitos', `Débitos (${deb.length})`], ['fornecedores', `Créditos por fornecedor (${A.fornecedores.length})`], ['rad', `Compras a pagar com CBS (${RAD.candidatas.length})`]];
+  let corpo = '';
+  if (ap.vista === 'resumo') corpo = `<div class="card flush"><div class="table-wrap" id="ap-tab"><table><thead><tr><th>Apuração de ${mesBR(mes)} pelas notas importadas</th><th class="num">CBS</th><th class="num">IBS</th></tr></thead><tbody>
+      ${linhaConta('Débitos: CBS e IBS destacados nas notas emitidas pela empresa', A.cbs.debitos, A.ibs.debitos)}
+      ${linhaConta('(−) Estorno de débitos: devoluções de venda', z(-A.cbs.estornoDebitos), z(-A.ibs.estornoDebitos))}
+      ${linhaConta('(−) Créditos: CBS e IBS destacados nas notas de entrada', z(-A.cbs.creditos), z(-A.ibs.creditos))}
+      ${linhaConta('(+) Estorno de créditos: devoluções de compra', A.cbs.estornoCreditos, A.ibs.estornoCreditos)}
+      ${linhaConta(`Saldo do mês (${saldoTxt(A.cbs)[0]} na CBS; ${saldoTxt(A.ibs)[0]} no IBS)`, A.cbs.saldo, A.ibs.saldo, true)}</tbody></table></div></div>
+      <div class="card"><h3 style="margin:0 0 6px">Situação dos créditos de CBS</h3><p class="small muted" style="margin:0 0 8px">O crédito só pode ser usado depois que o débito da compra é extinto. Aqui a plataforma mostra o que dá para saber sem a Receita: se a nota já foi paga ao fornecedor.</p>
+        <div class="table-wrap"><table><thead><tr><th>Créditos de CBS do mês</th><th class="num">CBS</th><th>O que significa</th></tr></thead><tbody>
+          <tr><td>Em notas já pagas</td><td class="num">${money(A.creditoPago)}</td><td class="small wrap">O fornecedor já recebeu. Se ele recolheu a CBS, o crédito está liberado; a confirmação vem da Receita.</td></tr>
+          <tr><td>Em notas ainda a pagar</td><td class="num">${money(A.creditoAberto)}</td><td class="small wrap">${A.candidatas.length} nota(s). É onde o recolhimento pelo adquirente (RAD) pode ser usado: a empresa paga a CBS e o crédito deixa de depender do fornecedor.</td></tr>
+          <tr><td>Em notas sem título ligado</td><td class="num">${money(A.creditoSemTitulo)}</td><td class="small wrap">${A.semTitulo.length} nota(s) sem lançamento vinculado em Notas Fiscais: ligue o título para a plataforma saber se foi paga.</td></tr></tbody></table></div></div>`;
+  else if (ap.vista === 'debitos') corpo = `<div class="card flush"><div class="table-wrap" style="max-height:60vh" id="ap-tab"><table><thead><tr><th>Nº</th><th>Emissão</th><th>Cliente ou emitente</th><th>Tipo</th><th class="num">Valor</th><th class="num">Base IBS/CBS</th><th class="num">CBS</th><th class="num">IBS</th></tr></thead><tbody>
+      ${deb.map(l => `<tr><td>${nNota(l.nota)}</td><td>${dateBR(l.nota.emissao)}</td><td class="wrap" style="min-width:220px">${esc(l.parte)}</td><td class="small">${esc(GRUPO_CBS_TXT[l.grupo])}${l.sem ? ' <span class="badge vencido">sem o grupo IBS/CBS</span>' : ''}</td><td class="num">${money(l.nota.v_nf)}</td><td class="num">${money(l.base)}</td>
+        <td class="num">${money(l.grupo === 'debito' ? l.cbs : -l.cbs)}</td><td class="num">${money(l.grupo === 'debito' ? l.ibs : -l.ibs)}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Nenhuma nota de saída no mês.</td></tr>'}</tbody></table></div></div>`;
+  else if (ap.vista === 'fornecedores') corpo = `<div class="card flush"><div class="table-wrap" style="max-height:60vh" id="ap-tab"><table><thead><tr><th>Fornecedor</th><th class="num">Notas</th><th class="num">Compras</th><th class="num">Base IBS/CBS</th><th class="num">CBS (crédito)</th><th class="num">IBS (crédito)</th><th class="num">CBS em notas a pagar</th><th>Próximo vencimento</th></tr></thead><tbody>
+      ${A.fornecedores.map(f => `<tr><td class="wrap" style="min-width:240px">${esc(f.nome)}${f.semGrupo ? ` <span class="badge aberto" title="Notas sem o grupo IBS/CBS: sem crédito destacado">${f.semGrupo} sem IBS/CBS</span>` : ''}</td><td class="num">${f.notas}</td><td class="num">${money(f.valor)}</td><td class="num">${money(f.base)}</td>
+        <td class="num">${money(f.cbs)}</td><td class="num">${money(f.ibs)}</td><td class="num">${f.cbsAberto ? money(f.cbsAberto) : '–'}</td><td>${f.vencimento ? dateBR(f.vencimento) : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Nenhuma nota de entrada no mês.</td></tr>'}</tbody></table></div></div>`;
+  else corpo = `<div class="card"><p class="small" style="margin:0">Compras de ${mesBR(iniRad(mes).slice(0, 7))} a ${mesBR(mes)} com CBS destacada e título ainda em aberto. Recolhendo como adquirente, a empresa paga a CBS por DARF e o restante ao fornecedor: o desembolso total é o mesmo e o crédito não depende de o fornecedor recolher.
+        <b>Por enquanto é só a lista</b>: a plataforma ainda não gera o DARF nem altera o pagamento. Combine com a contabilidade e com o fornecedor antes de abater a CBS do pagamento.</p></div>
+      <div class="card flush"><div class="table-wrap" style="max-height:60vh" id="ap-tab"><table><thead><tr><th>Nº</th><th>Emissão</th><th>Fornecedor</th><th class="num">Valor da nota</th><th class="num">Em aberto</th><th>Vencimento</th><th class="num">CBS da nota</th><th class="num">Líquido ao fornecedor com o RAD</th><th>Pagamento</th></tr></thead><tbody>
+      ${RAD.candidatas.map(l => `<tr><td>${nNota(l.nota)}</td><td>${dateBR(l.nota.emissao)}</td><td class="wrap" style="min-width:220px">${esc(l.parte)}</td><td class="num">${money(l.nota.v_nf)}</td><td class="num">${money(l.aberto)}</td><td>${l.vencimento ? dateBR(l.vencimento) : ''}</td>
+        <td class="num">${money(l.cbs)}</td><td class="num">${money(l.liquido)}</td><td><span class="badge ${PG[l.pagamento][0]}">${PG[l.pagamento][1]}</span></td></tr>`).join('') || '<tr><td colspan="9" class="empty">Nenhuma compra a pagar com CBS destacada no período.</td></tr>'}
+      ${RAD.candidatas.length ? `<tr style="font-weight:700"><td colspan="4">Total</td><td class="num">${money(RAD.candidatas.reduce((s, l) => s + l.aberto, 0))}</td><td></td><td class="num">${money(RAD.creditoAberto)}</td><td class="num">${money(RAD.candidatas.reduce((s, l) => s + l.liquido, 0))}</td><td></td></tr>` : ''}</tbody></table></div></div>`;
+  c.innerHTML = `<div class="card"><div class="toolbar" style="margin-bottom:0"><div class="chips" id="ap-v">${vistas.map(([kk, t]) => `<span class="chip ${ap.vista === kk ? 'on' : ''}" data-v="${kk}">${t}</span>`).join('')}</div><span class="spacer"></span><button class="btn" id="ap-xls">Excel</button></div>
+      <p class="small muted" style="margin:8px 0 0"><b>Prévia interna</b>, calculada só com as notas importadas na plataforma e os valores destacados nelas${a ? ` (alíquotas de ${a.ano}: CBS ${pctBR(a.cbs)} e IBS ${pctBR(ibs(a))})` : ''}. Não é a apuração oficial: nota não importada, ajustes e pagamentos feitos na Receita não aparecem aqui. A conferência com a Apuração Assistida da Receita entra quando a ligação com a API estiver pronta.
+      ${ehSimples(rg) && !rg.ibscbs_regular ? ' <b>Empresa do Simples com IBS/CBS dentro do DAS no período: esta apuração não se aplica; os valores abaixo são só os destacados nas notas.</b>' : ''}</p></div>
+    <div class="kpis">${k('Débitos de CBS', money(A.cbs.debitos - A.cbs.estornoDebitos), `${deb.filter(l => l.grupo === 'debito').length} nota(s) emitida(s)${A.cbs.estornoDebitos ? ` · devoluções ${money(A.cbs.estornoDebitos)}` : ''}`)}
+      ${k('Créditos de CBS', money(A.cbs.creditos - A.cbs.estornoCreditos), `${cre.filter(l => l.grupo === 'credito').length} nota(s) de entrada · ${A.fornecedores.length} fornecedor(es)`)}
+      ${k('Saldo de CBS do mês', money(Math.abs(A.cbs.saldo)), saldoTxt(A.cbs)[0], saldoTxt(A.cbs)[1])}
+      ${k('Saldo de IBS do mês', money(Math.abs(A.ibs.saldo)), saldoTxt(A.ibs)[0], saldoTxt(A.ibs)[1])}
+      ${k('CBS em compras a pagar', money(RAD.creditoAberto), `${RAD.candidatas.length} nota(s) dos últimos 3 meses onde cabe o recolhimento pelo adquirente`, RAD.candidatas.length ? 'warn' : '')}</div>
+    ${A.semGrupo.saidas || A.semGrupo.entradas ? `<p class="small neg">${A.semGrupo.saidas ? `${A.semGrupo.saidas} nota(s) emitida(s) pela empresa sem o grupo IBS/CBS. ` : ''}${A.semGrupo.entradas ? `${A.semGrupo.entradas} nota(s) de entrada sem o grupo IBS/CBS (sem crédito destacado). ` : ''}Veja a aba Conferência IBS/CBS.</p>` : ''}
+    ${corpo}`;
+  $('#ap-v', c).onclick = (e) => { const v = e.target.closest('[data-v]')?.dataset.v; if (v) { ap.vista = v; pintarCbs(c, mes); } };
+  $('#ap-xls', c).onclick = () => { const t = $('#ap-tab table', c); if (t) exportXLSX(t, `apuracao_cbs_${ap.vista}_${mes}`); };
 }

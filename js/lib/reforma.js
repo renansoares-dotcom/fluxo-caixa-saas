@@ -106,5 +106,48 @@ export function conferir(nt, lista, itens = [], o = {}) {
   if (!out.motivos.length) out.motivos.push('confere');
   return out;
 }
+// ------------------------------------------------------------------ prévia da apuração da CBS (17/11/2026)
+// Mesmo desenho da apuração assistida da Receita, calculado só com as notas importadas na plataforma:
+// débito = CBS destacada nas saídas da empresa; crédito = CBS destacada nas entradas de terceiros; devolução estorna o lado dela.
+export const GRUPO_CBS = { venda: 'debito', outra_saida: 'debito', dev_venda: 'estorno_debito', compra: 'credito', outra_entrada: 'credito', dev_compra: 'estorno_credito' };
+export const GRUPO_CBS_TXT = { debito: 'Débito', estorno_debito: 'Estorno de débito (devolução de venda)', credito: 'Crédito', estorno_credito: 'Estorno de crédito (devolução de compra)' };
+
+/**
+ * notas: cabeçalhos do mês (classeNota precisa de cfops, tipo, emissao_propria, situacao)
+ * titulos: Map nota_id → [{ status, valor, data }] (lançamentos ligados à nota em Notas Fiscais)
+ * devolve { linhas, cbs, ibs, semGrupo, fornecedores, candidatas, semTitulo }
+ *  - cbs/ibs: { debitos, estornoDebitos, creditos, estornoCreditos, saldo } (saldo > 0 = a pagar; < 0 = credor)
+ *  - candidatas: compras com CBS destacada e título ainda em aberto (onde o recolhimento pelo adquirente pode ser usado)
+ */
+export function apurarCbs(notas, titulos = new Map()) {
+  const zero = () => ({ debitos: 0, estornoDebitos: 0, creditos: 0, estornoCreditos: 0, saldo: 0 });
+  const T = { cbs: zero(), ibs: zero() }, campo = { debito: 'debitos', estorno_debito: 'estornoDebitos', credito: 'creditos', estorno_credito: 'estornoCreditos' };
+  const linhas = [], semGrupo = { saidas: 0, entradas: 0 }, forn = new Map();
+  for (const nt of notas || []) {
+    const classe = classeNota(nt), grupo = GRUPO_CBS[classe]; if (!grupo) continue;
+    const cbs = n(nt.v_cbs), ib = n(nt.v_ibs), sem = !n(nt.v_bc_ibscbs) && !cbs && !ib;
+    if (sem) semGrupo[grupo === 'debito' || grupo === 'estorno_credito' ? 'saidas' : 'entradas']++;
+    T.cbs[campo[grupo]] += cbs; T.ibs[campo[grupo]] += ib;
+    const L = { nota: nt, classe, grupo, cbs, ibs: ib, base: n(nt.v_bc_ibscbs), sem, parte: (nt.emissao_propria ? nt.dest_nome : nt.emit_nome) || '' };
+    if (grupo === 'credito') {
+      const ts = titulos.get(nt.id) || [], ab = ts.filter(t => t.status !== 'Pago');
+      L.titulos = ts.length; L.aberto = r2(ab.reduce((a, t) => a + Math.abs(n(t.valor)), 0)); L.vencimento = ab.map(t => t.data).sort()[0] || null;
+      L.pagamento = !ts.length ? 'sem_titulo' : ab.length ? (ab.length < ts.length ? 'parcial' : 'aberta') : 'paga';
+      const k = nt.favorecido_id || nt.emit_doc || L.parte, f = forn.get(k) || forn.set(k, { chave: k, nome: L.parte, doc: nt.emit_doc || '', notas: 0, valor: 0, base: 0, cbs: 0, ibs: 0, cbsAberto: 0, aberto: 0, vencimento: null, semGrupo: 0 }).get(k);
+      f.notas++; f.valor += n(nt.v_nf); f.base += L.base; f.cbs += cbs; f.ibs += ib; if (sem) f.semGrupo++;
+      if (ab.length && cbs > 0) { f.cbsAberto += cbs; f.aberto += L.aberto; if (!f.vencimento || (L.vencimento && L.vencimento < f.vencimento)) f.vencimento = L.vencimento; }
+    }
+    linhas.push(L);
+  }
+  for (const t of [T.cbs, T.ibs]) { for (const k of Object.keys(t)) t[k] = r2(t[k]); t.saldo = r2((t.debitos - t.estornoDebitos) - (t.creditos - t.estornoCreditos)); }
+  const fornecedores = [...forn.values()].map(f => ({ ...f, valor: r2(f.valor), base: r2(f.base), cbs: r2(f.cbs), ibs: r2(f.ibs), cbsAberto: r2(f.cbsAberto), aberto: r2(f.aberto) })).sort((a, b) => b.cbs - a.cbs || b.valor - a.valor);
+  const cred = linhas.filter(l => l.grupo === 'credito' && l.cbs > 0);
+  // se recolher como adquirente, o fornecedor recebe o título menos a CBS (nunca menos que zero)
+  const candidatas = cred.filter(l => l.pagamento === 'aberta' || l.pagamento === 'parcial').map(l => ({ ...l, liquido: r2(Math.max(0, l.aberto - l.cbs)) })).sort((a, b) => (a.vencimento || '9').localeCompare(b.vencimento || '9') || b.cbs - a.cbs);
+  const soma = (L, k) => r2(L.reduce((a, l) => a + l[k], 0));
+  return { linhas, cbs: T.cbs, ibs: T.ibs, semGrupo, fornecedores, candidatas, semTitulo: cred.filter(l => l.pagamento === 'sem_titulo'),
+    creditoAberto: soma(candidatas, 'cbs'), creditoPago: soma(cred.filter(l => l.pagamento === 'paga'), 'cbs'), creditoSemTitulo: soma(cred.filter(l => l.pagamento === 'sem_titulo'), 'cbs') };
+}
+
 const fmt = (v) => n(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 export const pctBR = (v, d = 4) => (+(+v).toFixed(d)).toLocaleString('pt-BR', { maximumFractionDigits: d }) + '%';

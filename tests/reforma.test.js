@@ -91,3 +91,31 @@ test('relatório de faturamento com devolução, cancelada, ABC e ano anterior',
   assert.equal(c.total.liquido, 0);
   assert.equal(F.anoAnterior('2024-02-29'), '2023-02-28');
 });
+
+test('apuração da CBS (prévia): débitos, créditos, estornos, saldo e compras a pagar', () => {
+  const N = (id, o) => ({ id, situacao: 'autorizada', emissao: '2026-10-10', ...o });
+  const notas = [
+    N('v1', { emissao_propria: true, tipo: 'saida', cfops: ['5101'], dest_nome: 'Cliente A', v_nf: 10000, v_bc_ibscbs: 8000, v_cbs: 72, v_ibs: 8 }),
+    N('v2', { emissao_propria: true, tipo: 'saida', cfops: ['6101'], dest_nome: 'Cliente B', v_nf: 5000, v_bc_ibscbs: 4000, v_cbs: 36, v_ibs: 4 }),
+    N('v3', { emissao_propria: true, tipo: 'saida', cfops: ['5101'], dest_nome: 'Cliente C', v_nf: 1000 }),                                   // sem o grupo IBS/CBS
+    N('dv', { emissao_propria: false, tipo: 'saida', cfops: ['5201'], emit_nome: 'Cliente A', v_nf: 1000, v_bc_ibscbs: 800, v_cbs: 7.2, v_ibs: 0.8 }),   // devolução de venda emitida pelo cliente
+    N('c1', { emissao_propria: false, tipo: 'saida', cfops: ['6101'], emit_nome: 'Resinas', emit_doc: '1', v_nf: 20000, v_bc_ibscbs: 16000, v_cbs: 144, v_ibs: 16 }),
+    N('c2', { emissao_propria: false, tipo: 'saida', cfops: ['5102'], emit_nome: 'Resinas', emit_doc: '1', v_nf: 3000, v_bc_ibscbs: 2400, v_cbs: 21.6, v_ibs: 2.4 }),
+    N('c3', { emissao_propria: false, tipo: 'saida', cfops: ['5101'], emit_nome: 'Tintas', emit_doc: '2', v_nf: 2000, v_bc_ibscbs: 1600, v_cbs: 14.4, v_ibs: 1.6 }),
+    N('dc', { emissao_propria: true, tipo: 'saida', cfops: ['5201'], dest_nome: 'Resinas', v_nf: 500, v_bc_ibscbs: 400, v_cbs: 3.6, v_ibs: 0.4 }),       // devolução de compra emitida pela empresa
+    N('cx', { situacao: 'cancelada', emissao_propria: true, tipo: 'saida', cfops: ['5101'], v_cbs: 999 }),
+  ];
+  const tit = new Map([['c1', [{ status: 'Em aberto', valor: -10000, data: '2026-11-20' }, { status: 'Pago', valor: -10000, data: '2026-10-25' }]], ['c2', [{ status: 'Pago', valor: -3000, data: '2026-10-30' }]]]);
+  const A = R.apurarCbs(notas, tit);
+  assert.deepEqual(A.cbs, { debitos: 108, estornoDebitos: 7.2, creditos: 180, estornoCreditos: 3.6, saldo: -75.6 });
+  assert.equal(A.ibs.saldo, -8.4);
+  assert.deepEqual(A.semGrupo, { saidas: 1, entradas: 0 });
+  // crédito: pago 21,60; a pagar 144,00 (título em parte pago); sem título 14,40
+  assert.deepEqual([A.creditoPago, A.creditoAberto, A.creditoSemTitulo], [21.6, 144, 14.4]);
+  assert.equal(A.candidatas.length, 1);
+  assert.deepEqual([A.candidatas[0].pagamento, A.candidatas[0].aberto, A.candidatas[0].vencimento, A.candidatas[0].liquido], ['parcial', 10000, '2026-11-20', 9856]);
+  // por fornecedor: Resinas com duas notas e a CBS da nota em aberto
+  assert.deepEqual(A.fornecedores.map(f => [f.nome, f.notas, f.cbs, f.cbsAberto]), [['Resinas', 2, 165.6, 144], ['Tintas', 1, 14.4, 0]]);
+  // sem notas, tudo zerado
+  assert.equal(R.apurarCbs([]).cbs.saldo, 0);
+});
