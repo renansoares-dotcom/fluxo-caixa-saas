@@ -1,7 +1,8 @@
 // Receita Federal — APIs da Apuração Assistida da CBS (docs.receitafederal.gov.br/apuracao-cbs) e DARF do RAD.
 // A tela (CPD › Fiscal › Apuração de Impostos › Apuração da CBS) chama esta função com o token do usuário; a função confere
 // a permissão (rfb_pode), obtém o token da Receita com a credencial guardada em segredo e grava o retorno no banco.
-// A credencial e o token da Receita nunca vão para o navegador, para o banco nem para os logs.
+// A credencial (Client Id e Client Secret) nunca sai dos segredos. O token TEMPORÁRIO fica guardado na tabela rfb_tokens (SQL 170),
+// que só esta função lê, para não pedir um token novo a cada chamada (a Receita limita as chamadas). Nada disso vai ao navegador nem aos logs.
 // Segredos: RFB_CBS_CHAVE (Client Id) e RFB_CBS_SEGREDO (Client Secret), gerados em Serviços da Receita Federal ›
 // Gerar Credencial de Acesso para API › Chaves Secretas. Para uma empresa específica, acrescente _<CNPJ só dígitos>.
 // Fluxo da consulta: POST /{serviço}/{cnpj8} -> tíquete · GET /situacao/{tíquete} · GET /download/{tíquete} -> urlAssinada · GET na urlAssinada (sem token).
@@ -17,14 +18,18 @@ const so = (s: unknown) => String(s ?? '').replace(/\D/g, '');
 const num = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
 const segredo = (nome: string, cnpj: string) => (Deno.env.get(`${nome}_${cnpj}`) || Deno.env.get(nome) || '').trim();
 
-// token OAuth2 (Client Credentials). Guardado em memória enquanto a função fica viva; nunca sai daqui.
+// token OAuth2 (Client Credentials). Reaproveitado até vencer: 1º a memória da função, 2º a tabela rfb_tokens, só então a Receita.
 const cache = new Map<string, { tok: string; ate: number }>();
+const resumoDe = async (s: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
 const LIMITE = /rate limit|too many|limite de (chamadas|requisi)/i;
 const MSG_LIMITE = 'A Receita Federal bloqueou novas chamadas por enquanto: o limite de chamadas desta credencial foi atingido. A credencial está correta. Aguarde e tente mais tarde, sem repetir cliques (cada tentativa conta no limite).';
-async function obterToken(cnpj: string): Promise<{ tok?: string; motivo?: string; http?: number; limite?: boolean }> {
+async function obterToken(adm: any, cnpj: string): Promise<{ tok?: string; motivo?: string; http?: number; limite?: boolean }> {
   const id = segredo('RFB_CBS_CHAVE', cnpj), sec = segredo('RFB_CBS_SEGREDO', cnpj);
   if (!id || !sec) return { motivo: `Falta o segredo ${!id ? 'RFB_CBS_CHAVE' : 'RFB_CBS_SEGREDO'} na função (Supabase › Edge Functions › Secrets).` };
-  const c = cache.get(id); if (c && c.ate > Date.now() + 30000) return { tok: c.tok };
+  const c = cache.get(id); if (c && c.ate > Date.now() + 60000) return { tok: c.tok };
+  const chave = await resumoDe(id);
+  try { const { data: g } = await adm.from('rfb_tokens').select('token, expira_em').eq('credencial', chave).maybeSingle();
+    if (g?.token && new Date(g.expira_em).getTime() > Date.now() + 60000) { cache.set(id, { tok: g.token, ate: new Date(g.expira_em).getTime() }); return { tok: g.token }; } } catch { /* tabela ainda não existe: segue pedindo à Receita */ }
   // 1ª forma: credencial no cabeçalho (Basic); 2ª: no corpo. As duas são do padrão OAuth2; a Receita aceita uma delas.
   const tentativas: [Record<string, string>, string][] = [
     [{ Authorization: 'Basic ' + btoa(`${id}:${sec}`), 'Content-Type': 'application/x-www-form-urlencoded' }, 'grant_type=client_credentials'],
@@ -33,7 +38,9 @@ async function obterToken(cnpj: string): Promise<{ tok?: string; motivo?: string
   for (const [headers, body] of tentativas) {
     try {
       const r = await fetch(TOKEN_URL, { method: 'POST', headers, body }); const txt = await r.text(); let d: any = null; try { d = JSON.parse(txt); } catch { /* resposta não é JSON */ }
-      if (r.ok && d?.access_token) { cache.set(id, { tok: d.access_token, ate: Date.now() + Math.max(60, num(d.expires_in) || 300) * 1000 }); return { tok: d.access_token }; }
+      if (r.ok && d?.access_token) { const ate = Date.now() + Math.max(60, num(d.expires_in) || 300) * 1000; cache.set(id, { tok: d.access_token, ate });
+        try { await adm.from('rfb_tokens').upsert({ credencial: chave, token: d.access_token, expira_em: new Date(ate).toISOString(), obtido_em: new Date().toISOString() }, { onConflict: 'credencial' }); } catch { /* sem a tabela, fica só na memória */ }
+        return { tok: d.access_token }; }
       ultimo = { http: r.status, motivo: String(d?.error_description || d?.error || d?.mensagem || d?.message || `HTTP ${r.status}`).slice(0, 200) };
       // limite de chamadas da Receita: a credencial não foi recusada; não gasta outra chamada tentando a 2ª forma
       if (r.status === 429 || LIMITE.test(ultimo.motivo)) return { http: r.status, limite: true, motivo: MSG_LIMITE };
@@ -41,10 +48,13 @@ async function obterToken(cnpj: string): Promise<{ tok?: string; motivo?: string
   }
   return { http: ultimo.http, motivo: `A Receita recusou a credencial ao pedir o token (${ultimo.motivo}). Confira os segredos RFB_CBS_CHAVE e RFB_CBS_SEGREDO.` };
 }
+async function esquecerToken(adm: any, cnpj: string) { const id = segredo('RFB_CBS_CHAVE', cnpj); cache.delete(id); try { await adm.from('rfb_tokens').delete().eq('credencial', await resumoDe(id)); } catch { /* nada */ } }
+let aoRecusar: (() => Promise<void>) | null = null;   // definido a cada requisição: token recusado (401) é esquecido
 async function rfb(tok: string, metodo: string, caminho: string, corpo?: unknown) {
   try {
     const r = await fetch(BASE + caminho, { method: metodo, headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json', ...(corpo !== undefined ? { 'Content-Type': 'application/json' } : {}) }, body: corpo !== undefined ? JSON.stringify(corpo) : undefined });
     const txt = await r.text(); let d: any = null; try { d = JSON.parse(txt); } catch { d = { mensagemErro: txt.slice(0, 300) }; }
+    if (r.status === 401 && aoRecusar) await aoRecusar();
     return { http: r.status, d };
   } catch (e) { return { http: 0, d: { codigoErro: 'SEM_CONEXAO', mensagemErro: 'Receita Federal inacessível: ' + (e as Error).message.slice(0, 150) } }; }
 }
@@ -68,7 +78,7 @@ Deno.serve(async (req) => {
     const cnpj = so(emp?.cnpj); if (cnpj.length !== 14) return json({ erro: 'O CNPJ da empresa não está cadastrado com 14 dígitos (Cadastros › Empresa).' }, 400);
     const { data: mb } = await adm.from('membros').select('nome').eq('empresa_id', empresa).eq('user_id', u.user.id).maybeSingle();
 
-    const t = await obterToken(cnpj);
+    const t = await obterToken(adm, cnpj); aoRecusar = () => esquecerToken(adm, cnpj);
     if (b.acao === 'testar') return json(t.tok ? { ok: true, motivo: 'Credencial aceita pela Receita Federal: token de acesso obtido.' } : { ok: false, http: t.http ?? null, motivo: t.motivo });
     if (!t.tok) return json({ erro: t.motivo, limite: !!t.limite }, t.limite ? 429 : 400);
     const tok = t.tok;
