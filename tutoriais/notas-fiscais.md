@@ -1,7 +1,7 @@
 ---
 titulo: Notas fiscais e apuração de impostos
 tela: CPD › Notas Fiscais (FIS001) e Apuração de Impostos (FIS002)
-versao: 1.7
+versao: 1.8
 atualizado: 2026-11-17
 ---
 ## 1. Para que serve
@@ -238,17 +238,48 @@ As quatro visões da aba:
 - **Créditos por fornecedor**: quanto de CBS e IBS cada fornecedor destacou e quanto disso está em nota ainda a pagar.
 - **Compras a pagar com CBS**: as compras do mês e dos dois meses anteriores com CBS destacada e título em aberto.
 
-**Por que olhar as compras a pagar.** O crédito de CBS só pode ser usado depois que o débito da compra é extinto. No recolhimento pelo adquirente (RAD), a empresa paga a CBS da compra por DARF e o restante ao fornecedor: o desembolso total é o mesmo e o crédito não depende de o fornecedor recolher. A coluna "Líquido ao fornecedor com o RAD" mostra quanto ele receberia.
+**Por que olhar as compras a pagar.** O crédito de CBS só pode ser usado depois que o débito da compra é extinto. No recolhimento pelo adquirente (RAD), a empresa paga a CBS da compra por DARF e o restante ao fornecedor: o desembolso total é o mesmo e o crédito não depende de o fornecedor recolher. A coluna "Líquido com o RAD" mostra quanto ele receberia.
 
-![Figura 10 — Compras a pagar com CBS destacada: onde cabe o recolhimento pelo adquirente (dados fictícios)](img/notas-fiscais-10.jpg)
+![Figura 10 — Compras a pagar com CBS destacada: marcar a nota para o recolhimento pelo adquirente (dados fictícios)](img/notas-fiscais-10.jpg)
 
 **Limites desta prévia**
 
 - Não é a apuração oficial e não fala com a Receita: ajustes, pagamentos e recolhimentos feitos lá não aparecem.
 - Só entram as notas importadas na plataforma, pelos valores destacados nelas. Nota sem o grupo IBS/CBS fica sem débito ou crédito (veja a seção 6.1).
 - "Paga" ou "a pagar" vem do título ligado à nota em Notas Fiscais. Nota sem título ligado aparece à parte.
-- A plataforma ainda não gera o DARF do RAD nem altera o pagamento. Combine com a contabilidade e com o fornecedor antes de abater a CBS de um pagamento.
+- A plataforma ainda não gera o DARF do RAD nem altera o valor do título (seção 6.9). Combine com a contabilidade e com o fornecedor antes de abater a CBS de um pagamento.
 - Para empresa do Simples com IBS/CBS dentro do DAS, a apuração não se aplica; a aba avisa.
+
+### 6.9 Recolhimento pelo adquirente (RAD)
+
+Na visão **Compras a pagar com CBS**, a empresa registra em quais notas decidiu recolher a CBS como adquirente. O recurso vem **desligado**.
+
+**Ligar e definir as regras.** Clique em **Parâmetros do RAD** (administrador ou financeiro):
+
+![Figura 11 — Parâmetros do RAD: ligar o uso, a regra padrão, a conta do DARF e a regra por fornecedor (dados fictícios)](img/notas-fiscais-11.jpg)
+
+| Parâmetro | O que faz |
+|---|---|
+| Usar o recolhimento pelo adquirente | Mostra o botão de marcar nas notas |
+| Regra padrão dos fornecedores | Sempre recolher, nunca recolher ou decidir nota a nota |
+| Conta do título do DARF | Reservada para quando a plataforma passar a gerar o DARF |
+| Regra por fornecedor | Vale mais que a padrão. "Nunca" tira o botão das notas daquele fornecedor; "sempre" destaca o botão |
+
+**Marcar a nota.**
+
+1. Na linha da nota, coluna **RAD**, clique em **Recolher**.
+2. Confira a CBS da nota e o líquido sugerido ao fornecedor, escreva uma observação se quiser e clique em **Marcar a nota**.
+3. A linha passa a mostrar **marcada**, com quem marcou e quando. **Desfazer** tira a marcação.
+
+**Na Autorização de Pagamentos**, o título da nota marcada aparece com o aviso **RAD**, a CBS e o líquido sugerido. A CBS é abatida, na sugestão, do título em aberto de vencimento mais próximo.
+
+O que a marcação **não** faz, por enquanto:
+
+- não gera o DARF: ele ainda é emitido fora da plataforma;
+- não altera o valor do título: para abater a CBS, ajuste o valor autorizado na Autorização de Pagamentos;
+- não confirma o recolhimento nem libera o crédito: isso virá da consulta à Receita.
+
+A regra "sempre" não marca sozinha; a decisão continua sendo nota a nota.
 
 ## 7. Regras e travas
 
@@ -283,3 +314,4 @@ As quatro visões da aba:
 | 1.5 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.6 | 08/11/2026 | Imposto a recolher (ICMS com PRODEPE, FEEF, AD/DIPER e FECEP; IPI; PIS/COFINS com créditos), ajustes e fechamento do mês; parâmetros por vigência com fonte; transição da reforma até 2033 (SQL 141, melhoria 9.2). |
 | 1.7 | 17/11/2026 | Apuração da CBS (prévia): débitos, créditos, estornos por devolução e saldo do mês pelas notas importadas; crédito por fornecedor; compras a pagar com CBS destacada (onde cabe o recolhimento pelo adquirente). |
+| 1.8 | 17/11/2026 | Recolhimento pelo adquirente (RAD), primeira parte: parâmetros, regra por fornecedor, marcação da nota e aviso com o líquido sugerido na Autorização de Pagamentos. |

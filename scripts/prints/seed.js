@@ -320,6 +320,14 @@ DB.log_carga_notas = DB.log_carga_notas || [];
     const pago = k % 5 < 2, v = new Date(n.emissao + 'T12:00:00'); v.setDate(v.getDate() + 28 + (k % 3) * 14);
     DB.lancamentos.push({ id: 'cbs-l' + k, empresa_id: E, data: v.toISOString().slice(0, 10), plano_id: plc?.id, favorecido_id: n.favorecido_id || null, valor: n.v_nf, status: pago ? 'Pago' : 'Em aberto', descricao: `NF ${n.numero} — ${n.emit_nome}`, documento: n.numero + '/1', origem: 'nfe' });
     DB.nfe_vinculos.push({ id: 'nv-cbs' + k, empresa_id: E, nota_id: n.id, parcela_id: null, lancamento_id: 'cbs-l' + k, tipo: 'exata' }); });
+  // RAD (SQL 168): ligado, uma regra por fornecedor e uma nota já marcada
+  { const ab = DB.nfe_vinculos.map(v => ({ v, n: DB.nfe_notas.find(x => x.id === v.nota_id), l: DB.lancamentos.find(x => x.id === v.lancamento_id) })).filter(x => x.l && x.l.status !== 'Pago' && x.n && +x.n.v_cbs > 0);
+    DB.rad_config = [{ empresa_id: E, ativo: true, regra_padrao: 'perguntar', plano_darf_id: null }];
+    DB.rad_fornecedores = ab[0]?.n.favorecido_id ? [{ id: 'rf1', empresa_id: E, favorecido_id: ab[0].n.favorecido_id, regra: 'sempre', observacao: null }] : [];
+    const m = ab[ab.length - 1];
+    DB.rad_recolhimentos = m ? [{ id: 'rr-rad1', empresa_id: E, nota_id: m.n.id, chave: m.n.chave, favorecido_id: m.n.favorecido_id, valor_cbs: m.n.v_cbs, situacao: 'marcado', observacao: 'Combinado com o fornecedor', marcado_por_nome: 'Ana Financeiro', marcado_em: '2026-11-12T13:20:00Z' }] : [];
+    window.RPC.rad_titulos = () => m ? [{ lancamento_id: m.l.id, recolhimento_id: 'rr-rad1', nota_id: m.n.id, nota_numero: m.n.numero, valor_cbs: m.n.v_cbs, valor_titulo: Math.abs(m.l.valor), liquido_sugerido: Math.round((Math.abs(m.l.valor) - m.n.v_cbs) * 100) / 100 }] : [];
+    window.RPC.rad_marcar = () => 'rr-novo'; window.RPC.rad_desmarcar = () => null; }
   DB.trib_aliquotas = [];
 }
 // Carteira cedida: títulos cedidos a dois fundos fictícios e o relatório de pagos de um deles

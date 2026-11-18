@@ -2,8 +2,8 @@
 //  - Alíquotas por vigência (padrão da plataforma + ajustes da empresa, SQL 072)
 //  - Simulador 2027: PIS/Cofins de hoje × CBS+IBS sobre as notas dos últimos 12 meses
 //  - Conferência IBS/CBS: o destacado em cada nota × a alíquota do ano da emissão
-import { sb, state, q, fetchAll, isAdmin } from './data.js';
-import { $, esc, money, pct, dateBR, fail, toast, modal, loading, exportXLSX, MESES_CURTO } from './ui.js';
+import { sb, state, q, fetchAll, isAdmin, podeEditar } from './data.js';
+import { $, $$, esc, money, pct, dateBR, fail, toast, modal, loading, exportXLSX, confirmDialog, MESES_CURTO } from './ui.js';
 import { aliquotas, doAno, total, ibs, simular, conferir, SITUACAO, PIS_COFINS, pctBR, classeNota, baseEstimada, apurarCbs, GRUPO_CBS_TXT } from './reforma.js';
 import { carregarRegimes, vigente, ehSimples, descricao } from './regime.js';
 import { baseTransicao, transicao, paramDoMes } from './apuracao.js';
@@ -175,6 +175,10 @@ export async function pintarCbs(c, mes) {
     }
     Object.assign(ap, { chave: `${state.empresa.id}|${mes}`, notas, tit });
   } catch (e) { fail(e); c.innerHTML = ''; return; }
+  // RAD (SQL 168): parâmetros, regra por fornecedor e notas já marcadas. Sem o SQL, a lista segue só informativa.
+  let rad = null; try { const e = state.empresa.id; const [cf, fr, rc] = await Promise.all([q(sb.from('rad_config').select('*').eq('empresa_id', e)), q(sb.from('rad_fornecedores').select('*').eq('empresa_id', e)),
+      q(sb.from('rad_recolhimentos').select('*').eq('empresa_id', e).neq('situacao', 'cancelado'))]);
+    rad = { cfg: cf[0] || { ativo: false, regra_padrao: 'perguntar' }, regra: Object.fromEntries(fr.map(x => [x.favorecido_id, x.regra])), forn: fr, porNota: Object.fromEntries(rc.map(x => [x.nota_id, x])) }; } catch { rad = null; }
   const RG = await carregarRegimes(state.empresa.id), rg = vigente(RG, fimMes(mes));
   const A = apurarCbs(ap.notas.filter(x => x.emissao >= mes + '-01'), ap.tit), L = await carregarAliquotas(), a = doAno(L, +mes.slice(0, 4));
   const RAD = apurarCbs(ap.notas.filter(x => !x.emissao_propria), ap.tit);   // compras a pagar: o mês e os dois anteriores
@@ -184,6 +188,12 @@ export async function pintarCbs(c, mes) {
   const PG = { paga: ['pago', 'paga'], aberta: ['aberto', 'a pagar'], parcial: ['aberto', 'paga em parte'], sem_titulo: ['', 'sem título ligado'] };
   const deb = A.linhas.filter(l => l.grupo === 'debito' || l.grupo === 'estorno_debito'), cre = A.linhas.filter(l => l.grupo === 'credito' || l.grupo === 'estorno_credito');
   const linhaConta = (t, cb, ib, forte = false) => `<tr${forte ? ' style="font-weight:700"' : ''}><td>${t}</td><td class="num">${money(cb)}</td><td class="num">${money(ib)}</td></tr>`;
+  const regraDe = (l) => rad ? (rad.regra[l.nota.favorecido_id] || rad.cfg.regra_padrao) : 'perguntar';
+  const celRad = (l) => { const m = rad.porNota[l.nota.id], rg2 = regraDe(l);
+    if (m) return `<span class="badge pago" title="${esc(`Marcada por ${m.marcado_por_nome || 'alguém da equipe'} em ${new Date(m.marcado_em).toLocaleDateString('pt-BR')}${m.observacao ? ' · ' + m.observacao : ''}`)}">marcada</span>${podeEditar() && m.situacao === 'marcado' ? ` <a href="#" class="small" data-des="${m.id}">desfazer</a>` : ''}`;
+    if (rg2 === 'nunca') return '<span class="small muted">fornecedor fora do RAD</span>';
+    if (!rad.cfg.ativo) return '<span class="small muted">desligado</span>';
+    return podeEditar() ? `<button class="btn small ${rg2 === 'sempre' ? 'primary' : ''}" data-mar="${l.nota.id}" title="${rg2 === 'sempre' ? 'Regra do fornecedor: sempre recolher' : 'Registrar a decisão de recolher a CBS desta nota como adquirente'}">Recolher</button>` : '<span class="small muted">não marcada</span>'; };
   const vistas = [['resumo', 'Resumo'], ['debitos', `Débitos (${deb.length})`], ['fornecedores', `Créditos por fornecedor (${A.fornecedores.length})`], ['rad', `Compras a pagar com CBS (${RAD.candidatas.length})`]];
   let corpo = '';
   if (ap.vista === 'resumo') corpo = `<div class="card flush"><div class="table-wrap" id="ap-tab"><table><thead><tr><th>Apuração de ${mesBR(mes)} pelas notas importadas</th><th class="num">CBS</th><th class="num">IBS</th></tr></thead><tbody>
@@ -204,11 +214,12 @@ export async function pintarCbs(c, mes) {
       ${A.fornecedores.map(f => `<tr><td class="wrap" style="min-width:240px">${esc(f.nome)}${f.semGrupo ? ` <span class="badge aberto" title="Notas sem o grupo IBS/CBS: sem crédito destacado">${f.semGrupo} sem IBS/CBS</span>` : ''}</td><td class="num">${f.notas}</td><td class="num">${money(f.valor)}</td><td class="num">${money(f.base)}</td>
         <td class="num">${money(f.cbs)}</td><td class="num">${money(f.ibs)}</td><td class="num">${f.cbsAberto ? money(f.cbsAberto) : '–'}</td><td>${f.vencimento ? dateBR(f.vencimento) : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Nenhuma nota de entrada no mês.</td></tr>'}</tbody></table></div></div>`;
   else corpo = `<div class="card"><p class="small" style="margin:0">Compras de ${mesBR(iniRad(mes).slice(0, 7))} a ${mesBR(mes)} com CBS destacada e título ainda em aberto. Recolhendo como adquirente, a empresa paga a CBS por DARF e o restante ao fornecedor: o desembolso total é o mesmo e o crédito não depende de o fornecedor recolher.
-        <b>Por enquanto é só a lista</b>: a plataforma ainda não gera o DARF nem altera o pagamento. Combine com a contabilidade e com o fornecedor antes de abater a CBS do pagamento.</p></div>
-      <div class="card flush"><div class="table-wrap" style="max-height:60vh" id="ap-tab"><table><thead><tr><th>Nº</th><th>Emissão</th><th>Fornecedor</th><th class="num">Valor da nota</th><th class="num">Em aberto</th><th>Vencimento</th><th class="num">CBS da nota</th><th class="num">Líquido ao fornecedor com o RAD</th><th>Pagamento</th></tr></thead><tbody>
-      ${RAD.candidatas.map(l => `<tr><td>${nNota(l.nota)}</td><td>${dateBR(l.nota.emissao)}</td><td class="wrap" style="min-width:220px">${esc(l.parte)}</td><td class="num">${money(l.nota.v_nf)}</td><td class="num">${money(l.aberto)}</td><td>${l.vencimento ? dateBR(l.vencimento) : ''}</td>
-        <td class="num">${money(l.cbs)}</td><td class="num">${money(l.liquido)}</td><td><span class="badge ${PG[l.pagamento][0]}">${PG[l.pagamento][1]}</span></td></tr>`).join('') || '<tr><td colspan="9" class="empty">Nenhuma compra a pagar com CBS destacada no período.</td></tr>'}
-      ${RAD.candidatas.length ? `<tr style="font-weight:700"><td colspan="4">Total</td><td class="num">${money(RAD.candidatas.reduce((s, l) => s + l.aberto, 0))}</td><td></td><td class="num">${money(RAD.creditoAberto)}</td><td class="num">${money(RAD.candidatas.reduce((s, l) => s + l.liquido, 0))}</td><td></td></tr>` : ''}</tbody></table></div></div>`;
+        ${rad ? `<b>Marcar a nota registra a decisão</b> de recolher como adquirente e avisa na Autorização de Pagamentos, com o líquido sugerido.` : '<b>Por enquanto é só a lista.</b>'} A plataforma ainda não gera o DARF nem altera o valor do título. Combine com a contabilidade e com o fornecedor antes de abater a CBS do pagamento.</p>
+        ${rad ? `<div class="toolbar" style="margin:8px 0 0"><span class="small">${rad.cfg.ativo ? `Recolhimento pelo adquirente <b>ligado</b> · regra padrão: ${REGRA_RAD[rad.cfg.regra_padrao]} · ${Object.keys(rad.porNota).length} nota(s) marcada(s)` : 'Recolhimento pelo adquirente <b>desligado</b> nesta empresa.'}</span><span class="spacer"></span>${podeEditar() ? '<button class="btn" id="ap-par">Parâmetros do RAD</button>' : ''}</div>` : ''}</div>
+      <div class="card flush"><div class="table-wrap" style="max-height:60vh" id="ap-tab"><table><thead><tr><th>Nº</th><th>Emissão</th><th>Fornecedor</th><th class="num">Valor da nota</th><th class="num">Em aberto</th><th>Vencimento</th><th class="num">CBS da nota</th><th class="num" title="Quanto o fornecedor receberia se a CBS fosse recolhida pelo adquirente">Líquido com o RAD</th><th>Pagamento</th>${rad ? '<th>RAD</th>' : ''}</tr></thead><tbody>
+      ${RAD.candidatas.map(l => `<tr><td>${nNota(l.nota)}</td><td>${dateBR(l.nota.emissao)}</td><td class="wrap" style="min-width:160px">${esc(l.parte)}</td><td class="num">${money(l.nota.v_nf)}</td><td class="num">${money(l.aberto)}</td><td>${l.vencimento ? dateBR(l.vencimento) : ''}</td>
+        <td class="num">${money(l.cbs)}</td><td class="num">${money(l.liquido)}</td><td><span class="badge ${PG[l.pagamento][0]}">${PG[l.pagamento][1]}</span></td>${rad ? `<td>${celRad(l)}</td>` : ''}</tr>`).join('') || '<tr><td colspan="10" class="empty">Nenhuma compra a pagar com CBS destacada no período.</td></tr>'}
+      ${RAD.candidatas.length ? `<tr style="font-weight:700"><td colspan="4">Total</td><td class="num">${money(RAD.candidatas.reduce((s, l) => s + l.aberto, 0))}</td><td></td><td class="num">${money(RAD.creditoAberto)}</td><td class="num">${money(RAD.candidatas.reduce((s, l) => s + l.liquido, 0))}</td><td></td>${rad ? '<td></td>' : ''}</tr>` : ''}</tbody></table></div></div>`;
   c.innerHTML = `<div class="card"><div class="toolbar" style="margin-bottom:0"><div class="chips" id="ap-v">${vistas.map(([kk, t]) => `<span class="chip ${ap.vista === kk ? 'on' : ''}" data-v="${kk}">${t}</span>`).join('')}</div><span class="spacer"></span><button class="btn" id="ap-xls">Excel</button></div>
       <p class="small muted" style="margin:8px 0 0"><b>Prévia interna</b>, calculada só com as notas importadas na plataforma e os valores destacados nelas${a ? ` (alíquotas de ${a.ano}: CBS ${pctBR(a.cbs)} e IBS ${pctBR(ibs(a))})` : ''}. Não é a apuração oficial: nota não importada, ajustes e pagamentos feitos na Receita não aparecem aqui. A conferência com a Apuração Assistida da Receita entra quando a ligação com a API estiver pronta.
       ${ehSimples(rg) && !rg.ibscbs_regular ? ' <b>Empresa do Simples com IBS/CBS dentro do DAS no período: esta apuração não se aplica; os valores abaixo são só os destacados nas notas.</b>' : ''}</p></div>
@@ -221,4 +232,44 @@ export async function pintarCbs(c, mes) {
     ${corpo}`;
   $('#ap-v', c).onclick = (e) => { const v = e.target.closest('[data-v]')?.dataset.v; if (v) { ap.vista = v; pintarCbs(c, mes); } };
   $('#ap-xls', c).onclick = () => { const t = $('#ap-tab table', c); if (t) exportXLSX(t, `apuracao_cbs_${ap.vista}_${mes}`); };
+  if (!rad) return;
+  $$('[data-mar]', c).forEach(b => b.onclick = () => { const l = RAD.candidatas.find(x => x.nota.id === b.dataset.mar);
+    modal({ title: `Recolher como adquirente — nota ${nNota(l.nota)}`, narrow: true, body: `<p class="small">${esc(l.parte)}<br>CBS da nota: <b>${money(l.cbs)}</b> · em aberto: ${money(l.aberto)} · líquido sugerido ao fornecedor: <b>${money(l.liquido)}</b></p>
+        <p class="small muted">Registra a decisão e avisa na Autorização de Pagamentos. O título não muda e o DARF ainda é gerado fora da plataforma.</p><label>Observação (opcional)<input id="rm-o" maxlength="200" placeholder="ex.: combinado com o fornecedor"></label>`,
+      foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rm-ok">Marcar a nota</button>',
+      onMount: (m, close) => { $('#rm-ok', m).onclick = async () => { try { await q(sb.rpc('rad_marcar', { p_nota: l.nota.id, p_observacao: $('#rm-o', m).value })); close(); toast('Nota marcada para o recolhimento pelo adquirente'); pintarCbs(c, mes); } catch (err) { fail(err); } }; } }); });
+  $$('[data-des]', c).forEach(a => a.onclick = async (ev) => { ev.preventDefault(); if (!await confirmDialog('Desfazer a marcação desta nota?')) return;
+    try { await q(sb.rpc('rad_desmarcar', { p_id: a.dataset.des, p_motivo: null })); toast('Marcação desfeita'); pintarCbs(c, mes); } catch (err) { fail(err); } });
+  $('#ap-par', c) && ($('#ap-par', c).onclick = () => parametrosRad(rad, () => pintarCbs(c, mes)));
+}
+
+const REGRA_RAD = { sempre: 'sempre recolher', nunca: 'nunca recolher', perguntar: 'decidir nota a nota' };
+// parâmetros do RAD: liga o uso, a regra padrão, a conta do DARF e a regra de cada fornecedor
+async function parametrosRad(rad, depois) {
+  const e = state.empresa.id; let PL = [], FV = [];
+  try { [PL, FV] = await Promise.all([q(sb.from('plano_contas').select('id,codigo,nome').eq('empresa_id', e).eq('tipo', 'S').eq('nivel', 2).order('codigo')), fetchAll(() => sb.from('favorecidos').select('id,nome').eq('empresa_id', e).order('nome'))]); } catch (err) { return fail(err); }
+  const nome = Object.fromEntries(FV.map(f => [f.id, f.nome])), optR = (v) => Object.entries(REGRA_RAD).map(([k, t]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${t[0].toUpperCase() + t.slice(1)}</option>`).join('');
+  let mudou = false;
+  modal({ title: 'Parâmetros do RAD — recolhimento da CBS pelo adquirente', wide: true, body: `<form id="pr-f" class="grid2">
+      <label class="chk" style="grid-column:1/-1"><input type="checkbox" name="at" ${rad.cfg.ativo ? 'checked' : ''}> Usar o recolhimento pelo adquirente nesta empresa</label>
+      <label>Regra padrão dos fornecedores<select name="rp">${optR(rad.cfg.regra_padrao)}</select><span class="small muted">"sempre" só destaca o botão; a marcação continua sendo feita nota a nota</span></label>
+      <label>Conta do título do DARF<select name="pl"><option value="">— definir depois —</option>${PL.map(x => `<option value="${x.id}" ${rad.cfg.plano_darf_id === x.id ? 'selected' : ''}>${esc(x.codigo)} · ${esc(x.nome)}</option>`).join('')}</select><span class="small muted">usada quando a plataforma passar a gerar o DARF</span></label>
+      <div style="grid-column:1/-1"><button class="btn primary">Salvar</button></div></form>
+    <h3 style="margin:16px 0 6px">Regra por fornecedor</h3><p class="small muted" style="margin:0 0 6px">Vale mais que a regra padrão. "Nunca" tira o botão das notas do fornecedor.</p>
+    <div class="table-wrap"><table class="small"><thead><tr><th>Fornecedor</th><th>Regra</th><th></th></tr></thead><tbody id="pr-t"></tbody></table></div>
+    <div class="toolbar" style="margin-top:6px"><label class="grow small">Fornecedor<input id="pr-fv" list="pr-fl" placeholder="nome do fornecedor"><datalist id="pr-fl">${FV.map(f => `<option value="${esc(f.nome)}">`).join('')}</datalist></label>
+      <label class="small">Regra<select id="pr-rg">${optR('sempre')}</select></label><button class="btn" id="pr-add">+ Regra</button></div>`,
+    foot: '<button class="btn" data-close>Fechar</button>',
+    onMount: (m, close) => {
+      const pintar = () => { $('#pr-t', m).innerHTML = rad.forn.map(x => `<tr><td>${esc(nome[x.favorecido_id] || '')}</td><td>${REGRA_RAD[x.regra]}</td><td><button class="btn ghost sm" data-x="${x.id}">✕</button></td></tr>`).join('') || '<tr><td colspan="3" class="empty">Nenhuma regra: todos seguem a regra padrão.</td></tr>';
+        $$('[data-x]', m).forEach(b => b.onclick = async () => { try { await q(sb.from('rad_fornecedores').delete().eq('id', b.dataset.x)); rad.forn = rad.forn.filter(x => x.id !== b.dataset.x); mudou = true; pintar(); } catch (err) { fail(err); } }); };
+      pintar();
+      $('#pr-f', m).onsubmit = async (ev) => { ev.preventDefault(); const f = ev.target;
+        try { await q(sb.from('rad_config').upsert({ empresa_id: e, ativo: f.at.checked, regra_padrao: f.rp.value, plano_darf_id: f.pl.value || null, atualizado_em: new Date().toISOString() }, { onConflict: 'empresa_id' })); toast('Parâmetros do RAD salvos'); close(); depois(); } catch (err) { fail(err); } };
+      $('#pr-add', m).onclick = async () => { const n = $('#pr-fv', m).value.trim().toLowerCase(), fv = FV.find(f => f.nome.toLowerCase() === n);
+        if (!fv) return toast('Fornecedor não encontrado em Favorecidos', true);
+        if (rad.forn.some(x => x.favorecido_id === fv.id)) return toast('Este fornecedor já tem regra: exclua a atual para trocar', true);
+        try { const r = await q(sb.from('rad_fornecedores').insert({ empresa_id: e, favorecido_id: fv.id, regra: $('#pr-rg', m).value }).select('*')); rad.forn.push(r[0]); $('#pr-fv', m).value = ''; mudou = true; pintar(); } catch (err) { fail(err); } };
+      m.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { if (mudou) depois(); }));
+    } });
 }
