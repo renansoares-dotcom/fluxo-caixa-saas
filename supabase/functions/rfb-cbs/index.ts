@@ -5,6 +5,7 @@
 // Segredos: RFB_CBS_CHAVE (Client Id) e RFB_CBS_SEGREDO (Client Secret), gerados em Serviços da Receita Federal ›
 // Gerar Credencial de Acesso para API › Chaves Secretas. Para uma empresa específica, acrescente _<CNPJ só dígitos>.
 // Ações: testar · solicitar (debitos | creditos | pagamentos | recolhimentos) · atualizar (situação + importação) · rad_gerar (DARF).
+// rad_gerar está TRAVADA (18/11/2026): só funciona com o segredo RFB_CBS_PERMITIR_DARF = sim. Sem ele, a função só testa e consulta.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
@@ -122,6 +123,8 @@ Deno.serve(async (req) => {
 
     // ---- gera o DARF do recolhimento pelo adquirente para as notas marcadas (uma chamada por nota, para o retorno ser inequívoco) ----
     if (b.acao === 'rad_gerar') {
+      // 18/11/2026 (pedido do Renan): por enquanto só teste e consulta. Gerar DARF fica travado aqui até o segredo RFB_CBS_PERMITIR_DARF = sim existir.
+      if (Deno.env.get('RFB_CBS_PERMITIR_DARF') !== 'sim') return json({ erro: 'A geração de DARF está desligada nesta plataforma. Por enquanto, só o teste de conexão e as consultas estão liberados.' }, 403);
       const ids: string[] = Array.isArray(b.recolhimento_ids) ? b.recolhimento_ids.slice(0, 20) : [];
       if (!ids.length) return json({ erro: 'Nenhuma nota informada.' }, 400);
       const { data: cfg } = await adm.from('rad_config').select('ativo').eq('empresa_id', empresa).maybeSingle();

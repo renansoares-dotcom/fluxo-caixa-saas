@@ -1,7 +1,7 @@
 ---
 titulo: Notas fiscais e apuração de impostos
 tela: CPD › Notas Fiscais (FIS001) e Apuração de Impostos (FIS002)
-versao: 1.9
+versao: 1.10
 atualizado: 2026-11-18
 ---
 ## 1. Para que serve
@@ -273,7 +273,7 @@ Na visão **Compras a pagar com CBS**, a empresa registra em quais notas decidiu
 
 **Na Autorização de Pagamentos**, o título da nota marcada aparece com o aviso **RAD**, a CBS e o líquido sugerido. A CBS é abatida, na sugestão, do título em aberto de vencimento mais próximo.
 
-**Gerar o DARF.** Com a ligação com a Receita Federal ativa (seção 6.10), a nota marcada mostra **gerar DARF**:
+**Gerar o DARF (desligado por enquanto).** A geração do DARF pela plataforma está travada: hoje a ligação com a Receita só testa a conexão e consulta. Quando for liberada, a nota marcada mostrará **gerar DARF**:
 
 1. Clique em **gerar DARF** e escolha recolher todo o débito da nota ou só uma parte.
 2. Confirme. A Receita devolve o valor, a data máxima, o PIX, o código de barras e o PDF.
@@ -346,3 +346,4 @@ O que cada consulta alimenta:
 | 1.7 | 17/11/2026 | Apuração da CBS (prévia): débitos, créditos, estornos por devolução e saldo do mês pelas notas importadas; crédito por fornecedor; compras a pagar com CBS destacada (onde cabe o recolhimento pelo adquirente). |
 | 1.8 | 17/11/2026 | Recolhimento pelo adquirente (RAD), primeira parte: parâmetros, regra por fornecedor, marcação da nota e aviso com o líquido sugerido na Autorização de Pagamentos. |
 | 1.9 | 18/11/2026 | Ligação com a Receita Federal (Apuração Assistida da CBS): testar a conexão, consultas de créditos, recolhimentos, débitos e pagamentos, geração do DARF do recolhimento pelo adquirente com PIX, código de barras e título a pagar. |
+| 1.10 | 18/11/2026 | Geração do DARF pela plataforma travada: a ligação com a Receita Federal fica só em teste de conexão e consultas. |
