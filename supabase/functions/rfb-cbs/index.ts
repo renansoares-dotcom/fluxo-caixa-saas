@@ -19,7 +19,9 @@ const segredo = (nome: string, cnpj: string) => (Deno.env.get(`${nome}_${cnpj}`)
 
 // token OAuth2 (Client Credentials). Guardado em memória enquanto a função fica viva; nunca sai daqui.
 const cache = new Map<string, { tok: string; ate: number }>();
-async function obterToken(cnpj: string): Promise<{ tok?: string; motivo?: string; http?: number }> {
+const LIMITE = /rate limit|too many|limite de (chamadas|requisi)/i;
+const MSG_LIMITE = 'A Receita Federal bloqueou novas chamadas por enquanto: o limite de chamadas desta credencial foi atingido. A credencial está correta. Aguarde e tente mais tarde, sem repetir cliques (cada tentativa conta no limite).';
+async function obterToken(cnpj: string): Promise<{ tok?: string; motivo?: string; http?: number; limite?: boolean }> {
   const id = segredo('RFB_CBS_CHAVE', cnpj), sec = segredo('RFB_CBS_SEGREDO', cnpj);
   if (!id || !sec) return { motivo: `Falta o segredo ${!id ? 'RFB_CBS_CHAVE' : 'RFB_CBS_SEGREDO'} na função (Supabase › Edge Functions › Secrets).` };
   const c = cache.get(id); if (c && c.ate > Date.now() + 30000) return { tok: c.tok };
@@ -33,6 +35,8 @@ async function obterToken(cnpj: string): Promise<{ tok?: string; motivo?: string
       const r = await fetch(TOKEN_URL, { method: 'POST', headers, body }); const txt = await r.text(); let d: any = null; try { d = JSON.parse(txt); } catch { /* resposta não é JSON */ }
       if (r.ok && d?.access_token) { cache.set(id, { tok: d.access_token, ate: Date.now() + Math.max(60, num(d.expires_in) || 300) * 1000 }); return { tok: d.access_token }; }
       ultimo = { http: r.status, motivo: String(d?.error_description || d?.error || d?.mensagem || d?.message || `HTTP ${r.status}`).slice(0, 200) };
+      // limite de chamadas da Receita: a credencial não foi recusada; não gasta outra chamada tentando a 2ª forma
+      if (r.status === 429 || LIMITE.test(ultimo.motivo)) return { http: r.status, limite: true, motivo: MSG_LIMITE };
     } catch (e) { ultimo = { http: 0, motivo: 'Receita Federal inacessível: ' + (e as Error).message.slice(0, 150) }; }
   }
   return { http: ultimo.http, motivo: `A Receita recusou a credencial ao pedir o token (${ultimo.motivo}). Confira os segredos RFB_CBS_CHAVE e RFB_CBS_SEGREDO.` };
@@ -66,7 +70,7 @@ Deno.serve(async (req) => {
 
     const t = await obterToken(cnpj);
     if (b.acao === 'testar') return json(t.tok ? { ok: true, motivo: 'Credencial aceita pela Receita Federal: token de acesso obtido.' } : { ok: false, http: t.http ?? null, motivo: t.motivo });
-    if (!t.tok) return json({ erro: t.motivo }, 400);
+    if (!t.tok) return json({ erro: t.motivo, limite: !!t.limite }, t.limite ? 429 : 400);
     const tok = t.tok;
 
     // ---- abre uma consulta assíncrona (a Receita aceita 4 por dia por serviço e por credencial) ----
@@ -94,6 +98,7 @@ Deno.serve(async (req) => {
       const valida = ['PENDENTE', 'EM_PROCESSAMENTO', 'CONCLUIDA', 'ERRO', 'EXPIRADA'].includes(r.d?.situacao);
       if (!valida) {   // resposta fora do padrão (HTTP diferente de 200 ou sem o campo situacao): não muda a situação; guarda o HTTP e os NOMES dos campos
         const msg = String(r.d?.mensagemErro || r.d?.message || r.d?.mensagem || `HTTP ${r.http}`).slice(0, 200);
+        if (r.http === 429 || LIMITE.test(msg)) { await adm.from('rfb_cbs_solicitacoes').update({ atualizada_em: new Date().toISOString(), mensagem_erro: 'Limite de chamadas da Receita atingido ao consultar a situação. Tente mais tarde.' }).eq('id', s.id); return json({ ok: false, situacao: s.situacao, limite: true, erro: MSG_LIMITE }); }
         await adm.from('rfb_cbs_solicitacoes').update({ atualizada_em: new Date().toISOString(), codigo_erro: r.d?.codigoErro || `HTTP_${r.http}`, mensagem_erro: 'Consulta da situação falhou: ' + msg, resumo: { http_situacao: r.http, campos_da_situacao: Object.keys(r.d || {}) } }).eq('id', s.id);
         return json({ ok: false, situacao: s.situacao, erro: `A Receita não informou a situação agora (${msg}). Tente atualizar de novo em instantes.` });
       }
@@ -105,6 +110,7 @@ Deno.serve(async (req) => {
       const link = urlAssinadaDe(dl.d);
       if (dl.http !== 200 || !link) {   // sem link: continua CONCLUIDA para poder tentar de novo; guarda o HTTP e os NOMES dos campos (sem valores)
         const msg = String(dl.d?.mensagemErro || dl.d?.message || `HTTP ${dl.http}`).slice(0, 200);
+        if (dl.http === 429 || LIMITE.test(msg)) { await adm.from('rfb_cbs_solicitacoes').update({ ...base, mensagem_erro: 'Limite de chamadas da Receita atingido ao pedir o link do arquivo. Tente mais tarde.' }).eq('id', s.id); return json({ ok: false, situacao: sit, limite: true, erro: MSG_LIMITE }); }
         await adm.from('rfb_cbs_solicitacoes').update({ ...base, codigo_erro: dl.d?.codigoErro || `HTTP_${dl.http}`, mensagem_erro: 'Link do arquivo não obtido: ' + msg, resumo: { http_download: dl.http, campos_do_download: Object.keys(dl.d || {}) } }).eq('id', s.id);
         return json({ ok: false, situacao: sit, erro: `A consulta foi concluída, mas a Receita não liberou o link do arquivo (${msg}). Tente atualizar de novo em instantes.` });
       }
