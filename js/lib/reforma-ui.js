@@ -179,6 +179,10 @@ export async function pintarCbs(c, mes) {
   let rad = null; try { const e = state.empresa.id; const [cf, fr, rc] = await Promise.all([q(sb.from('rad_config').select('*').eq('empresa_id', e)), q(sb.from('rad_fornecedores').select('*').eq('empresa_id', e)),
       q(sb.from('rad_recolhimentos').select('*').eq('empresa_id', e).neq('situacao', 'cancelado'))]);
     rad = { cfg: cf[0] || { ativo: false, regra_padrao: 'perguntar' }, regra: Object.fromEntries(fr.map(x => [x.favorecido_id, x.regra])), forn: fr, porNota: Object.fromEntries(rc.map(x => [x.nota_id, x])) }; } catch { rad = null; }
+  // Receita Federal (SQL 169): consultas pedidas, créditos e recolhimentos como a Receita os vê. Sem o SQL, a visão não aparece.
+  let rfb = null; try { const e = state.empresa.id; const [so, cr] = await Promise.all([q(sb.from('rfb_cbs_solicitacoes').select('*').eq('empresa_id', e).order('solicitada_em', { ascending: false }).limit(30)),
+      fetchAll(() => sb.from('rfb_cbs_creditos').select('chave, pa, origem, apurado, a_apropriar, apropriado, utilizado, saldo_credor, atualizacao').eq('empresa_id', e).order('id'))]);
+    rfb = { sol: so, cred: cr, porChave: cr.reduce((m, x) => { const k = m[x.chave] || (m[x.chave] = { apurado: 0, a_apropriar: 0, apropriado: 0, saldo_credor: 0 }); for (const c of Object.keys(k)) k[c] += +x[c] || 0; return m; }, {}) }; } catch { rfb = null; }
   const RG = await carregarRegimes(state.empresa.id), rg = vigente(RG, fimMes(mes));
   const A = apurarCbs(ap.notas.filter(x => x.emissao >= mes + '-01'), ap.tit), L = await carregarAliquotas(), a = doAno(L, +mes.slice(0, 4));
   const RAD = apurarCbs(ap.notas.filter(x => !x.emissao_propria), ap.tit);   // compras a pagar: o mês e os dois anteriores
@@ -190,11 +194,14 @@ export async function pintarCbs(c, mes) {
   const linhaConta = (t, cb, ib, forte = false) => `<tr${forte ? ' style="font-weight:700"' : ''}><td>${t}</td><td class="num">${money(cb)}</td><td class="num">${money(ib)}</td></tr>`;
   const regraDe = (l) => rad ? (rad.regra[l.nota.favorecido_id] || rad.cfg.regra_padrao) : 'perguntar';
   const celRad = (l) => { const m = rad.porNota[l.nota.id], rg2 = regraDe(l);
-    if (m) return `<span class="badge pago" title="${esc(`Marcada por ${m.marcado_por_nome || 'alguém da equipe'} em ${new Date(m.marcado_em).toLocaleDateString('pt-BR')}${m.observacao ? ' · ' + m.observacao : ''}`)}">marcada</span>${podeEditar() && m.situacao === 'marcado' ? ` <a href="#" class="small" data-des="${m.id}">desfazer</a>` : ''}`;
+    if (m && m.situacao === 'recolhido') return `<span class="badge pago" title="Recolhimento confirmado pela Receita${m.numero_darf ? ' · DARF ' + esc(m.numero_darf) : ''}">recolhido${m.recolhido_em ? ' ' + dateBR(m.recolhido_em) : ''}</span>`;
+    if (m && m.situacao === 'darf_gerado') return `<a href="#" class="badge aberto" data-darf="${m.id}" title="Ver o PIX, o código de barras e o PDF do DARF">DARF ${money(m.darf_valor_total)}${m.darf_data_maxima ? ' até ' + dateBR(m.darf_data_maxima).slice(0, 5) : ''}</a>`;
+    if (m) return `<span class="badge pago" title="${esc(`Marcada por ${m.marcado_por_nome || 'alguém da equipe'} em ${new Date(m.marcado_em).toLocaleDateString('pt-BR')}${m.observacao ? ' · ' + m.observacao : ''}${m.darf_mensagem ? ' · última tentativa de DARF: ' + m.darf_mensagem : ''}`)}">marcada</span>${podeEditar() && rfb ? ` <a href="#" class="small" data-gd="${m.id}">gerar DARF</a>` : ''}${podeEditar() ? ` <a href="#" class="small" data-des="${m.id}">desfazer</a>` : ''}${m.darf_retorno && m.darf_retorno !== 'DARF_GERADO' ? ` <span class="badge vencido" title="${esc(m.darf_mensagem || m.darf_retorno)}">DARF recusado</span>` : ''}`;
     if (rg2 === 'nunca') return '<span class="small muted">fornecedor fora do RAD</span>';
     if (!rad.cfg.ativo) return '<span class="small muted">desligado</span>';
     return podeEditar() ? `<button class="btn small ${rg2 === 'sempre' ? 'primary' : ''}" data-mar="${l.nota.id}" title="${rg2 === 'sempre' ? 'Regra do fornecedor: sempre recolher' : 'Registrar a decisão de recolher a CBS desta nota como adquirente'}">Recolher</button>` : '<span class="small muted">não marcada</span>'; };
-  const vistas = [['resumo', 'Resumo'], ['debitos', `Débitos (${deb.length})`], ['fornecedores', `Créditos por fornecedor (${A.fornecedores.length})`], ['rad', `Compras a pagar com CBS (${RAD.candidatas.length})`]];
+  const vistas = [['resumo', 'Resumo'], ['debitos', `Débitos (${deb.length})`], ['fornecedores', `Créditos por fornecedor (${A.fornecedores.length})`], ['rad', `Compras a pagar com CBS (${RAD.candidatas.length})`], ...(rfb ? [['receita', 'Receita Federal']] : [])];
+  if (ap.vista === 'receita' && !rfb) ap.vista = 'resumo';
   let corpo = '';
   if (ap.vista === 'resumo') corpo = `<div class="card flush"><div class="table-wrap" id="ap-tab"><table><thead><tr><th>Apuração de ${mesBR(mes)} pelas notas importadas</th><th class="num">CBS</th><th class="num">IBS</th></tr></thead><tbody>
       ${linhaConta('Débitos: CBS e IBS destacados nas notas emitidas pela empresa', A.cbs.debitos, A.ibs.debitos)}
@@ -220,8 +227,22 @@ export async function pintarCbs(c, mes) {
       ${RAD.candidatas.map(l => `<tr><td>${nNota(l.nota)}</td><td>${dateBR(l.nota.emissao)}</td><td class="wrap" style="min-width:160px">${esc(l.parte)}</td><td class="num">${money(l.nota.v_nf)}</td><td class="num">${money(l.aberto)}</td><td>${l.vencimento ? dateBR(l.vencimento) : ''}</td>
         <td class="num">${money(l.cbs)}</td><td class="num">${money(l.liquido)}</td><td><span class="badge ${PG[l.pagamento][0]}">${PG[l.pagamento][1]}</span></td>${rad ? `<td>${celRad(l)}</td>` : ''}</tr>`).join('') || '<tr><td colspan="10" class="empty">Nenhuma compra a pagar com CBS destacada no período.</td></tr>'}
       ${RAD.candidatas.length ? `<tr style="font-weight:700"><td colspan="4">Total</td><td class="num">${money(RAD.candidatas.reduce((s, l) => s + l.aberto, 0))}</td><td></td><td class="num">${money(RAD.creditoAberto)}</td><td class="num">${money(RAD.candidatas.reduce((s, l) => s + l.liquido, 0))}</td><td></td>${rad ? '<td></td>' : ''}</tr>` : ''}</tbody></table></div></div>`;
+  if (ap.vista === 'receita') { const T = Object.values(rfb.porChave).reduce((a, x) => { a.apurado += x.apurado; a.a_apropriar += x.a_apropriar; a.apropriado += x.apropriado; a.saldo_credor += x.saldo_credor; return a; }, { apurado: 0, a_apropriar: 0, apropriado: 0, saldo_credor: 0 });
+    const ult = rfb.cred.map(x => x.atualizacao).filter(Boolean).sort().pop(), SIT = { PENDENTE: ['aberto', 'na fila'], EM_PROCESSAMENTO: ['aberto', 'processando'], CONCLUIDA: ['pago', 'concluída'], ERRO: ['vencido', 'erro'], EXPIRADA: ['vencido', 'expirada'], RECUSADA: ['vencido', 'recusada'] };
+    corpo = `<div class="card"><h3 style="margin:0 0 6px">Ligação com a Receita Federal</h3>
+        <p class="small muted" style="margin:0 0 8px">A plataforma usa a credencial da empresa, guardada em segredo, para consultar a Apuração Assistida da CBS. As consultas não são imediatas: a Receita processa e libera um arquivo. Cada serviço aceita <b>4 consultas por dia</b> e devolve só o que mudou desde a última, então a plataforma guarda o histórico.</p>
+        ${podeEditar() ? `<div class="toolbar" style="margin:0"><button class="btn" id="rf-t">Testar a conexão</button><span class="spacer"></span>
+          ${[['creditos', 'Consultar créditos'], ['recolhimentos', 'Consultar recolhimentos (RAD)'], ['debitos', 'Consultar débitos'], ['pagamentos', 'Consultar pagamentos']].map(([a2, t]) => `<button class="btn" data-sol="${a2}">${t}</button>`).join('')}</div><div id="rf-msg" class="small" style="margin-top:8px"></div>` : '<p class="small muted">Só administrador ou financeiro pede consultas.</p>'}</div>
+      <div class="kpis">${k('Documentos com crédito na Receita', Object.keys(rfb.porChave).length, ult ? `última atualização ${new Date(ult).toLocaleDateString('pt-BR')}` : 'nenhuma consulta de créditos importada')}
+        ${k('Crédito apurado', money(T.apurado), 'pelo que a Receita processou')}${k('A apropriar', money(T.a_apropriar), 'ainda não disponível para uso', T.a_apropriar ? 'warn' : '')}
+        ${k('Apropriado', money(T.apropriado), 'já disponível')}${k('Saldo credor', money(T.saldo_credor), 'apropriado e ainda não usado', T.saldo_credor ? 'pos' : '')}</div>
+      <div class="card flush"><div class="table-wrap" style="max-height:50vh" id="ap-tab"><table><thead><tr><th>Serviço</th><th>Pedida em</th><th>Por</th><th>Situação</th><th class="num">Registros</th><th>Observação</th><th></th></tr></thead><tbody>
+        ${rfb.sol.map(x => `<tr><td>${esc({ creditos: 'Créditos', recolhimentos: 'Recolhimentos (RAD)', debitos: 'Débitos', pagamentos: 'Pagamentos' }[x.api] || x.api)}</td><td>${new Date(x.solicitada_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td><td>${esc(x.solicitada_por_nome || '')}</td>
+          <td><span class="badge ${SIT[x.situacao]?.[0] || ''}">${SIT[x.situacao]?.[1] || x.situacao}</span>${x.importada_em ? ' <span class="small muted">importada</span>' : ''}</td><td class="num">${x.registros ?? ''}</td>
+          <td class="wrap small">${esc(x.mensagem_erro || (x.resumo?.periodos?.length ? 'Períodos: ' + x.resumo.periodos.join(', ') : x.tea_segundos > 0 && !x.importada_em ? `tempo estimado ${Math.ceil(x.tea_segundos / 60)} min` : ''))}</td>
+          <td>${podeEditar() && x.tiquete && !x.importada_em && !['ERRO', 'EXPIRADA', 'RECUSADA'].includes(x.situacao) ? `<button class="btn small" data-atu="${x.id}">Atualizar</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhuma consulta pedida ainda. Comece por "Testar a conexão".</td></tr>'}</tbody></table></div></div>`; }
   c.innerHTML = `<div class="card"><div class="toolbar" style="margin-bottom:0"><div class="chips" id="ap-v">${vistas.map(([kk, t]) => `<span class="chip ${ap.vista === kk ? 'on' : ''}" data-v="${kk}">${t}</span>`).join('')}</div><span class="spacer"></span><button class="btn" id="ap-xls">Excel</button></div>
-      <p class="small muted" style="margin:8px 0 0"><b>Prévia interna</b>, calculada só com as notas importadas na plataforma e os valores destacados nelas${a ? ` (alíquotas de ${a.ano}: CBS ${pctBR(a.cbs)} e IBS ${pctBR(ibs(a))})` : ''}. Não é a apuração oficial: nota não importada, ajustes e pagamentos feitos na Receita não aparecem aqui. A conferência com a Apuração Assistida da Receita entra quando a ligação com a API estiver pronta.
+      <p class="small muted" style="margin:8px 0 0"><b>Prévia interna</b>, calculada só com as notas importadas na plataforma e os valores destacados nelas${a ? ` (alíquotas de ${a.ano}: CBS ${pctBR(a.cbs)} e IBS ${pctBR(ibs(a))})` : ''}. Não é a apuração oficial: nota não importada, ajustes e pagamentos feitos na Receita não aparecem aqui.${rfb ? ' Os números oficiais dos créditos vêm das consultas da visão Receita Federal.' : ''}
       ${ehSimples(rg) && !rg.ibscbs_regular ? ' <b>Empresa do Simples com IBS/CBS dentro do DAS no período: esta apuração não se aplica; os valores abaixo são só os destacados nas notas.</b>' : ''}</p></div>
     <div class="kpis">${k('Débitos de CBS', money(A.cbs.debitos - A.cbs.estornoDebitos), `${deb.filter(l => l.grupo === 'debito').length} nota(s) emitida(s)${A.cbs.estornoDebitos ? ` · devoluções ${money(A.cbs.estornoDebitos)}` : ''}`)}
       ${k('Créditos de CBS', money(A.cbs.creditos - A.cbs.estornoCreditos), `${cre.filter(l => l.grupo === 'credito').length} nota(s) de entrada · ${A.fornecedores.length} fornecedor(es)`)}
@@ -232,7 +253,38 @@ export async function pintarCbs(c, mes) {
     ${corpo}`;
   $('#ap-v', c).onclick = (e) => { const v = e.target.closest('[data-v]')?.dataset.v; if (v) { ap.vista = v; pintarCbs(c, mes); } };
   $('#ap-xls', c).onclick = () => { const t = $('#ap-tab table', c); if (t) exportXLSX(t, `apuracao_cbs_${ap.vista}_${mes}`); };
+  // ---- Receita Federal: a função rfb-cbs fala com a Receita; a tela só pede e mostra ----
+  const fn = async (body) => { const { data, error } = await sb.functions.invoke('rfb-cbs', { body: { empresa_id: state.empresa.id, ...body } });
+    if (error) { let m = error.message; try { m = (await error.context.json()).erro || m; } catch { /* sem corpo */ } throw new Error(m); } return data; };
+  if (rfb) {
+    const msg = (t, ruim = false) => { const el = $('#rf-msg', c); if (el) el.innerHTML = `<span class="${ruim ? 'neg' : 'pos'}">${esc(t)}</span>`; };
+    $('#rf-t', c) && ($('#rf-t', c).onclick = async (ev) => { ev.target.disabled = true; msg('Testando…');
+      try { const r = await fn({ acao: 'testar' }); msg(r.motivo || (r.ok ? 'Conexão ok.' : 'Falhou.'), !r.ok); } catch (err) { msg(err.message, true); } ev.target.disabled = false; });
+    $$('[data-sol]', c).forEach(b => b.onclick = async () => { if (!await confirmDialog(`Pedir a consulta à Receita? Ela usa uma das 4 consultas de hoje deste serviço e o resultado leva alguns minutos.`)) return;
+      b.disabled = true; try { const r = await fn({ acao: 'solicitar', api: b.dataset.sol }); toast(r.ok ? `Consulta pedida${r.tea_segundos > 0 ? `: tempo estimado ${Math.ceil(r.tea_segundos / 60)} min` : ''}. Clique em Atualizar daqui a pouco.` : 'A Receita não aceitou o pedido.', !r.ok); } catch (err) { fail(err); } pintarCbs(c, mes); });
+    $$('[data-atu]', c).forEach(b => b.onclick = async () => { b.disabled = true;
+      try { const r = await fn({ acao: 'atualizar', solicitacao_id: b.dataset.atu }); toast(r.situacao === 'CONCLUIDA' && r.ok ? `Concluída: ${r.registros} registro(s) importado(s)` : r.erro || `Situação: ${r.situacao}`, !r.ok); } catch (err) { fail(err); } pintarCbs(c, mes); });
+  }
   if (!rad) return;
+  const verDarf = (m) => modal({ title: 'DARF do recolhimento pelo adquirente', narrow: true, body: `<p class="small">Valor: <b>${money(m.darf_valor_total)}</b>${m.darf_data_maxima ? ` · pagar até <b>${dateBR(m.darf_data_maxima)}</b>` : ''}${m.darf_opcao === 'PAGAMENTO_PARCIAL' ? ' · pagamento parcial' : ''}</p>
+      <label>PIX (copia e cola)<textarea id="dv-px" rows="3" readonly>${esc(m.darf_chave_pix || '')}</textarea></label><label>Código de barras<input id="dv-cb" readonly value="${esc(m.darf_codigo_barras || '')}"></label>
+      <p class="small muted">${m.lancamento_id ? 'O título a pagar do DARF já está em Lançamentos e na Autorização de Pagamentos.' : 'Sem a conta do DARF nos Parâmetros do RAD, o título a pagar não foi criado.'} O recolhimento é confirmado pela consulta de recolhimentos, na visão Receita Federal.</p>`,
+    foot: `<button class="btn" data-close>Fechar</button>${m.darf_link_pdf ? `<a class="btn" href="${esc(m.darf_link_pdf)}" target="_blank" rel="noopener">Abrir o PDF</a>` : ''}<button class="btn primary" id="dv-cp">Copiar o PIX</button>`,
+    onMount: (md) => { $('#dv-cp', md).onclick = async () => { try { await navigator.clipboard.writeText(m.darf_chave_pix || ''); toast('PIX copiado'); } catch { $('#dv-px', md).select(); } }; } });
+  $$('[data-darf]', c).forEach(a => a.onclick = (ev) => { ev.preventDefault(); verDarf(Object.values(rad.porNota).find(x => x.id === a.dataset.darf)); });
+  $$('[data-gd]', c).forEach(a => a.onclick = (ev) => { ev.preventDefault(); const m = Object.values(rad.porNota).find(x => x.id === a.dataset.gd), l = RAD.candidatas.find(x => x.nota.id === m.nota_id);
+    modal({ title: `Gerar o DARF — nota ${l ? nNota(l.nota) : ''}`, narrow: true, body: `<p class="small">${esc(l?.parte || '')}<br>CBS destacada na nota (prévia): <b>${money(m.valor_cbs)}</b></p>
+        <p class="small"><b>Isto gera um DARF de verdade na Receita Federal.</b> Gerar não paga: o pagamento é feito depois, pelo PIX ou código de barras. O valor é o que a Receita calcular para a nota.</p>
+        <label>O que recolher<select id="gd-o"><option value="total">Todo o débito da nota (valor definido pela Receita)</option><option value="parcial">Só uma parte</option></select></label>
+        <label id="gd-vl" hidden>Valor parcial (R$)<input id="gd-v" inputmode="decimal" placeholder="0,00"></label>`,
+      foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="gd-ok">Gerar o DARF</button>',
+      onMount: (md, close) => { $('#gd-o', md).onchange = (e2) => { $('#gd-vl', md).hidden = e2.target.value !== 'parcial'; };
+        $('#gd-ok', md).onclick = async (e2) => { const parc = $('#gd-o', md).value === 'parcial', v = parc ? +String($('#gd-v', md).value).replace(/\./g, '').replace(',', '.') : 0;
+          if (parc && !(v > 0)) return toast('Informe o valor parcial', true);
+          e2.target.disabled = true;
+          try { const r = await fn({ acao: 'rad_gerar', recolhimento_ids: [m.id], parcial: parc ? { [m.id]: v } : {} }), x = r.resultados?.[0];
+            close(); if (x?.ok) toast(`DARF gerado: ${money(x.valor)}${x.lancamento_id ? ' · título a pagar criado' : ''}`); else toast(`A Receita não gerou o DARF: ${MSG_DARF[x?.cdRetorno] || x?.mensagem || x?.cdRetorno || 'sem resposta'}`, true);
+            pintarCbs(c, mes); } catch (err) { e2.target.disabled = false; fail(err); } }; } }); });
   $$('[data-mar]', c).forEach(b => b.onclick = () => { const l = RAD.candidatas.find(x => x.nota.id === b.dataset.mar);
     modal({ title: `Recolher como adquirente — nota ${nNota(l.nota)}`, narrow: true, body: `<p class="small">${esc(l.parte)}<br>CBS da nota: <b>${money(l.cbs)}</b> · em aberto: ${money(l.aberto)} · líquido sugerido ao fornecedor: <b>${money(l.liquido)}</b></p>
         <p class="small muted">Registra a decisão e avisa na Autorização de Pagamentos. O título não muda e o DARF ainda é gerado fora da plataforma.</p><label>Observação (opcional)<input id="rm-o" maxlength="200" placeholder="ex.: combinado com o fornecedor"></label>`,
@@ -243,6 +295,8 @@ export async function pintarCbs(c, mes) {
   $('#ap-par', c) && ($('#ap-par', c).onclick = () => parametrosRad(rad, () => pintarCbs(c, mes)));
 }
 
+const MSG_DARF = { DFE_NAO_ENCONTRADO: 'a nota não foi encontrada na Receita ou não está ligada a este CNPJ', VALOR_PARCIAL_SUPERIOR_DFE: 'o valor parcial é maior que o débito da nota', CNPJ_NAO_ADQUIRENTE: 'a empresa não é a adquirente desta nota',
+  DADOS_DE_ENTRADA_INVALIDOS: 'dados inválidos', SEM_CHAVE: 'a nota não tem a chave de 44 dígitos', SITUACAO: 'a nota não está marcada' };
 const REGRA_RAD = { sempre: 'sempre recolher', nunca: 'nunca recolher', perguntar: 'decidir nota a nota' };
 // parâmetros do RAD: liga o uso, a regra padrão, a conta do DARF e a regra de cada fornecedor
 async function parametrosRad(rad, depois) {

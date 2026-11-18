@@ -1,8 +1,8 @@
 ---
 titulo: Notas fiscais e apuração de impostos
 tela: CPD › Notas Fiscais (FIS001) e Apuração de Impostos (FIS002)
-versao: 1.8
-atualizado: 2026-11-17
+versao: 1.9
+atualizado: 2026-11-18
 ---
 ## 1. Para que serve
 
@@ -273,13 +273,43 @@ Na visão **Compras a pagar com CBS**, a empresa registra em quais notas decidiu
 
 **Na Autorização de Pagamentos**, o título da nota marcada aparece com o aviso **RAD**, a CBS e o líquido sugerido. A CBS é abatida, na sugestão, do título em aberto de vencimento mais próximo.
 
-O que a marcação **não** faz, por enquanto:
+**Gerar o DARF.** Com a ligação com a Receita Federal ativa (seção 6.10), a nota marcada mostra **gerar DARF**:
 
-- não gera o DARF: ele ainda é emitido fora da plataforma;
-- não altera o valor do título: para abater a CBS, ajuste o valor autorizado na Autorização de Pagamentos;
-- não confirma o recolhimento nem libera o crédito: isso virá da consulta à Receita.
+1. Clique em **gerar DARF** e escolha recolher todo o débito da nota ou só uma parte.
+2. Confirme. A Receita devolve o valor, a data máxima, o PIX, o código de barras e o PDF.
+3. A linha passa a mostrar o DARF com o valor e a data. Clicar nele abre o PIX para copiar e o PDF.
+
+O valor do DARF é o que a Receita calcula para a nota; a CBS mostrada na lista é a prévia. Gerar o DARF não paga: o pagamento é feito depois, no banco. Com a **conta do título do DARF** preenchida nos parâmetros, a plataforma cria o título a pagar. Quando a consulta de recolhimentos confirma o pagamento, a nota passa a **recolhido**.
+
+A marcação e o DARF **não** alteram o valor do título do fornecedor: para abater a CBS, ajuste o valor autorizado na Autorização de Pagamentos.
 
 A regra "sempre" não marca sozinha; a decisão continua sendo nota a nota.
+
+### 6.10 Ligação com a Receita Federal
+
+A visão **Receita Federal** consulta a Apuração Assistida da CBS direto na Receita, com a credencial da empresa.
+
+![Figura 12 — Receita Federal: testar a conexão, pedir as consultas e acompanhar a situação de cada uma (dados fictícios)](img/notas-fiscais-12.jpg)
+
+**Antes de usar (uma vez).** Quem representa a empresa gera a credencial em Serviços da Receita Federal › Gerar Credencial de Acesso para API › Chaves Secretas, e o administrador da plataforma guarda o Client Id e o Client Secret como segredos. A credencial não aparece em nenhuma tela.
+
+1. Clique em **Testar a conexão**. A resposta diz se a Receita aceitou a credencial.
+2. Clique no serviço que quer consultar: **créditos**, **recolhimentos (RAD)**, **débitos** ou **pagamentos**.
+3. A consulta entra na lista como "na fila". Depois de alguns minutos, clique em **Atualizar**. Concluída, a plataforma baixa o arquivo e importa.
+
+O que saber sobre as consultas:
+
+- Cada serviço aceita **4 consultas por dia**. A plataforma avisa quando o limite do dia acabou.
+- A Receita devolve só o que mudou desde a última consulta (no máximo 8 dias). Sem consulta nos últimos 3 meses, começa no dia 1º do mês corrente. Por isso a plataforma guarda o histórico; meses antigos não voltam.
+- A consulta que passa de 4 horas sem resposta aparece como "expirada": peça outra.
+
+O que cada consulta alimenta:
+
+| Consulta | O que a plataforma faz |
+|---|---|
+| Créditos | Guarda, por nota, o crédito apurado, a apropriar, apropriado e o saldo credor, e mostra os totais |
+| Recolhimentos (RAD) | Guarda os DARFs pagos como adquirente e marca a nota como **recolhido** |
+| Débitos e pagamentos | Por enquanto, só registra que a consulta foi concluída e os períodos recebidos |
 
 ## 7. Regras e travas
 
@@ -315,3 +345,4 @@ A regra "sempre" não marca sozinha; a decisão continua sendo nota a nota.
 | 1.6 | 08/11/2026 | Imposto a recolher (ICMS com PRODEPE, FEEF, AD/DIPER e FECEP; IPI; PIS/COFINS com créditos), ajustes e fechamento do mês; parâmetros por vigência com fonte; transição da reforma até 2033 (SQL 141, melhoria 9.2). |
 | 1.7 | 17/11/2026 | Apuração da CBS (prévia): débitos, créditos, estornos por devolução e saldo do mês pelas notas importadas; crédito por fornecedor; compras a pagar com CBS destacada (onde cabe o recolhimento pelo adquirente). |
 | 1.8 | 17/11/2026 | Recolhimento pelo adquirente (RAD), primeira parte: parâmetros, regra por fornecedor, marcação da nota e aviso com o líquido sugerido na Autorização de Pagamentos. |
+| 1.9 | 18/11/2026 | Ligação com a Receita Federal (Apuração Assistida da CBS): testar a conexão, consultas de créditos, recolhimentos, débitos e pagamentos, geração do DARF do recolhimento pelo adquirente com PIX, código de barras e título a pagar. |

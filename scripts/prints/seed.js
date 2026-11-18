@@ -327,7 +327,17 @@ DB.log_carga_notas = DB.log_carga_notas || [];
     const m = ab[ab.length - 1];
     DB.rad_recolhimentos = m ? [{ id: 'rr-rad1', empresa_id: E, nota_id: m.n.id, chave: m.n.chave, favorecido_id: m.n.favorecido_id, valor_cbs: m.n.v_cbs, situacao: 'marcado', observacao: 'Combinado com o fornecedor', marcado_por_nome: 'Ana Financeiro', marcado_em: '2026-11-12T13:20:00Z' }] : [];
     window.RPC.rad_titulos = () => m ? [{ lancamento_id: m.l.id, recolhimento_id: 'rr-rad1', nota_id: m.n.id, nota_numero: m.n.numero, valor_cbs: m.n.v_cbs, valor_titulo: Math.abs(m.l.valor), liquido_sugerido: Math.round((Math.abs(m.l.valor) - m.n.v_cbs) * 100) / 100 }] : [];
-    window.RPC.rad_marcar = () => 'rr-novo'; window.RPC.rad_desmarcar = () => null; }
+    window.RPC.rad_marcar = () => 'rr-novo'; window.RPC.rad_desmarcar = () => null;
+    // Receita Federal (SQL 169): a nota marcada já tem DARF gerado; consultas pedidas e créditos como a Receita os vê
+    if (m) Object.assign(DB.rad_recolhimentos[0], { situacao: 'darf_gerado', darf_opcao: 'PAGAMENTO_TOTAL', darf_chave_pix: '00020126580014br.gov.bcb.pix0136darf-exemplo-ficticio5204000053039865802BR', darf_codigo_barras: '85870000006 08330385263 34307163411 20260000001',
+      darf_link_pdf: null, darf_data_maxima: '2026-11-30', darf_valor_principal: m.n.v_cbs, darf_valor_total: m.n.v_cbs, darf_gerado_em: '2026-11-18T14:05:00Z', darf_retorno: 'DARF_GERADO', lancamento_id: null });
+    DB.rfb_cbs_solicitacoes = [['creditos', '2026-11-18T14:10:00Z', 'CONCLUIDA', 37, '2026-11-18T14:16:00Z', { periodos: ['10/2026', '11/2026'] }, null], ['recolhimentos', '2026-11-18T14:11:00Z', 'EM_PROCESSAMENTO', null, null, null, null],
+      ['creditos', '2026-11-17T09:02:00Z', 'CONCLUIDA', 52, '2026-11-17T09:09:00Z', { periodos: ['11/2026'] }, null], ['debitos', '2026-11-17T09:03:00Z', 'EXPIRADA', null, null, null, 'Tempo limite de processamento excedido (240 minutos).']]
+      .map(([api, em, situacao, registros, imp, resumo, erro], i) => ({ id: 'rfs' + i, empresa_id: E, api, tiquete: 'tq-' + i, situacao, tea_segundos: 120, registros, importada_em: imp, resumo, mensagem_erro: erro, solicitada_por_nome: 'Ana Financeiro', solicitada_em: em }));
+    DB.rfb_cbs_creditos = DB.nfe_notas.filter(n => !n.emissao_propria && +n.v_cbs > 0 && /^2026-(10|11)/.test(n.emissao)).map((n, i) => ({ id: 'rfc' + i, empresa_id: E, chave: (n.chave || '') + '-' + i, pa: n.emissao.slice(5, 7) + '/2026', origem: 0, apurado: n.v_cbs,
+      a_apropriar: i % 3 === 0 ? n.v_cbs : 0, apropriado: i % 3 === 0 ? 0 : n.v_cbs, utilizado: 0, saldo_credor: i % 3 === 0 ? 0 : n.v_cbs, atualizacao: '2026-11-18T14:16:00Z' }));
+    window.FN = Object.assign(window.FN || {}, { testar: () => ({ ok: true, motivo: 'Credencial aceita pela Receita Federal: token de acesso obtido.' }), solicitar: () => ({ ok: true, tea_segundos: 120 }), atualizar: () => ({ ok: true, situacao: 'EM_PROCESSAMENTO' }),
+      rad_gerar: () => ({ ok: true, resultados: [{ ok: true, cdRetorno: 'DARF_GERADO', valor: 61.31, lancamento_id: null }] }) }); }
   DB.trib_aliquotas = [];
 }
 // Carteira cedida: títulos cedidos a dois fundos fictícios e o relatório de pagos de um deles
