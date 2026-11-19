@@ -3,6 +3,7 @@
 // a confirmar por resolução do Senado até dezembro; em 2027 o IBS é de teste (0,05% estadual + 0,05% municipal) e a CBS é reduzida em 0,1 p.p.
 // As linhas da tabela trib_aliquotas (SQL 072) substituem o padrão ano a ano.
 import { classificar } from './fat-relatorio.js';
+import { validarNota } from './rtc.js';
 
 const TCU = 'TCU, processo TC 006.529/2026-7 (alíquota de referência de 11,3468%), a confirmar por resolução do Senado';
 const EST = 'Estimativa (IBS de referência projetado em cerca de 18,7%, estadual e municipal somados); muda a cada ano';
@@ -97,10 +98,17 @@ export function conferir(nt, lista, itens = [], o = {}) {
     if (nt.emissao_propria && o.simplesDentro) { add('info', 'sem o grupo IBS/CBS: empresa do Simples com IBS/CBS no DAS (confira a regra de destaque com a contabilidade)'); return out; }
     add(nt.emissao_propria ? 'neg' : 'warn', 'sem o grupo IBS/CBS na nota'); return out;
   }
-  if (reducao.length) add('info', `CST ${reducao.join(', ')} (redução, isenção, suspensão ou diferimento): conferir o cClassTrib`);
-  if (!reducao.length) {
-    if (Math.abs(n(nt.v_cbs) - out.esperadoCbs) > tol(out.esperadoCbs)) add('neg', `CBS ${fmt(nt.v_cbs)}; esperado ${fmt(out.esperadoCbs)} (${pctBR(a.cbs)} da base)`);
-    if (Math.abs(n(nt.v_ibs) - out.esperadoIbs) > tol(out.esperadoIbs)) add('neg', `IBS ${fmt(nt.v_ibs)}; esperado ${fmt(out.esperadoIbs)} (${pctBR(ibs(a))} da base)`);
+  // tabela oficial da Receita (SQL 171): cClassTrib existe, está em vigor, combina com o CST, vale para o documento e aceita o NCM
+  const of = o.rtc && !o.rtc.vazio ? validarNota(o.rtc, itens, { data: nt.emissao, modelo: o.modelo || 55 }) : null;
+  if (of) { out.oficial = of; for (const m of of.motivos) add(of.nivel === 'neg' && !nt.emissao_propria ? 'warn' : of.nivel, m); }
+  // todos os itens com a mesma redução oficial (ex.: cesta básica, 100%): o esperado da nota já considera a redução e o valor é conferido
+  const unica = reducao.length && of?.unica && csts.every(c => c === '200') ? of.unica : null;
+  if (unica) { out.esperadoCbs = r2(base * a.cbs / 100 * (1 - unica.cbs / 100)); out.esperadoIbs = r2(base * ibs(a) / 100 * (1 - unica.ibs / 100)); out.reducao = unica; }
+  else if (reducao.length) add('info', of && of.nivel === 'ok' && of.reducoes.length ? `CST ${reducao.join(', ')} com classificação válida (${of.reducoes.join('; ')})`
+    : `CST ${reducao.join(', ')} (redução, isenção, suspensão ou diferimento): conferir o cClassTrib`);
+  if (!reducao.length || unica) {
+    if (Math.abs(n(nt.v_cbs) - out.esperadoCbs) > tol(out.esperadoCbs)) add('neg', `CBS ${fmt(nt.v_cbs)}; esperado ${fmt(out.esperadoCbs)} (${pctBR(a.cbs)} da base${unica ? `, com redução de ${String(unica.cbs).replace('.', ',')}%` : ''})`);
+    if (Math.abs(n(nt.v_ibs) - out.esperadoIbs) > tol(out.esperadoIbs)) add('neg', `IBS ${fmt(nt.v_ibs)}; esperado ${fmt(out.esperadoIbs)} (${pctBR(ibs(a))} da base${unica ? `, com redução de ${String(unica.ibs).replace('.', ',')}%` : ''})`);
   }
   if (base && est && Math.abs(base - est) > Math.max(1, est * 0.01)) add('info', `base ${fmt(base)} difere da estimada pela nota (${fmt(est)}: produtos − descontos + frete, seguro e outras − ICMS, PIS e Cofins)`);
   if (!out.motivos.length) out.motivos.push('confere');

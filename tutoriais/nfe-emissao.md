@@ -1,8 +1,8 @@
 ---
 titulo: Emissão de NF-e pela Focus NFe e o novo DANFE
 tela: CPD › Emissão de NF-e (FIS005)
-versao: 1.2
-atualizado: 2026-11-13
+versao: 1.3
+atualizado: 2026-11-19
 ---
 ## 1. Para que serve
 
@@ -112,6 +112,14 @@ Em homologação a nota não tem valor fiscal e o DANFE sai com a marca "SEM VAL
 
 Antes de enviar, a plataforma confere o que costuma causar rejeição: dados do emitente e do destinatário, NCM com 8 dígitos, CFOP coerente com a operação e o destino, quantidade e valor, classificação do IBS/CBS, soma das duplicatas e a chave da nota referenciada na devolução.
 
+**CST e cClassTrib pela tabela oficial da Receita.** A plataforma guarda a tabela de classificação do IBS/CBS que a Receita Federal publica com o código aberto da Calculadora de Tributos, e usa em três pontos:
+
+- **Sugestão:** ao clicar no campo **cClassTrib** do item, aparece a lista das classificações em vigor aceitas em NF-e para o CST informado. As que citam o NCM do item no anexo vêm primeiro, marcadas com "cita este NCM".
+- **Conferência na hora:** abaixo do item, a plataforma mostra a descrição da classificação e a redução de alíquota dela. Se houver problema, a linha fica colorida com o motivo: classificação que não existe, fora de vigência, de outro CST, não aceita em NF-e, ou NCM fora do anexo.
+- **Antes de emitir:** se algum item tiver pendência, a plataforma lista os itens e pergunta se quer emitir mesmo assim. A SEFAZ pode rejeitar a nota.
+
+Ao salvar uma **natureza de operação** com classificação errada, a plataforma também avisa e pede confirmação.
+
 Como os impostos são calculados:
 
 | Imposto | Base |
@@ -198,3 +206,4 @@ O desenho e os rótulos seguem o modelo de referência principal da NT 2026.010 
 | 1.0 | 12/11/2026 | Primeira versão: implantação do ambiente da Focus NFe, parâmetros, naturezas de operação, nota avulsa com impostos calculados, prévia, emissão, consulta, cancelamento, carta de correção, e-mail, inutilização e DANFE no leiaute da NT 2026.010. |
 | 1.1 | 13/11/2026 | DANFE redesenhado conforme o modelo de referência da NT 2026.010: linha do regime tributário, três blocos de totais, itens com bases, alíquotas e valores empilhados, campos condicionais e espaço do QR Code. |
 | 1.2 | 13/11/2026 | DANFE conferido com o texto da NT 2026.010: rótulos iguais aos do modelo de referência, duplicatas em três por linha, base do IPI no item, ICMS monofásico pela quantidade, QR Code impresso quando o XML traz o campo. |
+| 1.3 | 19/11/2026 | CST e cClassTrib sugeridos e conferidos pela tabela oficial de classificação da Receita Federal, no item, na natureza de operação e antes de emitir. |

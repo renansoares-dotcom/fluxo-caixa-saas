@@ -6,6 +6,8 @@
 import { sb, state, q, fetchAll, loadCadastros } from '../lib/data.js';
 import { $, $$, esc, toast, fail, modal, money, dateBR, today, options, parseNum, confirmDialog, logoPNG } from '../lib/ui.js';
 import { kpiGrid } from '../lib/componentes.js';
+import { carregarRtc } from '../lib/rtc-dados.js';
+import { validarItem, resumoClasstrib, sugestoes } from '../lib/rtc.js';
 import { STATUS, FINALIDADE, FRETE, PAGAMENTO, calcular, itemDaNatureza, parcelar, validar, payloadFocus, dadosDanfe, localDestino } from '../lib/nfe-emissao.js';
 import { lerDanfe, danfePDF, fmtChave, fmtDoc } from '../lib/danfe.js';
 
@@ -48,6 +50,9 @@ export async function render(root) {
   const re = () => render(root), admin = state.papel === 'admin', c = state.cad;
   const emit = () => ({ cnpj: empFull.cnpj, razao_social: empFull.razao_social || empFull.nome, nome: empFull.nome, ie: empFull.ie, logradouro: empFull.logradouro, municipio: empFull.municipio, uf: empFull.uf, cep: empFull.cep,
     nome_fantasia: cfg.nome_fantasia, numero: cfg.numero, complemento: cfg.complemento, bairro: cfg.bairro, telefone: cfg.telefone });
+  // tabela oficial de classificação do IBS/CBS (SQL 171): confere e sugere o CST e o cClassTrib de cada item
+  const RTC = await carregarRtc();
+  const rtcItem = (i, data) => validarItem(RTC, { cst: i.ibs_cbs_cst, classtrib: i.ibs_cbs_classificacao, ncm: i.ncm }, { data: data || new Date().toISOString().slice(0, 10), modelo: 55 });
   const fn = async (body) => { const { data, error } = await sb.functions.invoke('focus-nfe', { body: { empresa_id: e, ...body } }); if (error) { let m = error.message; try { m = (await error.context.json()).erro || m; } catch { /* sem corpo */ } throw new Error(m); } if (data?.erro) throw new Error(data.erro); return data; };
 
   $('#nf-acoes', root).innerHTML = `${admin ? '<button class="btn ghost" id="nf-par">Parâmetros</button>' : ''}${pode ? '<button class="btn ghost" id="nf-nat">Naturezas de operação</button><button class="btn ghost" id="nf-inu">Inutilizar numeração</button><button class="btn primary" id="nf-nova">Nova nota</button>' : ''}`;
@@ -175,8 +180,10 @@ export async function render(root) {
           <tr class="imp" data-j="${k}"><td></td><td colspan="9"><div class="nf-imp">
             <label>CST ICMS${inp('icms_cst', i.icms_cst, '', 'maxlength="3"')}</label><label>% ICMS${inp('icms_aliquota', nv(i.icms_aliquota), 'n')}</label><label>CST IPI${inp('ipi_cst', i.ipi_cst, '', 'maxlength="2"')}</label><label>% IPI${inp('ipi_aliquota', nv(i.ipi_aliquota), 'n')}</label>
             <label>CST PIS/COF.${inp('pis_cst', i.pis_cst, '', 'maxlength="2"')}</label><label>% PIS${inp('pis_aliquota', nv(i.pis_aliquota, 4).replace(/0{1,2}$/, ''), 'n')}</label><label>% COFINS${inp('cofins_aliquota', nv(i.cofins_aliquota, 4).replace(/0{1,2}$/, ''), 'n')}</label>
-            <label>CST IBS/CBS${inp('ibs_cbs_cst', i.ibs_cbs_cst, '', 'maxlength="3"')}</label><label>cClassTrib${inp('ibs_cbs_classificacao', i.ibs_cbs_classificacao, '', 'maxlength="6"')}</label></div>
-            <div class="small muted" style="margin-top:2px">ICMS ${nv(K[k].icms_valor)} · IPI ${nv(K[k].ipi_valor)} · PIS ${nv(K[k].pis_valor)} · COFINS ${nv(K[k].cofins_valor)}${String(i.ibs_cbs_cst || '').trim() ? ` · CBS ${nv(K[k].cbs_valor)} · IBS ${nv(K[k].ibs_uf_valor + K[k].ibs_mun_valor)}` : ''}</div></td></tr>`).join('')}</tbody></table>` : '<div class="empty" style="padding:14px 0">Nenhum item. Escolha um produto acima.</div>';
+            <label>CST IBS/CBS${inp('ibs_cbs_cst', i.ibs_cbs_cst, '', 'maxlength="3"')}</label><label>cClassTrib${inp('ibs_cbs_classificacao', i.ibs_cbs_classificacao, '', `maxlength="6" list="rtc-ct-${k}"`)}<datalist id="rtc-ct-${k}">${sugestoes(RTC, { ncm: i.ncm, data: N.data_emissao, modelo: 55 }).filter(x => !String(i.ibs_cbs_cst || '').trim() || x.cst === String(i.ibs_cbs_cst).trim()).slice(0, 60).map(x => `<option value="${x.codigo}">${esc((x.especifico ? 'cita este NCM · ' : '') + x.descricao.slice(0, 90))}</option>`).join('')}</datalist></label></div>
+            <div class="small muted" style="margin-top:2px">ICMS ${nv(K[k].icms_valor)} · IPI ${nv(K[k].ipi_valor)} · PIS ${nv(K[k].pis_valor)} · COFINS ${nv(K[k].cofins_valor)}${String(i.ibs_cbs_cst || '').trim() ? ` · CBS ${nv(K[k].cbs_valor)} · IBS ${nv(K[k].ibs_uf_valor + K[k].ibs_mun_valor)}` : ''}</div>
+            ${(() => { const r = rtcItem(i, N.data_emissao); if (r.motivos.length) return `<div class="small" style="margin-top:2px;color:var(--${r.nivel === 'neg' ? 'neg' : 'warn'})">Tabela oficial: ${esc(r.motivos.join(' · '))}</div>`;
+              return r.ct ? `<div class="small muted" style="margin-top:2px">${esc(r.ct.codigo)}: ${esc(resumoClasstrib(r.ct))}</div>` : ''; })()}</td></tr>`).join('')}</tbody></table>` : '<div class="empty" style="padding:14px 0">Nenhum item. Escolha um produto acima.</div>';
       $$('#e-itens input', m.el).forEach(x => x.onchange = () => { ler(); N.itens.forEach(i => { i.cofins_cst = i.pis_cst; }); itens(); });
       $$('[data-x]', m.el).forEach(b => b.onclick = () => { ler(); N.itens.splice(+b.dataset.x, 1); itens(); });
       totais(); dups(); };
@@ -205,6 +212,8 @@ export async function render(root) {
     $('#e-del', m.el) && ($('#e-del', m.el).onclick = async () => { if (!await confirmDialog('Excluir este rascunho?')) return; try { await q(sb.from('nfe_emissoes').delete().eq('id', N.id)); m.close(); re(); } catch (err) { fail(err); } });
     $('#e-emitir', m.el) && ($('#e-emitir', m.el).onclick = async (ev) => { ler();
       const prob = validar(N, emit(), cfg); if (prob.length) { toast(prob[0] + (prob.length > 1 ? ` (+${prob.length - 1} pendência(s))` : ''), true); return; }
+      const of = N.itens.map((i, k) => ({ k, r: rtcItem(i, N.data_emissao) })).filter(x => x.r.motivos.length);
+      if (of.length && !await confirmDialog(`A tabela oficial da Receita aponta ${of.length === 1 ? 'pendência em 1 item' : `pendências em ${of.length} itens`}:\n\n${of.slice(0, 5).map(x => `Item ${x.k + 1}: ${x.r.motivos.join('; ')}`).join('\n')}${of.length > 5 ? '\n…' : ''}\n\nA SEFAZ pode rejeitar a nota. Emitir mesmo assim?`)) return;
       const T = C().totais;
       if (!await confirmDialog(`Emitir a NF-e de ${money(T.nota)} para ${N.destinatario.nome} em ${cfg.ambiente === 'producao' ? 'PRODUÇÃO (com valor fiscal)' : 'homologação (teste)'}?`)) return;
       ev.target.disabled = true; ev.target.textContent = 'Enviando…';
@@ -239,6 +248,8 @@ export async function render(root) {
         ['icms_aliquota_interna', 'icms_reducao', 'ipi_aliquota', 'pis_aliquota', 'cofins_aliquota', 'cbs_aliquota', 'ibs_uf_aliquota', 'ibs_mun_aliquota'].forEach(k => d[k] = pn(g(k)));
         d.icms_aliquota_inter = g('icms_aliquota_inter') === '' ? null : pn(g('icms_aliquota_inter'));
         if (!d.nome || !d.natureza_operacao) return toast('Informe o nome e o texto da natureza', true);
+        const ofn = validarItem(RTC, { cst: d.ibs_cbs_cst, classtrib: d.ibs_cbs_classificacao }, { modelo: 55 });
+        if (ofn.nivel === 'neg' && !await confirmDialog(`A tabela oficial da Receita aponta: ${ofn.motivos.join('; ')}.\n\nSalvar a natureza mesmo assim?`)) return;
         ev.target.disabled = true; try { if (x.id) await q(sb.from('nfe_naturezas').update(d).eq('id', x.id)); else await q(sb.from('nfe_naturezas').insert(d)); toast('Natureza salva'); m2.close(); m.close(); await re(); } catch (err) { fail(err); ev.target.disabled = false; } }; };
     $('#na-nova', m.el).onclick = () => form();
     $$('[data-n]', m.el).forEach(b => b.onclick = () => form(nats.find(x => x.id === b.dataset.n)));

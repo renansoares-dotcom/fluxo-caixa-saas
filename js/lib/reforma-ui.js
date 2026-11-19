@@ -8,6 +8,8 @@ import { aliquotas, doAno, total, ibs, simular, conferir, SITUACAO, PIS_COFINS, 
 import { carregarRegimes, vigente, ehSimples, descricao } from './regime.js';
 import { baseTransicao, transicao, paramDoMes } from './apuracao.js';
 import { carregarParams } from './apuracao-ui.js';
+import { carregarRtc, origemRtc } from './rtc-dados.js';
+import { modeloDaChave } from './rtc.js';
 
 let TAB = null, semTabela = false;
 const sim = { ano: 2027, credAtual: 100, credNovo: 100, notas: null, chave: null };
@@ -121,18 +123,18 @@ function blocoTransicao(L, fim, PL) {
 
 // ------------------------------------------------------------------ conferência IBS/CBS
 export async function pintarConferencia(c, mes) {
-  loading(c); const L = await carregarAliquotas();
+  loading(c); const L = await carregarAliquotas(), RTC = await carregarRtc();
   let notas = conf.notas, itens = conf.itens;
   if (conf.chave !== `${state.empresa.id}|${mes}`) try {
-    notas = await fetchAll(() => sb.from('nfe_notas').select('id, numero, serie, emissao, tipo, situacao, emissao_propria, finalidade, dest_nome, emit_nome, v_prod, v_desc, v_frete, v_seg, v_outro, v_nf, v_icms, v_pis, v_cofins, v_bc_ibscbs, v_ibs, v_cbs')
+    notas = await fetchAll(() => sb.from('nfe_notas').select('id, chave, numero, serie, emissao, tipo, situacao, emissao_propria, finalidade, dest_nome, emit_nome, v_prod, v_desc, v_frete, v_seg, v_outro, v_nf, v_icms, v_pis, v_cofins, v_bc_ibscbs, v_ibs, v_cbs')
       .eq('empresa_id', state.empresa.id).eq('situacao', 'autorizada').gte('emissao', mes + '-01').lte('emissao', fimMes(mes)).order('numero'));
-    itens = await fetchAll(() => sb.from('nfe_itens').select('nota_id, cst_ibscbs, cclass_trib, nfe_notas!inner(empresa_id, emissao)').eq('nfe_notas.empresa_id', state.empresa.id).gte('nfe_notas.emissao', mes + '-01').lte('nfe_notas.emissao', fimMes(mes)).order('id'));
+    itens = await fetchAll(() => sb.from('nfe_itens').select('nota_id, ncm, cst_ibscbs, cclass_trib, nfe_notas!inner(empresa_id, emissao)').eq('nfe_notas.empresa_id', state.empresa.id).gte('nfe_notas.emissao', mes + '-01').lte('nfe_notas.emissao', fimMes(mes)).order('id'));
     Object.assign(conf, { chave: `${state.empresa.id}|${mes}`, notas, itens });
   } catch (e) { fail(e); c.innerHTML = ''; return; }
   const porNota = new Map(); for (const i of itens) (porNota.get(i.nota_id) || porNota.set(i.nota_id, []).get(i.nota_id)).push(i);
   const lado = (n) => n.emissao_propria ? 'saidas' : 'entradas';
   const RG = await carregarRegimes(state.empresa.id);
-  const R = notas.map(n => { const rg = vigente(RG, n.emissao); return { n, r: conferir(n, L, porNota.get(n.id) || [], { simplesDentro: ehSimples(rg) && !rg.ibscbs_regular }) }; });
+  const R = notas.map(n => { const rg = vigente(RG, n.emissao); return { n, r: conferir(n, L, porNota.get(n.id) || [], { simplesDentro: ehSimples(rg) && !rg.ibscbs_regular, rtc: RTC, modelo: modeloDaChave(n.chave) }) }; });
   const sel = R.filter(x => lado(x.n) === conf.lado);
   const cont = (nv) => sel.filter(x => x.r.nivel === nv).length;
   const vis = conf.filtro === 'problemas' ? sel.filter(x => x.r.nivel !== 'ok') : sel;
@@ -144,12 +146,13 @@ export async function pintarConferencia(c, mes) {
       <div class="chips" id="cf-flt">${[['problemas', 'Só o que precisa de atenção'], ['todas', 'Todas']].map(([k, t]) => `<span class="chip ${conf.filtro === k ? 'on' : ''}" data-f="${k}">${t}</span>`).join('')}</div>
       <span class="spacer"></span><button class="btn" id="cf-xls">Excel</button></div>
     <p class="small muted" style="margin:8px 0 0">${a ? `Alíquotas de ${a.ano}: CBS ${pctBR(a.cbs)} e IBS ${pctBR(ibs(a))} sobre a base destacada na nota ${selo(a)}.` : 'Antes da reforma: nada a conferir.'}
-      Divergente: a CBS ou o IBS destacados diferem do esperado em mais de 0,5% (mínimo de R$ 0,05), ou a nota emitida pela empresa veio sem o grupo IBS/CBS. Verificar: itens com CST diferente de 000 (redução, isenção, suspensão, diferimento) ou base diferente da estimada pela nota.</p></div>
-    <div class="kpis">${[['Notas no mês', sel.length, mesBR(mes)], ['Divergentes', cont('neg'), 'conferir com quem emite a nota'], ['Atenção', cont('warn'), 'sem o grupo IBS/CBS (terceiros)'], ['Verificar', cont('info'), 'CST de redução ou base diferente'],
+      Divergente: a CBS ou o IBS destacados diferem do esperado em mais de 0,5% (mínimo de R$ 0,05), ou a nota emitida pela empresa veio sem o grupo IBS/CBS. Verificar: itens com CST diferente de 000 (redução, isenção, suspensão, diferimento) ou base diferente da estimada pela nota.
+      ${origemRtc(RTC) ? `<br>${esc(origemRtc(RTC))} Cada item é conferido contra ela: cClassTrib inexistente, fora de vigência, de outro CST ou com NCM fora do anexo aparece como divergente na nota da empresa e como atenção na nota de terceiros. Nota em que todos os itens têm a mesma redução válida tem o valor conferido já com a redução.` : ''}</p></div>
+    <div class="kpis">${[['Notas no mês', sel.length, mesBR(mes)], ['Divergentes', cont('neg'), 'conferir com quem emite a nota'], ['Atenção', cont('warn'), RTC.vazio ? 'sem o grupo IBS/CBS (terceiros)' : 'sem o grupo IBS/CBS ou classificação a conferir'], ['Verificar', cont('info'), 'CST de redução ou base diferente'],
       ['CBS + IBS destacados', money(S('v_cbs') + S('v_ibs')), `CBS ${money(S('v_cbs'))} (esperado ${money(Esp('esperadoCbs'))}) · IBS ${money(S('v_ibs'))} (esperado ${money(Esp('esperadoIbs'))})`]].map(([t, v, s]) => `<div class="kpi"><div class="k-label">${t}</div><div class="k-value">${v}</div><div class="k-sub">${s}</div></div>`).join('')}</div>
-    <div class="card flush"><div class="table-wrap" style="max-height:60vh" id="cf-tab"><table><thead><tr><th>Nº</th><th>Emissão</th><th>${conf.lado === 'saidas' ? 'Destinatário' : 'Emitente'}</th><th class="num">Valor</th><th class="num">Base IBS/CBS</th><th class="num">CBS</th><th class="num">CBS esperada</th><th class="num">IBS</th><th class="num">IBS esperado</th><th>CST</th><th>Situação</th></tr></thead><tbody>
+    <div class="card flush"><div class="table-wrap" style="max-height:60vh" id="cf-tab"><table><thead><tr><th>Nº</th><th>Emissão</th><th>${conf.lado === 'saidas' ? 'Destinatário' : 'Emitente'}</th><th class="num">Valor</th><th class="num">Base IBS/CBS</th><th class="num">CBS</th><th class="num">CBS esperada</th><th class="num">IBS</th><th class="num">IBS esperado</th><th>Classificação</th><th>Situação</th></tr></thead><tbody>
       ${vis.length ? vis.map(({ n, r }) => `<tr><td>${n.serie && n.serie !== '1' ? n.serie + '-' : ''}${n.numero}</td><td>${dateBR(n.emissao)}</td><td class="wrap" style="min-width:240px">${esc((n.emissao_propria ? n.dest_nome : n.emit_nome) || '')}${r.nivel === 'ok' ? '' : `<div class="small muted">${esc(r.motivos.join(' · '))}</div>`}</td><td class="num">${money(n.v_nf)}</td>
-        <td class="num">${money(n.v_bc_ibscbs)}</td><td class="num">${money(n.v_cbs)}</td><td class="num">${r.base ? money(r.esperadoCbs) : '–'}</td><td class="num">${money(n.v_ibs)}</td><td class="num">${r.base ? money(r.esperadoIbs) : '–'}</td><td class="small">${esc((r.csts || []).join(', '))}</td>
+        <td class="num">${money(n.v_bc_ibscbs)}</td><td class="num">${money(n.v_cbs)}</td><td class="num">${r.base ? money(r.esperadoCbs) : '–'}</td><td class="num">${money(n.v_ibs)}</td><td class="num">${r.base ? money(r.esperadoIbs) : '–'}</td><td class="small">${esc((r.csts || []).join(', '))}${(() => { const k = [...new Set((porNota.get(n.id) || []).map(i => i.cclass_trib).filter(Boolean))]; return k.length ? `<div class="muted">${esc(k.slice(0, 3).join(', '))}${k.length > 3 ? '…' : ''}</div>` : ''; })()}</td>
         <td><span class="badge ${nivelTxt[r.nivel][0]}">${nivelTxt[r.nivel][1]}</span></td></tr>`).join('') : `<tr><td colspan="11" class="empty">${sel.length ? 'Todas as notas conferem.' : 'Nenhuma nota no mês.'}</td></tr>`}
     </tbody></table></div></div>`;
   $('#cf-lado', c).onclick = (e) => { const l = e.target.closest('[data-l]')?.dataset.l; if (l) { conf.lado = l; pintarConferencia(c, mes); } };

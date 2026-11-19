@@ -70,7 +70,7 @@ export function modal({ title, body, foot = '', wide = false, narrow = false, on
 
 export function confirmDialog(msg) {
   return new Promise(res => {
-    const m = modal({ title: 'Confirmar', body: `<p>${esc(msg)}</p>`,
+    const m = modal({ title: 'Confirmar', body: `<p style="white-space:pre-line">${esc(msg)}</p>`,
       foot: `<button class="btn" data-close>Cancelar</button><button class="btn danger" id="cf-ok">Confirmar</button>` });
     $('#cf-ok', m.el).onclick = () => { m.close(); res(true); };
     m.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) res(false); });

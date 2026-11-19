@@ -1,8 +1,8 @@
 ---
 titulo: Notas fiscais e apuração de impostos
 tela: CPD › Notas Fiscais (FIS001) e Apuração de Impostos (FIS002)
-versao: 1.10
-atualizado: 2026-11-18
+versao: 1.11
+atualizado: 2026-11-19
 ---
 ## 1. Para que serve
 
@@ -113,10 +113,27 @@ Confere, nota a nota, a CBS e o IBS destacados contra as alíquotas do ano da em
 2. Escolha **Notas emitidas pela empresa** ou **Notas de fornecedores e clientes**, e **Só o que precisa de atenção** ou **Todas**.
 3. As situações são:
    - **divergente**: a CBS ou o IBS diferem do esperado em mais de 0,5% (mínimo de R$ 0,05), ou a nota emitida pela empresa veio **sem o grupo IBS/CBS**. Desde agosto de 2026 a nota errada já gera multa: corrija o cadastro do produto no emissor;
-   - **atenção**: nota de terceiro sem o grupo IBS/CBS;
-   - **verificar**: itens com CST diferente de 000 (redução, isenção, suspensão ou diferimento) ou base diferente da estimada pela nota. Confira o **cClassTrib** do produto;
+   - **atenção**: nota de terceiro sem o grupo IBS/CBS, ou com a classificação errada pela tabela oficial;
+   - **verificar**: itens com CST diferente de 000 (redução, isenção, suspensão ou diferimento) ou base diferente da estimada pela nota. Quando a classificação é válida, a linha mostra a redução prevista para ela;
    - **confere**.
-4. **Excel** baixa a lista.
+4. A coluna **Classificação** mostra o CST e os cClassTrib dos itens da nota.
+5. **Excel** baixa a lista.
+
+**Conferência pela tabela oficial da Receita.** A plataforma guarda a tabela de classificação que a Receita Federal publica junto com o código aberto da Calculadora de Tributos. Cada item das notas é conferido contra ela:
+
+| O que é conferido | Mensagem na nota |
+|---|---|
+| O cClassTrib existe | "cClassTrib … não existe na tabela oficial" |
+| Está em vigor na data da emissão | "cClassTrib … fora de vigência em …" |
+| Pertence ao CST informado | "cClassTrib … é do CST …, mas o item está com CST …" |
+| O NCM consta do anexo da classificação (cesta básica, saúde etc.) | "NCM … não consta do anexo do cClassTrib …" |
+| É aceito no tipo de documento | "cClassTrib … não é aceito em NF-e" |
+
+- Nota em que **todos os itens têm a mesma redução válida** (por exemplo, cesta básica com 100%) tem a CBS e o IBS conferidos já com a redução; se bater, a situação é **confere**. Nota com itens de reduções diferentes continua em **verificar**.
+- Erro em nota **emitida pela empresa** aparece como **divergente**: corrija a natureza ou o item antes da próxima emissão.
+- Erro em nota **de terceiro** aparece como **atenção**: avise o fornecedor, porque classificação errada pode comprometer o crédito.
+- O rodapé do quadro informa a versão da base em uso e a data em que foi carregada. Quando a Receita publicar versão nova, a atualização é feita pelo suporte da plataforma; não há nada a digitar.
+- A tabela cobre CBS e IBS. O Imposto Seletivo fica de fora.
 
 ### 6.2 Reforma: simulador 2027
 
@@ -295,13 +312,17 @@ A visão **Receita Federal** consulta a Apuração Assistida da CBS direto na Re
 
 1. Clique em **Testar a conexão**. A resposta diz se a Receita aceitou a credencial.
 2. Clique no serviço que quer consultar: **créditos**, **recolhimentos (RAD)**, **débitos** ou **pagamentos**.
-3. A consulta entra na lista como "na fila". Depois de alguns minutos, clique em **Atualizar**. Concluída, a plataforma baixa o arquivo e importa.
+3. A consulta entra na lista como "na fila". Depois do tempo estimado, clique em **Atualizar**, uma vez só. Concluída, a plataforma pede o link do arquivo à Receita, baixa e importa.
+4. Se a consulta foi concluída mas o arquivo não veio, a linha mostra o motivo na coluna **Observação** e o botão **Tentar de novo**, que não gasta consulta do dia.
 
 O que saber sobre as consultas:
 
 - Cada serviço aceita **4 consultas por dia**. A plataforma avisa quando o limite do dia acabou.
 - A Receita devolve só o que mudou desde a última consulta (no máximo 8 dias). Sem consulta nos últimos 3 meses, começa no dia 1º do mês corrente. Por isso a plataforma guarda o histórico; meses antigos não voltam.
 - A consulta que passa de 4 horas sem resposta aparece como "expirada": peça outra.
+- O arquivo de uma consulta concluída fica disponível na Receita por até 48 horas.
+- Além das 4 consultas por dia, a Receita limita o total de chamadas da credencial em pouco tempo. Se aparecer "o limite de chamadas desta credencial foi atingido", a credencial está correta: aguarde e tente mais tarde, sem repetir cliques, porque cada tentativa conta. No primeiro teste o bloqueio durou menos de duas horas.
+- Os números mostram só o que a Receita devolveu nas consultas feitas, e não o saldo total de créditos da empresa.
 
 O que cada consulta alimenta:
 
@@ -347,3 +368,4 @@ O que cada consulta alimenta:
 | 1.8 | 17/11/2026 | Recolhimento pelo adquirente (RAD), primeira parte: parâmetros, regra por fornecedor, marcação da nota e aviso com o líquido sugerido na Autorização de Pagamentos. |
 | 1.9 | 18/11/2026 | Ligação com a Receita Federal (Apuração Assistida da CBS): testar a conexão, consultas de créditos, recolhimentos, débitos e pagamentos, geração do DARF do recolhimento pelo adquirente com PIX, código de barras e título a pagar. |
 | 1.10 | 18/11/2026 | Geração do DARF pela plataforma travada: a ligação com a Receita Federal fica só em teste de conexão e consultas. |
+| 1.11 | 19/11/2026 | Conferência IBS/CBS pela tabela oficial de classificação da Receita Federal (cClassTrib, vigência, CST, NCM do anexo e tipo de documento). Ligação com a Receita: botão Tentar de novo, aviso de limite de chamadas e prazo de 48 horas do arquivo. |
