@@ -1,7 +1,7 @@
 ---
 titulo: Análise de Problemas — Pareto, Ishikawa, 5 Porquês e 5W2H
 tela: Painéis › Análise de Problemas (PAI013)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-20
 ---
 ## 1. Para que serve
@@ -80,8 +80,10 @@ O problema também nasce de outros pontos da plataforma:
 | De onde | Como |
 |---|---|
 | Aba Pareto | Botão **Abrir problema** ao lado do item. O gráfico vai junto |
-| Não conformidade (Qualidade) | Botão **Analisar o problema** na ficha da RNC |
-| Ordem de manutenção | Botão **Analisar o problema** na ficha da OS |
+| Não conformidade (Qualidade) | Botão **Analisar o problema** na ficha da RNC. Os 5 porquês e a causa já registrados na RNC vão junto |
+| Ordem de manutenção | Botão **Analisar o problema** na ficha da OS. A causa informada na OS vai junto |
+
+Se a RNC ou a OS já tem um problema aberto, o botão leva direto a ele, em vez de abrir outro.
 
 ## 5. A ficha do problema
 
@@ -116,7 +118,12 @@ O que cada fonte mede:
 | Não conformidades por produto | Quantidade de RNC por produto |
 | Custo da não qualidade | Custo das RNC por origem |
 | Devoluções de clientes | Valor das notas de devolução por cliente |
+| Entregas fora do prazo | Entregas a clientes acima do prazo da Logística (dias entre a emissão da nota e a entrega), por cliente |
+| Ocorrências de entrega | Ocorrências registradas nas entregas, por tipo (cliente ausente, recusa, avaria, endereço errado e outras) |
+| Pedidos de compra atrasados | Pedidos recebidos depois da data prevista, ou vencidos e ainda não recebidos, por fornecedor |
 | Títulos a receber vencidos | Valor vencido e em aberto por cliente |
+
+O prazo das entregas é o parâmetro "dias de atraso" da Logística, o mesmo usado no Painel da Diretoria.
 
 ### 5.2 Ishikawa: por que isso acontece
 
@@ -169,7 +176,7 @@ Andamento de cada ação:
 | Botão | Quem usa | Efeito |
 |---|---|---|
 | **Iniciar** | Responsável pela ação ou quem conduz | Ação em andamento |
-| **Concluir** | Responsável pela ação ou quem conduz | Pede a data, a evidência do que foi feito e o custo real |
+| **Concluir** | Responsável pela ação ou quem conduz | Pede a data, a evidência do que foi feito e o custo real. Aceita foto ou documento da evidência |
 | **Editar** | Quem participa | Altera a ação em aberto. Mudança de prazo fica no diário |
 | **Cancelar** | Quem conduz | Pede o motivo |
 | **Reabrir** | Quem conduz | Ação concluída ou cancelada volta para pendente |
@@ -178,9 +185,24 @@ A barra no alto mostra quantas ações foram concluídas, quantas estão atrasad
 
 Quando a última ação é concluída, o problema passa para **Verificar eficácia**, e quem conduz é avisado.
 
+### 5.5 Anexos
+
+![Figura 8 — Anexos do problema: fotos e documentos, ligados ao problema ou a uma ação do plano (dados fictícios)](img/analise-problemas-11.jpg)
+
+Aba **Anexos** da ficha. Guarda fotos e documentos do problema: a peça com defeito, a planilha de medição, o procedimento novo, a evidência de uma ação.
+
+1. Escolha um ou mais arquivos: imagem, PDF, planilha, documento ou texto, até 10 MB cada.
+2. Se o arquivo for evidência de uma ação, escolha a ação em **Ligado à ação**.
+3. Clique em **Enviar**.
+
+- Na conclusão de uma ação, o arquivo escolhido já entra ligado a ela, e a linha da ação passa a mostrar quantos anexos de evidência tem.
+- Clique no nome do arquivo para abrir.
+- **Excluir**: quem enviou ou quem conduz o problema, enquanto o problema está aberto. Depois de encerrado, os anexos ficam preservados.
+- Cada inclusão e exclusão fica registrada no diário. O limite é de 40 anexos por problema.
+
 ## 6. Verificar a eficácia e encerrar
 
-![Figura 8 — Verificar a eficácia e encerrar o problema (dados fictícios)](img/analise-problemas-7.jpg)
+![Figura 9 — Verificar a eficácia e encerrar o problema (dados fictícios)](img/analise-problemas-7.jpg)
 
 Aba **Eficácia e encerramento** da ficha.
 
@@ -196,13 +218,13 @@ Aba **Eficácia e encerramento** da ficha.
 
 O administrador e o diretor podem **reabrir** um problema encerrado ou cancelado, informando o motivo.
 
-**Imprimir**, no alto da ficha, gera o relatório do problema com o Pareto, o Ishikawa, os 5 Porquês, o plano 5W2H e a eficácia.
+**Imprimir**, no alto da ficha, gera o relatório do problema com o Pareto, o Ishikawa, os 5 Porquês, o plano 5W2H, a eficácia e a lista de anexos.
 
 A aba **Diário** guarda os comentários da equipe e tudo o que a plataforma registrou: abertura, ações incluídas, mudanças de prazo, conclusões e a verificação.
 
 ## 7. Plano de ação de todos os problemas
 
-![Figura 9 — Plano de ação de todos os problemas, com as ações atrasadas (dados fictícios)](img/analise-problemas-8.jpg)
+![Figura 10 — Plano de ação de todos os problemas, com as ações atrasadas (dados fictícios)](img/analise-problemas-8.jpg)
 
 A aba **Plano de ação** junta as ações de todos os problemas em aberto.
 
@@ -217,7 +239,7 @@ Os botões são os mesmos da ficha. O número do problema leva à ficha dele.
 
 ## 8. Pareto fora de um problema
 
-![Figura 10 — Pareto com o dado da plataforma: horas de máquina parada por motivo (dados fictícios)](img/analise-problemas-9.jpg)
+![Figura 11 — Pareto com o dado da plataforma: horas de máquina parada por motivo (dados fictícios)](img/analise-problemas-9.jpg)
 
 A aba **Pareto** serve para descobrir onde está a maior perda antes de abrir qualquer problema.
 
@@ -225,6 +247,8 @@ A aba **Pareto** serve para descobrir onde está a maior perda antes de abrir qu
 2. Clique em **Abrir problema** ao lado do item que será tratado.
 
 O problema é aberto com o título sugerido, a área da fonte e o gráfico guardado, tendo aquele item como foco.
+
+O **Painel da Diretoria** mostra o resumo da Análise de Problemas com a situação do dia: problemas em aberto, ações atrasadas, problemas sem plano, aguardando eficácia e encerrados. O quadro aparece quando a empresa tem ao menos um problema registrado, e leva a esta tela.
 
 ## 9. Avisos
 
@@ -269,7 +293,10 @@ Deixe "Quem (usuário da plataforma)" sem escolha e escreva o nome no campo ao l
 Na verificação, responda que as ações não foram eficazes. O problema volta para a análise com o histórico preservado.
 
 **Qual a diferença para os 5 porquês da RNC?**
-A RNC da Qualidade trata o material não conforme e continua com os seus 5 porquês. Use **Analisar o problema** na RNC quando o caso pedir o Ishikawa e um plano de ação com vários responsáveis.
+A RNC da Qualidade trata o material não conforme e continua com os seus 5 porquês. Use **Analisar o problema** na RNC quando o caso pedir o Ishikawa e um plano de ação com vários responsáveis. O que já foi escrito na RNC vai para o problema; o que for escrito depois no problema não volta para a RNC.
+
+**Não consigo enviar um arquivo.**
+Confira o tamanho (até 10 MB) e o tipo: imagem, PDF, planilha .xlsx, documento .docx, .csv ou .txt. Problema cancelado não recebe anexo.
 
 **Posso mudar as categorias do Ishikawa?**
 Sim, nos Parâmetros. As causas já lançadas em uma categoria que deixou de existir continuam aparecendo no problema.
@@ -279,3 +306,4 @@ Sim, nos Parâmetros. As causas já lançadas em uma categoria que deixou de exi
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 20/11/2026 | Primeira versão: problemas com Pareto (dado da plataforma ou lista digitada), Ishikawa, 5 Porquês e plano de ação 5W2H, avisos de prazo, verificação da eficácia, impressão e parâmetros. |
+| 1.1 | 20/11/2026 | Anexos no problema e nas ações. Três fontes novas do Pareto: entregas fora do prazo, ocorrências de entrega e pedidos de compra atrasados. A RNC e a OS levam os porquês e a causa para o problema. Resumo no Painel da Diretoria. |

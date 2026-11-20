@@ -44,14 +44,29 @@ const iniMes = (k = 0) => { const d = new Date(); d.setMonth(d.getMonth() - k, 1
 let D = null;
 async function carregar() {
   const e = state.empresa.id;
-  const [cfg, problemas, acoes, pessoas] = await Promise.all([
+  const [cfg, problemas, acoes, pessoas, anexos] = await Promise.all([
     q(sb.from('prob_config').select('*').eq('empresa_id', e).maybeSingle()), q(sb.from('prob_problemas').select('*').eq('empresa_id', e).order('numero', { ascending: false })),
-    q(sb.from('prob_acoes').select('*').eq('empresa_id', e).order('prazo')), q(sb.rpc('prob_pessoas', { p_empresa: e })).catch(() => [])]);
-  D = { cfg: { ...P.CFG0, ...(cfg || {}) }, problemas, acoes, pessoas: pessoas || [], porProb: new Map() };
+    q(sb.from('prob_acoes').select('*').eq('empresa_id', e).order('prazo')), q(sb.rpc('prob_pessoas', { p_empresa: e })).catch(() => []),
+    q(sb.from('prob_anexos').select('*').eq('empresa_id', e).order('criado_em')).catch(() => [])]);   // sem o SQL 173, a tela segue sem anexos
+  D = { cfg: { ...P.CFG0, ...(cfg || {}) }, problemas, acoes, pessoas: pessoas || [], anexos: anexos || [], porProb: new Map() };
   for (const a of acoes) (D.porProb.get(a.problema_id) || D.porProb.set(a.problema_id, []).get(a.problema_id)).push(a);
   for (const L of D.porProb.values()) L.sort((a, b) => a.numero - b.numero);
 }
 const acoesDe = (id) => D.porProb.get(id) || [];
+const anexosDe = (id) => D.anexos.filter(a => a.problema_id === id);
+const BUCKET = 'problemas', TIPOS = 'image/jpeg,image/png,image/webp,application/pdf,.xlsx,.docx,.csv,.txt';
+/** envia os arquivos para a pasta do problema e registra cada um (função prob_anexar) */
+async function enviarAnexos(p, arquivos, acaoId = null) {
+  let n = 0;
+  for (const f of arquivos) {
+    if (f.size > 10 * 1048576) throw new Error(`"${f.name}" passa de 10 MB.`);
+    const cam = `${p.empresa_id}/${p.id}/${Date.now()}-${n}-${P.nomeDeArquivo(f.name)}`;
+    const { error } = await sb.storage.from(BUCKET).upload(cam, f, { contentType: f.type || 'application/octet-stream' }); if (error) throw new Error(error.message);
+    await rpc('prob_anexar', { p_problema: p.id, p_acao: acaoId, p_caminho: cam, p_nome: f.name, p_tipo: f.type || null, p_tamanho: f.size }); n++;
+  }
+  return n;
+}
+const verAnexo = async (cam) => { try { const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(cam, 300); if (error) throw error; window.open(data.signedUrl, '_blank'); } catch (e) { fail(e); } };
 const prob = (id) => D.problemas.find(p => p.id === id);
 const pessoasOpt = (sel) => `<option value="">Escolha…</option>` + D.pessoas.map(m => `<option value="${m.user_id}" ${m.user_id === sel ? 'selected' : ''}>${esc(m.nome)}</option>`).join('');
 
@@ -64,7 +79,16 @@ export async function render(root) {
     root.innerHTML = `<div class="card"><div class="empty">A Análise de Problemas ainda não está disponível neste banco de dados (SQL 172 não aplicado).<br><span class="muted small">${esc(e.message || '')}</span></div></div>`; return; }
   const pintar = () => (ui.id && prob(ui.id) ? ficha(root, pintar) : lista(root, pintar));
   pintar();
-  if (qs.get('novo') && pode()) novoProblema({ titulo: qs.get('titulo') || '', descricao: qs.get('descricao') || '', area: qs.get('area') || '', origem_tipo: qs.get('origem') || 'manual', origem_id: qs.get('origem_id') || '', origem_ref: qs.get('ref') || '' }, root, pintar);
+  if (qs.get('novo') && pode()) {
+    const tipo = qs.get('origem') || 'manual', oid = qs.get('origem_id') || '';
+    const ja = oid && D.problemas.find(x => x.origem_id === oid && x.origem_tipo === tipo && x.situacao !== 'cancelado');
+    if (ja) { toast(`Esta ${tipo === 'rnc' ? 'não conformidade' : 'ordem'} já tem o problema nº ${ja.numero}.`); ir(ja.id); pintar(); return; }
+    let ini = { titulo: qs.get('titulo') || '', descricao: qs.get('descricao') || '', area: qs.get('area') || '', origem_tipo: tipo, origem_id: oid, origem_ref: qs.get('ref') || '' };
+    // a RNC e a OS já têm análise: os porquês e a causa registrados lá vão para o problema
+    if (oid && (tipo === 'rnc' || tipo === 'manutencao')) { try { const r = await q(sb.from(tipo === 'rnc' ? 'qual_rnc' : 'man_ordens').select(tipo === 'rnc' ? 'numero, descricao, porques, causa' : 'numero, descricao, causa').eq('id', oid).maybeSingle()); ini = { ...ini, ...P.daOrigem(tipo, r) }; } catch { /* segue com o que veio no endereço */ } }
+    history.replaceState(null, '', '#/problemas');
+    novoProblema(ini, root, pintar);
+  }
 }
 const recarregar = async (pintar) => { await carregar(); pintar(); };
 const ir = (id, aba) => { ui.id = id; if (aba) ui.ficha = aba; history.replaceState(null, '', id ? `#/problemas?id=${id}` : '#/problemas'); };
@@ -120,7 +144,7 @@ function linhaAcao(a, hoje, comProblema) {
   const p = prob(a.problema_id), atr = P.acaoAtrasada(a, hoje), falta = P.faltaNo5w2h(a);
   return `<tr data-ac="${a.id}"><td ${comProblema ? 'style="white-space:normal;max-width:190px"' : ''}>${comProblema ? `<a href="#/problemas?id=${a.problema_id}&aba=5w2h" data-ab="${a.problema_id}">nº ${p?.numero ?? ''}</a><div class="pb-sub">${esc(p?.titulo || '')}</div>` : a.numero}</td>
     <td style="min-width:240px;white-space:normal"><b>${esc(a.o_que)}</b>${a.por_que ? `<div class="pb-sub"><span class="pb-w">Por quê</span>${esc(a.por_que)}</div>` : ''}${a.onde ? `<div class="pb-sub"><span class="pb-w">Onde</span>${esc(a.onde)}</div>` : ''}${a.como ? `<div class="pb-sub"><span class="pb-w">Como</span>${esc(a.como)}</div>` : ''}
-      ${a.evidencia ? `<div class="pb-sub">${a.situacao === 'cancelada' ? 'Motivo' : 'Evidência'}: ${esc(a.evidencia)}</div>` : ''}${falta.length && P.acaoAberta(a) ? `<div class="pb-sub warn">Falta no 5W2H: ${esc(falta.join(', '))}</div>` : ''}</td>
+      ${a.evidencia ? `<div class="pb-sub">${a.situacao === 'cancelada' ? 'Motivo' : 'Evidência'}: ${esc(a.evidencia)}</div>` : ''}${(() => { const k = D.anexos.filter(x => x.acao_id === a.id).length; return k ? `<div class="pb-sub"><a href="#" data-anx="${a.problema_id}">${k} anexo(s) de evidência</a></div>` : ''; })()}${falta.length && P.acaoAberta(a) ? `<div class="pb-sub warn">Falta no 5W2H: ${esc(falta.join(', '))}</div>` : ''}</td>
     <td style="white-space:normal;max-width:150px">${esc(a.responsavel_nome)}</td>
     <td class="${atr ? 'neg' : ''}" style="white-space:nowrap">${dateBR(a.prazo)}${a.inicio ? `<div class="pb-sub">início ${dateBR(a.inicio)}</div>` : ''}${atr ? `<div class="pb-sub neg">${P.diasDeAtraso(a, hoje)} dia(s) de atraso</div>` : ''}${a.concluida_em ? `<div class="pb-sub">feita em ${dateBR(a.concluida_em)}</div>` : ''}</td>
     <td class="num">${nv(a.custo_previsto)}${a.custo_real != null ? `<div class="pb-sub">real ${nv(a.custo_real)}</div>` : ''}</td>
@@ -137,6 +161,7 @@ function botoesAcao(a) {
 }
 function ligarAcoes(el, pintar) {
   $$('[data-ab]', el).forEach(a => a.onclick = (ev) => { ev.preventDefault(); ir(a.dataset.ab, '5w2h'); pintar(); });
+  $$('[data-anx]', el).forEach(a => a.onclick = (ev) => { ev.preventDefault(); ir(a.dataset.anx, 'anexos'); pintar(); });
   $$('tr[data-ac] [data-b]', el).forEach(b => b.onclick = async () => {
     const a = D.acoes.find(x => x.id === b.closest('tr').dataset.ac), k = b.dataset.b;
     try {
@@ -151,11 +176,14 @@ function ligarAcoes(el, pintar) {
 function concluirAcao(a, pintar) {
   const m = modal({ title: `Concluir a ação ${a.numero}`, narrow: true, body: `<p style="margin-top:0"><b>${esc(a.o_que)}</b></p><div class="pb-g">
       <label class="c3">Concluída em<input type="date" name="d" value="${today()}" max="${today()}"></label><label class="c3">Custo real (R$)<input name="c" inputmode="decimal" placeholder="${nv(a.custo_previsto)}"></label>
-      <label class="c6">Evidência do que foi feito<textarea name="e" rows="3" placeholder="Ex.: peça trocada, procedimento revisado e treinado, ata da reunião"></textarea></label></div>`,
+      <label class="c6">Evidência do que foi feito<textarea name="e" rows="3" placeholder="Ex.: peça trocada, procedimento revisado e treinado, ata da reunião"></textarea></label>
+      <label class="c6">Foto ou documento da evidência (opcional, até 10 MB cada)<input type="file" name="f" multiple accept="${TIPOS}"></label></div>`,
     foot: '<button class="btn" data-x>Voltar</button><button class="btn primary" data-ok>Concluir a ação</button>',
     onMount: (el, close) => { $('[data-x]', el).onclick = close; $('[data-ok]', el).onclick = async () => {
       const cr = $('[name=c]', el).value.trim().replace(/\./g, '').replace(',', '.');
-      try { const s = await rpc('prob_acao_situacao', { p_acao: a.id, p_situacao: 'concluida', p: { concluida_em: $('[name=d]', el).value, evidencia: $('[name=e]', el).value, ...(cr ? { custo_real: cr } : {}) } });
+      try { const arq = [...$('[name=f]', el).files]; if (arq.some(f => f.size > 10 * 1048576)) throw new Error('Cada arquivo pode ter até 10 MB.');
+        if (arq.length) await enviarAnexos(prob(a.problema_id), arq, a.id);   // o arquivo entra antes: depois de concluída a ação, o problema pode estar em verificação
+        const s = await rpc('prob_acao_situacao', { p_acao: a.id, p_situacao: 'concluida', p: { concluida_em: $('[name=d]', el).value, evidencia: $('[name=e]', el).value, ...(cr ? { custo_real: cr } : {}) } });
         close(); toast(s === 'verificacao' ? 'Ação concluída. Todas as ações do plano estão feitas: verifique a eficácia.' : 'Ação concluída.'); await recarregar(pintar); } catch (e) { fail(e); } }; } });
   return m;
 }
@@ -246,21 +274,21 @@ function novoProblema(ini, root, pintar, p = null) {
       <label class="c2">Gravidade<select name="gravidade">${Object.entries(P.GRAV).map(([k, [t]]) => `<option value="${k}" ${k === v.gravidade ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label class="c2">Prazo para resolver<input type="date" name="prazo" value="${v.prazo || ''}"></label>
       <label class="c3">Responsável por conduzir<select name="resp" ${p && !conduz(p) ? 'disabled' : ''}>${pessoasOpt(v.responsavel_id)}</select></label>
-      ${v.origem_ref ? `<div class="c3 muted small" style="align-self:end">Origem: ${esc(P.ORIGEM[v.origem_tipo] || '')} ${esc(v.origem_ref)}</div>` : ''}</div>`,
+      ${v.origem_ref ? `<div class="c3 muted small" style="align-self:end">Origem: ${esc(P.ORIGEM[v.origem_tipo] || '')} ${esc(v.origem_ref)}${!p && v.porques ? '. Os porquês e a causa já registrados vão junto.' : ''}</div>` : ''}</div>`,
     foot: `<button class="btn" data-x>Voltar</button><button class="btn primary" data-ok>${p ? 'Salvar' : 'Abrir o problema'}</button>`,
     onMount: (el, close) => { $('[data-x]', el).onclick = close; if (!p && !v.area && ini.area) $('[name=area]', el).value = ini.area;
       $('[data-ok]', el).onclick = async () => { const g = (n) => $(`[name=${n}]`, el).value, d = { titulo: g('titulo'), descricao: g('descricao'), area: g('area'), gravidade: g('gravidade'), prazo: g('prazo') };
         try {
           if (p) { await rpc('prob_salvar', { p_id: p.id, p: { ...d, ...(conduz(p) ? { responsavel_id: g('resp') } : {}) } }); close(); toast('Dados salvos.'); await recarregar(pintar); }
           else { const id = await rpc('prob_abrir', { p_empresa: state.empresa.id, p: { ...d, responsavel_id: g('resp'), origem_tipo: v.origem_tipo || 'manual', origem_id: v.origem_id || '', origem_ref: v.origem_ref || '', ...(v.pareto ? { pareto: v.pareto } : {}), ...(v.porques ? { porques: v.porques } : {}), ...(v.causa_raiz ? { causa_raiz: v.causa_raiz } : {}) } });
-            close(); toast('Problema aberto. Comece levantando as causas no Ishikawa.'); ir(id, v.pareto ? 'pareto' : 'ishikawa'); await recarregar(pintar); }
+            close(); toast(v.porques ? 'Problema aberto com os porquês da origem. Confira a causa raiz e monte o plano de ação.' : 'Problema aberto. Comece levantando as causas no Ishikawa.'); ir(id, v.pareto ? 'pareto' : v.porques ? 'porques' : 'ishikawa'); await recarregar(pintar); }
         } catch (e) { fail(e); } }; } });
 }
 
 /* ------------------------------------------------------------------ ficha do problema */
 function ficha(root, pintar) {
   const p = prob(ui.id), A = acoesDe(p.id), hoje = today(), E = P.etapas(p, A), aberto = !['encerrado', 'cancelado'].includes(p.situacao), ed = pode() && aberto;
-  if (!['pareto', 'ishikawa', 'porques', '5w2h', 'fechar', 'diario'].includes(ui.ficha)) ui.ficha = 'ishikawa';
+  if (!['pareto', 'ishikawa', 'porques', '5w2h', 'fechar', 'anexos', 'diario'].includes(ui.ficha)) ui.ficha = 'ishikawa';
   root.innerHTML = `${CSS}<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
       <div style="min-width:0;flex:1"><a href="#/problemas" id="pb-volta" class="small">‹ Todos os problemas</a>
         <h2 style="margin:4px 0 6px">Nº ${p.numero} · ${esc(p.titulo)}</h2>
@@ -270,7 +298,7 @@ function ficha(root, pintar) {
       <div style="display:flex;gap:6px;flex-wrap:wrap">${ed ? '<button class="btn" id="pb-ed">Editar dados</button>' : ''}<button class="btn" id="pb-imp">Imprimir</button>
         ${aberto && conduz(p) ? '<button class="btn" id="pb-can">Cancelar problema</button>' : ''}${!aberto && gerencia() ? '<button class="btn" id="pb-rea">Reabrir</button>' : ''}</div></div>
     <div class="pb-rot">${E.map((x, i) => `<button class="pb-et ${ui.ficha === x.k ? 'on' : ''} ${x.feito ? 'ok' : ''}" data-e="${x.k}"><span class="n">${x.feito ? '✓' : i + 1}</span><b>${x.nome}</b><small>${x.sub}</small><small>${esc(x.txt)}</small></button>`).join('')}</div>
-    <div class="chips tabs" id="pb-fa2">${[['fechar', p.situacao === 'encerrado' ? 'Encerramento' : 'Eficácia e encerramento'], ['diario', 'Diário']].map(([k, t]) => `<span class="chip ${ui.ficha === k ? 'on' : ''}" data-e="${k}">${t}</span>`).join('')}</div>
+    <div class="chips tabs" id="pb-fa2">${[['fechar', p.situacao === 'encerrado' ? 'Encerramento' : 'Eficácia e encerramento'], ['anexos', `Anexos${anexosDe(p.id).length ? ` (${anexosDe(p.id).length})` : ''}`], ['diario', 'Diário']].map(([k, t]) => `<span class="chip ${ui.ficha === k ? 'on' : ''}" data-e="${k}">${t}</span>`).join('')}</div>
     <div id="pb-fc" style="margin-top:12px"></div>`;
   $('#pb-volta', root).onclick = (ev) => { ev.preventDefault(); ir(null); pintar(); };
   $$('[data-e]', root).forEach(b => b.onclick = () => { ui.ficha = b.dataset.e; pintar(); });
@@ -279,7 +307,7 @@ function ficha(root, pintar) {
   if ($('#pb-can', root)) $('#pb-can', root).onclick = () => motivo('Cancelar o problema', 'Motivo do cancelamento (as ações em aberto também são canceladas)', 'Cancelar o problema', async (t) => { await rpc('prob_cancelar', { p_id: p.id, p_motivo: t }); toast('Problema cancelado.'); await recarregar(pintar); });
   if ($('#pb-rea', root)) $('#pb-rea', root).onclick = () => motivo('Reabrir o problema', 'Motivo da reabertura', 'Reabrir', async (t) => { await rpc('prob_reabrir', { p_id: p.id, p_motivo: t }); toast('Problema reaberto.'); await recarregar(pintar); });
   const c = $('#pb-fc', root);
-  ({ pareto: fPareto, ishikawa: fIshikawa, porques: fPorques, '5w2h': f5w2h, fechar: fFechar, diario: fDiario })[ui.ficha](c, p, A, ed, pintar, hoje);
+  ({ pareto: fPareto, ishikawa: fIshikawa, porques: fPorques, '5w2h': f5w2h, fechar: fFechar, anexos: fAnexos, diario: fDiario })[ui.ficha](c, p, A, ed, pintar, hoje);
 }
 function motivo(titulo, rotulo, botao, feito) {
   modal({ title: titulo, narrow: true, body: `<label>${esc(rotulo)}<textarea name="t" rows="3"></textarea></label>`, foot: `<button class="btn" data-x>Voltar</button><button class="btn primary" data-ok>${esc(botao)}</button>`,
@@ -388,6 +416,25 @@ function fFechar(c, p, A, ed, pintar) {
     toast(s === 'encerrado' ? 'Problema encerrado.' : 'Registrado: as ações não resolveram. O problema voltou para a análise.'); if (s !== 'encerrado') ui.ficha = 'ishikawa'; await recarregar(pintar); } catch (e) { fail(e); } };
 }
 
+/* ---- anexos: fotos e documentos do problema e das ações */
+function fAnexos(c, p, A, ed, pintar) {
+  const L = anexosDe(p.id), podeAnexar = pode() && p.situacao !== 'cancelado', aberto = !['encerrado', 'cancelado'].includes(p.situacao), img = (a) => String(a.tipo || '').startsWith('image/');
+  c.innerHTML = `<div class="card"><h3 style="margin-top:0">Anexos</h3><p class="muted small" style="margin-top:0">Fotos e documentos do problema: a peça com defeito, o relatório, o procedimento novo, a evidência de uma ação. Imagem, PDF, planilha ou texto, até 10 MB cada.</p>
+      ${podeAnexar ? `<div class="pb-g"><label class="c3">Arquivos<input type="file" id="ax-f" multiple accept="${TIPOS}"></label>
+        <label class="c2">Ligado à ação (opcional)<select id="ax-a"><option value="">Ao problema</option>${A.map(a => `<option value="${a.id}">Ação ${a.numero}: ${esc(a.o_que.slice(0, 40))}</option>`).join('')}</select></label>
+        <label style="align-self:end"><button class="btn primary" id="ax-ok">Enviar</button></label></div>` : ''}</div>
+    <div class="table-wrap"><table><thead><tr><th>Arquivo</th><th>Ligado a</th><th>Enviado por</th><th>Quando</th><th class="num">Tamanho</th><th></th></tr></thead><tbody>
+    ${L.map(a => { const ac = A.find(x => x.id === a.acao_id); return `<tr><td style="white-space:normal"><a href="#" data-ver="${esc(a.caminho)}">${esc(a.nome)}</a>${img(a) ? ' <span class="pb-st">imagem</span>' : ''}</td><td>${ac ? `Ação ${ac.numero}` : 'Problema'}</td><td>${esc(a.criado_por_nome || '—')}</td><td>${hora(a.criado_em)}</td>
+      <td class="num">${esc(P.tamanhoTxt(a.tamanho))}</td><td>${aberto && pode() && (a.criado_por === state.user?.id || conduz(p)) ? `<button class="btn small" data-del="${a.id}">Excluir</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">Nenhum anexo.</td></tr>'}
+    </tbody></table></div>`;
+  $$('[data-ver]', c).forEach(a => a.onclick = (ev) => { ev.preventDefault(); verAnexo(a.dataset.ver); });
+  if ($('#ax-ok', c)) $('#ax-ok', c).onclick = async () => { const fs = [...$('#ax-f', c).files]; if (!fs.length) return toast('Escolha ao menos um arquivo.', true);
+    const b = $('#ax-ok', c); b.disabled = true; b.textContent = 'Enviando…';
+    try { const n = await enviarAnexos(p, fs, $('#ax-a', c).value || null); toast(`${n} anexo(s) enviado(s).`); } catch (e) { fail(e); } await recarregar(pintar); };
+  $$('[data-del]', c).forEach(b => b.onclick = async () => { const a = L.find(x => x.id === b.dataset.del); if (!await confirmDialog(`Excluir o anexo "${a.nome}"?`)) return;
+    try { const cam = await rpc('prob_anexo_excluir', { p_id: a.id }); if (cam) await sb.storage.from(BUCKET).remove([cam]).catch(() => null); toast('Anexo excluído.'); await recarregar(pintar); } catch (e) { fail(e); } });
+}
+
 /* ---- diário */
 async function fDiario(c, p, A, ed, pintar) {
   c.innerHTML = '<div class="card"><div class="loading">Carregando…</div></div>';
@@ -415,5 +462,6 @@ function imprimir(p, A) {
         A.map(a => [a.numero, esc(a.o_que), esc(a.por_que || '—'), esc(a.onde || '—'), `${a.inicio ? dateBR(a.inicio) + ' a ' : ''}${dateBR(a.prazo)}`, esc(a.responsavel_nome), esc(a.como || '—'), 'R$ ' + nv(a.custo_previsto), P.SIT_ACAO[a.situacao][0] + (a.concluida_em ? ' em ' + dateBR(a.concluida_em) : '')]))}
       <p>${pr.feitas} de ${pr.total} ação(ões) concluída(s) · custo previsto R$ ${nv(pr.previsto)}${pr.real ? ` · custo real R$ ${nv(pr.real)}` : ''}</p>
       <h2>${G ? 6 : 5}. Eficácia</h2><p>${p.eficacia ? `${p.eficacia === 'eficaz' ? 'Ações eficazes' : 'Ações não eficazes'}${p.eficacia_em ? ' em ' + dateBR(p.eficacia_em) : ''}. ${esc(p.eficacia_obs || '')}` : 'Ainda não verificada.'}</p>
+      ${anexosDe(p.id).length ? `<h2>${G ? 7 : 6}. Anexos</h2>${T(['Arquivo', 'Ligado a', 'Enviado por', 'Quando'], anexosDe(p.id).map(a => [esc(a.nome), A.find(x => x.id === a.acao_id) ? 'Ação ' + A.find(x => x.id === a.acao_id).numero : 'Problema', esc(a.criado_por_nome || '—'), hora(a.criado_em)]))}` : ''}
       <div class="ass"><div>Responsável pelo problema</div><div>Aprovação</div></div>`, rodape: 'Base: Análise de Problemas da plataforma (Pareto, Ishikawa, 5 Porquês e 5W2H)' });
 }

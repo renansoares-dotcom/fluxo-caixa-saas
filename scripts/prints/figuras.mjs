@@ -362,6 +362,7 @@ export const FIGS = [
   ['analise-problemas', 'problemas', '## 7.', 'Plano de ação de todos os problemas, com as ações atrasadas', 'click:[data-a=acoes]|click:[data-f=abertas]'],
   ['analise-problemas', 'problemas', '## 8.', 'Pareto com o dado da plataforma: horas de máquina parada por motivo', 'click:[data-a=pareto]|click:#pp-go|scroll:#pp-r'],
   ['analise-problemas', 'problemas', '## 3.', 'Parâmetros: categorias do Ishikawa, áreas, avisos de prazo e regras para encerrar', 'click:[data-a=param]'],
+  ['analise-problemas', 'problemas?id=pb1&aba=anexos', '### 5.5', 'Anexos do problema: fotos e documentos, ligados ao problema ou a uma ação do plano'],
   ['rma', 'rma', '## 4.', 'RMA: meses de competência, prazos e os documentos do mês com a situação de cada um'],
   ['rma', 'rma', '### 3.1', 'Parâmetros do RMA: ativação, sigla dos arquivos, primeiro mês, prazo, processo e quem recebe', 'click:#rm-par'],
   ['rma', 'rma', '### 3.2', 'Documentos pedidos: a lista que forma o pacote de cada mês', 'click:#rm-docs'],

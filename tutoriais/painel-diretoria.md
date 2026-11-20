@@ -1,8 +1,8 @@
 ---
 titulo: Painel da Diretoria
 tela: Painéis › Painel da Diretoria (PAI007)
-versao: 1.0
-atualizado: 2026-11-07
+versao: 1.1
+atualizado: 2026-11-20
 ---
 ## 1. Para que serve
 
@@ -84,9 +84,26 @@ Os indicadores e as regras de cálculo:
 
 ### 3.2 Evolução de 13 meses
 
-![Figura 2 — Evolução de 13 meses, com os meses fora da meta em vermelho (dados fictícios)](img/painel-diretoria-2.jpg)
+![Figura 2 — Resumo da Análise de Problemas e a evolução de 13 meses, com os meses fora da meta em vermelho (dados fictícios)](img/painel-diretoria-2.jpg)
 
 Abaixo dos cartões, uma tabela mostra os 13 meses de cada indicador. Os meses que não atingiram a meta aparecem em vermelho. Em **Como cada indicador é calculado** estão as regras acima.
+
+### 3.3 Análise de problemas
+
+Entre os cartões e a tabela de 13 meses, o painel mostra o resumo da **Análise de Problemas** (PAI013) com a situação do dia:
+
+| Número | O que conta |
+|---|---|
+| Problemas em aberto | Problemas não encerrados nem cancelados, com quantos são de gravidade alta ou crítica |
+| Ações atrasadas | Ações do plano 5W2H com o prazo vencido, sobre o total em aberto |
+| Sem plano de ação | Problema aberto sem nenhuma ação |
+| Aguardando eficácia | Ações concluídas, falta conferir o resultado |
+| Encerrados | Total encerrado e o tempo médio para resolver |
+
+- O quadro mostra a situação de hoje, e não a do mês de referência escolhido no alto.
+- Ele só aparece quando a empresa tem ao menos um problema registrado.
+- Clicar no quadro abre a Análise de Problemas.
+- Esses números não entram no PDF da reunião nem têm meta.
 
 ## 4. Comentários
 
@@ -164,3 +181,4 @@ O documento segue o **padrão oficial de relatório à Diretoria**:
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão: oito indicadores com meta, situação, tendência e detalhe; comentários; metas e parâmetros; PDF da reunião no padrão de relatório à Diretoria. |
+| 1.1 | 20/11/2026 | Resumo da Análise de Problemas no painel: problemas em aberto, ações atrasadas, sem plano, aguardando eficácia e encerrados. |

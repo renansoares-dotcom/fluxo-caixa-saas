@@ -73,3 +73,17 @@ test('painel: problemas abertos, sem plano, ações atrasadas e tempo médio par
   const AC = [{ problema_id: 1, situacao: 'pendente', prazo: '2026-11-10' }, { problema_id: 1, situacao: 'em_andamento', prazo: '2026-11-25' }, { problema_id: 3, situacao: 'concluida', prazo: '2026-11-01' }, { problema_id: 5, situacao: 'pendente', prazo: '2026-01-01' }];
   assert.deepEqual(P.resumo(PR, AC, hoje), { abertos: 3, criticos: 2, verificar: 1, semPlano: 1, acoesAbertas: 2, acoesAtrasadas: 1, acoesSemana: 1, encerrados: 1, diasMedios: 10, problemasAtrasados: 1 });
 });
+test('origem: a RNC leva os porquês e a causa para o problema; a OS leva a causa', () => {
+  const r = P.daOrigem('rnc', { numero: 12, descricao: 'Sacos com cor fora do padrão', porques: ['Cor aprovada no visual', '', 'Sem padrão físico'], causa: 'Falta de padrão de cor' });
+  assert.equal(r.origem_ref, 'nº 12'); assert.equal(r.titulo, 'RNC 12: Sacos com cor fora do padrão'); assert.equal(r.area, 'Qualidade'); assert.equal(r.causa_raiz, 'Falta de padrão de cor');
+  assert.deepEqual(r.porques, [{ partida: 'Sacos com cor fora do padrão', respostas: ['Cor aprovada no visual', 'Sem padrão físico'], causa: 'Falta de padrão de cor' }]);
+  const o = P.daOrigem('manutencao', { numero: 7, descricao: 'Motor travou', causa: null });
+  assert.equal(o.origem_ref, 'OS nº 7'); assert.equal(o.area, 'Manutenção'); assert.equal(o.porques, undefined); assert.equal(o.causa_raiz, undefined);
+  assert.deepEqual(P.daOrigem('rnc', null), {});
+});
+test('anexos: nome de arquivo seguro e tamanho legível; fontes novas do Pareto', () => {
+  assert.equal(P.nomeDeArquivo('Foto do anél (1).JPG'), 'Foto_do_anel_1_.JPG'); assert.equal(P.nomeDeArquivo(''), 'arquivo');
+  assert.equal(P.tamanhoTxt(120000), '117 KB'); assert.equal(P.tamanhoTxt(3 * 1048576), '3,0 MB'); assert.equal(P.tamanhoTxt(null), '');
+  assert.deepEqual(['entregas_atraso', 'ocorrencias', 'atraso_fornecedor'].map(k => P.FONTES.find(f => f.k === k)?.area), ['Logística', 'Logística', 'Compras']);
+  assert.equal(new Set(P.FONTES.map(f => f.k)).size, 10);
+});

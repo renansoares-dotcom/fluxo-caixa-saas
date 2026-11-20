@@ -181,3 +181,48 @@ select pg_temp.falha($$select * from prob_pareto('e000000a-0000-0000-0000-000000
 reset role;
 delete from lancamentos where descricao like 'título vencido %' or descricao = 'título pago';
 delete from notificacoes where tipo = 'problema';
+
+-- SQL 173: anexos e fontes novas do Pareto
+select pg_temp.ok((select not public and file_size_limit = 10485760 from storage.buckets where id = 'problemas'), 'bucket privado de 10 MB');
+select pg_temp.ok((select count(*) = 3 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like 'problemas_arq_%'), 'políticas do bucket');
+select pg_temp.entrar(:F);
+insert into tp select 'p3', prob_abrir(:E, '{"titulo":"Problema para os anexos"}');
+insert into tp select 'a9', prob_acao_salvar((select id from tp where k = 'p3'), null, '{"o_que":"Ação com evidência","prazo":"2027-01-10","responsavel_nome":"Terceiro"}');
+select pg_temp.falha(format($$select prob_anexar(%L, null, 'outra/pasta/foto.jpg', 'foto.jpg')$$, (select id from tp where k = 'p3')), 'caminho fora da pasta do problema');
+select pg_temp.falha(format($$select prob_anexar(%L, %L, %L, 'foto.jpg')$$, (select id from tp where k = 'p3'), (select id from tp where k = 'a1'), :E::text || '/' || (select id from tp where k = 'p3') || '/1-foto.jpg'), 'ação de outro problema');
+insert into tp select 'x1', prob_anexar((select id from tp where k = 'p3'), (select id from tp where k = 'a9'), :E::text || '/' || (select id from tp where k = 'p3') || '/1-foto.jpg', 'foto do anel.jpg', 'image/jpeg', 120000);
+reset role;
+select pg_temp.ok((select nome = 'foto do anel.jpg' and acao_id is not null and criado_por = :F and criado_por_nome is not null from prob_anexos where id = (select id from tp where k = 'x1')), 'anexo registrado na ação');
+select pg_temp.ok((select count(*) = 1 from prob_diario where problema_id = (select id from tp where k = 'p3') and texto like 'Anexo incluído: foto do anel.jpg (ação 1).'), 'anexo no diário');
+select pg_temp.entrar(:L);
+select pg_temp.ok((select count(*) = 1 from prob_anexos where problema_id = (select id from tp where k = 'p3')), 'leitura enxerga o anexo');
+select pg_temp.falha(format($$select prob_anexar(%L, null, %L, 'x.pdf')$$, (select id from tp where k = 'p3'), :E::text || '/' || (select id from tp where k = 'p3') || '/2-x.pdf'), 'leitura não anexa');
+reset role;
+select pg_temp.entrar(:C);
+select pg_temp.falha(format($$select prob_anexo_excluir(%L)$$, (select id from tp where k = 'x1')), 'terceiro não exclui o anexo');
+select pg_temp.falha($$insert into prob_anexos(empresa_id, problema_id, caminho, nome) select empresa_id, id, 'x', 'y' from prob_problemas limit 1$$, 'sem gravação direta de anexo');
+reset role;
+select pg_temp.entrar(:B);
+select pg_temp.ok((select count(*) = 0 from prob_anexos), 'empresa B não vê os anexos');
+reset role;
+select pg_temp.entrar(:F);
+select pg_temp.ok(prob_anexo_excluir((select id from tp where k = 'x1')) like '%/1-foto.jpg', 'quem enviou exclui e recebe o caminho');
+select pg_temp.ok((select count(*) >= 0 from prob_pareto(:E, 'entregas_atraso', '2026-01-01', '2026-12-31')) and (select count(*) >= 0 from prob_pareto(:E, 'ocorrencias', '2026-01-01', '2026-12-31')), 'fontes da logística respondem');
+reset role;
+-- pedido de compra atrasado: previsto para 10/03, recebido em 15/03 (atrasado); outro previsto para 20/03 e recebido em 18/03 (no prazo)
+alter table compras_pedidos disable trigger user; alter table compras_recebimentos disable trigger user;
+insert into compras_pedidos(id, empresa_id, numero, favorecido_id, data_pedido, entrega_prevista, total, status) values
+  ('c0170000-0000-0000-0000-000000000001', :E, 91731, 'fa0000a7-0000-0000-0000-000000000001', '2026-03-01', '2026-03-10', 100, 'recebido'),
+  ('c0170000-0000-0000-0000-000000000002', :E, 91732, 'fa0000a7-0000-0000-0000-000000000001', '2026-03-01', '2026-03-20', 100, 'recebido'),
+  ('c0170000-0000-0000-0000-000000000003', :E, 91733, 'fa0000a7-0000-0000-0000-000000000002', '2026-03-01', '2026-03-12', 100, 'enviado'),
+  ('c0170000-0000-0000-0000-000000000004', :E, 91734, 'fa0000a7-0000-0000-0000-000000000002', '2026-03-01', '2026-03-12', 100, 'cancelado');
+insert into compras_recebimentos(empresa_id, pedido_id, data) values (:E, 'c0170000-0000-0000-0000-000000000001', '2026-03-15'), (:E, 'c0170000-0000-0000-0000-000000000002', '2026-03-18');
+alter table compras_pedidos enable trigger user; alter table compras_recebimentos enable trigger user;
+select pg_temp.entrar(:C);
+select pg_temp.ok((select valor = 1 from prob_pareto(:E, 'atraso_fornecedor', '2026-03-01', '2026-03-31') where nome = 'CLIENTE DEVEDOR 172') and (select valor = 1 from prob_pareto(:E, 'atraso_fornecedor', '2026-03-01', '2026-03-31') where nome = 'CLIENTE PEQUENO 172')
+  and (select count(*) = 2 from prob_pareto(:E, 'atraso_fornecedor', '2026-03-01', '2026-03-31')), 'pedido recebido depois do previsto e pedido vencido sem receber contam; no prazo e cancelado não');
+reset role;
+alter table compras_pedidos disable trigger user; alter table compras_recebimentos disable trigger user;
+delete from compras_recebimentos where pedido_id::text like 'c0170000-%'; delete from compras_pedidos where id::text like 'c0170000-%';
+alter table compras_pedidos enable trigger user; alter table compras_recebimentos enable trigger user;
+delete from notificacoes where tipo = 'problema';

@@ -6,6 +6,7 @@ import { sb, state, q, montarMatriz, comRecompras, montarDRE, loadCadastros } fr
 import { $, $$, esc, toast, fail, modal, today, MESES } from '../lib/ui.js';
 import { INDICADORES, IND, SIT, meses13, serieAnual, saldosFimMes, montarIndicadores, fmt, fmtVar, analise, itensDeliberacao } from '../lib/diretoria-calc.js';
 import { codigoDa } from '../lib/telas.js';
+import { resumo as resumoProblemas } from '../lib/problemas.js';
 
 export const title = 'Painel da Diretoria';
 const FILTROS = { p_status: ['Pago'], p_conta: null, p_grupo: null, p_cc: null, p_favorecido: null, p_disp: null };
@@ -78,7 +79,10 @@ export async function render(root) {
   $('#dr-ref', root).onchange = (e) => { ui.ref = e.target.value; render(root); };
   $('#dr-par', root) && ($('#dr-par', root).onclick = () => parametros(() => render(root)));
   $('#dr-pdf', root).onclick = () => D && pdfReuniao(D);
-  try { D = await carregar(ui.ref); }
+  try { D = await carregar(ui.ref);
+    // Análise de Problemas (SQL 172): situação de hoje, fora da série de 13 meses. Sem o SQL, o painel segue sem o quadro
+    try { const [pp, aa] = await Promise.all([q(sb.from('prob_problemas').select('id, situacao, gravidade, prazo, aberto_em, encerrado_em').eq('empresa_id', state.empresa.id)), q(sb.from('prob_acoes').select('problema_id, situacao, prazo').eq('empresa_id', state.empresa.id))]);
+      D.problemas = pp.length ? resumoProblemas(pp, aa, today()) : null; } catch { D.problemas = null; } }
   catch (err) { fail(err); $('#dr-corpo', root).innerHTML = '<div class="card"><div class="empty">Não foi possível carregar o painel. Confira se o SQL 101 já foi executado.</div></div>'; return; }
   pintar(root);
 }
@@ -93,6 +97,13 @@ function pintar(root) {
       ${semMeta ? `<span class="small muted">${semMeta} sem meta${podeMetas() ? ' — defina em Metas e parâmetros' : ''}</span>` : ''}
     </div>
     <div id="dr-grade" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">${I.map(card).join('')}</div>
+    ${D.problemas ? `<h3 style="margin:20px 0 6px">Análise de problemas <span class="muted small" style="font-weight:400">· situação de hoje</span></h3>
+    <a class="card" href="#/problemas" style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;text-decoration:none;color:inherit">
+      ${[['Problemas em aberto', D.problemas.abertos, `${D.problemas.criticos} de gravidade alta ou crítica`, ''], ['Ações atrasadas', D.problemas.acoesAtrasadas, `${D.problemas.acoesAbertas} em aberto`, D.problemas.acoesAtrasadas ? 'neg' : ''],
+        ['Sem plano de ação', D.problemas.semPlano, 'problema aberto sem ação', D.problemas.semPlano ? 'warn' : ''], ['Aguardando eficácia', D.problemas.verificar, 'ações concluídas', ''],
+        ['Encerrados', D.problemas.encerrados, D.problemas.diasMedios != null ? `${D.problemas.diasMedios} dia(s) em média` : '—', '']]
+        .map(([t, v, sub, tom]) => `<div><div class="small muted">${t}</div><div class="${tom}" style="font-size:1.5em;font-weight:700">${v}</div><div class="small muted">${sub}</div></div>`).join('')}
+      <span class="small" style="margin-left:auto">Abrir a Análise de Problemas ›</span></a>` : ''}
     <h3 style="margin:20px 0 6px">Evolução de 13 meses</h3>
     <div class="card flush"><div class="table-wrap"><table class="small"><thead><tr><th>Indicador</th>${D.meses.map(m => `<th class="num">${curto(m)}</th>`).join('')}<th class="num">Meta</th></tr></thead><tbody>
       ${I.map(i => `<tr><td style="white-space:nowrap"><b>${esc(i.nome)}</b></td>${i.serie.map((v, k) => { const s = i.metas[k] != null && v != null ? (i.sentido === 'menor' ? v <= i.metas[k] : v >= i.metas[k]) : null;

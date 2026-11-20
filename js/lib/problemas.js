@@ -17,6 +17,9 @@ export const FONTES = [
   { k: 'rnc_produto', nome: 'Não conformidades por produto', unidade: 'RNC', medida: 'Quantidade de RNC por produto', area: 'Qualidade' },
   { k: 'rnc_custo', nome: 'Custo da não qualidade', unidade: 'R$', medida: 'Custo das RNC por origem', area: 'Qualidade' },
   { k: 'devolucoes', nome: 'Devoluções de clientes', unidade: 'R$', medida: 'Valor devolvido por cliente', area: 'Comercial' },
+  { k: 'entregas_atraso', nome: 'Entregas fora do prazo', unidade: 'entregas', medida: 'Entregas fora do prazo por cliente', area: 'Logística' },
+  { k: 'ocorrencias', nome: 'Ocorrências de entrega', unidade: 'ocorrências', medida: 'Ocorrências de entrega por tipo', area: 'Logística' },
+  { k: 'atraso_fornecedor', nome: 'Pedidos de compra atrasados', unidade: 'pedidos', medida: 'Pedidos recebidos depois do previsto por fornecedor', area: 'Compras' },
   { k: 'vencidos', nome: 'Títulos a receber vencidos', unidade: 'R$', medida: 'Valor vencido e em aberto por cliente', area: 'Financeiro', financeiro: true },
 ];
 
@@ -131,6 +134,18 @@ export function partidasPendentes(ish = [], pq = []) {
   const ja = new Set(limparPorques(pq).map(c => c.partida.toLowerCase()));
   return causasProvaveis(ish).filter(c => !ja.has(c.texto.trim().toLowerCase()));
 }
+
+/** RNC ou ordem de manutenção viram o ponto de partida do problema: a cadeia de porquês e a causa já registradas vão junto */
+export function daOrigem(tipo, r) {
+  if (!r) return {};
+  const resp = (Array.isArray(r.porques) ? r.porques : []).map(x => String(x ?? '').trim()).filter(Boolean), causa = String(r.causa ?? '').trim(), desc = String(r.descricao ?? '').trim();
+  const out = { origem_ref: `${tipo === 'rnc' ? 'nº' : 'OS nº'} ${r.numero}`, titulo: `${tipo === 'rnc' ? 'RNC' : 'OS'} ${r.numero}: ${desc.slice(0, 100)}`, descricao: desc, area: tipo === 'rnc' ? 'Qualidade' : 'Manutenção' };
+  if (resp.length || causa) out.porques = [{ partida: desc.slice(0, 140) || out.titulo, respostas: resp, causa }];
+  if (causa) out.causa_raiz = causa;
+  return out;
+}
+export const tamanhoTxt = (b) => { const v = n(b); return !v ? '' : v < 1024 * 1024 ? `${Math.max(1, Math.round(v / 1024))} KB` : `${numBR(v / 1048576, 1)} MB`; };
+export const nomeDeArquivo = (nome) => String(nome ?? 'arquivo').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]+/g, '_').slice(-80) || 'arquivo';
 
 /* ---------------------------------------------------------------- 5W2H e andamento */
 

@@ -2686,6 +2686,14 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
     { id: 'pd2', empresa_id: E, problema_id: 'pb1', tipo: 'comentario', texto: 'Medimos a folga do anel hoje: 1,2 mm de um lado e 0,4 mm do outro.', autor: 'Carlos Menezes', criado_em: d(-16) + 'T18:40:00Z' },
     { id: 'pd3', empresa_id: E, problema_id: 'pb1', tipo: 'sistema', texto: 'Ação 1 concluída.', autor: 'Carlos Menezes', criado_em: d(-9) + 'T14:00:00Z' },
     { id: 'pd4', empresa_id: E, problema_id: 'pb1', tipo: 'comentario', texto: 'Gabarito na ferramentaria, fica pronto na sexta.', autor: 'Renata Alves', criado_em: d(-1) + 'T17:00:00Z' }];
+  DB.prob_anexos = [
+    { id: 'px1', empresa_id: E, problema_id: 'pb1', acao_id: null, caminho: E + '/pb1/1-bolha.jpg', nome: 'Bolha instável no 2º turno.jpg', tipo: 'image/jpeg', tamanho: 1840000, criado_por: 'u2', criado_por_nome: 'Carlos Menezes', criado_em: d(-17) + 'T14:20:00Z' },
+    { id: 'px2', empresa_id: E, problema_id: 'pb1', acao_id: null, caminho: E + '/pb1/2-medicao.xlsx', nome: 'Medição da folga do anel.xlsx', tipo: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', tamanho: 48000, criado_por: 'u2', criado_por_nome: 'Carlos Menezes', criado_em: d(-16) + 'T18:45:00Z' },
+    { id: 'px3', empresa_id: E, problema_id: 'pb1', acao_id: 'pa1', caminho: E + '/pb1/3-pop.pdf', nome: 'POP-EXT-014 Montagem do anel de ar.pdf', tipo: 'application/pdf', tamanho: 620000, criado_por: 'u1', criado_por_nome: 'Renata Alves', criado_em: d(-9) + 'T13:55:00Z' }];
+  Object.assign(PAR, { entregas_atraso: [['SUPERMERCADOS BOA COMPRA LTDA', 9, 9], ['ATACADO SERTÃO LTDA', 6, 6], ['FARMÁCIAS SAÚDE MAIS S.A.', 3, 3], ['MERCADINHO DO BAIRRO ME', 2, 2], ['PADARIA PÃO QUENTE LTDA', 1, 1]],
+    ocorrencias: [['Cliente ausente', 11, 11], ['Endereço errado', 6, 6], ['Recusa da mercadoria', 4, 4], ['Avaria', 3, 3], ['Problema no veículo', 2, 2]],
+    atraso_fornecedor: [['PETROQUÍMICA NORTE S.A.', 7, 7], ['TINTAS GRÁFICAS LTDA', 4, 4], ['EMBALAGENS PAPELÃO ME', 2, 2], ['ADITIVOS BRASIL LTDA', 1, 1]] });
+  window.RPC.prob_anexar = () => 'px9'; window.RPC.prob_anexo_excluir = () => null;
   window.RPC.prob_pessoas = () => PES.map(([user_id, nome, papel]) => ({ user_id, nome, papel }));
   window.RPC.prob_pareto = (a) => (PAR[a.p_fonte] || []).map(([nome, valor, qtd]) => ({ nome, valor, qtd }));
   for (const f of ['prob_abrir', 'prob_salvar', 'prob_acao_salvar', 'prob_acao_situacao', 'prob_encerrar', 'prob_cancelar', 'prob_reabrir', 'prob_acao_reabrir', 'prob_comentar', 'prob_config_salvar']) window.RPC[f] = () => null;
