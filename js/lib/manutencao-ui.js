@@ -128,7 +128,7 @@ export async function fichaOS(D, o, { onMudou } = {}) {
     </div><p class="muted small">Serviço de terceiro (oficina, assistência técnica). Com a conta do plano escolhida, ao salvar entra um lançamento "Em aberto" no fluxo de caixa.</p></div>
     <div data-p="anx" hidden>${exe ? '<div class="toolbar"><input type="file" id="fa-a" accept="image/*,application/pdf" capture="environment" multiple><button class="btn small" id="fa-ok" type="button">Enviar</button></div>' : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap">${A.map(a => `<a href="#" data-ver="${esc(a.caminho)}" class="btn small ghost">📎 ${esc(a.nome)}</a>`).join('') || '<span class="muted">Sem anexos.</span>'}</div></div>`,
-    foot: `${ger && aberta ? '<button class="btn danger" id="fo-canc">Cancelar OS</button>' : ''}<span class="spacer"></span><button class="btn" id="fo-imp">Imprimir OS</button>
+    foot: `${ger && aberta ? '<button class="btn danger" id="fo-canc">Cancelar OS</button>' : ''}<span class="spacer"></span><button class="btn" id="fo-prob" title="Abre um problema com Ishikawa, 5 Porquês e plano de ação 5W2H para esta ordem">Analisar o problema</button><button class="btn" id="fo-imp">Imprimir OS</button>
       ${exe && aberta ? `${o.situacao !== 'em_execucao' ? '<button class="btn" id="fo-ini">▶ Iniciar</button>' : '<button class="btn" id="fo-peca">Aguardando peça</button><button class="btn" id="fo-terc">Aguardando terceiro</button>'}
         <button class="btn" id="fo-salva">Salvar</button><button class="btn primary" id="fo-concl">✔ Concluir</button>` : exe ? '<button class="btn primary" id="fo-salva">Salvar</button>' : ''}` });
   conversaNoModal(md, 'man_ordem', o.id);
@@ -167,6 +167,7 @@ export async function fichaOS(D, o, { onMudou } = {}) {
   });
   b('#fo-canc', async () => { const m = prompt('Motivo do cancelamento:'); if (!m?.trim()) return; await q(sb.from('man_ordens').update({ situacao: 'cancelada', motivo_cancelamento: m.trim() }).eq('id', o.id)); toast('OS cancelada'); recarregar(); });
   b('#fo-imp', async () => imprimirOS(D, o, H, P));
+  b('#fo-prob', async () => { el.closest('.modal-back')?.remove(); location.hash = '#/problemas?' + new URLSearchParams({ novo: '1', origem: 'manutencao', origem_id: o.id, ref: 'OS nº ' + o.numero, area: 'Manutenção', titulo: `OS ${o.numero}: ${String(o.descricao || '').slice(0, 100)}`, descricao: [o.descricao, o.causa ? 'Causa informada na OS: ' + o.causa : ''].filter(Boolean).join(' ') }); });
   b('#fh-ok', async () => {
     const h = parseNum($('#fh-h', el).value); if (!(h > 0)) return toast('Informe as horas', true);
     await q(sb.from('man_os_horas').insert({ empresa_id: state.empresa.id, ordem_id: o.id, tecnico: $('#fh-t', el).value.trim() || 'Técnico', data: $('#fh-d', el).value || today(), horas: h, custo_hora: +D.P.custo_hora || 0, descricao: $('#fh-x', el).value.trim() || null }));

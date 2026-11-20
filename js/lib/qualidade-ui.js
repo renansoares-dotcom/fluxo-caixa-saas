@@ -229,11 +229,12 @@ export async function fichaRnc(D, r, { onMudou } = {}) {
       <label class="xs">Verificada em<input type="date" name="efd" value="${r.eficacia_em || ''}" ${reg ? '' : 'disabled'}></label>
       <label class="full">Prevenção (D7) — o que muda para não acontecer em outros produtos<input name="prev" value="${esc(r.prevencao || '')}" ${reg ? '' : 'disabled'} placeholder="Ex.: checklist de setup da solda em todas as máquinas"></label>
     </div></form>`,
-    foot: `<span class="spacer"></span><button class="btn" id="fr-imp">Imprimir RNC</button>${reg ? '<button class="btn primary" id="fr-ok">Salvar</button>' : ''}` });
+    foot: `<span class="spacer"></span><button class="btn" id="fr-prob" title="Abre um problema com Ishikawa, 5 Porquês e plano de ação 5W2H para esta não conformidade">Analisar o problema</button><button class="btn" id="fr-imp">Imprimir RNC</button>${reg ? '<button class="btn primary" id="fr-ok">Salvar</button>' : ''}` });
   conversaNoModal(md, 'qual_rnc', r.id);
   const el = md.el, f = $('#fr', el);
   if ($('#fr-cli', el)) blocoCliente(r, $('#fr-cli', el), { reg, onMudou: () => { md.close(); onMudou?.(); } });
   $('#fr-imp', el).onclick = () => imprimirRnc(D, r);
+  $('#fr-prob', el).onclick = () => { el.closest('.modal-back')?.remove(); location.hash = '#/problemas?' + new URLSearchParams({ novo: '1', origem: 'rnc', origem_id: r.id, ref: 'nº ' + r.numero, area: 'Qualidade', titulo: `RNC ${r.numero}: ${String(r.descricao || '').slice(0, 100)}`, descricao: r.descricao || '' }); };
   $('#fr-ok', el) && ($('#fr-ok', el).onclick = async () => {
     const reg2 = { descricao: f.desc.value.trim() || r.descricao, gravidade: f.grav.value, custo: f.custo.value.trim() ? parseNum(f.custo.value) : 0, situacao: f.sit.value,
       acao_imediata: f.aim.value.trim() || null, porques: $$('[data-pq]', el).map(x => x.value.trim()).filter(Boolean), causa: f.causa.value.trim() || null,
