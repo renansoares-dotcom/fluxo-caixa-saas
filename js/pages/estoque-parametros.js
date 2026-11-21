@@ -4,8 +4,9 @@ import { sb, state, q, podeEditar, isAdmin, loadCadastros } from '../lib/data.js
 import { $, $$, esc, dateBR, toast, fail, modal, confirmDialog, exportXLSX, erroTela } from '../lib/ui.js';
 import { FINALIDADES, POSSE, TIPOS_SPED, SENTIDOS, DOCUMENTOS, PAPEIS, periodoAberto } from '../lib/estoque-kardex.js';
 
+import { abaEtiquetas } from '../lib/etiquetas-ui.js';
 export const title = 'Parâmetros do Estoque';
-const ABAS = [['locais', 'Locais'], ['familias', 'Famílias de item'], ['tipos', 'Tipos de movimento'], ['regras', 'Regras por CFOP'], ['fechamento', 'Fechamento']];
+const ABAS = [['locais', 'Locais'], ['familias', 'Famílias de item'], ['tipos', 'Tipos de movimento'], ['regras', 'Regras por CFOP'], ['fechamento', 'Fechamento'], ['etiquetas', 'Etiquetas']];
 const ui = { aba: 'locais', sentido: 'entrada', busca: '' };
 let D = null;
 const sim = (b) => b ? 'Sim' : '<span class="muted">Não</span>';
@@ -52,6 +53,7 @@ function pintar(root) {
     if (!await confirmDialog('Criar os locais, famílias, tipos de movimento e regras padrão que estiverem faltando? O que já existe não muda.')) return;
     try { await q(sb.rpc('est_configurar_padrao', { p_empresa: state.empresa.id })); toast('Parametrização completada'); await recarregar(root); } catch (err) { fail(err); }
   });
+  if (ui.aba === 'etiquetas') return abaEtiquetas($('#ep-corpo', root), ['admin', 'diretor'].includes(state.papel));
   ({ locais, familias, tipos, regras, fechamento })[ui.aba](root, ed);
 }
 async function recarregar(root) { await carregar(); pintar(root); }

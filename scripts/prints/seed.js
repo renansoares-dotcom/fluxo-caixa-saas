@@ -2751,3 +2751,20 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
   const dfe = DB.dfe_documentos?.find(d => d.situacao === 'xml_disponivel' && /COLOR MASTER/.test(d.emitente_nome)); if (dfe) dfe.chave = window.CHAVE_SEFAZ;
   window.CHAVE_FORA = chave('34567890000112', 5120);
 }
+
+// ---------- etiquetas de mercadoria (SQL 175): código por produto e por lote, lote da NF 77310 e seu saldo ----------
+{
+  let n = 100; const E0 = DB.empresas[0].id, hoje = new Date().toISOString().slice(0, 10);
+  DB.produtos.forEach(p => { p.etiqueta = 'P' + String(++n).padStart(7, '0'); });
+  DB.est_lotes.forEach(l => { l.etiqueta = 'L' + String(++n).padStart(7, '0'); });
+  const p = DB.produtos.find(x => x.codigo === 'MP-001'), locMP = DB.est_locais.find(l => l.finalidade === 'materia_prima') || DB.est_locais[0], tm = DB.est_tipos_movimento.find(t => t.codigo === 'COMPRA') || DB.est_tipos_movimento[0];
+  if (p && locMP) {
+    const lote = { id: 'lt-nf77310', empresa_id: E0, produto_id: p.id, codigo: 'NF77310-1', lote_fornecedor: 'BRK 7915', origem: 'compra', etiqueta: 'L0000123' };
+    DB.est_lotes.push(lote);
+    DB.est_movimentos.push({ id: 'mv-nf77310', empresa_id: E0, data: hoje, produto_id: p.id, local_id: locMP.id, lote_id: lote.id, tipo_movimento_id: tm.id, quantidade: 10000, custo_unitario: 8.715, valor: 87150, nota_id: 'nf-cf1', documento: 'NF 77310', estorno_de: null, criado_em: new Date().toISOString() });
+    DB.est_saldos.push({ id: 'sd-nf77310', empresa_id: E0, produto_id: p.id, local_id: locMP.id, lote_id: lote.id, quantidade: 10000, valor: 87150, ultimo_movimento: hoje });
+  }
+  DB.etq_config = [];
+  window.RPC.est_transferir = window.RPC.est_transferir || (() => 'trf1');
+  window.RPC.etq_config_salvar = () => null;
+}

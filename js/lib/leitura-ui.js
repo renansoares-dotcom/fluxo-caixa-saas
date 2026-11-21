@@ -16,9 +16,10 @@ export async function tratarLeitura(txt) {
   const r = reconhecer(txt);
   if (r.tipo === 'vazio') return;
   if (r.tipo === 'nfe') return notaLida(r);
+  if (r.tipo === 'etiqueta') return (await import('./etiquetas-ui.js')).etiquetaLida(r);
   if (r.tipo === 'boleto') return toast(`Boleto lido${r.valor ? ` (${money(r.valor)})` : ''}. O lançamento da conta a pagar pela leitura do boleto ainda não está disponível.`);
   if (r.tipo === 'invalido') return toast(r.motivo, true);
-  toast(`Código não reconhecido: ${String(r.codigo).slice(0, 40)}. Por enquanto a leitura vale para o código de barras do DANFE.`, true);
+  toast(`Código não reconhecido: ${String(r.codigo).slice(0, 40)}. A leitura vale para o código de barras do DANFE e para a etiqueta de mercadoria da plataforma.`, true);
 }
 
 async function notaLida(k) {
@@ -42,6 +43,7 @@ async function notaLida(k) {
     situacao = `<span class="badge pago">Importada</span> Está em Notas Fiscais: emissão ${dateBR(nota.emissao)}, ${money(nota.v_nf)}, ${esc(nota.situacao)}.${recebida ? ` <b>Já usada no recebimento de ${dateBR(recebida.data)}.</b>` : ''}`;
     botoes = `<button class="btn ${pedidos.length && !recebida ? '' : 'primary'}" id="lt-abrir">Abrir a nota</button>`
       + (recebida ? '' : pedidos.slice(0, 4).map(p => `<button class="btn primary" data-ped="${p.id}">Conferir com o PC ${p.numero}</button>`).join(''));
+    if (nota.tipo === 'entrada') botoes = '<button class="btn" id="lt-etq">Etiquetas</button>' + botoes;
     if (nota.tipo === 'entrada' && !recebida && !pedidos.length) situacao += '<div class="small muted" style="margin-top:6px">Não há pedido de compra aprovado e em aberto para este fornecedor.</div>';
   } else if (dfe?.situacao === 'xml_disponivel') {
     situacao = `<span class="badge previsto">Na SEFAZ</span> A nota chegou da SEFAZ (${dateBR(dfe.emissao)}, ${money(dfe.valor)}) e ainda não foi importada em Notas Fiscais.`;
@@ -63,6 +65,7 @@ async function notaLida(k) {
     <div style="margin-top:14px">${situacao}</div>`,
     foot: `<button class="btn ghost" data-close>Fechar</button><span class="spacer"></span>${botoes}` });
   $('#lt-abrir', m.el) && ($('#lt-abrir', m.el).onclick = () => { m.close(); ir('notas', { tipo: 'nota', id: nota.id, tipo_nf: nota.tipo, emissao: nota.emissao }); });
+  $('#lt-etq', m.el) && ($('#lt-etq', m.el).onclick = async () => { (await import('./etiquetas-ui.js')).etiquetasDaNota(nota); });
   $$('[data-ped]', m.el).forEach(b => b.onclick = () => { m.close(); ir('compras/recebimentos', { tipo: 'receber', id: b.dataset.ped, nota: nota.id }); });
   $('#lt-imp', m.el) && ($('#lt-imp', m.el).onclick = async (ev) => {
     ev.target.disabled = true;
@@ -78,8 +81,8 @@ async function notaLida(k) {
 /** janela "Ler código": campo para o leitor (ou para digitar a chave) e a opção da leitura automática deste computador */
 export function abrirLeitura() {
   const m = modal({ title: 'Ler código de barras', narrow: true, body: `
-    <label>Leia o código de barras do DANFE ou digite a chave de acesso<input id="lt-cod" inputmode="numeric" autocomplete="off" placeholder="44 dígitos" style="font-family:monospace"></label>
-    <p class="small muted">O leitor funciona como um teclado: aponte para o código de barras do DANFE e a plataforma acha a nota. Não precisa abrir esta janela — com a leitura automática ligada, basta ler o código em qualquer tela, sem clicar em nenhum campo.</p>
+    <label>Leia o código de barras do DANFE ou a etiqueta da mercadoria (ou digite o código)<input id="lt-cod" autocomplete="off" placeholder="chave de 44 dígitos ou código da etiqueta" style="font-family:monospace"></label>
+    <p class="small muted">O leitor funciona como um teclado: aponte para o código de barras do DANFE ou para a etiqueta da mercadoria, e a plataforma acha a nota ou o lote. Não precisa abrir esta janela — com a leitura automática ligada, basta ler o código em qualquer tela, sem clicar em nenhum campo.</p>
     <label style="display:flex;flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="lt-auto" style="width:auto;margin:0" ${leituraAutomatica() ? 'checked' : ''}> Leitura automática em qualquer tela, neste computador</label>`,
     foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="lt-ok">Procurar</button>' });
   const cod = $('#lt-cod', m.el); setTimeout(() => cod.focus(), 50);
@@ -92,14 +95,15 @@ export function abrirLeitura() {
 /** leitura em qualquer tela: quando ninguém está digitando num campo e chegam muitos caracteres de uma vez, é o leitor */
 export function instalarLeitor() {
   const d = detector(); let timer = null;
-  const dispara = () => { const c = d.fim(); if (c) tratarLeitura(c); return !!c; };
+  // código curto que não é etiqueta nem chave: ignora em silêncio (pode ser alguém batendo no teclado)
+  const dispara = () => { const c = d.fim(); if (!c || (c.length < 12 && reconhecer(c).tipo === 'desconhecido')) return false; tratarLeitura(c); return true; };
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.altKey || e.metaKey || !leituraAutomatica()) return;
     const el = e.target;
     if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) { d.limpar(); return; }
     if (e.key === 'Enter' || e.key === 'Tab') {
       clearTimeout(timer);
-      if (d.pendente() >= 20) { if (dispara()) { e.preventDefault(); e.stopPropagation(); } } else d.limpar();
+      if (d.pendente() >= 8) { if (dispara()) { e.preventDefault(); e.stopPropagation(); } } else d.limpar();
       return;
     }
     if (e.key.length === 1) { d.tecla(e.key, performance.now()); clearTimeout(timer); timer = setTimeout(dispara, 150); }

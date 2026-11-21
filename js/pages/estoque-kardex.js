@@ -8,6 +8,8 @@ import { FINALIDADES, SENTIDOS, TIPOS_SPED, PODE_MOVIMENTAR, MOTIVOS, resumoLoca
 import { isAdmin } from '../lib/data.js';
 const _pe = podeEditar;
 
+import { abrirLeitura } from '../lib/leitura-ui.js';
+import { etiquetaDe } from '../lib/etiquetas-ui.js';
 export const title = 'Kardex';
 const ui = { aba: 'locais', local: '', busca: '', tipo: '', motivo: '' };
 let D = null;
@@ -49,7 +51,7 @@ function pintar(root) {
   const comSaldo = new Set(D.saldos.filter(s => +s.quantidade).map(s => s.produto_id));
   const movMes = D.movs.filter(m => m.data.startsWith(mes));
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Kardex</h2><div class="muted small">Estoque oficial: saldo por local e lote, custo médio ponderado móvel por produto. Movimento não se altera nem se exclui — corrige-se por estorno.</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="kx-xls">Excel</button>${podeMov() ? '<button class="btn" id="kx-trf">Transferir</button><button class="btn primary" id="kx-novo">Novo movimento</button>' : ''}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="kx-xls">Excel</button><button class="btn" id="kx-ler">Ler código</button>${podeMov() ? '<button class="btn" id="kx-trf">Transferir</button><button class="btn primary" id="kx-novo">Novo movimento</button>' : ''}</div></div>
     ${faixaImplantacao()}
     <div class="kpis">
       <div class="kpi"><div class="k-label">Valor do estoque</div><div class="k-value">${money(R.total)}</div><div class="k-sub">ao custo médio, locais que compõem custo</div></div>
@@ -64,6 +66,7 @@ function pintar(root) {
   $('#kx-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; pintar(root); } };
   $('#kx-loc', root) && ($('#kx-loc', root).onchange = (e) => { ui.local = e.target.value; corpoAba(root, R); });
   let t; $('#kx-bus', root) && ($('#kx-bus', root).oninput = (e) => { clearTimeout(t); t = setTimeout(() => { ui.busca = e.target.value; corpoAba(root, R); }, 250); });
+  $('#kx-ler', root).onclick = () => abrirLeitura();
   $('#kx-xls', root).onclick = () => { const tb = $('#kx-corpo table', root); if (tb) exportXLSX(tb, 'kardex_' + ui.aba); };
   $('#kx-novo', root) && ($('#kx-novo', root).onclick = () => movimento(root));
   $('#kx-impl', root) && ($('#kx-impl', root).onclick = () => implantar(root));
@@ -127,11 +130,14 @@ async function kardexProduto(p, root) {
       <div><span class="muted">Custo médio</span><div>${c ? unit(c.custo_medio) + ' / ' + esc(p.unidade) : '–'}</div></div>
       <div><span class="muted">Valor</span><div>${c ? money(c.valor) : '–'}</div></div>
     </div>
-    ${S.length ? `<h3 style="margin:14px 0 6px">Saldo por local e lote</h3><div class="table-wrap"><table><thead><tr><th>Local</th><th>Lote</th><th class="num">Quantidade</th><th class="num">Valor</th><th>Último movimento</th></tr></thead><tbody>
-      ${S.map(s => `<tr><td>${esc(D.loc[s.local_id]?.nome || '')}</td><td>${esc(D.lote[s.lote_id]?.codigo || '')}${D.lote[s.lote_id]?.lote_fornecedor ? ` <span class="small muted">forn. ${esc(D.lote[s.lote_id].lote_fornecedor)}</span>` : ''}</td><td class="num">${qtd(s.quantidade)}</td><td class="num">${money(s.valor)}</td><td>${dateBR(s.ultimo_movimento)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    ${S.length ? `<h3 style="margin:14px 0 6px">Saldo por local e lote</h3><div class="table-wrap"><table><thead><tr><th>Local</th><th>Lote</th><th class="num">Quantidade</th><th class="num">Valor</th><th>Último movimento</th><th></th></tr></thead><tbody>
+      ${S.map(s => `<tr><td>${esc(D.loc[s.local_id]?.nome || '')}</td><td>${esc(D.lote[s.lote_id]?.codigo || '')}${D.lote[s.lote_id]?.lote_fornecedor ? ` <span class="small muted">forn. ${esc(D.lote[s.lote_id].lote_fornecedor)}</span>` : ''}</td><td class="num">${qtd(s.quantidade)}</td><td class="num">${money(s.valor)}</td><td>${dateBR(s.ultimo_movimento)}</td><td><button class="btn small ghost" data-etq="${s.lote_id || ''}" data-q="${s.quantidade}">Etiqueta</button></td></tr>`).join('')}</tbody></table></div>` : ''}
     <h3 style="margin:14px 0 6px">Movimentos</h3><div class="table-wrap" style="max-height:45vh" id="kp-movs">${tabelaMovs(M, false)}</div>
     ${podeMov() ? '<p class="small muted">Clique num movimento para estorná-lo.</p>' : ''}`,
     foot: `${podeEditar() ? '<button class="btn" id="kp-rec" title="Refaz custo e saldos em ordem de data (após lançamentos com data retroativa)">Recalcular</button>' : ''}<span class="spacer"></span>${podeMov() ? '<button class="btn" id="kp-mov">Novo movimento deste produto</button>' : ''}<button class="btn" data-close>Fechar</button>` });
+  $$('[data-etq]', m.el).forEach(b => b.onclick = () => { const l = D.lote[b.dataset.etq] || null;
+    if (!(l ? l.etiqueta : p.etiqueta)) return toast('As etiquetas precisam do SQL 175.', true);
+    etiquetaDe(p, l, { quantidade: +b.dataset.q, fornecedor: '' }); });
   if (podeMov()) $$('#kp-movs tr[data-m]', m.el).forEach(tr => { const mv = M.find(x => x.id === tr.dataset.m); if (!mv || mv.estorno_de || estornados.has(mv.id)) return; tr.classList.add('clickable'); tr.onclick = () => estornar(mv, p, root, m); });
   $('#kp-mov', m.el) && ($('#kp-mov', m.el).onclick = () => { m.close(); movimento(root, { produto: p }); });
   $('#kp-rec', m.el) && ($('#kp-rec', m.el).onclick = async () => {

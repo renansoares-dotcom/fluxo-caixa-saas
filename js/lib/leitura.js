@@ -1,6 +1,7 @@
 // Leitor de código de barras (21/11/2026, ideia do Renan). O leitor USB ou Bluetooth funciona como um teclado: "digita" o código
 // depressa e termina com Enter. Parte pura: reconhece o que foi lido (chave de NF-e/CT-e do DANFE, boleto) e separa a leitura do
-// leitor da digitação de uma pessoa. As etiquetas de mercadoria e o inventário entram aqui nas próximas etapas.
+// leitor da digitação de uma pessoa. Etapa 2: reconhece também a etiqueta de mercadoria (L… = lote, P… = produto; js/lib/etiquetas.js).
+import { codigoEtiqueta } from './etiquetas.js';
 const so = (s) => String(s ?? '').replace(/\D/g, '');
 const UF = { 11: 'RO', 12: 'AC', 13: 'AM', 14: 'RR', 15: 'PA', 16: 'AP', 17: 'TO', 21: 'MA', 22: 'PI', 23: 'CE', 24: 'RN', 25: 'PB', 26: 'PE', 27: 'AL', 28: 'SE', 29: 'BA',
   31: 'MG', 32: 'ES', 33: 'RJ', 35: 'SP', 41: 'PR', 42: 'SC', 43: 'RS', 50: 'MS', 51: 'MT', 52: 'GO', 53: 'DF' };
@@ -34,6 +35,7 @@ export function boleto(txt) {
 /** reconhece o que foi lido. Aceita o código puro, a chave com espaços e o endereço do QR da NFC-e (…?p=CHAVE|…) */
 export function reconhecer(txt) {
   const bruto = String(txt ?? '').trim(); if (!bruto) return { tipo: 'vazio' };
+  const etq = codigoEtiqueta(bruto); if (etq) return { tipo: 'etiqueta', ...etq };
   const candidatos = [so(bruto), ...(bruto.match(/\d{44}/g) || [])].filter(c => c.length === 44);
   for (const c of candidatos) { const k = chaveNFe(c); if (k?.valida) return { tipo: 'nfe', ...k }; }
   for (const c of candidatos) { const b = boleto(c); if (b?.valida) return { tipo: 'boleto', ...b }; }
@@ -45,7 +47,7 @@ export function reconhecer(txt) {
 
 /** separa a leitura do leitor da digitação: o leitor manda muitos caracteres em poucos milissegundos.
  *  uso: const d = detector(); d.tecla(caractere, agora) a cada tecla; d.fim(agora) no Enter ou na pausa → o código lido, ou null */
-export function detector({ minimo = 20, intervalo = 45 } = {}) {
+export function detector({ minimo = 8, intervalo = 45 } = {}) {
   let buf = '', t0 = 0, tUlt = 0;
   return {
     tecla(ch, agora) { if (buf && agora - tUlt > 250) buf = ''; if (!buf) t0 = agora; buf += ch; tUlt = agora; },
