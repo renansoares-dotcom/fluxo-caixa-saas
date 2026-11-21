@@ -2736,3 +2736,18 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
   window.RPC.relp_variante_excluir = (a) => { DB.relp_variantes = DB.relp_variantes.filter(v => v.id !== a.p_id); return null; };
   window.RPC.relp_config_salvar = () => null;
 }
+
+// ---------- leitor de código de barras: nota de entrada com chave válida (a mesma do recebimento do PC 117) ----------
+{
+  const dv = (c) => { let s = 0, p = 2; for (let i = c.length - 1; i >= 0; i--) { s += +c[i] * p; p = p === 9 ? 2 : p + 1; } const r = s % 11; return r < 2 ? 0 : 11 - r; };
+  const hoje = new Date(), aamm = String(hoje.getFullYear()).slice(2) + String(hoje.getMonth() + 1).padStart(2, '0');
+  const chave = (cnpj, numero) => { const b = '26' + aamm + cnpj + '55' + '001' + String(numero).padStart(9, '0') + '1' + '00077310'; return b + dv(b); };
+  const ped = DB.compras_pedidos.find(p => p.numero === 117), E0 = DB.empresas[0].id, iso = (d) => { const x = new Date(); x.setDate(x.getDate() + d); return x.toISOString().slice(0, 10); };
+  window.CHAVE_LIDA = chave('11222333000144', 77310);
+  if (!DB.nfe_notas.some(n => n.id === 'nf-cf1')) DB.nfe_notas.push({ id: 'nf-cf1', empresa_id: E0, chave: window.CHAVE_LIDA, modelo: 55, serie: '1', numero: 77310, emissao: iso(-2), tipo: 'entrada', emissao_propria: false, finalidade: '1',
+    natureza: 'VENDA DE PRODUÇÃO', cfops: ['5101'], emit_nome: 'RESINAS DO BRASIL S.A.', emit_doc: '11222333000144', dest_nome: DB.empresas[0].razao_social, favorecido_id: ped?.favorecido_id, v_prod: 87570, v_nf: 87570, situacao: 'autorizada', eventos: [] });
+  else Object.assign(DB.nfe_notas.find(n => n.id === 'nf-cf1'), { chave: window.CHAVE_LIDA, favorecido_id: ped?.favorecido_id });
+  window.CHAVE_SEFAZ = chave('23456789000101', 8841);
+  const dfe = DB.dfe_documentos?.find(d => d.situacao === 'xml_disponivel' && /COLOR MASTER/.test(d.emitente_nome)); if (dfe) dfe.chave = window.CHAVE_SEFAZ;
+  window.CHAVE_FORA = chave('34567890000112', 5120);
+}

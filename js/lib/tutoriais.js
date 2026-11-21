@@ -14,6 +14,8 @@ export const MANUAIS = [
     resumo: 'Calendário (mês, semana e lista) com compromissos próprios e tudo o que tem data na plataforma: títulos, cheques, contatos, fechamento, contratos, frota, manutenção e mais; saldo previsto por dia; resolver, adiar e delegar.' },
   { id: 'relatorios', titulo: 'Relatórios agendados', area: 'Painéis', rotas: ['relatorios'],
     resumo: 'Relatórios enviados por e-mail na frequência escolhida (posição de caixa, contas a pagar, faturamento, despesas, produção, fretes), com modelos prontos e prévia.' },
+  { id: 'leitor-codigo-barras', titulo: 'Leitor de código de barras — leitura do DANFE', area: 'Compras', rotas: [],
+    resumo: 'Leia o código de barras do DANFE em qualquer tela: a plataforma acha a nota (importada, na SEFAZ ou ausente) e leva à conferência com o pedido de compra.' },
   { id: 'relatorios-padrao', titulo: 'Padrão dos relatórios — parâmetros impressos, histórico, Repetir e variantes', area: 'Painéis', rotas: ['relatorios/emitidos'],
     resumo: 'Todo relatório em PDF ou Excel sai com código, número de emissão, usuário e os filtros usados; histórico das emissões com o botão Repetir, filtros salvos com nome (variantes) e catálogo de códigos.' },
   { id: 'painel-diretoria', titulo: 'Painel da Diretoria', area: 'Painéis', rotas: ['diretoria'],

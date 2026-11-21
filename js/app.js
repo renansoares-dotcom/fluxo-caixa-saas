@@ -16,6 +16,7 @@ import { montarMenu, marcarTela, modoPainel, cliqueArea, fecharPainel } from './
 import { codigoDa } from './lib/telas.js';
 import { aplicarPendente } from './lib/relatorio-filtros.js';
 import { abrirVariantes } from './lib/relatorio-variantes-ui.js';
+import { instalarLeitor } from './lib/leitura-ui.js';
 import { iniciarUso, pararUso, telaUso, cargaUso } from './lib/uso.js';
 import { exigirTermo } from './lib/lgpd-termo.js';
 import { iniciarOffline, guardarEntrada, lerEntrada } from './lib/offline.js';
@@ -173,6 +174,7 @@ const routes = {
 // ---------- Tema ----------
 const savedTheme = (() => { try { return localStorage.getItem('fc-theme'); } catch { return null; } })();
 if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+instalarLeitor();   // leitor de código de barras: leitura em qualquer tela
 $('#filtros-btn') && ($('#filtros-btn').onclick = () => { if (state.empresa?.id) abrirVariantes(); });
 $('#theme-btn').onclick = () => {
   const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');

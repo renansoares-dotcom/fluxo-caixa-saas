@@ -4,6 +4,7 @@ import { sb, state, q, fetchAll } from '../lib/data.js';
 import { $, $$, esc, money, dateBR, today, fail, toast, modal } from '../lib/ui.js';
 import { cadCompras, ST_PED, badge, ABERTOS, qtd, inp, unit, num, diasTxt } from '../lib/compras.js';
 import { carregarPedidos } from './compras-pedidos.js';
+import { abrirLeitura } from '../lib/leitura-ui.js';
 import { TIPOS, SITUACOES, situacaoNota, resumo, podeLiberar, filtrar } from '../lib/confronto.js';
 
 export const title = 'Recebimentos';
@@ -14,16 +15,17 @@ export async function render(root) {
   if (/[?&]aba=confronto/.test(location.hash)) ui.aba = 'confronto';
   const gestor = ['admin', 'diretor'].includes(state.papel);
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Recebimentos</h2><div class="muted small">Importe o XML da nota em Notas Fiscais (entradas) e confira aqui contra o pedido. Nota que diverge do pedido tem o pagamento bloqueado até a liberação.</div></div>
-      ${gestor ? '<button class="btn ghost" id="rc-par">Parâmetros do confronto</button>' : ''}</div>
+      <div style="display:flex;gap:8px;flex-wrap:nowrap;white-space:nowrap"><button class="btn" id="rc-ler">Ler DANFE</button>${gestor ? '<button class="btn ghost" id="rc-par">Parâmetros do confronto</button>' : ''}</div></div>
     <div class="card toolbar"><div class="chips" id="rc-abas">${[['receber', 'A receber'], ['confronto', 'Confronto pedido × nota']].map(([k, t]) => `<span class="chip ${ui.aba === k ? 'on' : ''}" data-a="${k}">${t}</span>`).join('')}</div></div>
     <div id="rc-corpo" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#rc-abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a && a !== ui.aba) { ui.aba = a; render(root); } };
   $('#rc-par', root) && ($('#rc-par', root).onclick = () => parametros(root));
+  $('#rc-ler', root).onclick = () => abrirLeitura();
   PAR = (await q(sb.from('compras_parametros').select('*').eq('empresa_id', state.empresa.id)).catch(() => []))[0] || {};
   if (ui.aba === 'confronto') return confronto(root);
   const ab = state.abrir?.tipo === 'receber' ? state.abrir : null; if (ab) delete state.abrir;
   await carregar(root);
-  if (ab) { const p = P.find(x => x.id === ab.id); if (p) receber(p, root); }
+  if (ab) { const p = P.find(x => x.id === ab.id); if (p) receber(p, root, ab.nota); }
 }
 
 async function carregar(root) {
@@ -70,7 +72,7 @@ function casar(itens, nitens, doc) {
   });
 }
 
-async function receber(p, root) {
+async function receber(p, root, notaLida = null) {
   let notas = [];
   try {
     const ids = [...new Set(p.itens.map(i => i.produto_id).filter(Boolean))];
@@ -143,6 +145,11 @@ async function receber(p, root) {
   };
   $('#rc-notas', m.el).onchange = () => { const id = $('input[name=rc-n]:checked', m.el)?.value; nota = notas.find(n => n.id === id) || null; pintarConf(); };
   if (notas.length === 1 && !notas[0].ja_recebida) { $('input[name=rc-n]', m.el).checked = true; nota = notas[0]; }
+  if (notaLida) {   // veio da leitura do DANFE: a nota lida já entra escolhida
+    const r = $$('input[name=rc-n]', m.el).find(x => x.value === notaLida);
+    if (r) { r.checked = true; nota = notas.find(n => n.id === notaLida) || null; }
+    else toast('A nota lida não está entre as notas deste pedido (fornecedor diferente ou emitida mais de 30 dias antes do pedido). Escolha a nota na lista.', true);
+  }
   pintarConf();
   function itensTela() {
     return $$('tr[data-k]', conf).map(tr => { const i = pend[+tr.dataset.k], nid = nota ? $('.rc-ni', tr).value : '';

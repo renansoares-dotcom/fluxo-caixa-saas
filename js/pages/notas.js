@@ -11,6 +11,8 @@ import { usosPorNota, usarCredito, desfazerUso } from '../lib/creditos.js';
 import { pintarRelatorios, limparCacheRelatorios } from '../lib/notas-relatorio-ui.js';
 import { conversaNoModal } from '../lib/mini-chat.js';
 
+import { abrirLeitura, tratarLeitura } from '../lib/leitura-ui.js';
+import { reconhecer } from '../lib/leitura.js';
 export const title = 'Notas Fiscais';
 /** importa XML já carregados (ex.: os que vieram da SEFAZ) pelo mesmo importador dos arquivos */
 export const importarXmls = (xmls, aoTerminar) => importar(null, xmls, aoTerminar);
@@ -43,6 +45,7 @@ export async function render(root) {
         <label class="grow">Buscar<input name="busca" value="${esc(ui.busca)}" placeholder="nº, cliente, CNPJ, natureza"></label>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="ler">Ler DANFE</button>
         <button class="btn" id="exp">Exportar Excel</button>
         ${podeEditar() ? '<button class="btn primary" id="imp">Importar XML</button>' : ''}
       </div></div>
@@ -59,7 +62,11 @@ export async function render(root) {
     if ((nm === 'de' || nm === 'ate') && ui.de && ui.ate && ui.de > ui.ate) { toast('A data inicial é depois da final', true); return; }
     carregar(root);
   });
-  let t; $('#flt [name=busca]', root).oninput = (e) => { clearTimeout(t); t = setTimeout(() => { ui.busca = e.target.value; pintar(root); }, 300); };
+  $('#ler', root).onclick = () => abrirLeitura();
+  // chave do DANFE lida (ou colada) no campo Buscar: abre a nota em vez de filtrar a lista
+  let t; $('#flt [name=busca]', root).oninput = (e) => { clearTimeout(t);
+    if (e.target.value.replace(/\D/g, '').length === 44 && reconhecer(e.target.value).tipo === 'nfe') { const c = e.target.value; e.target.value = ''; ui.busca = ''; return tratarLeitura(c); }
+    t = setTimeout(() => { ui.busca = e.target.value; pintar(root); }, 300); };
   $('#abas', root).onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { ui.aba = a; root.querySelectorAll('#abas .chip').forEach(c => c.classList.toggle('on', c.dataset.a === a)); pintar(root); } };
   $('#imp', root) && ($('#imp', root).onclick = () => importar(root));
   $('#exp', root).onclick = () => exportXLSX($('#corpo table', root), `notas_${ui.tipo}_${D?.ini || ui.mes}_${D?.fim || ''}`);
