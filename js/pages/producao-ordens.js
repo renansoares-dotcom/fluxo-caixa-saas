@@ -181,7 +181,7 @@ async function abrir(o, root) {
 
 async function imprimirOP(o, et, nec) {
   const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up', true);
-  await abrirRelatorio({ janela: w, nome: `Ordem de produção OP ${o.numero}`, titulo: `Ordem de produção nº ${o.numero}`,
+  await abrirRelatorio({ rel: 'Ordem de produção', tipo: 'documento', janela: w, nome: `Ordem de produção OP ${o.numero}`, titulo: `Ordem de produção nº ${o.numero}`,
     subtitulo: o.numero_iniflex ? `Iniflex ${esc(o.numero_iniflex)}` : '',
     extraCss: 'table.prc td{height:22px;border-bottom:.4px solid #888} table.prc td+td{border-left:.25px solid #bbb}',
     corpo: `<h2>1. Produto e pedido</h2>

@@ -79,7 +79,7 @@ export async function render(root) {
   };
   if (podeEditar()) {
     $('#modelo', root).onclick = () => exportXLSX([['Data', 'Plano de contas', 'Descrição', 'Favorecido', 'Centro de Custo', 'Status', 'Conta', 'Valor', 'Opcional 1'],
-      [new Date().toISOString().slice(0, 10), state.cad.contasPlano[0]?.label || '', 'Exemplo', '', state.cad.cc[0]?.nome || '', 'Pago', state.cad.contas[0]?.nome || '', 100, '']], 'modelo_importacao');
+      [new Date().toISOString().slice(0, 10), state.cad.contasPlano[0]?.label || '', 'Exemplo', '', state.cad.cc[0]?.nome || '', 'Pago', state.cad.contas[0]?.nome || '', 100, '']], 'modelo_importacao', { cabecalho: false });
     $('#arq', root).onchange = (ev) => importar(ev.target.files[0], root);
   }
 }

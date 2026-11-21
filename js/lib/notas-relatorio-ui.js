@@ -84,7 +84,7 @@ function imprimir(R, per, perA) {
     <h2>2. ${esc(titulo)}</h2>${tabela(R, { pdf: true })}
     <p class="nota">${R.tipo === 'faturamento' ? 'Vendas: notas emitidas com CFOP de venda (5.101 a 5.125, 6.101 a 6.125, ST e exportação). Devoluções: notas de devolução de clientes.' : 'Compras: notas de fornecedores com CFOP de venda e notas próprias de entrada de compra, energia, comunicação, transporte, ativo e uso e consumo. Devoluções: notas próprias de devolução a fornecedores.'}
     Fora do relatório: ${fora(R)}. Valores com IPI e ST. ABC: A até 80% do acumulado, B até 95%, C o restante.</p>`;
-  abrirRelatorio({ nome: titulo, titulo: `Relatório de ${nomeRel(R.tipo).toLowerCase()}`, subtitulo: `Emissão de ${per}${rel.comparar ? ` · comparativo com ${perA}` : ''}`, corpo,
+  abrirRelatorio({ rel: 'Relatório de notas fiscais', tipo: 'relatorio', nome: titulo, titulo: `Relatório de ${nomeRel(R.tipo).toLowerCase()}`, subtitulo: `Emissão de ${per}${rel.comparar ? ` · comparativo com ${perA}` : ''}`, corpo,
     rodape: 'Base: XML das NF-e importados na plataforma (Notas fiscais).', paisagem: !(rel.ag === 'mes' && !rel.comparar), extraCss: '.nota{font-size:9pt;margin-top:8px}' });
 }
 

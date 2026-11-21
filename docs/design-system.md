@@ -93,7 +93,14 @@ $('#tb', root).append(seletorColunas({ tela: 'lancamentos', colunas: COLUNAS }).
 Tabela mais larga que a tela rola para o lado e **esmaece a borda** onde há mais colunas (`.table-wrap.rola-dir` / `.rola-esq`, marcadas por `js/app.js`; CSS só até 900 px). Não precisa fazer nada na tela.
 
 ## 6. Relatórios
-Sempre por `abrirRelatorio()` de `js/lib/relatorio.js`. O padrão é o de Fretes e CIOT: Times, logo, título em maiúsculas, seções numeradas, filetes pretos e rodapé com a base dos dados.
+Sempre por `abrirRelatorio()` de `js/lib/relatorio.js`. Padrão aprovado em 21/11/2026 (`js/lib/relatorio-padrao.js`, manual `relatorios-padrao`):
+- Leiaute de ERP: Times, só preto e cinza, sem fundo, sem ícone e **sem logotipo** (só o nome da empresa e o CNPJ). "Sem cores" vale para o relatório (PDF e Excel), não para as telas.
+- Cabeçalho corrido: empresa à esquerda; código do relatório, nome, número da emissão, data, hora e usuário à direita. Rodapé corrido: fonte dos dados e "Página X de Y".
+- Quadro **Parâmetros do relatório** com todos os filtros (vazio = "Todos"). Os filtros são lidos sozinhos da barra de filtros da tela (`.toolbar`); bloco de filtros fora da barra leva `data-filtros`; controle que não é filtro leva `data-sem-filtro`; grupo de fichas pode dizer o rótulo em `data-rotulo`.
+- Na chamada: `tipo: 'documento'` para pedido, ordem, laudo, termo (sem quadro de parâmetros) e `rel: 'Nome estável'` quando o `nome` traz número ou nome próprio (é o `rel` que vai para o catálogo de códigos).
+- Negativo com sinal de menos, total em negrito (`tr.tot`), grupo em `tr.gr`, subtotal em `tr.st`, valores à direita (`.n`/`.num`). Não use cor nem fundo no corpo; o padrão força preto.
+- Excel: `exportXLSX()` já põe o mesmo cabeçalho e registra a emissão. `{ cabecalho: false }` só para modelo de importação. Coluna numérica precisa da classe `num` para sair como número.
+- Relatório novo com dados estruturados: monte o `spec` e use `htmlPadrao()`.
 
 ## 7. Responsivo
 Teste em 1366, 1920 e 390 px. Nada pode estourar a largura, e os alvos de toque têm no mínimo 40 px no celular.

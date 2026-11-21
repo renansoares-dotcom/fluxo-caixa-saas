@@ -145,7 +145,7 @@ async function gerarExtrato(w, contas, o) {
   const corpo = partes.map((p, i) => `<section class="ext-conta">${uma ? '' : `<h2>${i + 1}. ${esc(p.r.ct.nome)}</h2>`}${p.html}</section>`).join('')
     || '<p class="m">Nenhuma conta com movimento no período.</p>';
   const per = `${dateBR(o.de)} a ${dateBR(o.ate)}`;
-  await abrirRelatorio({ janela: w, nome: uma ? `Extrato ${contas[0].ct.nome}` : 'Extrato das contas', titulo: 'Extrato da conta',
+  await abrirRelatorio({ rel: 'Extrato das contas', tipo: 'relatorio', janela: w, nome: uma ? `Extrato ${contas[0].ct.nome}` : 'Extrato das contas', titulo: 'Extrato da conta',
     subtitulo: `${uma ? esc(contas[0].ct.nome) + ' · ' : ''}${per}${o.detalhado ? '' : ' · resumo por dia'}`,
     corpo, extraCss: CSS_EXTRATO,
     rodape: `Lançamentos pagos da plataforma (Conferência do Dia), saldo inicial pelo saldo pago acumulado até ${dateBR(addDias(o.de, -1))}. Valores em R$. ${esc(state.empresa?.nome || '')}` });

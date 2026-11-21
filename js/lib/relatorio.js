@@ -4,22 +4,35 @@
 //  - abrirRelatorio(): janela de impressão (HTML)
 //  - padronizarPDF(doc): PDFs gerados direto (jsPDF + autoTable) passam para Times e para as tabelas do padrão
 import { state } from './data.js';
-import { esc, toast, logoPNG } from './ui.js';
+import { toast } from './ui.js';
 
 export { EMPRESA_REL, cssRelatorio, cabecalhoRelatorio, documentoRelatorio } from './relatorio-base.js';
-import { EMPRESA_REL, documentoRelatorio } from './relatorio-base.js';
+import { EMPRESA_REL } from './relatorio-base.js';
+import { documentoPadrao } from './relatorio-padrao.js';
+import { capturarFiltros, varianteEmUso } from './relatorio-filtros.js';
+import { registrarEmissao, rotaAtual } from './relatorio-emissao.js';
 
 /**
- * Abre a janela de impressão no padrão.
- * @param {object} o  { nome (cabeçalho), titulo (H1), subtitulo, corpo (HTML), rodape (texto), paisagem, extraCss, auto (imprime ao abrir) }
+ * Abre a janela de impressão no padrão dos relatórios (21/11/2026): cabeçalho com empresa, código do relatório, número da
+ * emissão, data, hora e usuário; quadro "Parâmetros do relatório" com os filtros da tela; tudo em preto, sem logotipo.
+ * @param {object} o  { nome (cabeçalho), rel (nome estável no catálogo, quando `nome` traz número ou nome próprio), titulo (H1), subtitulo,
+ *   corpo (HTML), rodape (texto), paisagem, extraCss, auto (imprime ao abrir), janela,
+ *   tipo: 'documento' (pedido, ordem, laudo… — sem quadro de parâmetros; padrão quando sai de uma ficha aberta) | 'relatorio',
+ *   parametros: [[rótulo, valor]] (opcional: sem isto, os filtros são lidos da barra de filtros da tela) }
  */
-export async function abrirRelatorio({ nome, titulo, subtitulo = '', corpo = '', rodape = '', paisagem = false, extraCss = '', margem, auto = true, janela = null }) {
+export async function abrirRelatorio({ nome, rel, titulo, subtitulo = '', corpo = '', rodape = '', paisagem = false, extraCss = '', auto = true, janela = null, tipo, parametros }) {
   const w = janela || window.open('', '_blank'); if (!w) { toast('Libere as janelas pop-up para imprimir', true); return null; }
-  const logo = await logoPNG().catch(() => null);
-  w.document.write(documentoRelatorio({ nome, titulo, subtitulo, corpo, rodape, paisagem, extraCss, margem, auto, logo, tituloPagina: `${nome || titulo} — ${state.empresa?.nome || ''}` }));
+  const doc = tipo ? tipo === 'documento' : !parametros && !!document.querySelector('.modal-back');
+  const cap = doc ? null : capturarFiltros();
+  let pars = doc ? [] : parametros || cap.parametros;
+  if (!doc && cap) { const v = varianteEmUso(rotaAtual(), cap.estado); if (v) pars = [...pars, ['Variante', v]]; }
+  const em = await registrarEmissao({ nome: rel || nome || titulo, formato: 'pdf', tipo: doc ? 'documento' : 'relatorio', parametros: pars, filtros: cap?.estado || null });
+  w.document.write(documentoPadrao({ codigo: em.codigo, nome: nome || titulo, titulo, subtitulo, corpo, rodape, paisagem, extraCss, tipo: doc ? 'documento' : 'relatorio', parametros: pars,
+    empresa: { nome: EMPRESA_REL, cnpj: cnpjFmt(em.cnpj) }, emissao: { numero: em.numero, quando: em.quando, usuario: em.usuario }, arquivo: `${nome || titulo} — ${state.empresa?.nome || ''}` }, { barra: true, auto }));
   w.document.close();
   return w;
 }
+const cnpjFmt = (c) => { const d = String(c || '').replace(/\D/g, ''); return d.length === 14 ? d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : String(c || ''); };
 
 // ---------------------------------------------------------------- PDFs gerados direto (jsPDF)
 export const PRETO = [17, 17, 17];

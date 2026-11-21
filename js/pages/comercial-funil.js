@@ -211,7 +211,7 @@ async function pdf(o, p, its) {
   const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para gerar o PDF', true);
   const cli = o.favorecido_id ? B.clientes.find(c => c.id === o.favorecido_id) : null;
   const espec = (i) => [i.material, i.largura_mm && `${qtd(i.largura_mm)} mm`, i.espessura_um && `${qtd(i.espessura_um)} µm`, i.comprimento_m && `${qtd(i.comprimento_m)} m`, i.cores_impressao ? `${i.cores_impressao} cor(es)` : null, i.especificacao].filter(Boolean).join(' · ');
-  await abrirRelatorio({ janela: w, nome: `Proposta comercial nº ${p.numero}`, titulo: `Proposta comercial nº ${p.numero}`,
+  await abrirRelatorio({ rel: 'Proposta comercial', tipo: 'documento', janela: w, nome: `Proposta comercial nº ${p.numero}`, titulo: `Proposta comercial nº ${p.numero}`,
     subtitulo: `Data ${dateBR(p.data)} · validade ${dateBR(p.validade) || '—'}`,
     corpo: `<h2>1. Cliente</h2>
     <table class="info"><tr><td>Cliente</td><td>${esc(cli?.nome || o.prospect || '')}</td></tr><tr><td>CNPJ/CPF</td><td>${esc(cli?.documento || '')}</td></tr>

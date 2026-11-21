@@ -110,7 +110,7 @@ export async function imprimirRomaneio(carga, veiculo, stops, m) {
   const kg = (v) => Math.round(+v || 0).toLocaleString('pt-BR');
   const linhas = (lista, carreg) => lista.map((s, i) => `<tr><td class="c">${carreg ? lista.length - i : i + 1}</td><td><b>${esc(s.nome || '')}</b><br><span class="p">${esc([s.logradouro, s.nro].filter(Boolean).join(', '))}${s.bairro ? ' · ' + esc(s.bairro) : ''}</span></td>
     <td>${esc(s.xmun || '')}/${esc(s.uf || '')}</td><td>${s.notas.map(n => n.numero).join(', ')}</td><td class="n">${kg(s.vol)}</td><td class="n">${kg(s.kg)}</td>${carreg ? '' : '<td class="ass"></td>'}</tr>`).join('');
-  await abrirRelatorio({ janela: w, nome: `Romaneio — carga ${carga.numero || '(sugestão)'}`, titulo: `Romaneio de carga ${carga.numero ? 'nº ' + carga.numero : '(sugestão)'}`,
+  await abrirRelatorio({ rel: 'Romaneio de carga', tipo: 'documento', janela: w, nome: `Romaneio — carga ${carga.numero || '(sugestão)'}`, titulo: `Romaneio de carga ${carga.numero ? 'nº ' + carga.numero : '(sugestão)'}`,
     subtitulo: `${dateBR(carga.data)} · ${esc(veiculo?.codigo || '')} ${esc(veiculo?.placa || '')}`,
     extraCss: '.c{text-align:center;width:28px} .p{color:#555;font-size:9.5px} td.ass{width:150px;border-left:.25px solid #bbb} @media print{h2{page-break-after:avoid}}',
     corpo: `<h2>1. Dados da carga</h2>

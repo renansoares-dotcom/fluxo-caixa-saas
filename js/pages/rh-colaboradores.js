@@ -233,7 +233,7 @@ async function imprimirRelatorio(xs, filtros) {
     return `${REL.grupo ? `<tr class="gr"><td colspan="${cols.length}">${esc(g)} <span>— ${l.length} pessoa(s)</span></td></tr>` : ''}
       ${l.map(c => { k++; return `<tr>${cols.map(([t, f, cl], i) => `<td class="${cl || ''}">${i === 0 ? k : f(c)}</td>`).join('')}</tr>`; }).join('')}
       ${REL.grupo && REL.salario ? `<tr class="st"><td colspan="${cols.length - 1 - (REL.assinatura ? 1 : 0)}">Subtotal ${esc(g)}</td><td class="n">${money(soma(l))}</td>${REL.assinatura ? '<td></td>' : ''}</tr>` : ''}`; }).join('');
-  await abrirRelatorio({ janela: w, nome: 'Relação de colaboradores', titulo: 'Relação de colaboradores', paisagem: cols.length > 8,
+  await abrirRelatorio({ tipo: 'relatorio', janela: w, nome: 'Relação de colaboradores', titulo: 'Relação de colaboradores', paisagem: cols.length > 8,
     subtitulo: `${esc(state.empresa.nome || '')}${state.user?.email ? ` · emitido por ${esc(state.user.email)}` : ''}`,
     extraCss: '.res{display:flex;gap:18px;justify-content:center;margin:4px 0 8px;font-size:11px} .res b{font-size:12px} td.ass{width:150px} tr.gr span{font-weight:normal;color:#555}',
     corpo: `<div class="res"><div>Pessoas: <b>${xs.length}</b></div>${REL.salario ? `<div>Salário base total: <b>${money(soma(xs))}</b></div><div>Média: <b>${money(soma(xs) / xs.length)}</b></div>` : ''}<div>Filtros: ${esc(filtros)}</div></div>

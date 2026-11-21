@@ -369,4 +369,9 @@ export const FIGS = [
   ['rma', 'rma', '## 7.', 'Registrar o envio do mês, com protocolo e comentários da administração', 'click:.rm-mes[data-mes="2026-09-01"]|click:#rm-enviar'],
   ['rma', 'rma', '### 5.2', 'Diário do documento: comentários da equipe com autor, data e hora', 'click:.rm-mes[data-mes="2026-10-01"]|click:[data-com="re1006"]'],
   ['importacao', 'compras/importacao', '### 6.3', 'Importação por meio de terceiro: repasses ao intermediário contra o total informado', 'click:.im-card[data-p="imp7"]|click:[data-paba="cambio"]'],
+  ['relatorios-padrao', 'relatorios/emitidos', '## 5.', 'Relatórios emitidos: indicadores, filtros e o histórico com os parâmetros de cada emissão'],
+  ['relatorios-padrao', 'relatorios/emitidos', '### 5.1', 'Emissão aberta: todos os parâmetros usados, com os botões Salvar como variante e Repetir', 'click:tr[data-id="rem131"] td:nth-child(4)'],
+  ['relatorios-padrao', 'estoque/kardex', '## 6.', 'Filtros salvos desta tela: aplicar uma variante ou salvar os filtros atuais com um nome', 'produtos|click:#filtros-btn'],
+  ['relatorios-padrao', 'relatorios/emitidos', '## 7.', 'Catálogo de códigos: cada relatório recebe o seu código na primeira emissão', 'catalogo'],
+  ['relatorios-padrao', 'relatorios/emitidos', '## 8.', 'Parâmetros dos relatórios: registro das emissões, prazo do histórico, variantes da empresa e CNPJ no cabeçalho', 'parametros'],
 ];

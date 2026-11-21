@@ -14,6 +14,8 @@ export const MANUAIS = [
     resumo: 'Calendário (mês, semana e lista) com compromissos próprios e tudo o que tem data na plataforma: títulos, cheques, contatos, fechamento, contratos, frota, manutenção e mais; saldo previsto por dia; resolver, adiar e delegar.' },
   { id: 'relatorios', titulo: 'Relatórios agendados', area: 'Painéis', rotas: ['relatorios'],
     resumo: 'Relatórios enviados por e-mail na frequência escolhida (posição de caixa, contas a pagar, faturamento, despesas, produção, fretes), com modelos prontos e prévia.' },
+  { id: 'relatorios-padrao', titulo: 'Padrão dos relatórios — parâmetros impressos, histórico, Repetir e variantes', area: 'Painéis', rotas: ['relatorios/emitidos'],
+    resumo: 'Todo relatório em PDF ou Excel sai com código, número de emissão, usuário e os filtros usados; histórico das emissões com o botão Repetir, filtros salvos com nome (variantes) e catálogo de códigos.' },
   { id: 'painel-diretoria', titulo: 'Painel da Diretoria', area: 'Painéis', rotas: ['diretoria'],
     resumo: 'Caixa, faturamento, margem, produção, perdas, qualidade, entregas e recuperação judicial em uma página, com meta, situação, tendência de 13 meses, comentários e o PDF da reunião mensal.' },
   { id: 'aprovacoes', titulo: 'Minhas aprovações — tudo o que espera a sua decisão', area: 'Painéis', rotas: ['aprovacoes'],

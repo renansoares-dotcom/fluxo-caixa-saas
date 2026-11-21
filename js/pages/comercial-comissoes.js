@@ -88,7 +88,7 @@ async function extrato(c) {
       <details style="margin-top:6px"><summary class="small">${f.itens.length} recebimento(s)</summary>${tabItens(f.itens)}</details></div>`).join('')
     || '<div class="card"><div class="empty">Nenhum fechamento ainda.</div></div>';
   $$('[data-pdf]', c).forEach(b => b.onclick = () => { const f = X.find(x => x.id === b.dataset.pdf), t = totais(f.itens);
-    abrirRelatorio({ nome: `Comissão ${MES(f.competencia)} ${f.vendedor}`, titulo: `EXTRATO DE COMISSÃO — ${MES(f.competencia)}`, subtitulo: esc(f.vendedor),
+    abrirRelatorio({ rel: 'Extrato de comissão', tipo: 'documento', nome: `Comissão ${MES(f.competencia)} ${f.vendedor}`, titulo: `EXTRATO DE COMISSÃO — ${MES(f.competencia)}`, subtitulo: esc(f.vendedor),
       extraCss: '.num{text-align:right} table{width:100%;border-collapse:collapse} td,th{border:1px solid #000;padding:3px 5px;font-size:9.5pt}',
       corpo: `<h2>1. Resumo</h2><p>Recebimentos: ${t.n} · base ${money(f.base_total)} · comissão ${money(f.comissao_total)}${+f.ajuste ? ` · ajuste ${money(f.ajuste)} (${esc(f.ajuste_motivo || '')})` : ''} · <b>total ${money(f.total)}</b>.
         ${f.lancamento_id ? (f.pago ? `Pago em ${dateBR(f.pagamento)}.` : `Previsto para ${dateBR(f.pagamento)}.`) : ''}</p>

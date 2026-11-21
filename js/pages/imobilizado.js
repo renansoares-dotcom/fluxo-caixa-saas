@@ -544,7 +544,7 @@ async function creditos(c) {
     const v = $('#cr-fator', c).value.trim(), fs = { ...fatores }; if (v) fs[m] = Math.min(1, Math.max(0, parseNum(v))); else delete fs[m];
     try { await q(sb.from('af_parametros').upsert({ empresa_id: state.empresa.id, ciap_fatores: fs })); toast('Fator salvo'); await carregar(); creditos(c); } catch (e) { fail(e); }
   };
-  $('#cr-imp', c).onclick = () => abrirRelatorio({ nome: 'Créditos do imobilizado', titulo: 'CRÉDITOS FISCAIS DO ATIVO IMOBILIZADO', subtitulo: `${mesBR(m)} · CIAP e PIS/COFINS`,
+  $('#cr-imp', c).onclick = () => abrirRelatorio({ tipo: 'relatorio', nome: 'Créditos do imobilizado', titulo: 'CRÉDITOS FISCAIS DO ATIVO IMOBILIZADO', subtitulo: `${mesBR(m)} · CIAP e PIS/COFINS`,
     corpo: `<h2>1. CIAP — ICMS (fator ${nf(fatores[m] ?? 1, 4)})</h2>${tabelaHTML(['Plaqueta', 'Bem', 'Aquisição', 'ICMS', 'Parcela', 'Crédito'], ciap.map(({ b, p }) => [b.plaqueta, esc(b.descricao), dateBR(b.data_aquisicao), money(b.icms_credito), `${p.parcela}/48`, money(p.credito)]), ['', '', '', '', 'Total', money(tc)], [3, 5])}
       <h2>2. PIS/COFINS (9,25%)</h2>${tabelaHTML(['Plaqueta', 'Bem', 'Método', 'Base', 'Crédito'], pis.map(({ b, met, p }) => [b.plaqueta, esc(b.descricao), I.CREDITOS[met], money(p.base), money(p.credito)]), ['', '', '', 'Total', money(tp)], [3, 4])}
       <p class="nota">Controle de apoio para a contabilidade. Bases: LC 87/1996, art. 20, § 5º; Leis 10.637/2002 e 10.833/2003, art. 3º, VI; Lei 11.774/2008, art. 1º, XII.</p>`,
@@ -554,7 +554,7 @@ async function creditos(c) {
 // ---------------------------------------------------------------- Relatórios
 function relatorios(c) {
   c.innerHTML = `<div class="card"><h3 style="margin-top:0">Relatórios do imobilizado</h3>
-    <div class="grid-form" style="max-width:820px"><label class="xs">Posição em<input type="date" id="rl-data" value="${ui.relData}"></label><label class="xs">Período de<input type="month" id="rl-de" value="${ui.relDe}"></label>
+    <div class="grid-form" data-filtros style="max-width:820px"><label class="xs">Posição em<input type="date" id="rl-data" value="${ui.relData}"></label><label class="xs">Período de<input type="month" id="rl-de" value="${ui.relDe}"></label>
       <label class="xs">até<input type="month" id="rl-ate" value="${ui.relAte}"></label></div>
     <div class="table-wrap" style="margin-top:12px"><table>
       ${[['razao', 'Razão auxiliar do imobilizado', 'Bem a bem por classe na data: custo, depreciação acumulada e valor líquido (posição).'],
@@ -582,13 +582,13 @@ function razaoAuxiliar() {
     const t = [0, 0]; const linhas = L.map(b => { const p = I.posicao(b, D.Dp, ate); t[0] += p.custo; t[1] += p.acum; return [b.plaqueta, esc(b.descricao), dateBR(b.data_aquisicao), esc(ccNome(b.centro_custo_id)), money(p.custo), money(p.acum), money(p.vcl)]; });
     tg = [tg[0] + t[0], tg[1] + t[1]];
     return `<h2>${esc(k.codigo)} — ${esc(k.nome)} <span style="font-weight:400;font-size:10pt">(taxa fiscal ${nf(k.taxa_fiscal, 2)}% a.a.)</span></h2>${tabelaHTML(['Plaqueta', 'Bem', 'Aquisição', 'Centro de custo', 'Custo', 'Depr. acumulada', 'Valor líquido'], linhas, ['', `${L.length} bens`, '', 'Total da classe', money(t[0]), money(t[1]), money(t[0] - t[1])], [4, 5, 6])}`; }).join('');
-  abrirRelatorio({ nome: 'Razão auxiliar do imobilizado', titulo: 'RAZÃO AUXILIAR DO ATIVO IMOBILIZADO', subtitulo: `Posição em ${dateBR(ui.relData)} (depreciação gravada até ${mesBR(ate)})`, paisagem: true, extraCss: CSS_REL,
+  abrirRelatorio({ tipo: 'relatorio', nome: 'Razão auxiliar do imobilizado', titulo: 'RAZÃO AUXILIAR DO ATIVO IMOBILIZADO', subtitulo: `Posição em ${dateBR(ui.relData)} (depreciação gravada até ${mesBR(ate)})`, paisagem: true, extraCss: CSS_REL,
     corpo: `${corpo}<h2>Total geral</h2>${tabelaHTML(['', 'Custo', 'Depreciação acumulada', 'Valor líquido'], [['Bens em uso', money(tg[0]), money(tg[1]), money(tg[0] - tg[1])]], null, [1, 2, 3])}`,
     rodape: `Base: cadastro do imobilizado e depreciações gravadas na plataforma (${D.ult ? 'último mês calculado ' + mesBR(D.ult) : 'nenhum mês calculado'})` });
 }
 function quadroMovimentacao() {
   const L = I.movimentacao(D.B, D.Dp, D.K, { de: ui.relDe, ate: ui.relAte }), s = (k) => L.reduce((t, l) => t + l[k], 0);
-  abrirRelatorio({ nome: 'Movimentação do imobilizado', titulo: 'QUADRO DE MOVIMENTAÇÃO DO ATIVO IMOBILIZADO', subtitulo: `${mesBR(ui.relDe)} a ${mesBR(ui.relAte)}`, paisagem: true, extraCss: CSS_REL,
+  abrirRelatorio({ tipo: 'relatorio', nome: 'Movimentação do imobilizado', titulo: 'QUADRO DE MOVIMENTAÇÃO DO ATIVO IMOBILIZADO', subtitulo: `${mesBR(ui.relDe)} a ${mesBR(ui.relAte)}`, paisagem: true, extraCss: CSS_REL,
     corpo: `<h2>1. Custo</h2>${tabelaHTML(['Classe', 'Saldo inicial', 'Adições', 'Baixas', 'Saldo final'], L.map(l => [esc(l.classe), money(l.custoIni), money(l.adicoes), money(l.baixasCusto ? -l.baixasCusto : 0), money(l.custoFim)]), ['Total', money(s('custoIni')), money(s('adicoes')), money(-s('baixasCusto')), money(s('custoFim'))], [1, 2, 3, 4])}
       <h2>2. Depreciação acumulada</h2>${tabelaHTML(['Classe', 'Saldo inicial', 'Depreciação do período', 'Baixas', 'Saldo final'], L.map(l => [esc(l.classe), money(l.depIni), money(l.depMes), money(l.depBaixas ? -l.depBaixas : 0), money(l.depFim)]), ['Total', money(s('depIni')), money(s('depMes')), money(-s('depBaixas')), money(s('depFim'))], [1, 2, 3, 4])}
       <h2>3. Valor contábil líquido</h2>${tabelaHTML(['Classe', 'Inicial', 'Final', 'Taxa fiscal'], L.map(l => [esc(l.classe), money(l.vclIni), money(l.vclFim), nf(D.kById[l.classe_id]?.taxa_fiscal, 2) + '% a.a.']), ['Total', money(s('vclIni')), money(s('vclFim')), ''], [1, 2])}
@@ -600,7 +600,7 @@ function mapaDepreciacao(m) {
   const porK = {}, porCC = {};
   for (const d of ds) { const b = D.bById[d.bem_id], k = b?.classe_id; (porK[k] ||= [0, 0, 0]); porK[k][0]++; porK[k][1] += +d.valor; porK[k][2] += +d.valor_fiscal; const cc = d.centro_custo_id || ''; porCC[cc] = (porCC[cc] || 0) + +d.valor; }
   const tot = ds.reduce((s, d) => s + +d.valor, 0), totf = ds.reduce((s, d) => s + +d.valor_fiscal, 0), calc = D.C.find(x => I.mesDe(x.competencia) === m);
-  abrirRelatorio({ nome: 'Mapa de depreciação', titulo: 'MAPA DE DEPRECIAÇÃO', subtitulo: `${mesBR(m)}${calc ? ` · ${calc.situacao === 'fechado' ? 'mês fechado' : 'mês calculado, não fechado'}` : ' · mês não calculado'}`, extraCss: CSS_REL,
+  abrirRelatorio({ tipo: 'relatorio', nome: 'Mapa de depreciação', titulo: 'MAPA DE DEPRECIAÇÃO', subtitulo: `${mesBR(m)}${calc ? ` · ${calc.situacao === 'fechado' ? 'mês fechado' : 'mês calculado, não fechado'}` : ' · mês não calculado'}`, extraCss: CSS_REL,
     corpo: `<h2>1. Por classe</h2>${tabelaHTML(['Classe', 'Bens', 'Contábil', 'Fiscal', 'Diferença'], Object.entries(porK).map(([k, v]) => [esc(classeTxt(k)), v[0], money(v[1]), money(v[2]), money(v[2] - v[1])]), ['Total', ds.length, money(tot), money(totf), money(totf - tot)], [1, 2, 3, 4])}
       <h2>2. Por centro de custo</h2>${tabelaHTML(['Centro de custo', 'Depreciação', '% do total'], Object.entries(porCC).sort((a, b) => b[1] - a[1]).map(([k, v]) => [esc(ccNome(k) || 'Sem centro de custo'), money(v), pct(tot ? v / tot : 0, 1)]), ['Total', money(tot), '100,0%'], [1, 2])}
       <h2>3. Bem a bem</h2>${tabelaHTML(['Plaqueta', 'Bem', 'Fração', 'Quota', 'Acumulada', 'Fiscal'], ds.map(d => { const b = D.bById[d.bem_id]; return [b?.plaqueta, esc(b?.descricao), nf(d.meses, 2), money(d.valor), money(d.acumulada), money(d.valor_fiscal)]; }), null, [2, 3, 4, 5])}
@@ -617,7 +617,7 @@ async function conferenciaContabil() {
       if (k?.conta_ativo_id) ctl[k.conta_ativo_id] = (ctl[k.conta_ativo_id] || 0) + p.custo; if (k?.conta_deprec_id) ctl[k.conta_deprec_id] = (ctl[k.conta_deprec_id] || 0) - p.acum; }
     const linhas = Object.entries(ctl).map(([id, v]) => { const s = sById[id] ?? 0; return [esc(nomeConta(id)), money(Math.abs(v)), money(Math.abs(s)), Math.abs(v - s) < 0.01 ? 'Confere' : `<b>${money(Math.abs(v) - Math.abs(s))}</b>`]; });
     const semConta = bs.filter(b => !D.kById[b.classe_id]?.conta_ativo_id);
-    abrirRelatorio({ nome: 'Conferência do imobilizado', titulo: 'CONFERÊNCIA DO IMOBILIZADO COM A CONTABILIDADE', subtitulo: `Posição em ${dateBR(d)}`, extraCss: CSS_REL,
+    abrirRelatorio({ tipo: 'relatorio', nome: 'Conferência do imobilizado', titulo: 'CONFERÊNCIA DO IMOBILIZADO COM A CONTABILIDADE', subtitulo: `Posição em ${dateBR(d)}`, extraCss: CSS_REL,
       corpo: `<h2>1. Controle × saldo contábil</h2>${tabelaHTML(['Conta contábil', 'Controle (bens)', 'Saldo contábil', 'Diferença'], linhas, null, [1, 2, 3])}
         ${semConta.length ? `<p><b>${semConta.length} bem(ns)</b> em classe sem conta contábil (${money(semConta.reduce((s, b) => s + +b.valor_aquisicao, 0))}) não entram na conferência.</p>` : ''}
         <p class="nota">O saldo contábil vem do balancete gerencial da plataforma (saldo de abertura + lançamentos gerados: financeiro, notas e depreciação). Diferença costuma ser bem não cadastrado, compra lançada em outra conta, baixa sem cálculo do mês ou saldo de abertura desatualizado.</p>`,
@@ -626,7 +626,7 @@ async function conferenciaContabil() {
 }
 function totalmenteDepreciados() {
   const L = D.B.filter(b => b.situacao !== 'baixado' && D.kById[b.classe_id]?.deprecia && D.pos[b.id].vcl <= (+b.valor_residual || 0) + 0.005);
-  abrirRelatorio({ nome: 'Bens totalmente depreciados', titulo: 'BENS TOTALMENTE DEPRECIADOS AINDA EM USO', subtitulo: `${L.length} bens · posição do último mês calculado`, extraCss: CSS_REL,
+  abrirRelatorio({ tipo: 'relatorio', nome: 'Bens totalmente depreciados', titulo: 'BENS TOTALMENTE DEPRECIADOS AINDA EM USO', subtitulo: `${L.length} bens · posição do último mês calculado`, extraCss: CSS_REL,
     corpo: `${tabelaHTML(['Plaqueta', 'Bem', 'Classe', 'Aquisição', 'Custo', 'Local'], L.map(b => [b.plaqueta, esc(b.descricao), esc(D.kById[b.classe_id]?.codigo), dateBR(b.data_aquisicao), money(b.valor_aquisicao), esc(b.local || '')]), null, [4])}
       <p class="nota">O CPC 27 pede revisão da vida útil e do valor residual pelo menos no fim de cada exercício. Bem totalmente depreciado e ainda produtivo indica vida útil estimada curta demais.</p>`,
     rodape: 'Base: cadastro do imobilizado' });
@@ -634,7 +634,7 @@ function totalmenteDepreciados() {
 function relBaixas() {
   const L = D.B.filter(b => b.baixa_data && I.mesDe(b.baixa_data) >= ui.relDe && I.mesDe(b.baixa_data) <= ui.relAte);
   const linhas = L.map(b => { const p = I.posicao(b, D.Dp, I.mesDe(b.baixa_data)); return { b, p, res: (+b.baixa_valor || 0) - p.vcl }; });
-  abrirRelatorio({ nome: 'Baixas do imobilizado', titulo: 'BAIXAS DO ATIVO IMOBILIZADO', subtitulo: `${mesBR(ui.relDe)} a ${mesBR(ui.relAte)}`, paisagem: true, extraCss: CSS_REL,
+  abrirRelatorio({ tipo: 'relatorio', nome: 'Baixas do imobilizado', titulo: 'BAIXAS DO ATIVO IMOBILIZADO', subtitulo: `${mesBR(ui.relDe)} a ${mesBR(ui.relAte)}`, paisagem: true, extraCss: CSS_REL,
     corpo: `${tabelaHTML(['Data', 'Plaqueta', 'Bem', 'Tipo', 'Custo', 'Depr. acumulada', 'Valor líquido', 'Venda', 'Resultado'],
       linhas.map(({ b, p, res }) => [dateBR(b.baixa_data), b.plaqueta, esc(b.descricao), I.BAIXAS[b.baixa_tipo], money(p.custo), money(p.acum), money(p.vcl), money(b.baixa_valor || 0), money(res)]),
       ['', '', `${L.length} bens`, 'Total', money(linhas.reduce((s, x) => s + x.p.custo, 0)), money(linhas.reduce((s, x) => s + x.p.acum, 0)), money(linhas.reduce((s, x) => s + x.p.vcl, 0)), money(linhas.reduce((s, x) => s + (+x.b.baixa_valor || 0), 0)), money(linhas.reduce((s, x) => s + x.res, 0))], [4, 5, 6, 7, 8])}
@@ -643,7 +643,7 @@ function relBaixas() {
 }
 function imprimirFicha(b, deps, mov) {
   const p = D.pos[b.id];
-  abrirRelatorio({ nome: 'Ficha do bem', titulo: `FICHA DO BEM ${b.plaqueta}`, subtitulo: esc(b.descricao), extraCss: CSS_REL,
+  abrirRelatorio({ tipo: 'documento', nome: 'Ficha do bem', titulo: `FICHA DO BEM ${b.plaqueta}`, subtitulo: esc(b.descricao), extraCss: CSS_REL,
     corpo: `<h2>1. Identificação</h2>${tabelaHTML(['Campo', 'Valor'], [['Classe', esc(classeTxt(b.classe_id))], ['Marca / modelo / série', esc([b.marca, b.modelo, b.serie].filter(Boolean).join(' · '))], ['Centro de custo / local', esc([ccNome(b.centro_custo_id), b.local].filter(Boolean).join(' · '))],
       ['Responsável', esc(b.responsavel || '')], ['Fornecedor / NF', esc([favNome(b.favorecido_id), b.nf_numero].filter(Boolean).join(' · NF '))], ['Aquisição / início de uso', `${dateBR(b.data_aquisicao)} / ${dateBR(b.data_inicio_uso) || '—'}`],
       ['Custo / residual', `${money(b.valor_aquisicao)} / ${money(b.valor_residual)}`], ['Vida útil / taxa fiscal', `${b.vida_util_meses} meses / ${nf(b.taxa_fiscal, 2)}% a.a.`], ['Depreciação acumulada / valor líquido', `${money(p.acum)} / ${money(p.vcl)}`], ['Situação', I.selo(b, p).txt]])}
@@ -652,7 +652,7 @@ function imprimirFicha(b, deps, mov) {
 }
 function termoBaixa(b) {
   const p = I.posicao(b, D.Dp);
-  abrirRelatorio({ nome: 'Termo de baixa', titulo: 'TERMO DE BAIXA DE BEM DO ATIVO IMOBILIZADO', subtitulo: `${b.plaqueta} — ${esc(b.descricao)}`, extraCss: CSS_REL,
+  abrirRelatorio({ tipo: 'documento', nome: 'Termo de baixa', titulo: 'TERMO DE BAIXA DE BEM DO ATIVO IMOBILIZADO', subtitulo: `${b.plaqueta} — ${esc(b.descricao)}`, extraCss: CSS_REL,
     corpo: `<h2>1. Bem</h2>${tabelaHTML(['Campo', 'Valor'], [['Plaqueta', b.plaqueta], ['Descrição', esc(b.descricao)], ['Classe', esc(classeTxt(b.classe_id))], ['Série', esc(b.serie || '')], ['Aquisição', `${dateBR(b.data_aquisicao)} · ${money(b.valor_aquisicao)}`],
       ['Depreciação acumulada até o último mês calculado', money(p.acum)], ['Valor contábil líquido', money(p.vcl)]])}
       <h2>2. Baixa</h2>${tabelaHTML(['Campo', 'Valor'], [['Data', dateBR(b.baixa_data)], ['Tipo', I.BAIXAS[b.baixa_tipo]], ['Valor da venda', b.baixa_valor ? money(b.baixa_valor) : '—'], ['Motivo', esc(b.baixa_motivo || '')]])}
@@ -663,7 +663,7 @@ function termoInventario(iv, itens) {
   const alvo = D.B.filter(b => noEscopo(b, iv)), ach = new Set(itens.filter(i => i.bem_id && i.encontrado).map(i => i.bem_id));
   const falt = alvo.filter(b => !ach.has(b.id)), div = itens.filter(i => { const b = D.bById[i.bem_id]; return b && i.local_encontrado && b.local !== i.local_encontrado; });
   const concl = iv.situacao === 'concluido';
-  abrirRelatorio({ nome: concl ? 'Termo de inventário' : 'Lista de conferência', titulo: concl ? 'TERMO DE INVENTÁRIO FÍSICO DO ATIVO IMOBILIZADO' : 'LISTA PARA CONFERÊNCIA FÍSICA', subtitulo: `Inventário nº ${iv.numero} — ${esc(iv.descricao)} · ${dateBR(iv.data_inicio)}`, paisagem: !concl, extraCss: CSS_REL,
+  abrirRelatorio({ rel: 'Inventário físico do imobilizado', tipo: 'documento', nome: concl ? 'Termo de inventário' : 'Lista de conferência', titulo: concl ? 'TERMO DE INVENTÁRIO FÍSICO DO ATIVO IMOBILIZADO' : 'LISTA PARA CONFERÊNCIA FÍSICA', subtitulo: `Inventário nº ${iv.numero} — ${esc(iv.descricao)} · ${dateBR(iv.data_inicio)}`, paisagem: !concl, extraCss: CSS_REL,
     corpo: concl ? `<h2>1. Resumo</h2>${tabelaHTML(['Item', 'Quantidade'], [['Bens esperados', alvo.length], ['Encontrados', alvo.filter(b => ach.has(b.id)).length], ['Não encontrados', falt.length], ['Encontrados em outro local', div.length], ['Achados sem cadastro', itens.filter(i => !i.bem_id).length], ['Em estado ruim ou inservível', itens.filter(i => ['ruim', 'inservivel'].includes(i.estado)).length]], null, [1])}
       <h2>2. Não encontrados</h2>${tabelaHTML(['Plaqueta', 'Bem', 'Local no cadastro', 'Custo', 'Valor líquido'], falt.map(b => [b.plaqueta, esc(b.descricao), esc(b.local || ''), money(b.valor_aquisicao), money(D.pos[b.id].vcl)]), ['', '', 'Total', money(falt.reduce((s, b) => s + +b.valor_aquisicao, 0)), money(falt.reduce((s, b) => s + D.pos[b.id].vcl, 0))], [3, 4])}
       <h2>3. Encontrados em outro local</h2>${tabelaHTML(['Plaqueta', 'Bem', 'Cadastro', 'Encontrado em'], div.map(i => { const b = D.bById[i.bem_id]; return [b.plaqueta, esc(b.descricao), esc(b.local || ''), esc(i.local_encontrado)]; }))}

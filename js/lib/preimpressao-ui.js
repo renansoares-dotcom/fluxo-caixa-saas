@@ -411,7 +411,7 @@ export async function certificado(D, p, d) {
   try { if (v?.previa) img = (await linksArte(sb, [v.previa]))[v.previa] || ''; } catch { /* sem prévia */ }
   try { const g = (await qr())(0, 'M'); g.addData(`${location.origin}${location.pathname}#/preimpressao/artes?abrir=${p.id}`); g.make(); qrSvg = g.createSvgTag({ cellSize: 2, margin: 0 }); } catch { /* sem QR */ }
   const Vs = D.versoesDe(p.id).filter(x => x.enviada_em || x.origem === 'cliente'), Ds = D.decisoesDe(p.id);
-  await abrirRelatorio({ janela: w, nome: `Certificado arte ${p.numero}`, titulo: `CERTIFICADO DE APROVAÇÃO DE ARTE Nº ${p.numero}-V${v?.numero}`, subtitulo: `${esc(fav?.nome || '')} — ${esc(p.nome)}`,
+  await abrirRelatorio({ rel: 'Certificado de aprovação de arte', tipo: 'documento', janela: w, nome: `Certificado arte ${p.numero}`, titulo: `CERTIFICADO DE APROVAÇÃO DE ARTE Nº ${p.numero}-V${v?.numero}`, subtitulo: `${esc(fav?.nome || '')} — ${esc(p.nome)}`,
     extraCss: '.hash{font-family:Consolas,monospace;font-size:8.5pt;word-break:break-all} .cx{display:grid;grid-template-columns:1fr 62mm;gap:8mm;align-items:start} .cx img{width:62mm;border:1px solid #999} .termo{border:1px solid #000;padding:3mm 4mm;font-size:10pt} .qr{text-align:center;font-size:8pt;margin-top:3mm}',
     corpo: `<h2>1. Identificação</h2><div class="cx"><div>${T2(['Campo', 'Valor'], [
         ['Cliente', `${esc(fav?.nome || '')}${fav?.documento ? ' · CNPJ/CPF ' + esc(fav.documento) : ''}`], ['Embalagem', esc(p.nome) + (p.codigo_cliente ? ` · código no cliente ${esc(p.codigo_cliente)}` : '')],

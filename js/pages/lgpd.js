@@ -168,7 +168,7 @@ function anonimizar(r, abertas, re) {
 async function relatorioTitular(R) {
   const { abrirRelatorio } = await import('../lib/relatorio.js');
   const cfg = await config();
-  abrirRelatorio({ nome: 'Relatório de dados pessoais', titulo: 'Relatório de dados pessoais do titular', subtitulo: `Busca: ${ui.busca} · emitido em ${dateBR(today())}`,
+  abrirRelatorio({ tipo: 'relatorio', nome: 'Relatório de dados pessoais', titulo: 'Relatório de dados pessoais do titular', subtitulo: `Busca: ${ui.busca} · emitido em ${dateBR(today())}`,
     corpo: `<p>Em atendimento à Lei 13.709/2018 (LGPD), art. 18, seguem os dados pessoais do titular tratados por ${esc(state.empresa.nome)}, com a origem e a base legal de cada tratamento.</p>
       ${R.map(r => `<h3>${esc(ORIGENS[r.origem] || r.origem)}: ${esc(r.nome)}</h3><table><tbody>${Object.entries(r.campos || {}).map(([k, v]) => `<tr><td style="width:35%">${esc(k)}</td><td>${esc(v ?? '')}</td></tr>`).join('')}</tbody></table><p><b>Base legal:</b> ${esc(r.base_legal)}</p>`).join('')}
       <p>Os dados são guardados em servidores contratados para a hospedagem da plataforma, com acesso restrito por perfil e registro de auditoria. Dúvidas e pedidos: ${esc(cfg.encarregado_nome || 'encarregado de dados')}${cfg.encarregado_email ? ` (${esc(cfg.encarregado_email)})` : ''}.</p>`,

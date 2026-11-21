@@ -473,7 +473,7 @@ async function relatorio(F, semFicha, caixa, pf, dispensados = []) {
       <td class="n">${money(f.valor)}</td><td class="n">${f.piso != null ? money(f.piso) : '–'}</td><td>${esc(f.ciot || '–')}</td><td>${f.mdfe_chave ? 'sim' : 'não'}</td><td>${l ? (l.status === 'Pago' ? 'pago ' : 'prog. ') + dateBR(l.data) : '–'}</td><td>${p.length ? esc(p.join(', ')) : 'conforme'}</td></tr>`; }).join('');
   const sf = semFicha.map(l => `<tr><td>${dateBR(l.data)}</td><td>${esc(state.cad.favById[l.favorecido_id]?.nome || l.descricao || '')}</td><td>${esc(state.cad.contaById[l.conta_id]?.nome || '')}</td><td class="n">${money(l.valor)}</td><td>${[caixa(l) ? 'pago pelo caixa' : '', pf(l) ? 'pessoa física?' : ''].filter(Boolean).join(' · ')}</td></tr>`).join('');
   const tot = (xs, f = (x) => +x.valor || 0) => money(xs.reduce((s, x) => s + f(x), 0));
-  await abrirRelatorio({ janela: w, nome: 'Conformidade ANTT nos fretes', titulo: 'Relatório de conformidade de fretes', paisagem: true,
+  await abrirRelatorio({ tipo: 'relatorio', janela: w, nome: 'Conformidade ANTT nos fretes', titulo: 'Relatório de conformidade de fretes', paisagem: true,
     subtitulo: `Competência ${mesTxt} · CIOT, MDF-e, piso mínimo, vale-pedágio e pagamento`,
     corpo: `<h2>1. Fretes com ficha (${F.length} · ${tot(F)})</h2>
     <table><thead><tr><th>Nº</th><th>Data</th><th>Transportador</th><th>Destino</th><th class="n">Valor</th><th class="n">Piso</th><th>CIOT</th><th>MDF-e</th><th>Pagamento</th><th>Situação</th></tr></thead><tbody>${linhas || '<tr><td colspan="10">Nenhum frete com ficha no mês.</td></tr>'}</tbody></table>
@@ -766,7 +766,7 @@ function resumoMDFe(f, t) {
       ${lin('Motorista', esc(vt.condutor.map(c => `${c.xNome} · CPF ${fmtDoc(c.CPF)}`).join('; ')))}</table>
     ${x.seg.length ? `<h3>6. Seguro</h3><table>${x.seg.map(s => lin('Seguro da carga', `${esc(MD.RESP_SEG[s.infResp.respSeg] || '')} · ${esc(s.infSeg.xSeg)} · CNPJ ${esc(fmtDoc(s.infSeg.CNPJ))} · apólice ${esc(s.nApol)}${s.nAver.length ? ' · averbação ' + esc(s.nAver.join(', ')) : ''}`)).join('')}</table>` : ''}
     ${d.info ? `<h3>Informações complementares</h3><p>${esc(d.info)}</p>` : ''}`;
-  abrirRelatorio({ nome: `MDF-e do frete nº ${f.numero}`, titulo: `Dados do MDF-e — frete nº ${f.numero}`, subtitulo: `${t?.nome || ''} · ${dateBR(f.data)} · valor do frete ${money(f.valor)}`, corpo,
+  abrirRelatorio({ rel: 'Dados do MDF-e do frete', tipo: 'documento', nome: `MDF-e do frete nº ${f.numero}`, titulo: `Dados do MDF-e — frete nº ${f.numero}`, subtitulo: `${t?.nome || ''} · ${dateBR(f.data)} · valor do frete ${money(f.valor)}`, corpo,
     rodape: 'Fonte: Logística › Fretes e CIOT (plataforma). Leiaute MDF-e 3.00 e NT 2026.001 (CIOT).' });
 }
 

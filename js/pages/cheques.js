@@ -414,7 +414,7 @@ const CSS_IMP = `.cq-t{width:100%;border-collapse:collapse;font-size:11px}.cq-t 
 async function bordero({ D, conta, fav }, d) {
   const L = D.Ch.filter(x => x.deposito_id === d.id), w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para gerar o PDF', true);
   if (!L.length) { w.close(); return toast('Os cheques deste depósito já mudaram de situação (devolvidos e reapresentados em outro depósito)', true); }
-  await abrirRelatorio({ janela: w, nome: `Borderô de depósito nº ${d.numero}`, titulo: `Borderô de depósito de cheques nº ${d.numero}`, subtitulo: `${esc(conta(d.conta_id))} · ${dateBR(d.data)}`, extraCss: CSS_IMP,
+  await abrirRelatorio({ rel: 'Borderô de depósito de cheques', tipo: 'documento', janela: w, nome: `Borderô de depósito nº ${d.numero}`, titulo: `Borderô de depósito de cheques nº ${d.numero}`, subtitulo: `${esc(conta(d.conta_id))} · ${dateBR(d.data)}`, extraCss: CSS_IMP,
     corpo: `<table class="cq-t"><thead><tr><th>#</th><th>Banco</th><th>Agência</th><th>Conta</th><th>Nº cheque</th><th>Emitente</th><th>Cliente</th><th>Bom para</th><th class="n">Valor</th></tr></thead><tbody>
       ${L.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.banco)}</td><td>${esc(x.agencia)}</td><td>${esc(x.conta)}</td><td>${esc(x.numero)}</td><td>${esc(x.emitente || '')}</td><td>${esc(fav(x.favorecido_id))}</td><td>${dateBR(x.bom_para)}</td><td class="n">${money(x.valor)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="8">${L.length} cheque(s)</td><td class="n">${money(soma(L))}</td></tr></tfoot></table>
@@ -425,7 +425,7 @@ async function copia({ conta }, em) {
   const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para gerar o PDF', true);
   const T = await q(sb.from('chq_emitido_titulos').select('avulso,lancamentos(data,descricao,documento,valor)').eq('emitido_id', em.id)).catch(() => []);
   const nome = em.nominal || state.cad.favById[em.favorecido_id]?.nome || '';
-  await abrirRelatorio({ janela: w, nome: `Cópia de cheque nº ${em.numero}`, titulo: 'Cópia de cheque', subtitulo: `${esc(conta(em.conta_id))} · cheque nº ${em.numero}`, extraCss: CSS_IMP,
+  await abrirRelatorio({ rel: 'Cópia de cheque', tipo: 'documento', janela: w, nome: `Cópia de cheque nº ${em.numero}`, titulo: 'Cópia de cheque', subtitulo: `${esc(conta(em.conta_id))} · cheque nº ${em.numero}`, extraCss: CSS_IMP,
     corpo: `<div class="cq-chq"><div class="l"><span>${esc(conta(em.conta_id))}</span><span>Cheque nº <b>${em.numero}</b></span><span class="v">R$ ${money(em.valor).replace(/^R\$\s?/, '')}</span></div>
         <div class="e">Pague por este cheque a quantia de <b>${esc(valorPorExtenso(em.valor))}</b></div><div class="e">a <b>${esc(nome || '— ao portador —')}</b>${em.cruzado ? ' · cruzado' : ''}</div>
         <div class="l"><span>Emissão: ${dateBR(em.emissao)}</span><span>Bom para: <b>${dateBR(em.bom_para)}</b></span><span>${esc(state.empresa?.nome || '')}</span></div></div>

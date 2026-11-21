@@ -119,7 +119,7 @@ async function relatorio(fundo, de, ate) {
   const porFundo = {}; for (const l of liq) { const p = porFundo[l.fundo] || (porFundo[l.fundo] = { n: 0, face: 0, pago: 0 }); p.n++; p.face += +l.valor_face; p.pago += +l.valor_pago; }
   const tr = (cells) => `<tr>${cells.join('')}</tr>`, td = (v, n) => `<td${n ? ' class="n"' : ''}>${v}</td>`;
   const vazio = (n, txt = 'Nenhum.') => `<tr><td colspan="${n}">${txt}</td></tr>`;
-  await abrirRelatorio({ janela: w, nome: 'Carteira cedida', titulo: 'Relatório da carteira cedida aos fundos', paisagem: true,
+  await abrirRelatorio({ tipo: 'relatorio', janela: w, nome: 'Carteira cedida', titulo: 'Relatório da carteira cedida aos fundos', paisagem: true,
     subtitulo: `${fundo ? 'Fundo ' + esc(fundo) : 'Todos os fundos'} · posição em ${dateBR(B.hoje)} · liquidações de ${dateBR(de)} a ${dateBR(ate)}`,
     corpo: `<h2>1. Resumo por fundo</h2>
     <table><thead><tr><th>Fundo</th><th class="n">A vencer</th><th class="n">Vencidos aguardando o fundo</th><th class="n">Vencidos sem liquidação</th><th class="n">Coobrigação</th><th class="n">Liquidados</th><th class="n">Recomprados</th><th>Atualização</th></tr></thead><tbody>

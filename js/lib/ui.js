@@ -1,4 +1,5 @@
 // Utilidades de interface: formatação, DOM, modal, toast, export
+import { numeroBR } from './relatorio-padrao.js';
 export const MESES = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
 export const MESES_CURTO = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -86,13 +87,27 @@ export function formData(form) {
 export function loading(el, msg = 'Carregando…') { el.innerHTML = `<div class="loading">${esc(msg)}</div>`; }
 
 // Exporta uma <table> (ou matriz) para Excel
-export function exportXLSX(tableOrRows, nome = 'relatorio') {
+/** Exporta para Excel. No padrão dos relatórios (21/11/2026) a planilha leva o mesmo cabeçalho do PDF: empresa, código do
+ *  relatório, número da emissão, data, hora, usuário e os filtros da tela. `cabecalho: false` exporta só os dados (modelos de importação). */
+export function exportXLSX(tableOrRows, nome = 'relatorio', { cabecalho = true, titulo = '' } = {}) {
   if (!window.XLSX) return toast('Biblioteca de Excel ainda carregando', true);
-  const wb = XLSX.utils.book_new();
-  const ws = Array.isArray(tableOrRows) ? XLSX.utils.aoa_to_sheet(tableOrRows)
-    : XLSX.utils.table_to_sheet(tableOrRows, { raw: false });
-  XLSX.utils.book_append_sheet(wb, ws, 'Dados');
-  XLSX.writeFile(wb, `${nome}.xlsx`);
+  const gravar = (linhas) => {
+    const wb = XLSX.utils.book_new();
+    // tabela da tela: coluna numérica (classe num/n/r) vira número de verdade ("8.300,000" = 8300); as demais ficam como texto (código "01", CFOP "5.101")
+    const ws = XLSX.utils.aoa_to_sheet(Array.isArray(tableOrRows) ? tableOrRows : tabelaParaLinhas(tableOrRows));
+    if (linhas?.length) { linhas.desloca(ws, linhas.length); XLSX.utils.sheet_add_aoa(ws, linhas, { origin: 'A1' }); }
+    XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+    XLSX.writeFile(wb, `${nome}.xlsx`);
+  };
+  if (!cabecalho) return gravar(null);
+  import('./relatorio-excel.js').then(m => m.cabecalhoPlanilha(titulo)).then(gravar, () => gravar(null));
+}
+
+function tabelaParaLinhas(tb) {
+  return [...tb.rows].map(tr => { const l = [];
+    for (const c of tr.cells) { const t = (c.innerText ?? c.textContent ?? '').replace(/\s+/g, ' ').trim(); const n = c.tagName === 'TD' && /(^|\s)(num|n|r)(\s|$)/.test(c.className) ? numeroBR(t) : null;
+      l.push(n ?? t); for (let i = 1; i < (c.colSpan || 1); i++) l.push(''); }
+    return l; });
 }
 
 export function debounce(fn, ms = 300) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }

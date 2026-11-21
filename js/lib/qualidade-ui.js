@@ -301,7 +301,7 @@ export function novaRnc(D, { onSalvo } = {}) {
 const T = (cab, L, num = []) => `<table><thead><tr>${cab.map((h, i) => `<th${num.includes(i) ? ' class="num"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${L.map(l => `<tr>${l.map((v, i) => `<td${num.includes(i) ? ' class="num"' : ''}>${v ?? ''}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cab.length}">—</td></tr>`}</tbody></table>`;
 export function imprimirLaudo(D, i) {
   const pl = D.plById[i.plano_id] || { caracteristicas: [] }, av = Q.avaliar(pl.caracteristicas || [], i.resultados || []), res = Object.fromEntries((i.resultados || []).map(x => [x.nome, x]));
-  abrirRelatorio({ nome: `Laudo ${i.numero}`, titulo: `LAUDO DE INSPEÇÃO Nº ${i.numero}`, subtitulo: esc(nomeProd(D, i.produto_id)),
+  abrirRelatorio({ rel: 'Laudo de inspeção', tipo: 'documento', nome: `Laudo ${i.numero}`, titulo: `LAUDO DE INSPEÇÃO Nº ${i.numero}`, subtitulo: esc(nomeProd(D, i.produto_id)),
     extraCss: '.num{text-align:right} .ass{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:50px} .ass div{border-top:1px solid #000;padding-top:4px;text-align:center;font-size:10pt} .ok{color:#137333;font-weight:bold} .nok{color:#b3261e;font-weight:bold}',
     corpo: `<h2>1. Identificação</h2>${T(['Campo', 'Valor'], [['Etapa / origem', `${Q.ETAPAS[i.etapa]} · ${Q.ORIGENS[i.origem] || i.origem}`], ['Produto', esc(nomeProd(D, i.produto_id))], ['Referência', esc(refTxt(D, i)) || '—'],
       ['Quantidade do lote', `${nf(i.quantidade)} ${esc(i.unidade || '')}`], ['Plano / amostra', `${esc(pl.nome || 'Sem plano')} · amostra ${i.amostra ?? '–'} (aceita ${i.ac ?? 0}, rejeita ${i.re ?? 1})`],
@@ -315,7 +315,7 @@ export function imprimirLaudo(D, i) {
       <div class="ass"><div>Inspetor</div><div>Responsável pela decisão</div></div>`, rodape: 'Base: inspeções da qualidade na plataforma' });
 }
 export function imprimirRnc(D, r) {
-  abrirRelatorio({ nome: `RNC ${r.numero}`, titulo: `RELATÓRIO DE NÃO CONFORMIDADE Nº ${r.numero}`, subtitulo: esc(nomeProd(D, r.produto_id)),
+  abrirRelatorio({ rel: 'Relatório de não conformidade', tipo: 'documento', nome: `RNC ${r.numero}`, titulo: `RELATÓRIO DE NÃO CONFORMIDADE Nº ${r.numero}`, subtitulo: esc(nomeProd(D, r.produto_id)),
     extraCss: '.ass{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:50px} .ass div{border-top:1px solid #000;padding-top:4px;text-align:center;font-size:10pt}',
     corpo: `<h2>1. Identificação</h2>${T(['Campo', 'Valor'], [['Origem / gravidade', `${Q.ORIGENS_RNC[r.origem]} · ${Q.GRAVIDADES[r.gravidade]}`], ['Aberta', `${hora(r.aberta_em)} por ${esc(r.aberta_por || '')}`],
       ['Cliente / fornecedor', esc(nomeFav(D, r.favorecido_id)) || '—'], ['Quantidade', r.quantidade != null ? `${nf(r.quantidade)} ${esc(r.unidade || '')}` : '—'], ['Situação', Q.SIT_RNC[r.situacao]]])}

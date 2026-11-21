@@ -14,6 +14,8 @@ import { esquecerRegimes } from './lib/regime.js';
 import { abrirLancamento } from './lib/lanc-form.js';
 import { montarMenu, marcarTela, modoPainel, cliqueArea, fecharPainel } from './lib/menu.js';
 import { codigoDa } from './lib/telas.js';
+import { aplicarPendente } from './lib/relatorio-filtros.js';
+import { abrirVariantes } from './lib/relatorio-variantes-ui.js';
 import { iniciarUso, pararUso, telaUso, cargaUso } from './lib/uso.js';
 import { exigirTermo } from './lib/lgpd-termo.js';
 import { iniciarOffline, guardarEntrada, lerEntrada } from './lib/offline.js';
@@ -165,11 +167,13 @@ const routes = {
   'diretoria': () => import(`./pages/diretoria.js?v=${V}`),
   'perguntar': () => import(`./pages/perguntar.js?v=${V}`),
   'relatorios': () => import(`./pages/relatorios.js?v=${V}`),
+  'relatorios/emitidos': () => import(`./pages/relatorios-emitidos.js?v=${V}`),
 };
 
 // ---------- Tema ----------
 const savedTheme = (() => { try { return localStorage.getItem('fc-theme'); } catch { return null; } })();
 if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+$('#filtros-btn') && ($('#filtros-btn').onclick = () => { if (state.empresa?.id) abrirVariantes(); });
 $('#theme-btn').onclick = () => {
   const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   const next = cur === 'dark' ? 'light' : 'dark';
@@ -326,7 +330,7 @@ function aplicarAreas() {
   const rh = $('#nav .nav-area[data-area="rh"]'); if (rh) rh.hidden = !temRH();
 }
 // perfil de acesso por tela (melhoria 10.2): só nos papéis de menu completo; esconde o que o perfil não inclui
-const TELAS_LIVRES = ['tutoriais', 'meus-avisos', 'conversas', 'portal'];
+const TELAS_LIVRES = ['tutoriais', 'meus-avisos', 'conversas', 'portal', 'relatorios/emitidos'];
 async function aplicarPerfil(empresa, papel) {
   $$('#nav a[data-perfil-oculto]').forEach(a => { a.hidden = false; delete a.dataset.perfilOculto; });
   $$('#nav .nav-area[data-perfil-oculto]').forEach(a => { a.hidden = false; delete a.dataset.perfilOculto; });
@@ -440,9 +444,9 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil producao (operador no terminal do setor)
 const rotaDeMotorista = (r) => ['logistica/motorista', 'portal', 'tutoriais', 'meus-avisos'].includes(r);   // motorista: só o app (melhoria 7.1)
 const rotaDeColaborador = (r) => ['portal', 'meus-avisos'].includes(r);   // colaborador: só o Meu Portal (melhoria 8.2)
-const rotaDeProducao = (r) => ['portal', 'problemas', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'recuperadora/entradas', 'recuperadora/lotes', 'recuperadora/processamento', 'recuperadora/qualidade', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'estoque/inventario', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
-const rotaDeVendas = (r) => r === 'comercial' || ['portal', 'problemas', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'comercial/carteira', 'comercial/funil', 'comercial/mapa', 'comercial/comissoes', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
-const rotaDeCompras = (r) => ['portal', 'notas/sefaz', 'problemas', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/reposicao', 'estoque/inventario', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
+const rotaDeProducao = (r) => ['portal', 'problemas', 'relatorios/emitidos', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'recuperadora/entradas', 'recuperadora/lotes', 'recuperadora/processamento', 'recuperadora/qualidade', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'estoque/inventario', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
+const rotaDeVendas = (r) => r === 'comercial' || ['portal', 'problemas', 'relatorios/emitidos', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'comercial/carteira', 'comercial/funil', 'comercial/mapa', 'comercial/comissoes', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
+const rotaDeCompras = (r) => ['portal', 'notas/sefaz', 'problemas', 'relatorios/emitidos', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/reposicao', 'estoque/inventario', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;
@@ -497,6 +501,8 @@ async function render() {
     page.innerHTML = '';
     await mod.render(page);
     if (seq === renderSeq) cargaUso(route, performance.now() - t0);
+    // padrão de relatórios (SQL 174): filtros pedidos em "Repetir" ou numa variante são recolocados ao abrir a tela
+    if (seq === renderSeq && sessionStorage.getItem('relp-repetir')) aplicarPendente(route, toast).catch(() => {});
     if (state.abrir?.tipo === 'lancamento') { const id = state.abrir.id; delete state.abrir; abrirLancamentoPorId(id); }
   } catch (e) { fail(e); page.innerHTML = `<div class="card empty">Não foi possível carregar esta tela.<br><span class="small">${esc(e.message || e)}</span></div>`; }
 }

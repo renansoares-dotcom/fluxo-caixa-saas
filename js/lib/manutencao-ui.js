@@ -190,7 +190,7 @@ export async function fichaOS(D, o, { onMudou } = {}) {
 const T = (cab, L, num = []) => `<table><thead><tr>${cab.map((h, i) => `<th${num.includes(i) ? ' class="num"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${L.map(l => `<tr>${l.map((v, i) => `<td${num.includes(i) ? ' class="num"' : ''}>${v ?? ''}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cab.length}">—</td></tr>`}</tbody></table>`;
 export function imprimirOS(D, o, H, P) {
   const eq = D.eById[o.equipamento_id] || {}, c = M.custoOS(o, H, P, +D.P.custo_hora || 0), f = D.fById[o.falha_id];
-  abrirRelatorio({ nome: `OS ${o.numero}`, titulo: `ORDEM DE SERVIÇO DE MANUTENÇÃO Nº ${o.numero}`, subtitulo: `${esc(eq.codigo || '')} — ${esc(eq.nome || '')}`,
+  abrirRelatorio({ rel: 'Ordem de serviço de manutenção', tipo: 'documento', nome: `OS ${o.numero}`, titulo: `ORDEM DE SERVIÇO DE MANUTENÇÃO Nº ${o.numero}`, subtitulo: `${esc(eq.codigo || '')} — ${esc(eq.nome || '')}`,
     extraCss: '.num{text-align:right} .ass{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:50px} .ass div{border-top:1px solid #000;padding-top:4px;text-align:center;font-size:10pt} .ck{font-family:monospace}',
     corpo: `<h2>1. Identificação</h2>${T(['Campo', 'Valor'], [['Tipo / prioridade', `${M.TIPOS_OS[o.tipo]} · ${M.PRIORIDADES[o.prioridade]}`], ['Situação', M.SITUACOES[o.situacao]], ['Aberta', `${hora(o.solicitada_em)} por ${esc(o.solicitante || '')} (${esc(o.origem)})`],
       ['Equipamento', `${esc(eq.codigo || '')} ${esc(eq.nome || '')} · criticidade ${eq.criticidade || ''}${eq.local ? ' · ' + esc(eq.local) : ''}`], ['Programada / vence', `${dateBR(o.programada_para) || '—'} / ${dateBR(o.vence_em) || '—'}`], ['Responsável', esc(o.responsavel || '')],

@@ -190,7 +190,7 @@ async function abrir(p, root) {
 
 async function imprimir(p) {
   const f = C.forById[p.favorecido_id], w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
-  await abrirRelatorio({ janela: w, nome: `Pedido de compra PC ${p.numero}`, titulo: `Pedido de compra nº ${p.numero}`,
+  await abrirRelatorio({ rel: 'Pedido de compra', tipo: 'documento', janela: w, nome: `Pedido de compra PC ${p.numero}`, titulo: `Pedido de compra nº ${p.numero}`,
     subtitulo: `Data do pedido ${dateBR(p.data_pedido)}${p.pedido_iniflex ? ` · Iniflex ${esc(p.pedido_iniflex)}` : ''}`,
     corpo: `<h2>1. Fornecedor e condições</h2>
     <table class="info"><tr><td>Fornecedor</td><td>${esc(f?.nome || '')}</td></tr><tr><td>CNPJ/CPF</td><td>${esc(f?.documento || '')}</td></tr>

@@ -232,7 +232,7 @@ const T2 = (cab, L, num = []) => `<table><thead><tr>${cab.map((h, i) => `<th${nu
 /** ordem de preparação impressa (para a bancada) */
 export function imprimirOrdem(D, o, and, Me = []) {
   const v = D.veById[o.versao_id], c = D.coById[o.cor_id];
-  abrirRelatorio({ nome: `Tinta ${o.numero}`, titulo: `ORDEM DE PREPARAÇÃO DE TINTA Nº ${o.numero}`, subtitulo: `${esc(corTxt(D, o.cor_id))} — ${esc(versaoTxt(D, o.versao_id))}`,
+  abrirRelatorio({ rel: 'Ordem de preparação de tinta', tipo: 'documento', nome: `Tinta ${o.numero}`, titulo: `ORDEM DE PREPARAÇÃO DE TINTA Nº ${o.numero}`, subtitulo: `${esc(corTxt(D, o.cor_id))} — ${esc(versaoTxt(D, o.versao_id))}`,
     extraCss: '.num{text-align:right} .cx{display:inline-block;width:70px;border-bottom:1px solid #000} .ass{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px} .ass div{border-top:1px solid #000;padding-top:4px;text-align:center;font-size:10pt}',
     corpo: `<h2>1. Identificação</h2>${T2(['Campo', 'Valor'], [['Cor', `${esc(corTxt(D, o.cor_id))} · ${esc(c?.referencia || '')}`], ['Receita', esc(versaoTxt(D, o.versao_id))], ['Quantidade planejada', `${nf(o.quantidade)} kg`],
       ['Ordem de produção', esc(opTxt(D, o.ordem_id)) || '—'], ['Padrão', `${v?.viscosidade_alvo != null ? `viscosidade ${nf(v.viscosidade_alvo, 1)} ± ${nf(v.viscosidade_tol, 1)} s (${esc(v.viscosidade_metodo || '')})` : ''}${v?.delta_e_max != null ? ` · ΔE ≤ ${nf(v.delta_e_max, 2)}` : ''}`],

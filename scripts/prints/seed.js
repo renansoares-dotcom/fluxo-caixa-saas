@@ -2698,3 +2698,41 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
   window.RPC.prob_pareto = (a) => (PAR[a.p_fonte] || []).map(([nome, valor, qtd]) => ({ nome, valor, qtd }));
   for (const f of ['prob_abrir', 'prob_salvar', 'prob_acao_salvar', 'prob_acao_situacao', 'prob_encerrar', 'prob_cancelar', 'prob_reabrir', 'prob_acao_reabrir', 'prob_comentar', 'prob_config_salvar']) window.RPC[f] = () => null;
 }
+
+// ---------- padrão de relatórios (SQL 174): catálogo, emissões, variantes e parâmetros ----------
+{
+  const emp = DB.empresas[0].id, ha = (dias, hh, mm) => { const d = new Date(); d.setDate(d.getDate() - dias); d.setHours(hh, mm, 0, 0); return d.toISOString(); };
+  const loc = DB.est_locais?.[0];
+  const kx = (aba, busca) => ({ c: [{ k: '#ano-global', t: 's', v: String(new Date().getFullYear()) }, { k: '#kx-abas', t: 'f', v: aba, a: 'a' }, { k: '#kx-loc', t: 's', v: loc?.id || '' }, { k: '#kx-bus', t: 'i', v: busca }] });
+  const pk = (visao, busca) => [['Ano de trabalho', String(new Date().getFullYear())], ['Visão', visao], ['Local', loc?.nome || ''], ['Busca (código ou descrição)', busca]];
+  DB.relp_config = [{ empresa_id: emp, registrar: true, meses_historico: 24, variante_publica: 'gerencia', cnpj_cabecalho: true }];
+  DB.relp_catalogo = [['EST002', 1, 'Kardex – planilha', 'estoque/kardex'], ['FIN009', 1, 'Extrato das contas', 'conferencia'], ['FIN019', 1, 'Carteira cedida', 'fidc-carteira'], ['FIN019', 2, 'Carteira cedida – planilha', 'fidc-carteira'],
+    ['FIS002', 1, 'Apuração de Impostos – planilha', 'fiscal/apuracao'], ['CMP002', 1, 'Pedido de compra', 'compras/pedidos'], ['CTB006', 1, 'Mapa de depreciação', 'contab/imobilizado'], ['RHT001', 1, 'Relação de colaboradores', 'rh/colaboradores']]
+    .map(([tela, seq, nome, rota], i) => ({ id: i + 1, tela, seq, codigo: `${tela}-R0${seq}`, nome, rota }));
+  const E = (numero, dias, hh, mm, codigo, formato, quem, parametros, filtros, rota, tipo = 'relatorio') => { const c = DB.relp_catalogo.find(x => x.codigo === codigo);
+    return { id: 'rem' + numero, empresa_id: emp, numero, codigo, nome: c.nome, tela: c.tela, rota: rota || c.rota, formato, tipo, parametros, filtros, usuario_id: quem === 'Renata Alves' ? 'u1' : 'u-' + quem, usuario_nome: quem, emitido_em: ha(dias, hh, mm) }; };
+  DB.relp_emissoes = [
+    E(131, 0, 9, 42, 'EST002-R01', 'xlsx', 'Renata Alves', pk('Saldo por produto', 'resina'), kx('produtos', 'resina')),
+    E(130, 0, 9, 15, 'FIN019-R01', 'pdf', 'Renata Alves', [['Ano de trabalho', '2026'], ['Visão', 'Títulos'], ['Fundo', ''], ['Situação', 'Em risco']], { c: [] }),
+    E(129, 1, 16, 30, 'CMP002-R01', 'pdf', 'Carlos Lima', [], null, 'compras/pedidos', 'documento'),
+    E(128, 1, 11, 5, 'FIS002-R01', 'xlsx', 'Renata Alves', [['Ano de trabalho', '2026'], ['Mês', 'Out/2026'], ['Visão', 'Livro por CFOP / CST']], { c: [] }),
+    E(127, 2, 14, 20, 'EST002-R01', 'xlsx', 'Marcos Silva', pk('Movimentos', ''), kx('movs', '')),
+    E(126, 4, 8, 50, 'CTB006-R01', 'pdf', 'Renata Alves', [['Ano de trabalho', '2026'], ['Posição em', '31/10/2026'], ['Período de', '01/2026'], ['Até', '10/2026']], { c: [] }),
+    E(125, 6, 10, 12, 'FIN009-R01', 'pdf', 'Renata Alves', [['Ano de trabalho', '2026'], ['Conta', ''], ['De', '01/10/2026'], ['Até', '31/10/2026']], { c: [] }),
+    E(124, 9, 15, 40, 'RHT001-R01', 'pdf', 'Carlos Lima', [['Ano de trabalho', '2026'], ['Situação', 'Ativos'], ['Setor', '']], { c: [] }),
+  ];
+  DB.relp_variantes = [
+    { id: 'rv1', empresa_id: emp, tela: 'EST002', rota: 'estoque/kardex', nome: 'Resinas – saldo por produto', parametros: pk('Saldo por produto', 'resina').slice(1), filtros: kx('produtos', 'resina'), publica: true, usuario_id: 'u1', usuario_nome: 'Renata Alves', atualizado_em: ha(3, 10, 0) },
+    { id: 'rv2', empresa_id: emp, tela: 'EST002', rota: 'estoque/kardex', nome: 'Movimentos – todos os locais', parametros: [['Visão', 'Movimentos'], ['Local', ''], ['Busca (código ou descrição)', '']], filtros: { c: [{ k: '#kx-abas', t: 'f', v: 'movs', a: 'a' }, { k: '#kx-loc', t: 's', v: '' }, { k: '#kx-bus', t: 'i', v: '' }] }, publica: false, usuario_id: 'u1', usuario_nome: 'Renata Alves', atualizado_em: ha(8, 9, 0) },
+  ];
+  window.RPC.relp_emitir = (a) => {
+    const tela = a.p_tela || 'GER'; let c = DB.relp_catalogo.find(x => x.tela === tela && x.nome.toLowerCase() === a.p_nome.toLowerCase());
+    if (!c) { const seq = Math.max(0, ...DB.relp_catalogo.filter(x => x.tela === tela).map(x => x.seq)) + 1; c = { id: DB.relp_catalogo.length + 1, tela, seq, codigo: `${tela}-R${String(seq).padStart(2, '0')}`, nome: a.p_nome, rota: a.p_rota }; DB.relp_catalogo.push(c); }
+    const numero = Math.max(...DB.relp_emissoes.map(x => x.numero)) + 1;
+    DB.relp_emissoes.unshift({ id: 'rem' + numero, empresa_id: emp, numero, codigo: c.codigo, nome: c.nome, tela, rota: a.p_rota, formato: a.p_formato, tipo: a.p_tipo, parametros: a.p_parametros, filtros: a.p_filtros, usuario_id: 'u1', usuario_nome: 'Renata Alves', emitido_em: new Date().toISOString() });
+    return { codigo: c.codigo, numero, usuario: 'Renata Alves', emitido_em: new Date().toISOString(), cnpj: DB.empresas[0].cnpj };
+  };
+  window.RPC.relp_variante_salvar = (a) => { DB.relp_variantes.push({ id: 'rv' + (DB.relp_variantes.length + 1), empresa_id: emp, tela: a.p_tela, rota: a.p_rota, nome: a.p_nome, parametros: a.p_parametros, filtros: a.p_filtros, publica: a.p_publica, usuario_id: 'u1', usuario_nome: 'Renata Alves', atualizado_em: new Date().toISOString() }); return 'rvn'; };
+  window.RPC.relp_variante_excluir = (a) => { DB.relp_variantes = DB.relp_variantes.filter(v => v.id !== a.p_id); return null; };
+  window.RPC.relp_config_salvar = () => null;
+}
