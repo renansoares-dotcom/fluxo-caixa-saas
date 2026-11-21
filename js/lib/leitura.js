@@ -2,6 +2,7 @@
 // depressa e termina com Enter. Parte pura: reconhece o que foi lido (chave de NF-e/CT-e do DANFE, boleto) e separa a leitura do
 // leitor da digitação de uma pessoa. Etapa 2: reconhece também a etiqueta de mercadoria (L… = lote, P… = produto; js/lib/etiquetas.js).
 import { codigoEtiqueta } from './etiquetas.js';
+import { codigoCracha } from './almoxarifado.js';
 const so = (s) => String(s ?? '').replace(/\D/g, '');
 const UF = { 11: 'RO', 12: 'AC', 13: 'AM', 14: 'RR', 15: 'PA', 16: 'AP', 17: 'TO', 21: 'MA', 22: 'PI', 23: 'CE', 24: 'RN', 25: 'PB', 26: 'PE', 27: 'AL', 28: 'SE', 29: 'BA',
   31: 'MG', 32: 'ES', 33: 'RJ', 35: 'SP', 41: 'PR', 42: 'SC', 43: 'RS', 50: 'MS', 51: 'MT', 52: 'GO', 53: 'DF' };
@@ -36,6 +37,7 @@ export function boleto(txt) {
 export function reconhecer(txt) {
   const bruto = String(txt ?? '').trim(); if (!bruto) return { tipo: 'vazio' };
   const etq = codigoEtiqueta(bruto); if (etq) return { tipo: 'etiqueta', ...etq };
+  const cr = codigoCracha(bruto); if (cr) return { tipo: 'cracha', codigo: cr };
   const candidatos = [so(bruto), ...(bruto.match(/\d{44}/g) || [])].filter(c => c.length === 44);
   for (const c of candidatos) { const k = chaveNFe(c); if (k?.valida) return { tipo: 'nfe', ...k }; }
   for (const c of candidatos) { const b = boleto(c); if (b?.valida) return { tipo: 'boleto', ...b }; }

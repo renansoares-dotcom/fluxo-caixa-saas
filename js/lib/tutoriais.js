@@ -14,6 +14,8 @@ export const MANUAIS = [
     resumo: 'Calendário (mês, semana e lista) com compromissos próprios e tudo o que tem data na plataforma: títulos, cheques, contatos, fechamento, contratos, frota, manutenção e mais; saldo previsto por dia; resolver, adiar e delegar.' },
   { id: 'relatorios', titulo: 'Relatórios agendados', area: 'Painéis', rotas: ['relatorios'],
     resumo: 'Relatórios enviados por e-mail na frequência escolhida (posição de caixa, contas a pagar, faturamento, despesas, produção, fretes), com modelos prontos e prévia.' },
+  { id: 'almoxarifado', titulo: 'Requisição de Material — pedir, aprovar e entregar pelo almoxarifado', area: 'Painéis', rotas: ['almoxarifado'],
+    resumo: 'Qualquer pessoa pede material ao almoxarifado; aprovação só na exceção; entrega com identificação por crachá, retirada no balcão e baixa automática no Kardex, com tudo registrado.' },
   { id: 'leitor-codigo-barras', titulo: 'Leitor de código de barras — DANFE e etiquetas de mercadoria', area: 'Compras', rotas: [],
     resumo: 'Leia o DANFE em qualquer tela para achar a nota e conferir com o pedido; imprima a etiqueta de cada lote que entra e, lendo a etiqueta, veja o saldo por local, transfira ou dê saída.' },
   { id: 'relatorios-padrao', titulo: 'Padrão dos relatórios — parâmetros impressos, histórico, Repetir e variantes', area: 'Painéis', rotas: ['relatorios/emitidos'],

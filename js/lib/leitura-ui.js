@@ -11,10 +11,21 @@ const tenta = async (p) => { try { return await p; } catch { return null; } };
 const soDig = (s) => String(s || '').replace(/\D/g, '');
 let aberta = null;
 
+// uma janela aberta pode assumir a leitura de um tipo de código (o crachá na entrega do almoxarifado, a etiqueta no balcão):
+// aoLer(tipo, fn, el) vale enquanto `el` estiver na tela; a janela mais recente ganha
+const ganchos = [];
+export function aoLer(tipo, fn, el) { const g = { tipo, fn, el }; ganchos.push(g); return () => { const i = ganchos.indexOf(g); if (i >= 0) ganchos.splice(i, 1); }; }
+function gancho(tipo) {
+  for (let i = ganchos.length - 1; i >= 0; i--) { if (ganchos[i].el && !document.contains(ganchos[i].el)) { ganchos.splice(i, 1); continue; } if (ganchos[i].tipo === tipo) return ganchos[i].fn; }
+  return null;
+}
+
 /** trata um código lido ou digitado */
 export async function tratarLeitura(txt) {
   const r = reconhecer(txt);
   if (r.tipo === 'vazio') return;
+  const g = gancho(r.tipo); if (g) return g(r);
+  if (r.tipo === 'cracha') return ir('almoxarifado', { tipo: 'balcao', cracha: r.codigo });   // crachá lido fora de uma entrega: abre a retirada no balcão para a pessoa
   if (r.tipo === 'nfe') return notaLida(r);
   if (r.tipo === 'etiqueta') return (await import('./etiquetas-ui.js')).etiquetaLida(r);
   if (r.tipo === 'boleto') return toast(`Boleto lido${r.valor ? ` (${money(r.valor)})` : ''}. O lançamento da conta a pagar pela leitura do boleto ainda não está disponível.`);

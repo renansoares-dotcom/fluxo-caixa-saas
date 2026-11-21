@@ -2768,3 +2768,61 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
   window.RPC.est_transferir = window.RPC.est_transferir || (() => 'trf1');
   window.RPC.etq_config_salvar = () => null;
 }
+
+// ---------- requisição de material ao almoxarifado (SQL 176) ----------
+{
+  const E0 = DB.empresas[0].id, uc = DB.est_locais.find(l => l.finalidade === 'uso_consumo'), ins = DB.est_locais.find(l => l.finalidade === 'insumo');
+  const ha = (dias, hh, mm) => { const d = new Date(); d.setDate(d.getDate() - dias); d.setHours(hh, mm, 0, 0); return d.toISOString(); };
+  let n = 900;
+  const P = [['UC-101', 'PAPEL A4 RESMA 500 FOLHAS', 'UN', 86, 28.9], ['UC-102', 'CANETA ESFEROGRAFICA AZUL', 'UN', 240, 1.35], ['UC-103', 'TONER IMPRESSORA HP 85A', 'UN', 5, 389], ['UC-104', 'MASCARA PFF2', 'UN', 320, 2.8],
+    ['UC-105', 'DETERGENTE NEUTRO 5 L', 'UN', 22, 31.5], ['UC-106', 'PROTETOR AURICULAR TIPO PLUG', 'PAR', 150, 1.9], ['UC-107', 'GRAMPEADOR DE MESA', 'UN', 0, 34]].map(([codigo, descricao, unidade, saldo, custo]) => {
+    const p = { id: 'alp' + (++n), empresa_id: E0, codigo, descricao, unidade, tipo: 'uso_consumo', tipo_sped: '07', ativo: true, controla_lote: false, local_padrao_id: uc.id, etiqueta: 'P' + String(n).padStart(7, '0') };
+    DB.produtos.push(p); if (saldo) DB.est_saldos.push({ id: 'als' + n, empresa_id: E0, produto_id: p.id, local_id: uc.id, lote_id: null, quantidade: saldo, valor: saldo * custo, ultimo_movimento: ha(3, 9, 0).slice(0, 10) });
+    return { ...p, saldo, custo }; });
+  const luva = DB.produtos.find(x => x.codigo === 'UC-010'); if (luva) { luva.local_padrao_id = uc.id; P.push({ ...luva, saldo: 240, custo: 4.1 }); }
+  const ctrl = new Set([P[2].id]), cod = (c) => P.find(p => p.codigo === c), K = DB.rh_colaboradores;
+  DB.alm_config = [{ empresa_id: E0, valor_aprovacao: 500, papeis_almoxarife: ['admin', 'diretor', 'compras'], almoxarifes: [], papeis_aprovador: ['admin', 'diretor'], aprovadores: [], exigir_cracha: false, permitir_balcao: true, locais: null }];
+  const R = (numero, sit, origem, quemI, sol, dias, hh, motivo, itens, extra = {}) => { const k = K[quemI]; const id = 'alr' + numero;
+    DB.alm_requisicao_itens.push(...itens.map(([c, q, ent], i) => ({ id: id + 'i' + i, requisicao_id: id, empresa_id: E0, produto_id: cod(c).id, codigo: c, descricao: cod(c).descricao, unidade: cod(c).unidade, quantidade: q, qtd_entregue: ent || 0, controlado: ctrl.has(cod(c).id) })));
+    return { id, empresa_id: E0, numero, situacao: sit, origem, solicitante_id: sol[0], solicitante_nome: sol[1], colaborador_id: k.id, para_nome: k.nome, setor: k.setor, motivo, valor_estimado: itens.reduce((t, [c, q]) => t + q * cod(c).custo, 0), criado_em: ha(dias, hh, 10), atualizado_em: ha(dias, hh, 10), ...extra }; };
+  DB.alm_requisicao_itens = []; const EU = ['u1', 'Renata Alves'], DI = ['u5', 'Diego Martins'], BE = ['u4', 'Beatriz Rocha'];
+  DB.alm_requisicoes = [
+    R(48, 'aberta', 'pedido', 3, DI, 0, 8, 'Reposição do administrativo', [['UC-101', 10], ['UC-102', 24]]),
+    R(47, 'aprovacao', 'pedido', 3, DI, 0, 9, 'Impressora da recepção sem toner', [['UC-103', 1]], { motivo_aprovacao: 'item controlado: TONER IMPRESSORA HP 85A' }),
+    R(46, 'parcial', 'pedido', 0, EU, 1, 14, 'EPI da extrusão para a semana', [['UC-104', 60, 60], ['UC-106', 40, 20], ['UC-010', 30, 30]]),
+    R(45, 'atendida', 'balcao', 1, BE, 1, 10, 'Limpeza do refeitório', [['UC-105', 4, 4]]),
+    R(44, 'atendida', 'pedido', 2, EU, 3, 11, 'Material de escritório do faturamento', [['UC-101', 6, 6], ['UC-102', 12, 12]]),
+    R(43, 'recusada', 'pedido', 3, DI, 5, 15, null, [['UC-101', 30]], { motivo_aprovacao: 'valor estimado de R$ 867,00 acima do limite de R$ 500,00', decidido_nome: 'Carlos Lima', decidido_em: ha(5, 16, 0), decisao_motivo: 'Quantidade acima do consumo do mês. Peça 10 resmas.' }),
+    R(42, 'atendida', 'balcao', 0, BE, 6, 7, 'Troca de turno', [['UC-104', 20, 20], ['UC-106', 20, 20]]),
+    R(41, 'encerrada', 'pedido', 4, EU, 9, 13, 'Manutenção', [['UC-010', 20, 12], ['UC-107', 1, 0]], { encerrado_motivo: 'Grampeador sem saldo; pedido de compra aberto.' }),
+  ];
+  const Et = (req, dias, hh, nomeI, cracha, valor, obs) => ({ id: 'ale' + req + dias + hh, empresa_id: E0, requisicao_id: 'alr' + req, entregue_por: 'u4', entregue_nome: 'Beatriz Rocha', retirou_colaborador_id: K[nomeI].id, retirou_nome: K[nomeI].nome, cracha_lido: cracha, valor, observacao: obs || null, entregue_em: ha(dias, hh, 30) });
+  DB.alm_entregas = [Et(46, 1, 15, 0, true, 329), Et(45, 1, 10, 1, true, 126), Et(44, 3, 13, 2, false, 189.6), Et(42, 6, 7, 0, true, 94), Et(41, 8, 9, 4, true, 49.2, 'Levou 12 pares; o restante não tinha.')];
+  DB.alm_controlados = [...ctrl].map(produto_id => ({ produto_id, empresa_id: E0 }));
+  const saldoDe = (pid) => DB.est_saldos.filter(s => s.produto_id === pid && [uc.id, ins?.id].includes(s.local_id)).reduce((t, s) => t + +s.quantidade, 0);
+  Object.assign(window.RPC, {
+    alm_almoxarife: () => true, alm_aprovador: () => true,
+    alm_catalogo: () => P.map(p => ({ produto_id: p.id, codigo: p.codigo, descricao: p.descricao, unidade: p.unidade, saldo: saldoDe(p.id), controlado: ctrl.has(p.id), custo: p.custo, etiqueta: p.etiqueta })).sort((a, b) => a.descricao.localeCompare(b.descricao)),
+    alm_saldos: (a) => DB.est_saldos.filter(s => a.p_produtos.includes(s.produto_id) && s.local_id === uc.id && +s.quantidade).map(s => ({ produto_id: s.produto_id, local_id: s.local_id, local_nome: uc.nome, quantidade: +s.quantidade })),
+    alm_pessoas: () => K.map(k => ({ colaborador_id: k.id, nome: k.nome, matricula: k.matricula, setor: k.setor })),
+    alm_cracha: (a) => { const c = DB.crachas.find(x => x.codigo === a.p_codigo); return c ? { achou: true, colaborador_id: c.colaborador_id, nome: c.nome, setor: c.setor, tipo: 'colaborador', valido: true, situacao: 'válido' } : { achou: false }; },
+    alm_usuarios: () => DB.membros.map(m => ({ user_id: m.user_id, nome: m.nome, papel: m.papel })),
+    alm_requisitar: (a) => { const numero = Math.max(...DB.alm_requisicoes.map(r => r.numero)) + 1, id = 'alr' + numero, k = K.find(x => x.id === a.p_colaborador) || K[3];
+      const valor = a.p_itens.reduce((t, i) => t + i.quantidade * (P.find(p => p.id === i.produto_id)?.custo || 0), 0), cs = a.p_itens.filter(i => ctrl.has(i.produto_id)).map(i => P.find(p => p.id === i.produto_id).descricao);
+      const mot = [cs.length ? 'item controlado: ' + cs.join(', ') : '', valor > 500 ? 'valor estimado acima do limite de R$ 500,00' : ''].filter(Boolean).join('; ') || null;
+      DB.alm_requisicao_itens.push(...a.p_itens.map((i, x) => { const p = P.find(y => y.id === i.produto_id); return { id: id + 'i' + x, requisicao_id: id, empresa_id: E0, produto_id: p.id, codigo: p.codigo, descricao: p.descricao, unidade: p.unidade, quantidade: i.quantidade, qtd_entregue: 0, controlado: ctrl.has(p.id) }; }));
+      DB.alm_requisicoes.unshift({ id, empresa_id: E0, numero, situacao: mot ? 'aprovacao' : 'aberta', origem: a.p_origem || 'pedido', solicitante_id: 'u1', solicitante_nome: 'Renata Alves', colaborador_id: k.id, para_nome: a.p_para_nome || k.nome, setor: k.setor, motivo: a.p_motivo, valor_estimado: valor, motivo_aprovacao: mot, criado_em: new Date().toISOString() });
+      return { id, numero, situacao: mot ? 'aprovacao' : 'aberta', motivo_aprovacao: mot }; },
+    alm_entregar: (a) => { const r = DB.alm_requisicoes.find(x => x.id === a.p_id); let valor = 0;
+      for (const i of a.p_itens) { const it = DB.alm_requisicao_itens.find(x => x.id === i.item_id); it.qtd_entregue += i.quantidade; valor += i.quantidade * (P.find(p => p.id === it.produto_id)?.custo || 0); const s = DB.est_saldos.find(x => x.produto_id === it.produto_id && x.local_id === i.local_id); if (s) s.quantidade -= i.quantidade; }
+      r.situacao = DB.alm_requisicao_itens.some(x => x.requisicao_id === r.id && x.qtd_entregue < x.quantidade) ? 'parcial' : 'atendida';
+      const k = K.find(x => x.id === a.p_retirou);
+      DB.alm_entregas.push({ id: 'ale' + Date.now(), empresa_id: E0, requisicao_id: r.id, entregue_por: 'u1', entregue_nome: 'Renata Alves', retirou_colaborador_id: a.p_retirou, retirou_nome: k?.nome || a.p_retirou_nome, cracha_lido: !!a.p_cracha, valor, observacao: a.p_obs, entregue_em: new Date().toISOString() });
+      return { situacao: r.situacao, valor }; },
+    alm_balcao: (a) => { const v = window.RPC.alm_requisitar({ p_itens: a.p_itens, p_motivo: a.p_motivo, p_colaborador: a.p_retirou, p_para_nome: a.p_retirou_nome, p_origem: 'balcao' }); if (v.situacao !== 'aberta') return { ...v, entregue: false };
+      const e = window.RPC.alm_entregar({ p_id: v.id, p_itens: DB.alm_requisicao_itens.filter(i => i.requisicao_id === v.id).map(i => ({ item_id: i.id, quantidade: i.quantidade, local_id: uc.id })), p_retirou: a.p_retirou, p_retirou_nome: a.p_retirou_nome, p_cracha: a.p_cracha }); return { ...v, ...e, entregue: true }; },
+    alm_decidir: (a) => { const r = DB.alm_requisicoes.find(x => x.id === a.p_id); r.situacao = a.p_aprova ? 'aberta' : 'recusada'; r.decidido_nome = 'Renata Alves'; r.decidido_em = new Date().toISOString(); r.decisao_motivo = a.p_motivo; return null; },
+    alm_cancelar: (a) => { const r = DB.alm_requisicoes.find(x => x.id === a.p_id); r.situacao = r.situacao === 'parcial' ? 'encerrada' : 'cancelada'; r.encerrado_motivo = a.p_motivo; return r.situacao; },
+    alm_config_salvar: () => null, alm_controlar: (a) => { a.p_sim ? ctrl.add(a.p_produto) : ctrl.delete(a.p_produto); return null; },
+  });
+}
