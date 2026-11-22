@@ -167,10 +167,11 @@ async function guia(g, l, det) {
   abrirRelatorio({ janela: w, nome: `${nome} — inventário geral`, titulo: `${nome} — ${D.loc[l.local_id]?.nome || ''}`,
     subtitulo: `Inventário geral nº ${g.numero} · data de referência ${dateBR(g.referencia)} · ${aud ? 'auditor' : 'contador'}: ${esc((aud ? l.auditor_nome : l.responsavel_nome) || '')}`,
     corpo: `<p style="font-size:9pt">Conte o que está fisicamente no local e anote a quantidade. Esta guia não traz o saldo do sistema${aud ? ' nem a contagem já feita' : ''}. Item que não for encontrado: anote zero. Item encontrado que não está na lista: anote no final.</p>
-      <table><thead><tr><th style="width:26px">#</th><th style="width:90px">Código</th><th>Descrição</th><th style="width:90px">Lote</th><th style="width:36px">Un.</th><th style="width:110px">Quantidade contada</th><th style="width:150px">Observação</th></tr></thead><tbody>
+      <table class="guia"><thead><tr><th style="width:26px">#</th><th style="width:90px">Código</th><th>Descrição</th><th style="width:90px">Lote</th><th style="width:36px">Un.</th><th style="width:110px">Quantidade contada</th><th style="width:150px">Observação</th></tr></thead><tbody>
       ${its.map((i, k) => `<tr><td>${k + 1}</td><td>${esc(i.codigo || '')}</td><td>${esc(i.descricao || '')}</td><td>${esc(i.lote || '')}</td><td>${esc(i.unidade || '')}</td><td style="height:22px"></td><td></td></tr>`).join('')}
       ${Array.from({ length: 5 }, () => '<tr><td></td><td></td><td></td><td></td><td></td><td style="height:22px"></td><td>fora da lista</td></tr>').join('')}</tbody></table>
       <p style="font-size:9pt;margin-top:22px">Início: ____:____ &nbsp;&nbsp; Fim: ____:____ &nbsp;&nbsp;&nbsp;&nbsp; Assinatura: ______________________________________</p>`,
+    extraCss: '.guia td{height:26px;vertical-align:middle}.guia td:nth-child(6){border-left:1px solid #000;border-right:1px solid #000}',
     tipo: 'relatorio', parametros: [['Inventário', `nº ${g.numero}`], ['Local', D.loc[l.local_id]?.nome || ''], ['Tipo', aud ? 'Auditoria' : 'Contagem']] });
 }
 
