@@ -1,7 +1,7 @@
 ---
 titulo: Requisição de Material — pedir, aprovar e entregar pelo almoxarifado
 tela: Painéis › Requisição de Material (PAI015)
-versao: 1.5
+versao: 1.6
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -122,17 +122,48 @@ Na ficha da requisição, o botão **Comprovante** imprime o comprovante de entr
 
 ![Figura 8 — Comprovante de entrega de material (dados fictícios)](img/almoxarifado-8.jpg)
 
+### 8.1 Devolução ao almoxarifado
+
+Material que sobrou volta ao almoxarifado pela própria requisição de onde saiu.
+
+1. Abra a requisição e clique em **Receber devolução** (só quem atende o almoxarifado).
+2. Informe a quantidade devolvida de cada item e o **estado**:
+   - **Em bom estado**: volta ao estoque;
+   - **Avariado**: fica registrado, mas não volta ao estoque.
+3. Leia o crachá de quem devolve, ou escolha a pessoa.
+4. Informe o motivo e clique em **Registrar a devolução**.
+
+![Figura 9 — Receber devolução: quantidade, estado, quem devolve e o motivo (dados fictícios)](img/almoxarifado-10.jpg)
+
+Como a devolução entra no estoque:
+
+- volta ao **mesmo local e lote** de onde saiu;
+- pelo **custo em que saiu**, e não pelo custo médio de hoje;
+- no **mesmo centro de custo** da entrega, que tem o consumo reduzido;
+- com o tipo **Devolução ao almoxarifado** e o documento "DV" e o número da devolução.
+
+Limites:
+
+- só volta o que foi entregue e ainda não foi devolvido;
+- entrega estornada não tem devolução;
+- depois de uma devolução, a entrega não pode mais ser estornada: o restante volta pela devolução;
+- a devolução não é lançada à mão no Kardex: é feita só aqui;
+- o prazo para devolver é um parâmetro (30 dias por padrão).
+
+As devoluções aparecem na ficha da requisição, com quem devolveu, quem recebeu, os itens e o motivo.
+
 ## 9. Parâmetros
 
 Aba **Parâmetros** (administrador e diretor).
 
-![Figura 9 — Parâmetros do almoxarifado (dados fictícios)](img/almoxarifado-9.jpg)
+![Figura 10 — Parâmetros do almoxarifado (dados fictícios)](img/almoxarifado-9.jpg)
 
 | Parâmetro | Padrão | Efeito |
 |---|---|---|
 | Pedido acima de (R$) pede aprovação | Em branco | Em branco, não há regra de valor. O valor do pedido é estimado pelo custo médio do estoque |
 | Entrega só com o crachá lido | Desligado | Ligado, a entrega e o balcão só são registrados com o crachá lido pelo leitor. O banco confere o código lido: o crachá precisa existir, estar ativo e ser da pessoa que está retirando |
 | Permitir retirada no balcão | Ligado | Desligado, é preciso pedir antes |
+| Prazo para devolver (dias) | 30 | Até quantos dias depois da entrega o material pode voltar. Em branco, sem prazo |
 | Quem pediu pode aprovar a própria requisição | Desligado | Ligado, o aprovador pode aprovar o próprio pedido. Use só quando houver um único aprovador |
 | Quem atende e entrega | Administrador, Diretor e Compras | Perfis e pessoas que veem a fila e entregam |
 | Quem aprova | Administrador e Diretor | Perfis e pessoas que aprovam ou recusam |
@@ -161,6 +192,8 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 | Li o crachá e nada aconteceu | O cursor estava em outro campo. Clique fora dos campos, ou no campo Quem está retirando, e leia de novo |
 | Não vejo as abas Atender e Aprovar | Você não está entre os almoxarifes ou aprovadores. Peça ao administrador |
 | A pessoa não tem crachá | Escolha na lista ou digite o nome. A entrega fica marcada como identificada sem crachá |
+| "O prazo de devolução terminou" | O material foi entregue há mais dias que o prazo dos parâmetros. Quem administra pode aumentar o prazo ou deixá-lo em branco |
+| Devolução registrada com a quantidade errada | Não há estorno da devolução pela tela. Fale com o administrador antes de lançar outro movimento |
 
 ## 12. Histórico de versões
 
@@ -172,3 +205,4 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 | 1.3 | 22/11/2026 | O valor limite passa a valer para o dia. O estorno de uma entrega devolve a quantidade à requisição e marca a entrega como estornada. |
 | 1.4 | 22/11/2026 | Pedido só de itens do catálogo do almoxarifado. Valores (custo, valor do pedido e da entrega) só para quem atende e quem aprova. |
 | 1.5 | 22/11/2026 | A primeira entrega exige os parâmetros definidos. Quem entrega não retira para si mesmo. |
+| 1.6 | 22/11/2026 | Devolução ao almoxarifado: volta ao custo da saída, no mesmo local, lote e centro de custo; material avariado registrado sem voltar ao estoque; prazo por parâmetro (SQL 185). |

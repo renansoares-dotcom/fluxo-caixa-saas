@@ -2836,6 +2836,8 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
   ];
   const Et = (req, dias, hh, nomeI, cracha, valor, obs) => ({ id: 'ale' + req + dias + hh, empresa_id: E0, requisicao_id: 'alr' + req, entregue_por: 'u4', entregue_nome: 'Beatriz Rocha', retirou_colaborador_id: K[nomeI].id, retirou_nome: K[nomeI].nome, cracha_lido: cracha, valor, observacao: obs || null, entregue_em: ha(dias, hh, 30) });
   DB.alm_entregas = [Et(46, 1, 15, 0, true, 329), Et(45, 1, 10, 1, true, 126), Et(44, 3, 13, 2, false, 189.6), Et(42, 6, 7, 0, true, 94), Et(41, 8, 9, 4, true, 49.2, 'Levou 12 pares; o restante não tinha.')];
+  DB.alm_devolucoes = [{ id: 'ald1', empresa_id: E0, numero: 2, requisicao_id: 'alr41', devolveu_nome: K[4].nome, recebido_nome: 'Beatriz Rocha', cracha_lido: true, motivo: 'Sobrou da troca de turno', criado_em: '2026-11-18T16:20:00Z',
+    alm_devolucao_itens: DB.alm_requisicao_itens.filter(i => i.requisicao_id === 'alr41' && i.qtd_entregue > 0).map(i => ({ quantidade: 2, estado: 'boa', produto_id: i.produto_id })) }];
   DB.alm_controlados = [...ctrl].map(produto_id => ({ produto_id, empresa_id: E0 }));
   const saldoDe = (pid) => DB.est_saldos.filter(s => s.produto_id === pid && [uc.id, ins?.id].includes(s.local_id)).reduce((t, s) => t + +s.quantidade, 0);
   Object.assign(window.RPC, {
@@ -2862,6 +2864,9 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
       const e = window.RPC.alm_entregar({ p_id: v.id, p_itens: DB.alm_requisicao_itens.filter(i => i.requisicao_id === v.id).map(i => ({ item_id: i.id, quantidade: i.quantidade, local_id: uc.id })), p_retirou: a.p_retirou, p_retirou_nome: a.p_retirou_nome, p_cracha: a.p_cracha }); return { ...v, ...e, entregue: true }; },
     alm_decidir: (a) => { const r = DB.alm_requisicoes.find(x => x.id === a.p_id); r.situacao = a.p_aprova ? 'aberta' : 'recusada'; r.decidido_nome = 'Renata Alves'; r.decidido_em = new Date().toISOString(); r.decisao_motivo = a.p_motivo; return null; },
     alm_cancelar: (a) => { const r = DB.alm_requisicoes.find(x => x.id === a.p_id); r.situacao = r.situacao === 'parcial' ? 'encerrada' : 'cancelada'; r.encerrado_motivo = a.p_motivo; return r.situacao; },
+    alm_devolviveis: (a) => DB.alm_requisicao_itens.filter(i => i.requisicao_id === a.p_requisicao && i.qtd_entregue > 0).map((i, k) => ({ entrega_item_id: 'aei' + i.id, entregue_em: (DB.alm_entregas.find(e => e.requisicao_id === i.requisicao_id) || {}).entregue_em,
+      retirou_nome: '', produto_id: i.produto_id, codigo: i.codigo, descricao: i.descricao, unidade: i.unidade, local_id: uc.id, local_nome: uc.nome, lote_id: null, lote: null, entregue: i.qtd_entregue, devolvido: 0, pode_devolver: i.qtd_entregue, prazo_ate: '2026-11-30' })),
+    alm_devolver: () => ({ numero: 3, itens: 1, valor: 24 }), alm_devolucao_salvar: () => null,
     alm_config_salvar: () => null, alm_controlar: (a) => { a.p_sim ? ctrl.add(a.p_produto) : ctrl.delete(a.p_produto); return null; },
   });
 }

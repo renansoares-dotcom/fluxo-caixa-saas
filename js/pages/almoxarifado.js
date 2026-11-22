@@ -1,6 +1,7 @@
 // Painéis › Requisição de Material (PAI015, SQL 176): qualquer pessoa pede material ao almoxarifado; aprovação só na exceção
 // (item controlado ou valor acima do parâmetro); o almoxarife separa e entrega identificando quem retirou (crachá ou nome);
 // retirada no balcão registrada na hora; a entrega dá saída no Kardex com o custo no centro de custo de quem recebeu.
+// Devolução (SQL 185): o que sobrou volta ao almoxarifado pelo custo da saída e no mesmo centro de custo; avariado não volta.
 import { sb, state, q, fetchAll } from '../lib/data.js';
 import { $, $$, esc, toast, fail, modal, confirmDialog, money, dateBR, today, exportXLSX, erroTela } from '../lib/ui.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
@@ -11,7 +12,7 @@ export const title = 'Requisição de Material';
 const menos = (iso, d) => { const x = new Date(iso + 'T12:00:00'); x.setDate(x.getDate() - d); return x.toISOString().slice(0, 10); };
 const ui = { aba: 'minhas', situacao: 'abertas', setor: '', busca: '', de: menos(today(), 60), ate: today() };
 let D = null;
-const PADRAO = { valor_aprovacao: null, papeis_almoxarife: ['admin', 'diretor', 'compras'], almoxarifes: [], papeis_aprovador: ['admin', 'diretor'], aprovadores: [], exigir_cracha: false, permitir_balcao: true, locais: null, aprovar_proprio: false };
+const PADRAO = { valor_aprovacao: null, papeis_almoxarife: ['admin', 'diretor', 'compras'], almoxarifes: [], papeis_aprovador: ['admin', 'diretor'], aprovadores: [], exigir_cracha: false, permitir_balcao: true, locais: null, aprovar_proprio: false, devolucao_dias: 30 };
 const qtd = (v) => (v == null ? '' : (+v).toLocaleString('pt-BR', { maximumFractionDigits: 4 }));
 const quando = (t) => (t ? new Date(t).toLocaleString('pt-BR', { timeZone: 'America/Recife', dateStyle: 'short', timeStyle: 'short' }) : '');
 const badge = (s) => { const [t, c] = A.SIT[s] || [s, '']; return `<span class="badge ${c}">${t}</span>`; };
@@ -176,6 +177,51 @@ function ligarQuem(m, P, crachaInicial) {
   return st;
 }
 
+/* ------------------------------------------------------------------ devolução: o que sobrou volta ao almoxarifado */
+async function devolucoesDa(r, el) {
+  if (!el || !r.entregas.length) return;
+  try {
+    const L = await q(sb.from('alm_devolucoes').select('id,numero,devolveu_nome,recebido_nome,cracha_lido,motivo,criado_em,alm_devolucao_itens(quantidade,estado,produto_id)').eq('requisicao_id', r.id).order('numero'));
+    if (!L.length) return;
+    const nome = (pid) => { const i = r.itens.find(x => x.produto_id === pid); return i ? `${i.codigo} ${i.descricao}` : ''; };
+    el.innerHTML = `<h3 style="margin:14px 0 6px">Devoluções</h3><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Quando</th><th>Devolvido por</th><th>Recebido por</th><th>Itens</th><th>Motivo</th></tr></thead><tbody>
+      ${L.map(d => `<tr><td>${d.numero}</td><td>${quando(d.criado_em)}</td><td><b>${esc(d.devolveu_nome)}</b>${d.cracha_lido ? ' <span class="badge pago">crachá lido</span>' : ''}</td><td>${esc(d.recebido_nome || '')}</td>
+        <td class="wrap small">${(d.alm_devolucao_itens || []).map(i => `${qtd(i.quantidade)} × ${esc(nome(i.produto_id))}${i.estado === 'avariada' ? ' <span class="badge vencido">avariado, não voltou ao estoque</span>' : ''}`).join('<br>')}</td>
+        <td class="wrap small">${esc(d.motivo)}</td></tr>`).join('')}</tbody></table></div>`;
+  } catch { /* a lista de devoluções é complementar: sem ela o detalhe continua útil */ }
+}
+
+async function devolver(r, root) {
+  let L, P;
+  try { [L, P] = await Promise.all([rpc('alm_devolviveis', { p_requisicao: r.id }), pessoas()]); } catch (err) { return fail(err); }
+  if (!L.length) return toast('Nada desta requisição pode ser devolvido: tudo já voltou ou a entrega foi estornada', true);
+  const hoje = today(), fora = (l) => l.prazo_ate && l.prazo_ate < hoje;
+  const m = modal({ title: `Receber devolução — requisição nº ${r.numero}`, wide: true, body: `
+    <div class="table-wrap"><table><thead><tr><th>Item</th><th>Entregue em</th><th class="num">Pode voltar</th><th style="width:120px">Devolvido agora</th><th>Estado</th></tr></thead><tbody>
+    ${L.map((l, i) => `<tr><td class="wrap"><b>${esc(l.codigo)}</b> ${esc(l.descricao)}${l.lote ? ` · lote ${esc(l.lote)}` : ''}<div class="small muted">volta para ${esc(l.local_nome || '')}</div></td>
+      <td>${quando(l.entregue_em)}${fora(l) ? '<div class="small neg">prazo de devolução terminou</div>' : l.prazo_ate ? `<div class="small muted">até ${dateBR(l.prazo_ate)}</div>` : ''}</td>
+      <td class="num">${qtd(l.pode_devolver)} ${esc(l.unidade || '')}</td>
+      <td><input inputmode="decimal" data-dq="${i}" ${fora(l) ? 'disabled' : ''}></td>
+      <td><select data-de="${i}" ${fora(l) ? 'disabled' : ''}><option value="boa">Em bom estado (volta ao estoque)</option><option value="avariada">Avariado (não volta)</option></select></td></tr>`).join('')}</tbody></table></div>
+    <p class="small muted">O material em bom estado volta ao mesmo local, pelo custo em que saiu, e reduz o consumo do centro de custo. O avariado fica registrado, mas continua como consumo.</p>
+    ${blocoQuem(P).replace('Quem está retirando', 'Quem está devolvendo')}
+    <div class="grid-form" style="margin-top:8px"><label class="span2">Motivo da devolução<input id="dv-mot" maxlength="300" placeholder="Ex.: sobrou da manutenção da extrusora"></label></div>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="dv-ok">Registrar a devolução</button>' });
+  const quem = ligarQuem(m, P);
+  $('#dv-ok', m.el).onclick = async (ev) => {
+    const itens = []; for (const [i, l] of L.entries()) { const v = $(`[data-dq="${i}"]`, m.el).value.trim(); if (!v) continue; const q2 = A.qtdBR(v);
+      if (!(q2 > 0)) return toast(`Quantidade inválida em ${l.codigo}`, true); if (q2 > +l.pode_devolver + 1e-9) return toast(`${l.codigo}: no máximo ${qtd(l.pode_devolver)}`, true);
+      itens.push({ entrega_item_id: l.entrega_item_id, quantidade: q2, estado: $(`[data-de="${i}"]`, m.el).value }); }
+    if (!itens.length) return toast('Informe a quantidade devolvida', true);
+    if (!quem.nome) return toast('Identifique quem está devolvendo', true);
+    const mot = $('#dv-mot', m.el).value.trim(); if (mot.length < 3) return toast('Informe o motivo da devolução', true);
+    ev.target.disabled = true;
+    try { const x = await rpc('alm_devolver', { p_requisicao: r.id, p_itens: itens, p_motivo: mot, p_devolveu: quem.colaborador_id, p_devolveu_nome: quem.colaborador_id ? null : quem.nome, p_cracha_codigo: quem.cracha ? quem.codigo : null });
+      toast(`Devolução nº ${x.numero} registrada`); m.close(); await recarregar(root);
+    } catch (err) { fail(err); ev.target.disabled = false; }
+  };
+}
+
 /* ------------------------------------------------------------------ entregar */
 async function entregar(r, root) {
   let S, P;
@@ -264,11 +310,13 @@ function detalhe(r, root) {
     <h3 style="margin:14px 0 6px">Entregas</h3>
     ${r.entregas.length ? `<div class="table-wrap"><table><thead><tr><th>Quando</th><th>Entregue por</th><th>Retirado por</th><th>Identificação</th>${verValor ? '<th class="num">Valor</th>' : ''}<th>Observação</th></tr></thead><tbody>
       ${r.entregas.map(e => `<tr><td>${quando(e.entregue_em)}</td><td>${esc(e.entregue_nome || '')}</td><td><b>${esc(e.retirou_nome)}</b>${e.estornada_em ? ' <span class="badge vencido">estornada</span>' : ''}</td><td>${e.cracha_lido ? '<span class="badge pago">crachá lido</span>' : e.retirou_colaborador_id ? 'colaborador da lista' : '<span class="warn">nome digitado</span>'}</td>
-        ${verValor ? `<td class="num">${money(e.valor)}</td>` : ''}<td class="wrap small">${esc(e.observacao || '')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">Nada foi entregue ainda.</p>'}`,
+        ${verValor ? `<td class="num">${money(e.valor)}</td>` : ''}<td class="wrap small">${esc(e.observacao || '')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">Nada foi entregue ainda.</p>'}
+    <div id="de-dev"></div>`,
     foot: `${podeCancelar ? `<button class="btn danger" id="de-can">${r.situacao === 'parcial' ? 'Encerrar o que falta' : 'Cancelar'}</button>` : ''}${r.entregas.length ? '<button class="btn" id="de-imp">Comprovante</button>' : ''}<span class="spacer"></span><button class="btn" data-close>Fechar</button>
-      ${D.aprov && r.situacao === 'aprovacao' ? '<button class="btn" id="de-rec">Recusar</button><button class="btn primary" id="de-apr">Aprovar</button>' : ''}${D.almox && ['aberta', 'parcial'].includes(r.situacao) ? '<button class="btn primary" id="de-ent">Entregar</button>' : ''}` });
+      ${D.aprov && r.situacao === 'aprovacao' ? '<button class="btn" id="de-rec">Recusar</button><button class="btn primary" id="de-apr">Aprovar</button>' : ''}${D.almox && r.entregas.some(e => !e.estornada_em) ? '<button class="btn" id="de-dvl">Receber devolução</button>' : ''}${D.almox && ['aberta', 'parcial'].includes(r.situacao) ? '<button class="btn primary" id="de-ent">Entregar</button>' : ''}` });
+  devolucoesDa(r, $('#de-dev', m.el));
   const acao = (id, fn) => $(id, m.el) && ($(id, m.el).onclick = () => { m.close(); fn(); });
-  acao('#de-ent', () => entregar(r, root)); acao('#de-apr', () => decidir(r, true, root)); acao('#de-rec', () => decidir(r, false, root));
+  acao('#de-ent', () => entregar(r, root)); acao('#de-dvl', () => devolver(r, root)); acao('#de-apr', () => decidir(r, true, root)); acao('#de-rec', () => decidir(r, false, root));
   acao('#de-can', () => motivo(r.situacao === 'parcial' ? `Encerrar a requisição nº ${r.numero} sem entregar o restante` : `Cancelar a requisição nº ${r.numero}`, 'Motivo', async (t) => { await rpc('alm_cancelar', { p_id: r.id, p_motivo: t }); toast('Requisição encerrada'); await recarregar(root); }, !eu));
   $('#de-imp', m.el) && ($('#de-imp', m.el).onclick = () => comprovante(r));
 }
@@ -310,6 +358,7 @@ async function parametros(root) {
   c.innerHTML = `<div class="card" style="max-width:980px"><h2 style="margin-top:0">Parâmetros do almoxarifado</h2>
     <div class="grid-form">
       <label>Pedido acima de (R$) pede aprovação<input id="pa-valor" inputmode="decimal" value="${g.valor_aprovacao != null ? qtd(g.valor_aprovacao) : ''}" placeholder="em branco = sem regra de valor"></label>
+      <label>Prazo para devolver (dias)<input id="pa-dev" type="number" min="1" max="365" value="${g.devolucao_dias ?? ''}" placeholder="em branco = sem prazo"></label>
       <label style="display:flex;flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:10px"><input type="checkbox" id="pa-cracha" style="width:auto;margin:0" ${g.exigir_cracha ? 'checked' : ''}> Entrega só com o crachá lido</label>
       <label style="display:flex;flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:10px"><input type="checkbox" id="pa-balcao" style="width:auto;margin:0" ${g.permitir_balcao ? 'checked' : ''}> Permitir retirada no balcão, sem pedido prévio</label>
       <label style="display:flex;flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:10px"><input type="checkbox" id="pa-proprio" style="width:auto;margin:0" ${g.aprovar_proprio ? 'checked' : ''}> Quem pediu pode aprovar a própria requisição (exceção)</label>
@@ -336,9 +385,11 @@ async function parametros(root) {
     if (!locs.length) return toast('Marque pelo menos um local do almoxarifado', true);
     if (!marc('alx').length && !sel('#pa-alx-p').length) return toast('Marque quem atende o almoxarifado', true);
     if (!marc('apr').length && !sel('#pa-apr-p').length) return toast('Marque quem aprova', true);
+    const dvt = $('#pa-dev', c).value.trim(); if (dvt !== '' && !(+dvt >= 1 && +dvt <= 365)) return toast('Prazo para devolver: de 1 a 365 dias, ou em branco', true);
     ev.target.disabled = true;
     try { await rpc('alm_config_salvar', { p_empresa: state.empresa.id, p_valor: valor, p_papeis_almoxarife: marc('alx'), p_almoxarifes: sel('#pa-alx-p'), p_papeis_aprovador: marc('apr'), p_aprovadores: sel('#pa-apr-p'),
         p_cracha: $('#pa-cracha', c).checked, p_balcao: $('#pa-balcao', c).checked, p_locais: igual ? null : locs, p_aprovar_proprio: $('#pa-proprio', c).checked });
+      const dv = $('#pa-dev', c).value.trim(); await rpc('alm_devolucao_salvar', { p_empresa: state.empresa.id, p_dias: dv === '' ? null : +dv });
       toast('Parâmetros salvos'); D.catalogo = null; await recarregar(root); } catch (err) { fail(err); ev.target.disabled = false; }
   };
 }
