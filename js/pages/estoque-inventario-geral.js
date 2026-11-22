@@ -206,9 +206,8 @@ async function contar(root, g, gl) {
   const vez = (papel === 'contador' && gl.situacao === 'contando') || (papel === 'auditor' && gl.situacao === 'auditando') || papel === 'terceira';
   const T = { contador: ['Contagem', 'Concluir a contagem', 'contagem cega: o saldo do sistema não aparece'], auditor: ['Auditoria', 'Concluir a auditoria', 'auditoria cega: você não vê o saldo nem a contagem'], terceira: ['Terceira contagem', '', 'contagem e auditoria diferentes: contem juntos; um registra a quantidade que vale e o outro confirma'] }[papel];
   const rot = (i) => `${esc(i.codigo || '')} ${esc(i.descricao || '')}${i.lote ? ` · lote ${esc(i.lote)}` : ''}`;
-  const falta = its.filter(i => !i.feito), temCam = 'BarcodeDetector' in window && !!navigator.mediaDevices?.getUserMedia;
-  its.sort((a, b) => (a.feito ? 1 : 0) - (b.feito ? 1 : 0));
-  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">${T[0]} — ${esc(D.loc[gl.local_id]?.nome || '')}</h2><div class="muted small">Inventário geral nº ${g.numero} · ${its.length - falta.length} de ${its.length} · ${T[2]}</div></div>
+  const temCam = 'BarcodeDetector' in window && !!navigator.mediaDevices?.getUserMedia;
+  root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">${T[0]} — ${esc(D.loc[gl.local_id]?.nome || '')}</h2><div class="muted small">Inventário geral nº ${g.numero} · <span id="ct-cnt"></span> · ${T[2]}</div><div id="ct-fila" class="small" style="color:var(--warn)"></div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="ct-v">← Inventário</button>${vez && T[1] ? `<button class="btn primary" id="ct-fim">${T[1]}</button>` : ''}</div></div>
     ${vez ? `<form id="ct-f" class="card" style="display:grid;grid-template-columns:1fr 160px auto;gap:8px;align-items:end;margin-bottom:12px">
       <label>Leia a etiqueta ou digite o código<input id="ct-cod" autocomplete="off" placeholder="Etiqueta, código do produto ou do lote" style="font-size:1.1em" autofocus></label>
@@ -216,14 +215,38 @@ async function contar(root, g, gl) {
       <div id="ct-it" class="small" style="grid-column:1/-1"></div>
       ${temCam ? '<div style="grid-column:1/-1"><button type="button" class="btn" id="ct-cam" style="min-height:44px">Ler pela câmera</button><video id="ct-video" playsinline muted hidden style="width:100%;max-width:420px;border-radius:12px;background:#000;aspect-ratio:4/3;object-fit:cover;display:block;margin-top:8px"></video></div>' : ''}</form>`
       : `<div class="card small muted" style="margin-bottom:12px">${papel === 'contador' ? 'A contagem deste local foi concluída.' : 'Aguardando a sua vez neste local.'}</div>`}
-    <div class="card flush"><div class="table-wrap"><table class="small"><thead><tr><th>Item</th><th>Un.</th>${papel === 'terceira' ? '<th class="num">Contagem</th><th class="num">Auditoria</th>' : ''}<th class="num">${papel === 'terceira' ? 'Vale' : 'Quantidade'}</th><th></th></tr></thead><tbody>
-      ${its.map(i => `<tr><td>${rot(i)}${i.incluido ? ' <span class="badge negoc">achado</span>' : ''}</td><td>${esc(i.unidade || '')}</td>${papel === 'terceira' ? `<td class="num">${n(i.contado)}</td><td class="num">${n(i.auditado)}</td>` : ''}
-        <td class="num">${i.feito ? `<b>${n(i.quantidade)}</b>` : i.situacao === 'aguarda_outro' ? `${n(i.quantidade)} <span class="badge aberto">aguarda a outra pessoa confirmar</span>` : i.situacao === 'confirmar' ? `${n(i.quantidade)} <span class="badge negoc">proposta</span>` : '<span class="muted">a contar</span>'}</td>
+    <div class="card flush"><div class="table-wrap"><table class="small"><thead><tr><th>Item</th><th>Un.</th>${papel === 'terceira' ? '<th class="num">Contagem</th><th class="num">Auditoria</th>' : ''}<th class="num">${papel === 'terceira' ? 'Vale' : 'Quantidade'}</th><th></th></tr></thead><tbody id="ct-tb"></tbody></table></div></div>`;
+  // fila local: a quantidade registrada sem internet fica guardada no aparelho e é enviada quando a conexão volta
+  const CH = 'ig-fila-' + gl.id, lerFila = () => { try { return JSON.parse(localStorage.getItem(CH) || '[]'); } catch { return []; } };
+  const gravarFila = (L) => { try { L.length ? localStorage.setItem(CH, JSON.stringify(L)) : localStorage.removeItem(CH); } catch { /* sem armazenamento: a fila fica só na memória desta tela */ } };
+  let fila = lerFila();
+  for (const f of fila) { const i = its.find(x => x.item_id === f.item); if (i) { i.quantidade = f.qtd; i.feito = true; i.naFila = true; } }
+  const pintar = () => {
+    its.sort((a, b) => (a.feito ? 1 : 0) - (b.feito ? 1 : 0));
+    $('#ct-tb', root).innerHTML = its.map(i => `<tr><td>${rot(i)}${i.incluido ? ' <span class="badge negoc">achado</span>' : ''}</td><td>${esc(i.unidade || '')}</td>${papel === 'terceira' ? `<td class="num">${n(i.contado)}</td><td class="num">${n(i.auditado)}</td>` : ''}
+        <td class="num">${i.feito ? `<b>${n(i.quantidade)}</b>${i.naFila ? ' <span class="badge aberto" title="Guardado no aparelho">a enviar</span>' : ''}` : i.situacao === 'aguarda_outro' ? `${n(i.quantidade)} <span class="badge aberto">aguarda a outra pessoa confirmar</span>` : i.situacao === 'confirmar' ? `${n(i.quantidade)} <span class="badge negoc">proposta</span>` : '<span class="muted">a contar</span>'}</td>
         <td style="white-space:nowrap">${vez && i.situacao === 'confirmar' ? `<button class="btn primary small" data-conf="${i.item_id}">Confirmar ${n(i.quantidade)}</button> ` : ''}${vez && !(papel === 'terceira' && i.feito) ? `<button class="btn ghost small" data-it="${i.item_id}">${i.feito ? 'Corrigir' : papel === 'terceira' && i.quantidade != null ? 'Outra quantidade' : 'Contar'}</button>` : ''}</td></tr>`).join('')
-        || `<tr><td colspan="6" class="empty">Nenhum item na lista. ${papel === 'contador' ? 'Leia a etiqueta ou digite o código do que encontrar no local.' : ''}</td></tr>`}</tbody></table></div></div>`;
-  let fluxo = null, quadro = 0; const parar = () => { cancelAnimationFrame(quadro); fluxo?.getTracks().forEach(t => t.stop()); fluxo = null; };
+        || `<tr><td colspan="6" class="empty">Nenhum item na lista. ${papel === 'contador' ? 'Leia a etiqueta ou digite o código do que encontrar no local.' : ''}</td></tr>`;
+    $('#ct-cnt', root).textContent = `${its.filter(i => i.feito).length} de ${its.length}`;
+    $('#ct-fila', root).textContent = fila.length ? `${fila.length} quantidade(s) guardada(s) no aparelho, aguardando a internet para enviar` : '';
+    ligarLinhas();
+  };
+  let ligarLinhas = () => {};
+  let fluxo = null, quadro = 0; const parar = () => { cancelAnimationFrame(quadro); fluxo?.getTracks().forEach(t => t.stop()); fluxo = null; window.removeEventListener('online', enviarFila); };
+  const semRede = (err) => !navigator.onLine || /Failed to fetch|NetworkError|Load failed|network/i.test(String(err?.message || err));
+  async function enviarFila() {
+    if (!fila.length || !navigator.onLine) return;
+    const resto = [];
+    for (const f of fila) {
+      try { await q(sb.rpc('est_ig_contar', { p_item: f.item, p_qtd: f.qtd })); const i = its.find(x => x.item_id === f.item); if (i) i.naFila = false; }
+      catch (err) { if (semRede(err)) { resto.push(f); } else { fail(err); const i = its.find(x => x.item_id === f.item); if (i) { i.feito = false; i.naFila = false; } } }
+    }
+    const enviados = fila.length - resto.length; fila = resto; gravarFila(fila); if (enviados) toast(`${enviados} quantidade(s) enviada(s)`); pintar();
+  }
   $('#ct-v', root).onclick = () => { parar(); ir(root, g.id); };
+  pintar();
   if (!vez) return;
+  window.addEventListener('online', enviarFila); enviarFila();
   let alvo = null, recemLido = false;
   const escolher = (i) => { alvo = i; $('#ct-it', root).innerHTML = i ? `<b>${rot(i)}</b> · ${esc(i.unidade || '')}${papel === 'terceira' ? ` · contagem ${n(i.contado)} × auditoria ${n(i.auditado)}` : ''}` : ''; if (i) $('#ct-q', root).focus(); };
   // a etiqueta da plataforma (L… do lote, P… do produto) vem primeiro; depois o código do lote e o do produto
@@ -246,9 +269,12 @@ async function contar(root, g, gl) {
       await q(sb.rpc('est_ig_incluir', { p_ig_local: gl.id, p_produto: p.id, p_lote: lt?.id || null })); toast('Item incluído: informe a quantidade'); render(root);
     } catch (err) { fail(err); }
   };
-  $$('[data-it]', root).forEach(b => b.onclick = () => { const i = its.find(x => x.item_id === b.dataset.it); $('#ct-cod', root).value = i.codigo || ''; escolher(i); });
-  $$('[data-conf]', root).forEach(b => b.onclick = async () => { const i = its.find(x => x.item_id === b.dataset.conf);
-    try { const r = await q(sb.rpc('est_ig_terceira', { p_item: i.item_id, p_qtd: i.quantidade, p_justificativa: null })); toast(r === 'concluido' ? 'Confirmado: local concluído' : 'Confirmado'); parar(); r === 'concluido' ? ir(root, g.id) : render(root); } catch (err) { fail(err); } });
+  ligarLinhas = () => {
+    $$('[data-it]', root).forEach(b => b.onclick = () => { const i = its.find(x => x.item_id === b.dataset.it); $('#ct-cod', root).value = i.codigo || ''; escolher(i); });
+    $$('[data-conf]', root).forEach(b => b.onclick = async () => { const i = its.find(x => x.item_id === b.dataset.conf);
+      try { const r = await q(sb.rpc('est_ig_terceira', { p_item: i.item_id, p_qtd: i.quantidade, p_justificativa: null })); toast(r === 'concluido' ? 'Confirmado: local concluído' : 'Confirmado'); parar(); r === 'concluido' ? ir(root, g.id) : render(root); } catch (err) { fail(err); } });
+  };
+  ligarLinhas();
   $('#ct-f', root).onsubmit = async (e) => {
     e.preventDefault(); if (!alvo) return toast('Leia a etiqueta do item', true);
     // o leitor manda Enter depois do código: isso escolhe o item, não registra a quantidade
@@ -259,13 +285,19 @@ async function contar(root, g, gl) {
       if (papel === 'terceira') { const just = (prompt('Justificativa da diferença entre a contagem e a auditoria (obrigatória)') || '').trim(); if (just.length < 5) return toast('Informe a justificativa', true);
         const r = await q(sb.rpc('est_ig_terceira', { p_item: alvo.item_id, p_qtd: qv, p_justificativa: just }));
         toast(r === 'concluido' ? 'Local concluído' : r === 'confirmar' ? 'Registrado: falta a outra pessoa confirmar' : 'Registrado'); parar(); return r === 'concluido' ? ir(root, g.id) : render(root); }
-      await q(sb.rpc('est_ig_contar', { p_item: alvo.item_id, p_qtd: qv })); toast('Registrado'); parar(); render(root);
+      const it = alvo, limpa = () => { escolher(null); $('#ct-cod', root).value = ''; $('#ct-q', root).value = ''; $('#ct-cod', root).focus(); };
+      try { await q(sb.rpc('est_ig_contar', { p_item: it.item_id, p_qtd: qv })); it.naFila = false; toast('Registrado'); }
+      catch (err) { if (!semRede(err)) throw err;
+        fila = fila.filter(f => f.item !== it.item_id).concat({ item: it.item_id, qtd: qv }); gravarFila(fila); it.naFila = true; toast('Sem internet: guardado no aparelho, envia sozinho quando voltar'); }
+      it.quantidade = qv; it.feito = true; pintar(); limpa();   // só a lista é redesenhada: a câmera e o leitor continuam prontos
     } catch (err) { fail(err); }
   };
   $('#ct-fim', root) && ($('#ct-fim', root).onclick = async () => {
     try {
       if (papel === 'auditor') { const r = await q(sb.rpc('est_ig_concluir_auditoria', { p_ig_local: gl.id }));
         toast(r === 'terceira' ? 'Há itens diferentes da contagem: terceira contagem, com quem contou' : 'Auditoria confere: local concluído'); parar(); return ir(root, g.id); }
+      if (fila.length) { await enviarFila(); if (fila.length) return toast('Ainda há quantidades guardadas no aparelho: conclua quando a internet voltar', true); }
+      const falta = its.filter(i => !i.feito);
       let zerar = false; if (falta.length) { if (!confirm(`${falta.length} item(ns) sem contagem. Confirmar que não foram encontrados (ficam com zero)?`)) return; zerar = true; }
       else if (!confirm('Concluir a contagem deste local? Depois disso a contagem não pode mais ser alterada.')) return;
       const r = await q(sb.rpc('est_ig_concluir_contagem', { p_ig_local: gl.id, p_zerar_pendentes: zerar }));

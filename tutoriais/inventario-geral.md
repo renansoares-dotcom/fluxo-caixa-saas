@@ -1,7 +1,7 @@
 ---
 titulo: Inventário Geral — o inventário do dia 01
 tela: Compras › Estoque › Inventário Geral (EST010)
-versao: 1.2
+versao: 1.3
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -113,7 +113,11 @@ A contagem é cega em toda a plataforma: enquanto o local não termina, quem con
 
 O leitor envia Enter depois do código. A plataforma entende esse Enter como a escolha do item, e não como registro da quantidade.
 
+Depois de registrar, o campo do código volta a ficar pronto para a próxima leitura, e a câmera continua ligada. Só a lista é atualizada.
+
 Para corrigir, clique em **Corrigir** na linha, enquanto a contagem do local não foi concluída.
+
+**Sem internet no local.** Se a conexão cair durante a contagem, a quantidade fica **guardada no aparelho**, com a marca **a enviar** na linha. Quando a internet volta, a plataforma envia sozinha. A contagem só pode ser concluída depois que tudo foi enviado. Não feche o navegador nem limpe os dados do aparelho enquanto houver itens a enviar.
 
 ### 5.2 Item encontrado fora da lista
 
@@ -279,3 +283,4 @@ Com amostra 0% e as duas regras desligadas não há auditoria: a contagem conclu
 | 1.0 | 22/11/2026 | Primeira versão: inventário geral com data de referência, congelamento dos locais, contagem cega, auditoria cega por rodízio, terceira contagem, ajustes na data de referência, fechamento do mês, acuracidade por local e implantação pelo primeiro inventário. |
 | 1.1 | 22/11/2026 | Controle de corte: a contagem é comparada com o saldo do congelamento. Ajuste pelo custo da data de referência. Terceira contagem com justificativa obrigatória e confirmação da outra pessoa. Quem conta ou audita só vê o resultado depois que o seu local termina. Local com auditoria não fica sem auditor. Contagem cíclica barrada em local do inventário geral. Erro da aprovação aponta o item. |
 | 1.2 | 22/11/2026 | Contagem cega em toda a plataforma (saldo, Kardex e custo escondidos de quem conta ou audita, por parâmetro). Recontagem pedida por quem gerencia, sem cancelar o inventário. Desfazer inventário aprovado (administrador). Lote criado na própria contagem. Local inventariado não aceita movimento com data até a referência, mesmo com o mês reaberto. |
+| 1.3 | 22/11/2026 | Contagem mais rápida no celular: registrar não recarrega a tela. Sem internet, a quantidade fica guardada no aparelho e é enviada quando a conexão volta. |
