@@ -11,7 +11,7 @@ export const title = 'Requisição de Material';
 const menos = (iso, d) => { const x = new Date(iso + 'T12:00:00'); x.setDate(x.getDate() - d); return x.toISOString().slice(0, 10); };
 const ui = { aba: 'minhas', situacao: 'abertas', setor: '', busca: '', de: menos(today(), 60), ate: today() };
 let D = null;
-const PADRAO = { valor_aprovacao: null, papeis_almoxarife: ['admin', 'diretor', 'compras'], almoxarifes: [], papeis_aprovador: ['admin', 'diretor'], aprovadores: [], exigir_cracha: false, permitir_balcao: true, locais: null };
+const PADRAO = { valor_aprovacao: null, papeis_almoxarife: ['admin', 'diretor', 'compras'], almoxarifes: [], papeis_aprovador: ['admin', 'diretor'], aprovadores: [], exigir_cracha: false, permitir_balcao: true, locais: null, aprovar_proprio: false };
 const qtd = (v) => (v == null ? '' : (+v).toLocaleString('pt-BR', { maximumFractionDigits: 4 }));
 const quando = (t) => (t ? new Date(t).toLocaleString('pt-BR', { timeZone: 'America/Recife', dateStyle: 'short', timeStyle: 'short' }) : '');
 const badge = (s) => { const [t, c] = A.SIT[s] || [s, '']; return `<span class="badge ${c}">${t}</span>`; };
@@ -306,6 +306,7 @@ async function parametros(root) {
       <label>Pedido acima de (R$) pede aprovação<input id="pa-valor" inputmode="decimal" value="${g.valor_aprovacao != null ? qtd(g.valor_aprovacao) : ''}" placeholder="em branco = sem regra de valor"></label>
       <label style="display:flex;flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:10px"><input type="checkbox" id="pa-cracha" style="width:auto;margin:0" ${g.exigir_cracha ? 'checked' : ''}> Entrega só com o crachá lido</label>
       <label style="display:flex;flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:10px"><input type="checkbox" id="pa-balcao" style="width:auto;margin:0" ${g.permitir_balcao ? 'checked' : ''}> Permitir retirada no balcão, sem pedido prévio</label>
+      <label style="display:flex;flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:10px"><input type="checkbox" id="pa-proprio" style="width:auto;margin:0" ${g.aprovar_proprio ? 'checked' : ''}> Quem pediu pode aprovar a própria requisição (exceção)</label>
     </div>
     <fieldset style="margin-top:12px"><legend>Quem atende e entrega (almoxarife)</legend><div>${caixas('alx', g.papeis_almoxarife)}</div>
       <div class="small muted" style="margin:8px 0 4px">Pessoas a mais, de qualquer perfil (segure Ctrl para marcar várias):</div>${gente('pa-alx-p', g.almoxarifes)}</fieldset>
@@ -331,7 +332,7 @@ async function parametros(root) {
     if (!marc('apr').length && !sel('#pa-apr-p').length) return toast('Marque quem aprova', true);
     ev.target.disabled = true;
     try { await rpc('alm_config_salvar', { p_empresa: state.empresa.id, p_valor: valor, p_papeis_almoxarife: marc('alx'), p_almoxarifes: sel('#pa-alx-p'), p_papeis_aprovador: marc('apr'), p_aprovadores: sel('#pa-apr-p'),
-        p_cracha: $('#pa-cracha', c).checked, p_balcao: $('#pa-balcao', c).checked, p_locais: igual ? null : locs });
+        p_cracha: $('#pa-cracha', c).checked, p_balcao: $('#pa-balcao', c).checked, p_locais: igual ? null : locs, p_aprovar_proprio: $('#pa-proprio', c).checked });
       toast('Parâmetros salvos'); D.catalogo = null; await recarregar(root); } catch (err) { fail(err); ev.target.disabled = false; }
   };
 }

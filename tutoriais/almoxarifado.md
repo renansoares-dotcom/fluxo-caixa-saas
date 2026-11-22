@@ -1,7 +1,7 @@
 ---
 titulo: Requisição de Material — pedir, aprovar e entregar pelo almoxarifado
 tela: Painéis › Requisição de Material (PAI015)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-21
 ---
 ## 1. Para que serve
@@ -60,6 +60,8 @@ Você é avisado quando a requisição é aprovada, recusada, entregue ou encerr
 ## 5. Aprovar
 
 Na aba **Aprovar**, cada requisição mostra o motivo da aprovação. **Aprovar** libera para o almoxarifado; **Recusar** pede o motivo, que vai para quem pediu.
+
+**Quem pediu não aprova a própria requisição.** Se o aprovador for o próprio solicitante, outro aprovador precisa decidir. A exceção pode ser liberada em **Parâmetros**.
 
 ![Figura 2 — Aprovar: requisições que fogem da regra, com o motivo (dados fictícios)](img/almoxarifado-6.jpg)
 
@@ -125,6 +127,7 @@ Aba **Parâmetros** (administrador e diretor).
 | Pedido acima de (R$) pede aprovação | Em branco | Em branco, não há regra de valor. O valor do pedido é estimado pelo custo médio do estoque |
 | Entrega só com o crachá lido | Desligado | Ligado, a entrega e o balcão só são registrados com o crachá lido pelo leitor |
 | Permitir retirada no balcão | Ligado | Desligado, é preciso pedir antes |
+| Quem pediu pode aprovar a própria requisição | Desligado | Ligado, o aprovador pode aprovar o próprio pedido. Use só quando houver um único aprovador |
 | Quem atende e entrega | Administrador, Diretor e Compras | Perfis e pessoas que veem a fila e entregam |
 | Quem aprova | Administrador e Diretor | Perfis e pessoas que aprovam ou recusam |
 | Locais do almoxarifado | Insumos, Manutenção e Uso e consumo | De quais locais de estoque o almoxarifado entrega |
@@ -154,3 +157,4 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 21/11/2026 | Primeira versão: requisição, aprovação na exceção, fila do almoxarifado, entrega com identificação por crachá, retirada no balcão, baixa automática no Kardex, comprovante, relatório e parâmetros (SQL 176) |
+| 1.1 | 21/11/2026 | Quem pediu não aprova a própria requisição (exceção por parâmetro). Mudanças nos parâmetros e nos itens controlados ficam na trilha de auditoria. |

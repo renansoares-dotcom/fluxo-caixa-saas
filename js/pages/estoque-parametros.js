@@ -132,16 +132,17 @@ function familias(root, ed) {
 
 // ------------------------------------------------------------ tipos de movimento
 function tipos(root, ed) {
-  corpo(root, `${novoBtn(ed, 'ep-novo', 'Novo tipo de movimento')}<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Código</th><th>Tipo de movimento</th><th>Sentido</th><th>Origem padrão</th><th>Destino padrão</th><th>Forma custo</th><th>Gera financeiro</th><th>Documento</th><th>Situação</th></tr></thead><tbody>
+  corpo(root, `${novoBtn(ed, 'ep-novo', 'Novo tipo de movimento')}<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Código</th><th>Tipo de movimento</th><th>Sentido</th><th>Origem padrão</th><th>Destino padrão</th><th>Forma custo</th><th>Gera financeiro</th><th>Documento</th><th>Quem lança à mão</th><th>Situação</th></tr></thead><tbody>
     ${D.tipos.map(t => `<tr class="${ed ? 'clickable' : ''}" data-id="${t.id}"><td>${esc(t.codigo)}${t.sistema ? ' <span class="badge" title="Usado pela plataforma">sistema</span>' : ''}</td><td>${esc(t.nome)}</td><td>${SENTIDOS[t.sentido]}</td>
-      <td class="small">${esc(D.loc[t.local_origem_id]?.nome || '')}</td><td class="small">${esc(D.loc[t.local_destino_id]?.nome || '')}</td><td>${sim(t.afeta_custo)}</td><td>${sim(t.gera_financeiro)}</td><td>${DOCUMENTOS[t.documento]}</td><td>${t.ativo ? '' : '<span class="badge">inativo</span>'}</td></tr>`).join('')}
+      <td class="small">${esc(D.loc[t.local_origem_id]?.nome || '')}</td><td class="small">${esc(D.loc[t.local_destino_id]?.nome || '')}</td><td>${sim(t.afeta_custo)}</td><td>${sim(t.gera_financeiro)}</td><td>${DOCUMENTOS[t.documento]}</td><td class="small">${t.papeis_manual?.length ? 'Administrador, ' + t.papeis_manual.map(p => PAPEIS[p] || p).join(', ') : '<span class="muted">todos que movimentam</span>'}</td><td>${t.ativo ? '' : '<span class="badge">inativo</span>'}</td></tr>`).join('')}
   </tbody></table></div></div>
-  <p class="small muted">"Forma custo": a entrada entra pelo custo informado e recalcula o custo médio (compra, produção, saldo inicial). As demais entradas e todas as saídas usam o custo médio do momento. Os tipos "sistema" não se excluem (podem ser desativados).</p>`);
+  <p class="small muted">"Quem lança à mão": perfis que podem lançar o tipo pela tela do Kardex; o administrador sempre pode, e os lançamentos feitos pela plataforma (notas, requisições, inventário) não dependem disso. "Forma custo": a entrada entra pelo custo informado e recalcula o custo médio (compra, produção, saldo inicial). As demais entradas e todas as saídas usam o custo médio do momento. Os tipos "sistema" não se excluem (podem ser desativados).</p>`);
   const L = Object.fromEntries(D.locais.filter(l => l.ativo).map(l => [l.id, l.nome]));
   const abrir = (t) => ed && form({ titulo: t?.id ? `Tipo ${t.codigo}` : 'Novo tipo de movimento', tabela: 'est_tipos_movimento', root, excluir: !t?.sistema, v: t || { sentido: 'S', documento: 'nenhum', ativo: true },
     campos: [{ k: 'codigo', t: 'Código', obrig: true }, { k: 'nome', t: 'Nome', obrig: true, span: true }, { k: 'sentido', t: 'Sentido', tipo: 'sel', op: SENTIDOS, vazio: false },
       { k: 'documento', t: 'Documento exigido', tipo: 'sel', op: DOCUMENTOS, vazio: false }, { k: 'local_origem_id', t: 'Origem padrão', tipo: 'sel', op: L }, { k: 'local_destino_id', t: 'Destino padrão', tipo: 'sel', op: L },
-      { k: 'afeta_custo', t: 'Forma custo (entrada pelo custo informado)', tipo: 'chk' }, { k: 'gera_financeiro', t: 'Gera financeiro', tipo: 'chk' }, { k: 'ativo', t: 'Ativo', tipo: 'chk' }] });
+      { k: 'afeta_custo', t: 'Forma custo (entrada pelo custo informado)', tipo: 'chk' }, { k: 'gera_financeiro', t: 'Gera financeiro', tipo: 'chk' }, { k: 'ativo', t: 'Ativo', tipo: 'chk' },
+      { k: 'papeis_manual', t: 'Quem lança à mão pela tela (nenhum marcado = todos; o administrador sempre pode)', tipo: 'multi', op: { financeiro: 'Financeiro', diretor: 'Diretor', compras: 'Compras', producao: 'Produção' } }] });
   $('#ep-novo', root) && ($('#ep-novo', root).onclick = () => abrir(null));
   clicar(root, D.tipos, abrir);
 }

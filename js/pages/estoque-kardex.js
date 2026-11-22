@@ -149,7 +149,7 @@ async function kardexProduto(p, root) {
 async function estornar(mv, p, root, pai) {
   const t = D.tm[mv.tipo_movimento_id];
   const m = modal({ title: 'Estornar movimento', body: `<p style="margin-top:0">${dateBR(mv.data)} · ${esc(t?.nome || '')} · ${esc(D.loc[mv.local_id]?.nome || '')} · <b>${qtd(mv.quantidade)} ${esc(p.unidade)}</b> a ${unit(mv.custo_unitario)}</p>
-    ${mv.transferencia_id ? '<p class="small"><span class="badge vencido">transferência</span> Estorne as duas pernas (saída e entrada).</p>' : ''}
+    ${mv.transferencia_id ? '<p class="small"><span class="badge vencido">transferência</span> O estorno desfaz a transferência inteira: a saída da origem e a entrada no destino.</p>' : ''}
     <div class="grid2"><label>Data do estorno<input type="date" id="es-dt" value="${today()}"></label><label>Motivo<input id="es-mot" placeholder="obrigatório"></label></div>
     <p class="small muted">Gera o movimento inverso, ao mesmo custo. O original continua no kardex.</p>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="es-ok">Estornar</button>' });
@@ -161,7 +161,7 @@ async function estornar(mv, p, root, pai) {
 
 // ------------------------------------------------------------ movimento manual
 function movimento(root, { produto = null, transferencia = false } = {}) {
-  const tipos = D.tipos.filter(t => transferencia ? t.sentido === 'T' : t.sentido !== 'T');
+  const tipos = D.tipos.filter(t => (transferencia ? t.sentido === 'T' : t.sentido !== 'T') && (transferencia || state.papel === 'admin' || !t.papeis_manual?.length || t.papeis_manual.includes(state.papel)));
   const locOp = (sel) => D.locais.filter(l => l.ativo && l.controla_saldo).map(l => `<option value="${l.id}" ${sel === l.id ? 'selected' : ''}>${esc(l.nome)}</option>`).join('');
   const m = modal({ title: transferencia ? 'Transferência entre locais' : 'Novo movimento de estoque', wide: true, body: `
     <div class="grid-form">

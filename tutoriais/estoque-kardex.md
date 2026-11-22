@@ -1,8 +1,8 @@
 ---
 titulo: Kardex e parâmetros do estoque
 tela: Estoque › Kardex (EST002) e Parâmetros do Estoque (EST005)
-versao: 1.3
-atualizado: 2026-11-07
+versao: 1.4
+atualizado: 2026-11-21
 ---
 ## 1. Para que serve
 
@@ -53,13 +53,15 @@ Clique no produto para abrir o **kardex do produto**. Ele mostra:
 ### 3.2 Lançar um movimento
 
 1. Clique em **Novo movimento**.
-2. Escolha o **tipo de movimento**: por exemplo, compra, requisição para a produção, requisição interna, perda ou ajuste de inventário.
+2. Escolha o **tipo de movimento**: por exemplo, compra, requisição para a produção, requisição interna ou perda. A lista mostra só os tipos que o seu perfil pode lançar à mão (veja 4.3). **Saldo inicial** e **ajuste de inventário** vêm restritos ao administrador, ao financeiro e ao diretor.
 3. Informe a **data**, o **produto**, o **local** e a **quantidade**. O local já vem preenchido: primeiro o do tipo de movimento; depois o local padrão do produto.
 4. Se o produto controla lote, informe o **lote**. Um lote novo é criado na hora, com o **lote do fornecedor**.
 5. Nas entradas que formam custo (compra, produção e saldo inicial), informe o **custo unitário**, sem os impostos recuperáveis.
 6. Clique em **Lançar**.
 
 As demais entradas e todas as saídas usam o **custo médio do momento**. O saldo do local aparece embaixo do formulário antes de lançar.
+
+O movimento fica gravado com o usuário que lançou, a data e a hora. Estorno, transferência e movimento de nota fiscal não podem ser lançados por aqui: cada um tem o seu caminho (3.3, 3.4 e a entrada automática pelas notas).
 
 ### 3.3 Transferir entre locais
 
@@ -73,7 +75,7 @@ O movimento **não se altera nem se exclui**. Para corrigir:
 2. Clique no movimento errado.
 3. Informe a **data** e o **motivo** e clique em **Estornar**.
 
-O estorno lança o movimento inverso ao mesmo custo; o original fica no histórico. Numa transferência, estorne as duas pernas. Depois, lance o movimento certo.
+O estorno lança o movimento inverso ao mesmo custo; o original fica no histórico. Numa **transferência**, estornar qualquer uma das duas linhas desfaz a transferência inteira: a saída da origem e a entrada no destino. Cada movimento só pode ser estornado uma vez. Depois, lance o movimento certo.
 
 ### 3.5 Recalcular
 
@@ -117,7 +119,8 @@ Cada tipo de movimento tem:
 - os **locais padrão** de origem e de destino;
 - se **forma custo**;
 - se **gera financeiro**;
-- o **documento** exigido: nota, ordem de produção, requisição ou inventário.
+- o **documento** exigido: nota, ordem de produção, requisição ou inventário;
+- **quem lança à mão**: os perfis que podem lançar o tipo pela tela do Kardex. Sem nenhum perfil marcado, todos os que movimentam o estoque podem. O administrador sempre pode. Os lançamentos feitos pela plataforma (notas, requisições de material, inventário) não dependem deste campo.
 
 Os tipos marcados **sistema** são usados pela plataforma: podem ser desativados, mas não excluídos.
 
@@ -146,6 +149,11 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 - O sinal da quantidade segue o tipo: entrada soma e saída subtrai.
 - Movimento não se altera nem se exclui: só por estorno, e cada movimento só pode ser estornado uma vez.
 - Mês fechado não aceita movimento.
+- O lote informado precisa ser do mesmo produto.
+- Cada tipo de movimento só é lançado à mão pelos perfis definidos em **Parâmetros › Tipos de movimento**.
+- **Recalcular** só alcança produto da própria empresa.
+- A nota cancelada nunca é barrada pelo estoque: se o material já saiu e o estorno não cabe, o caso aparece nas pendências do estoque para tratar.
+- Mudanças em locais, famílias, tipos de movimento e regras por CFOP ficam na trilha de auditoria, com quem mudou e o valor anterior.
 - O custo não inclui os impostos recuperáveis (veja **Parâmetros de custo** em Posição de estoque).
 - **Qualidade**:
   - material no local **Quarentena (QUA)** ou **Reprovado (REP)** só sai pela decisão da inspeção ou pela disposição da não conformidade;
@@ -174,3 +182,4 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 | 1.1 | 05/11/2026 | Nomes das telas iguais aos do menu, com o código da tela no cabeçalho. |
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 07/11/2026 | Travas da qualidade: quarentena e reprovado só saem pela qualidade, lote bloqueado não sai, entrada com plano de recebimento vai para a quarentena. |
+| 1.4 | 21/11/2026 | Quem lança cada tipo de movimento à mão passa a ser parâmetro (saldo inicial e ajuste de inventário restritos por padrão). Estorno de transferência desfaz as duas pernas de uma vez. Lote conferido contra o produto. Trilha de auditoria nos parâmetros. Nota cancelada sem saldo para estornar vira pendência. |

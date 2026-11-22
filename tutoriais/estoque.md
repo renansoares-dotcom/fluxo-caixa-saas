@@ -1,8 +1,8 @@
 ---
 titulo: Estoque e produtos
 tela: Estoque › Implantação do Estoque (EST007), Posição de Estoque (EST001), Reposição de Estoque (EST008), Inventário Cíclico (EST009), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
-versao: 1.8
-atualizado: 2026-11-08
+versao: 1.9
+atualizado: 2026-11-21
 ---
 ## 1. Para que serve
 
@@ -260,6 +260,8 @@ Quem aprova vê, para cada item, o saldo do sistema, o contado, o recontado, a d
 
 Quem aprova recebe um aviso quando uma contagem chega para aprovação.
 
+**Quem contou não aprova a própria contagem.** A plataforma recusa a aprovação quando o aprovador é a mesma pessoa que contou algum item. Em empresa com uma pessoa só nessa função, a exceção pode ser liberada em **Parâmetros** (7.4).
+
 ### 7.4 Parâmetros
 
 Em **Parâmetros** (administrador e financeiro), ajuste:
@@ -269,6 +271,7 @@ Em **Parâmetros** (administrador e financeiro), ajuste:
 - a tolerância em percentual da quantidade e em reais. O item fica OK só quando está dentro das duas;
 - se a contagem é cega;
 - se a primeira contagem fora da tolerância pede recontagem;
+- se quem contou pode aprovar a própria contagem (exceção, desligada por padrão);
 - quem aprova os ajustes.
 
 ## 8. Regras e travas
@@ -306,3 +309,4 @@ Em **Parâmetros** (administrador e financeiro), ajuste:
 | 1.6 | 08/11/2026 | Nova tela Implantação do Estoque (EST007): os nove passos até o estoque oficial, com a situação calculada, o próximo passo, responsável, prazo, metas ajustáveis e os CFOPs sem regra. |
 | 1.7 | 08/11/2026 | Nova tela Reposição de Estoque (EST008): mínimo, ponto de pedido e máximo pelo consumo real e pelo nível de serviço, prazo de entrega real, cobertura, giro, parados, aplicar no cadastro e requisição de compra. |
 | 1.8 | 08/11/2026 | Nova tela Inventário Cíclico (EST009): contagens pela curva ABC e pela frequência de cada classe, contagem cega pelo celular com leitura da etiqueta, recontagem fora da tolerância, aprovação com ajustes AJ+/AJ− no Kardex e parâmetros na tela. |
+| 1.9 | 21/11/2026 | Inventário Cíclico: quem contou não aprova a própria contagem (exceção por parâmetro); item sem lote não entra duas vezes na mesma contagem. |

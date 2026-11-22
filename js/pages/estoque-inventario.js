@@ -144,12 +144,13 @@ function parametros(root) {
       <label>Tolerância (R$ da diferença)<input type="number" id="ip-v" min="0" step="10" value="${c.tolerancia_valor}"></label></div>
     <label class="chk" style="margin-top:8px"><input type="checkbox" id="ip-cg" ${c.contagem_cega ? 'checked' : ''}> Contagem cega (quem conta não vê o saldo do sistema)</label>
     <label class="chk"><input type="checkbox" id="ip-rc" ${c.recontar ? 'checked' : ''}> Pedir recontagem quando a primeira contagem passar da tolerância</label>
+    <label class="chk"><input type="checkbox" id="ip-pr" ${c.aprovar_propria ? 'checked' : ''}> Quem contou pode aprovar a própria contagem (exceção)</label>
     <div class="small" style="margin:8px 0 2px">Quem aprova os ajustes:</div><div style="display:flex;gap:4px 14px;flex-wrap:wrap">${PAP.map(([k, t]) => `<label class="chk" style="font-weight:400"><input type="checkbox" class="ip-p" value="${k}" ${c.papeis_aprovacao.includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div>
     <p class="small muted">Um item fica OK quando a diferença está dentro das duas tolerâncias (percentual e valor). Classes pela curva ABC do valor em estoque: A até 80%, B até 95%, C o resto.</p>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ip-ok">Salvar</button>' });
   $('#ip-ok', m.el).onclick = async () => {
     const v = (id) => +$(id, m.el).value, reg = { empresa_id: state.empresa.id, dias_a: v('#ip-a'), dias_b: v('#ip-b'), dias_c: v('#ip-c'), itens_por_contagem: v('#ip-n'), tolerancia_pct: v('#ip-t'), tolerancia_valor: v('#ip-v'),
-      contagem_cega: $('#ip-cg', m.el).checked, recontar: $('#ip-rc', m.el).checked, papeis_aprovacao: $$('.ip-p:checked', m.el).map(x => x.value), atualizado_em: new Date().toISOString() };
+      contagem_cega: $('#ip-cg', m.el).checked, recontar: $('#ip-rc', m.el).checked, aprovar_propria: $('#ip-pr', m.el).checked, papeis_aprovacao: $$('.ip-p:checked', m.el).map(x => x.value), atualizado_em: new Date().toISOString() };
     if (!reg.papeis_aprovacao.length) return toast('Escolha quem aprova', true);
     if (!(reg.dias_a >= 7 && reg.dias_b >= 7 && reg.dias_c >= 7 && reg.itens_por_contagem >= 1 && reg.itens_por_contagem <= 200 && reg.tolerancia_pct >= 0 && reg.tolerancia_pct <= 50 && reg.tolerancia_valor >= 0)) return toast('Confira as faixas', true);
     try { await q(sb.from('est_inv_config').upsert(reg)); m.close(); toast('Parâmetros salvos'); render(root); } catch (e) { fail(e); }
