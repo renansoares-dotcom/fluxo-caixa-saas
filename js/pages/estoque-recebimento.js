@@ -1,4 +1,4 @@
-// Compras › Estoque › Recebimento de Notas (EST011) — SQL 186, 187 e 188, 22/11/2026.
+// Compras › Estoque › Recebimento de Notas (EST011) — SQL 186 a 189, 22/11/2026.
 // Com a entrada pelo recebimento ligada, a nota de compra fica "a receber" e só entra no estoque quando quem atende o almoxarifado
 // confere o material na chegada: item a item, pelo celular, leitor ou câmera; a conferência é cega por parâmetro; entra o que chegou
 // em bom estado, na data da chegada, ao custo da nota; falta, sobra e avaria vão como aviso para Compras.
@@ -128,7 +128,7 @@ async function conferir(root, r) {
       foot: '<button class="btn" data-close>Voltar</button><button class="btn primary" id="cf-ok">Concluir</button>' });
     $('#cf-ok', m.el).onclick = async () => {
       try { const x = await q(sb.rpc('est_receb_concluir', { p_receb: r.id, p_data: $('#cf-d', m.el).value, p_observacao: $('#cf-o', m.el).value.trim() || null, p_zerar_pendentes: pend > 0 }));
-        m.close(); parar(); toast(`Recebimento concluído${x.divergencias ? ` · ${x.divergencias} divergência(s) avisada(s) a Compras` : ''}${x.lancados ? ` · ${x.lancados} item(ns) no estoque` : ''}`); ir(root, r.id);
+        m.close(); parar(); toast(`Recebimento concluído${x.divergencias ? ` · ${x.divergencias} divergência(s) avisada(s) a Compras` : ''}${x.bloqueado ? ` · pagamento da nota bloqueado em ${money(x.valor_bloqueado)}` : ''}${x.lancados ? ` · ${x.lancados} item(ns) no estoque` : ''}`, x.bloqueado); ir(root, r.id);
       } catch (e) { fail(e); }
     };
   };

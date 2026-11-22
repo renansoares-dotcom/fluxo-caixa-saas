@@ -1,7 +1,7 @@
 ---
 titulo: Recebimento de Notas — conferência na chegada
 tela: Compras › Estoque › Recebimento de Notas (EST011)
-versao: 1.2
+versao: 1.3
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -69,7 +69,10 @@ A plataforma então:
 
 1. lança no estoque o que chegou em bom estado, na data da chegada, ao custo unitário da nota, **até a quantidade da nota**: o que chegou a mais não entra e fica como divergência (sobrou) para Compras resolver com o fornecedor;
 2. registra as divergências (faltou, sobrou, avariado) de cada item;
-3. avisa Compras e o administrador quando houver divergência.
+3. avisa Compras e o administrador quando houver divergência;
+4. **trava o pagamento da nota** quando faltou ou chegou avariado algo além da tolerância. O valor travado é a quantidade que faltou ou veio avariada, ao preço unitário da nota. É o mesmo bloqueio do confronto pedido × nota de Compras: os títulos da nota, os de agora e os que forem ligados depois, ficam travados na Autorização de Pagamentos até alguém liberar em **Compras › Recebimentos › Confronto pedido × nota**, com o motivo (por exemplo, o fornecedor emitiu a nota de débito ou repôs o material). Sobra não trava o pagamento.
+
+O bloqueio segue o parâmetro de Compras "bloquear o pagamento quando houver divergência", e quem libera são os perfis definidos nos parâmetros do confronto.
 
 Se o estoque ainda não foi implantado, a conferência fica registrada, e entra no estoque o que chegar a partir da data de implantação.
 
@@ -129,3 +132,4 @@ A aprovação existe porque dispensar uma nota de material tira essa nota do est
 | 1.0 | 22/11/2026 | Primeira versão: entrada da nota de compra pelo recebimento conferido, conferência cega pelo celular, leitor ou câmera, data da chegada, custo da nota, divergências avisadas a Compras, nota sem material dispensada e parâmetros (SQL 186). |
 | 1.1 | 22/11/2026 | Nota e itens fora das outras telas para quem confere, durante a conferência. Chegada respeita mês fechado, limite de dias e local congelado (nada é gravado se não couber). Sobra além da nota não entra. Fila sem notas já lançadas pela emissão. |
 | 1.2 | 22/11/2026 | Dispensa de nota pedida por quem confere e aprovada por administrador, financeiro ou diretor. Perfil Compras não confere, a não ser nomeado. Avariado entra no local Avariados, fora do custo médio (SQL 188). |
+| 1.3 | 22/11/2026 | Falta e avaria na chegada travam o pagamento da nota, no mesmo bloqueio do confronto pedido × nota de Compras (SQL 189). |

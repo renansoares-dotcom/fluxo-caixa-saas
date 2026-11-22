@@ -32,9 +32,9 @@ create temp table _r (k text primary key, id uuid, j jsonb); grant all on _r to 
 create function pg_temp.nota(p_id text, p_num int, p_emissao date, p_qtd numeric, p_valor numeric) returns void language sql as $$
   insert into nfe_notas(id, empresa_id, chave, numero, emissao, tipo, emissao_propria, situacao, emit_doc, emit_nome, v_nf)
   values (('b6000000-0000-0000-0000-0000000000' || p_id)::uuid, 'e000000a-0000-0000-0000-000000000000', 'B6-' || p_num, p_num, p_emissao, 'entrada', false, 'autorizada', '66555444000133', 'FORNECEDOR B6', p_valor + 1);
-  insert into nfe_itens(id, empresa_id, nota_id, n_item, cprod, xprod, ucom, cfop, qcom, vprod) values
-    (('b6000000-0000-0000-0000-0000000001' || p_id)::uuid, 'e000000a-0000-0000-0000-000000000000', ('b6000000-0000-0000-0000-0000000000' || p_id)::uuid, 1, 'SC-RES', 'RESINA SACO 25 KG', 'SC', '5101', p_qtd, p_valor),
-    (('b6000000-0000-0000-0000-0000000002' || p_id)::uuid, 'e000000a-0000-0000-0000-000000000000', ('b6000000-0000-0000-0000-0000000000' || p_id)::uuid, 2, 'SEM-DEPARA', 'ITEM SEM DE-PARA', 'UN', '5101', 2, 1);
+  insert into nfe_itens(id, empresa_id, nota_id, n_item, cprod, xprod, ucom, cfop, qcom, vprod, vuncom) values
+    (('b6000000-0000-0000-0000-0000000001' || p_id)::uuid, 'e000000a-0000-0000-0000-000000000000', ('b6000000-0000-0000-0000-0000000000' || p_id)::uuid, 1, 'SC-RES', 'RESINA SACO 25 KG', 'SC', '5101', p_qtd, p_valor, p_valor / p_qtd),
+    (('b6000000-0000-0000-0000-0000000002' || p_id)::uuid, 'e000000a-0000-0000-0000-000000000000', ('b6000000-0000-0000-0000-0000000000' || p_id)::uuid, 2, 'SEM-DEPARA', 'ITEM SEM DE-PARA', 'UN', '5101', 2, 1, 0.5);
 $$;
 
 -- desligado: nada muda (nota antiga entra pela emissão)
@@ -110,6 +110,14 @@ select pg_temp.ok((select (j->>'divergencias')::int = 2 and (j->>'lancados')::in
 select pg_temp.ok((select data = current_date - 1 and quantidade = 75 and custo_unitario = 10 from est_movimentos where nfe_item_id = 'b6000000-0000-0000-0000-0000000001c3'),
   'entrou na data da chegada: 3 sacos × 25 = 75 kg, ao custo da nota (R$ 1.000 / 100 kg = R$ 10)');
 select pg_temp.ok((select divergencia like 'faltou 1%' from est_recebimento_itens where id = (select id from _r where k = 'i1')), 'a divergência fica registrada para Compras');
+select pg_temp.ok((select (j->>'bloqueado')::boolean and (j->>'valor_bloqueado')::numeric = 251 from _r where k = 'c')
+  and (select situacao = 'bloqueada' and valor_divergente = 251 from compras_bloqueios where nota_id = 'b6000000-0000-0000-0000-0000000000c3')
+  and (select bloqueio_id is not null from est_recebimentos where id = (select id from _r where k = 'r')),
+  'falta de 1 saco (R$ 250) e item que não chegou (R$ 1): o pagamento da nota fica bloqueado em R$ 251, no mesmo bloqueio de Compras');
+select pg_temp.entrar(:FIN::uuid);
+select pg_temp.ok((select count(*) >= 2 from jsonb_array_elements(public.compras_confronto_lista(:E::uuid, current_date - 30)) x, jsonb_array_elements(x -> 'divergencias') d
+   where x ->> 'numero' = '9103' and d ->> 'tipo' = 'recebimento' and (d ->> 'bloqueia')::boolean), 'a tela de confronto de Compras mostra as divergências da conferência, com o cadeado');
+reset role;
 select pg_temp.ok(not exists (select 1 from est_movimentos where nfe_item_id = 'b6000000-0000-0000-0000-0000000002c3') and not exists (select 1 from est_pendencias where nfe_item_id = 'b6000000-0000-0000-0000-0000000002c3' and status = 'aberta'), 'item que não chegou não entra nem pendura');
 select pg_temp.entrar(:ADM::uuid);
 select pg_temp.ok(public.est_processar_item('b6000000-0000-0000-0000-0000000001c3') = 'ja', 'reprocessar não duplica a entrada');
@@ -142,6 +150,7 @@ reset role;
 select pg_temp.ok((select quantidade = 100 and valor = 1000 from est_movimentos where nfe_item_id = 'b6000000-0000-0000-0000-0000000001c7')
   and (select divergencia like 'sobrou 2%' from est_recebimento_itens ri join est_recebimentos r on r.id = ri.recebimento_id where r.nota_id = 'b6000000-0000-0000-0000-0000000000c7' and ri.qtd_nota = 4),
   'chegaram 6 sacos para 4 na nota: entram 100 kg (R$ 1.000), e a sobra de 2 fica para Compras');
+select pg_temp.ok(not exists (select 1 from compras_bloqueios where nota_id = 'b6000000-0000-0000-0000-0000000000c7' and valor_divergente > 1), 'sobra não bloqueia o pagamento (só o item que não chegou)');
 
 -- nota sem material: dispensada com motivo
 select pg_temp.nota('c5', 9105, current_date, 1, 100);

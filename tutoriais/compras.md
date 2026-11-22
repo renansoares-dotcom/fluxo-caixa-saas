@@ -1,7 +1,7 @@
 ---
 titulo: Compras — requisições, pedidos e recebimentos
 tela: Compras › Painel de Compras (CMP001), Requisições e Cotações (CMP002), Pedidos de Compra (CMP003) e Recebimentos (CMP004)
-versao: 1.6
+versao: 1.7
 atualizado: 2026-11-08
 ---
 ## 1. Para que serve
@@ -222,6 +222,8 @@ Para **liberar o pagamento**, quem tem permissão clica em **Liberar pagamento**
 
 ![Figura 13 — Liberar o pagamento com o motivo (dados fictícios)](img/compras-9.jpg)
 
+**Conferência da chegada.** Com o Recebimento de Notas ligado (Compras › Estoque › Recebimento de Notas), quem atende o almoxarifado confere o material quando ele chega. O que faltou ou chegou avariado, ao preço unitário da nota, entra no **mesmo bloqueio** do confronto: os títulos da nota ficam travados, a divergência aparece aqui com o 🔒 e a liberação é a mesma, com o motivo. Sobra não bloqueia.
+
 **Parâmetros do confronto** (botão no topo de Recebimentos, para administrador e diretor):
 
 - ligar ou desligar o bloqueio;
@@ -283,3 +285,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.4 | 08/11/2026 | Cotação por link: convite por e-mail ou WhatsApp, página do fornecedor sem cadastro, resposta e recusa, lista de convites; mapa comparativo com o menor preço por item, prazo, valor presente e a compra dividida; parâmetros da cotação. |
 | 1.5 | 08/11/2026 | Confronto pedido × nota: o sistema confere quantidade, preço, itens fora do pedido e prazo de pagamento com tolerâncias; nota divergente tem o pagamento bloqueado até a liberação com motivo; aba **Confronto pedido × nota** com as notas sem pedido; parâmetros do confronto. |
 | 1.6 | 08/11/2026 | Avaliação dos fornecedores (IQF) no Painel de Compras: qualidade, entrega e preço e nota com pesos, classes A/B/C, eventos de cada fornecedor e parâmetros; IQF no mapa comparativo das cotações. |
+| 1.7 | 22/11/2026 | A conferência da chegada (Recebimento de Notas) entra no mesmo bloqueio do confronto: falta e avaria travam o pagamento da nota e aparecem aqui. |
