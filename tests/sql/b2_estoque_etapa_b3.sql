@@ -144,7 +144,7 @@ select pg_temp.falha($$select public.alm_requisitar('e000000a-0000-0000-0000-000
 
 -- ============================================================ 4 e 8. leitura por lista de empresas, índice e privilégios
 reset role;
-select pg_temp.ok((select count(*) = 6 and bool_and(qual like '%est_empresas_que_vejo%') from pg_policies where schemaname = 'public' and cmd = 'SELECT'
+select pg_temp.ok((select count(*) = 6 and bool_and(qual like '%est_empresas_que_vejo%') from pg_policies where schemaname = 'public' and cmd = 'SELECT' and permissive = 'PERMISSIVE'
   and tablename in ('est_movimentos', 'est_saldos', 'est_custos', 'est_inv_contagens', 'est_inv_itens', 'est_fechamento_saldos')), 'as seis tabelas leem pela lista de empresas, sem função por linha');
 select pg_temp.ok(exists (select 1 from pg_indexes where indexname = 'est_mov_emp_data'), 'índice por empresa e data');
 select pg_temp.ok((select count(*) = 0 from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' and c.relname ~ '^(est|alm|etq)_'

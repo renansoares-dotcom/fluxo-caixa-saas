@@ -1590,7 +1590,7 @@ window.RPC.pag_remessa_gravar = () => null;
     ...Array.from({ length: 34 }, (_, k) => ({ produto_id: 'abc-' + k, classe: k < 4 ? 'A' : k < 12 ? 'B' : 'C', valor: 1000, ultima_contagem: k % 3 ? new Date(hoje - (k * 6) * 864e5).toISOString() : null }))];
 
   // Inventário geral (SQL 182) — o inventário do dia 01, FICTÍCIO: três locais, um contando, um em auditoria e um concluído
-  DB.est_ig_config = [{ empresa_id: E, amostra_pct: 100, amostra_classe_a: true, amostra_divergentes: true, tolerancia_pct: 2, tolerancia_valor: 100, dif_auditoria_pct: 0.5, papeis_aprovacao: ['admin', 'diretor', 'financeiro'], aprovar_quem_contou: false, fechar_mes: true }];
+  DB.est_ig_config = [{ empresa_id: E, amostra_pct: 100, amostra_classe_a: true, amostra_divergentes: true, tolerancia_pct: 2, tolerancia_valor: 100, dif_auditoria_pct: 0.5, papeis_aprovacao: ['admin', 'diretor', 'financeiro'], aprovar_quem_contou: false, fechar_mes: true, esconder_saldo: true }];
   DB.est_ig_inventarios = [
     { id: 'ig-2', empresa_id: E, numero: 2, referencia: '2026-10-31', implantacao: false, situacao: 'aberto', observacao: 'Inventário do dia 01', criado_nome: 'Renata Alves', criado_em: '2026-11-01T06:50:00Z' },
     { id: 'ig-1', empresa_id: E, numero: 1, referencia: '2026-09-30', implantacao: true, situacao: 'aprovado', criado_nome: 'Ana Souza', criado_em: '2026-10-01T06:45:00Z', decidido_nome: 'Carlos Lima', decidido_em: '2026-10-01T15:20:00Z', ajustes: 148, valor_ajuste: 412380.5, mes_fechado: true }];

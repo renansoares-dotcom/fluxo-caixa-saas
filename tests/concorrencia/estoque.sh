@@ -83,4 +83,19 @@ wait
 [ "$(cat /tmp/conc-a.rc)" = 0 ] || { cat /tmp/conc-a.log; falhou "a primeira saída retroativa devia passar"; }
 [ "$(cat /tmp/conc-b.rc)" != 0 ] && grep -q "Saldo insuficiente" /tmp/conc-b.log || { cat /tmp/conc-b.log; falhou "a segunda saída retroativa devia ser barrada"; }
 [ "$("${P[@]}" -c "select (min(saldo_local_apos) >= 0)::text from est_movimentos where produto_id = '$PR2'")" = true ] || falhou "o Kardex não devia ter saldo negativo em nenhum dia"
+# 6) abrir o inventário geral com um lançamento em andamento: a abertura espera, e o saldo do congelamento já traz o lançamento
+ADM='a0000000-0000-0000-0000-00000000000a'
+"${P[@]}" -c "update est_ig_inventarios set situacao = 'cancelado' where empresa_id = '$E' and situacao = 'aberto'" -c "update est_inv_contagens set situacao = 'cancelada' where empresa_id = '$E' and situacao in ('aberta', 'em_aprovacao')" >/dev/null || falhou "preparação do inventário geral"
+UC=$("${P[@]}" -c "select id from est_locais where empresa_id = '$E' and codigo = 'UC'")
+entrada="insert into est_movimentos(empresa_id, data, produto_id, local_id, tipo_movimento_id, quantidade, custo_unitario, documento) select '$E', current_date, '$PR', '$UC', (select id from est_tipos_movimento where empresa_id = '$E' and codigo = 'COMPRA'), 5, 10, 'CONC'"
+abrir="select public.est_ig_abrir('$E', current_date, '[{\"local_id\":\"$UC\",\"responsavel_id\":\"$U\",\"auditor_id\":\"$ADM\"}]'::jsonb)"
+( "${P[@]}" -c "$entrar_adm" -c "begin" -c "$entrada" -c "select pg_sleep(2)" -c "commit" >/tmp/conc-a.log 2>&1; echo $? >/tmp/conc-a.rc ) &
+sleep 0.7
+"${P[@]}" -c "$entrar_adm" -c "$abrir" >/tmp/conc-b.log 2>&1; echo $? >/tmp/conc-b.rc
+wait
+[ "$(cat /tmp/conc-a.rc)" = 0 ] || { cat /tmp/conc-a.log; falhou "o lançamento em andamento devia passar"; }
+[ "$(cat /tmp/conc-b.rc)" = 0 ] || { cat /tmp/conc-b.log; falhou "a abertura do inventário devia passar depois do lançamento"; }
+[ "$("${P[@]}" -c "select (i.saldo_ref = s.quantidade)::text from est_ig_itens i join est_ig_inventarios g on g.id = i.inventario_id join est_saldos s on s.produto_id = i.produto_id and s.local_id = i.local_id where g.empresa_id = '$E' and g.situacao = 'aberto' and i.produto_id = '$PR'")" = true ] || falhou "o saldo do congelamento devia trazer o lançamento que estava em andamento"
+"${P[@]}" -c "$entrar_adm" -c "$entrada" >/tmp/conc-b.log 2>&1 && falhou "local congelado devia barrar o lançamento"
+"${P[@]}" -c "update est_ig_inventarios set situacao = 'cancelado', motivo = 'teste de concorrencia' where empresa_id = '$E' and situacao = 'aberto'" >/dev/null
 echo "concorrencia do estoque ok"

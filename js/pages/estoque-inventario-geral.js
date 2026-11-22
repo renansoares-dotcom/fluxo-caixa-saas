@@ -1,4 +1,4 @@
-// Compras › Estoque › Inventário Geral (EST010) — SQL 182 e 183, 22/11/2026.
+// Compras › Estoque › Inventário Geral (EST010) — SQL 182, 183 e 184, 22/11/2026.
 // O inventário do dia 01: data de referência, locais congelados, contagem cega por quem responde pelo local, auditoria cega por outra
 // pessoa (rodízio), terceira contagem quando divergem, ajustes na data de referência e fechamento do mês na aprovação.
 // A lista de itens vem só por função: quem conta não recebe o saldo; quem audita não recebe o saldo nem a contagem.
@@ -10,9 +10,9 @@ export const title = 'Inventário Geral';
 let D = null;
 const n = (v, d = 3) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: d }));
 const pct = (v) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%');
-const SIT = { aberto: ['Em andamento', 'aberto'], aprovado: ['Aprovado', 'pago'], cancelado: ['Cancelado', ''] };
+const SIT = { aberto: ['Em andamento', 'aberto'], aprovado: ['Aprovado', 'pago'], cancelado: ['Cancelado', ''], estornado: ['Desfeito', 'vencido'] };
 const SIT_L = { contando: ['Contando', 'aberto'], auditando: ['Em auditoria', 'negoc'], terceira: ['Terceira contagem', 'vencido'], concluido: ['Concluído', 'pago'] };
-const CFG = { amostra_pct: 100, amostra_classe_a: true, amostra_divergentes: true, tolerancia_pct: 2, tolerancia_valor: 100, dif_auditoria_pct: 0.5, papeis_aprovacao: ['admin', 'diretor', 'financeiro'], aprovar_quem_contou: false, fechar_mes: true };
+const CFG = { amostra_pct: 100, amostra_classe_a: true, amostra_divergentes: true, tolerancia_pct: 2, tolerancia_valor: 100, dif_auditoria_pct: 0.5, papeis_aprovacao: ['admin', 'diretor', 'financeiro'], aprovar_quem_contou: false, fechar_mes: true, esconder_saldo: true };
 const gerencia = () => ['admin', 'financeiro', 'diretor'].includes(state.papel);
 const aprova = () => D.cfg.papeis_aprovacao.includes(state.papel);
 const ir = (root, i, l) => { history.replaceState(null, '', '#/estoque/inventario-geral' + (i ? '?i=' + i + (l ? '&l=' + l : '') : '')); render(root); };
@@ -101,6 +101,7 @@ async function painel(root, g) {
       <div class="muted small">Data de referência ${dateBR(g.referencia)} · aberto por ${esc(g.criado_nome || '')} em ${dateBR(g.criado_em)}${g.observacao ? ' · ' + esc(g.observacao) : ''}${g.motivo ? ' · motivo: ' + esc(g.motivo) : ''}</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost" id="pg-v">← Inventários</button>
       ${aberto && gerencia() ? '<button class="btn" id="pg-x">Cancelar inventário</button>' : ''}${vejo && det.length ? '<button class="btn" id="pg-rel">Relatório</button>' : ''}
+      ${g.situacao === 'aprovado' && isAdmin() && !D.invs.some(x => x.situacao === 'aprovado' && x.numero > g.numero) ? '<button class="btn" id="pg-des">Desfazer inventário</button>' : ''}
       ${aberto && aprova() ? `<button class="btn primary" id="pg-ok" ${pronto ? '' : 'disabled'}>Aprovar e lançar os ajustes</button>` : ''}</div></div>
     ${aberto ? `<div class="card small" style="border-left:3px solid var(--warn);margin-bottom:12px">Local em contagem ou auditoria fica <b>congelado</b>: nenhum movimento entra nele. Depois de concluído o local volta a movimentar, mas movimento com data até ${dateBR(g.referencia)} só depois da aprovação.</div>` : ''}
     <div class="kpis" style="margin-bottom:12px">
@@ -121,13 +122,14 @@ async function painel(root, g) {
         <label style="display:flex;flex-direction:row;gap:6px;align-items:center;font-weight:400;margin:0;white-space:nowrap"><input type="checkbox" id="pg-sd" checked> Só as diferenças</label></div></div>
       ${semCusto.length && aberto ? `<div class="small" style="padding:0 14px 10px;color:var(--warn)">${semCusto.length} item(ns) com sobra não têm custo: informe o custo na linha (botão Custo) antes de aprovar.</div>` : ''}
       <div class="table-wrap"><table class="small"><thead><tr><th>Local</th><th>Item</th><th class="num" title="Saldo do local no momento em que foi congelado">Sistema</th><th class="num">Contado</th><th class="num">Auditado</th><th class="num">3ª contagem</th><th class="num">Vale</th><th class="num">Diferença</th><th class="num" title="Custo na data de referência">Custo</th><th class="num">Valor</th><th></th></tr></thead>
-      <tbody id="pg-tb"></tbody></table></div></div>` : `<div class="card small muted">${cego ? 'Você conta ou audita um local deste inventário: o resultado, com o saldo do sistema, aparece depois que o seu local terminar.' : 'O resultado, com o saldo do sistema e as diferenças, fica visível para quem gerencia ou aprova o inventário.'}</div>`}`;
+      <tbody id="pg-tb"></tbody></table></div>
+      ${aberto ? '<div style="display:flex;justify-content:flex-end;gap:8px;padding:10px 14px"><span class="small muted" style="align-self:center">Marque os itens de um local concluído para pedir recontagem, sem cancelar o inventário.</span><button class="btn" id="pg-rc">Pedir recontagem dos marcados</button></div>' : ''}</div>` : `<div class="card small muted">${cego ? 'Você conta ou audita um local deste inventário: o resultado, com o saldo do sistema, aparece depois que o seu local terminar.' : 'O resultado, com o saldo do sistema e as diferenças, fica visível para quem gerencia ou aprova o inventário.'}</div>`}`;
   const SL = Object.fromEntries(D.igl.map(l => [l.id, l.situacao]));
   const linhas = () => { const fl = $('#pg-fl', root).value, sd = $('#pg-sd', root).checked, L = det.filter(i => (!fl || i.ig_local_id === fl) && (!sd || dif.includes(i)));
     $('#pg-tb', root).innerHTML = L.map(i => `<tr><td>${esc(D.loc[i.local_id]?.codigo || '')}</td><td>${esc(i.codigo)} ${esc(i.descricao)}${i.lote ? ` · lote ${esc(i.lote)}` : ''}${i.incluido ? ' <span class="badge negoc">achado</span>' : ''}${i.justificativa ? `<div class="muted">${esc(i.justificativa)}</div>` : ''}</td>
       <td class="num">${n(i.saldo_ref)}</td><td class="num">${n(i.contado)}</td><td class="num">${i.na_amostra || SL[i.ig_local_id] === 'contando' ? n(i.auditado) : '<span class="muted">fora da amostra</span>'}</td><td class="num">${n(i.terceira)}</td><td class="num"><b>${n(i.final)}</b></td>
       <td class="num ${+i.diferenca < 0 ? 'neg' : ''}">${n(i.diferenca)}</td><td class="num">${n(i.custo, 4)}</td><td class="num ${+i.valor < 0 ? 'neg' : ''}">${money(i.valor)}</td>
-      <td>${aberto && gerencia() && !+i.custo ? `<button class="btn ghost small" data-custo="${i.item_id}">Custo</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="11" class="empty">${sd ? 'Nenhuma diferença até agora.' : 'Nenhum item.'}</td></tr>`;
+      <td style="white-space:nowrap">${aberto && gerencia() && !+i.custo ? `<button class="btn ghost small" data-custo="${i.item_id}">Custo</button>` : ''}${aberto && SL[i.ig_local_id] === 'concluido' ? ` <input type="checkbox" class="pg-rx" value="${i.item_id}" data-l="${i.ig_local_id}" title="Marcar para recontagem">` : ''}</td></tr>`).join('') || `<tr><td colspan="11" class="empty">${sd ? 'Nenhuma diferença até agora.' : 'Nenhum item.'}</td></tr>`;
     $$('[data-custo]', root).forEach(b => b.onclick = async () => { const v = parseNum(prompt('Custo unitário do item (R$)') || ''); if (!(v >= 0)) return;
       try { await q(sb.rpc('est_ig_custo', { p_item: b.dataset.custo, p_custo: v })); toast('Custo informado'); render(root); } catch (e) { fail(e); } }); };
   if (vejo) { linhas(); $('#pg-fl', root).onchange = linhas; $('#pg-sd', root).onchange = linhas; }
@@ -138,6 +140,15 @@ async function painel(root, g) {
   $('#pg-rel', root) && ($('#pg-rel', root).onclick = () => relatorio(g, det, acu));
   $('#pg-x', root) && ($('#pg-x', root).onclick = async () => { const mot = prompt('Motivo do cancelamento (os locais são descongelados e nada é ajustado)'); if (!mot) return;
     try { await q(sb.rpc('est_ig_cancelar', { p_inventario: g.id, p_motivo: mot })); toast('Inventário cancelado'); render(root); } catch (e) { fail(e); } });
+  $('#pg-rc', root) && ($('#pg-rc', root).onclick = async () => {
+    const M = $$('.pg-rx:checked', root); if (!M.length) return toast('Marque os itens a recontar no resultado', true);
+    const ls = [...new Set(M.map(x => x.dataset.l))]; if (ls.length > 1) return toast('Peça a recontagem de um local por vez', true);
+    const mot = (prompt(`Motivo da recontagem de ${M.length} item(ns)`) || '').trim(); if (mot.length < 5) return toast('Informe o motivo', true);
+    try { await q(sb.rpc('est_ig_recontar', { p_ig_local: ls[0], p_itens: M.map(x => x.value), p_motivo: mot })); toast('Recontagem pedida: quem conta e quem audita foram avisados'); render(root); } catch (e) { fail(e); } });
+  $('#pg-des', root) && ($('#pg-des', root).onclick = async () => {
+    const mot = (prompt(`Desfazer o inventário nº ${g.numero}? Todos os ajustes são estornados na data de referência e o mês é reaberto. Motivo:`) || '').trim(); if (!mot) return;
+    if (mot.length < 10) return toast('Informe o motivo (pelo menos 10 letras)', true);
+    try { const r = await q(sb.rpc('est_ig_estornar', { p_inventario: g.id, p_motivo: mot })); toast(`${r.estornos} ajuste(s) estornado(s)${r.mes_reaberto ? ' e mês reaberto' : ''}`); render(root); } catch (e) { fail(e); } });
   $('#pg-ok', root) && ($('#pg-ok', root).onclick = async () => {
     const fecha = D.cfg.fechar_mes ? ' e o mês da data de referência é fechado' : '';
     if (!confirm(`Aprovar o inventário nº ${g.numero}? ${dif.length} ajuste(s) entram no Kardex em ${dateBR(g.referencia)}${fecha}.`)) return;
@@ -227,7 +238,10 @@ async function contar(root, g, gl) {
       const lt = lim ? (await q(sb.from('est_lotes').select('id,codigo,produto_id').eq('empresa_id', e2).eq('etiqueta', lim).limit(1)))[0] : null;
       const p = (await q(lt ? sb.from('produtos').select('id,codigo,descricao,controla_lote').eq('id', lt.produto_id) : sb.from('produtos').select('id,codigo,descricao,controla_lote').eq('empresa_id', e2).or(`codigo.ilike.${cod.replace(/[,()*%]/g, '')},etiqueta.eq.${lim}`).limit(1)))[0];
       if (!p) return toast('Código não encontrado no cadastro', true);
-      if (p.controla_lote && !lt) return toast('Este produto controla lote: leia a etiqueta do lote', true);
+      if (p.controla_lote && !lt) {   // lote ainda sem etiqueta (comum na implantação): cria o lote pelo código da embalagem
+        const cl = (prompt(`${p.codigo} ${p.descricao} controla lote. Digite o código do lote escrito na embalagem:`) || '').trim(); if (!cl) return;
+        await q(sb.rpc('est_ig_incluir_lote', { p_ig_local: gl.id, p_produto: p.id, p_codigo: cl })); toast('Lote incluído: informe a quantidade'); return render(root);
+      }
       if (!confirm(`${p.codigo} ${p.descricao}${lt ? ' · lote ' + lt.codigo : ''} não está na lista deste local. Incluir?`)) return;
       await q(sb.rpc('est_ig_incluir', { p_ig_local: gl.id, p_produto: p.id, p_lote: lt?.id || null })); toast('Item incluído: informe a quantidade'); render(root);
     } catch (err) { fail(err); }
@@ -287,6 +301,7 @@ function parametros(root) {
       <label>Contagem × sistema: tolerância (R$)<input type="number" id="gp-v" min="0" step="10" value="${+c.tolerancia_valor}"></label></div>
     ${chk('gp-ca', c.amostra_classe_a, 'Sempre auditar os itens de maior valor (os que somam 80% do valor do local)')}
     ${chk('gp-dv', c.amostra_divergentes, 'Sempre auditar os itens que divergiram do sistema além da tolerância')}
+    ${chk('gp-es', c.esconder_saldo, 'Contagem cega: quem conta ou audita não vê o saldo nem o Kardex do local enquanto ele não termina')}
     ${chk('gp-fm', c.fechar_mes, 'Ao aprovar, fechar o mês da data de referência (a posição do fechamento passa a ser o inventário)')}
     ${chk('gp-qc', c.aprovar_quem_contou, 'Exceção: quem contou ou auditou também pode aprovar o inventário')}
     <div class="small" style="margin:8px 0 2px">Quem aprova o inventário:</div><div style="display:flex;gap:4px 14px;flex-wrap:wrap">${PAP.map(([k, t]) => `<label style="display:flex;flex-direction:row;gap:6px;align-items:center;font-weight:400"><input type="checkbox" class="gp-p" value="${k}" ${c.papeis_aprovacao.includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div>
@@ -297,7 +312,7 @@ function parametros(root) {
     if (!papeis.length) return toast('Escolha quem aprova', true);
     if (!(v('#gp-a') >= 0 && v('#gp-a') <= 100 && v('#gp-d') >= 0 && v('#gp-t') >= 0 && v('#gp-v') >= 0)) return toast('Confira as faixas', true);
     try { await q(sb.rpc('est_ig_config_salvar', { p_empresa: state.empresa.id, p: { amostra_pct: v('#gp-a'), dif_auditoria_pct: v('#gp-d'), tolerancia_pct: v('#gp-t'), tolerancia_valor: v('#gp-v'),
-      amostra_classe_a: k('#gp-ca'), amostra_divergentes: k('#gp-dv'), fechar_mes: k('#gp-fm'), aprovar_quem_contou: k('#gp-qc'), papeis_aprovacao: papeis } }));
+      amostra_classe_a: k('#gp-ca'), amostra_divergentes: k('#gp-dv'), esconder_saldo: k('#gp-es'), fechar_mes: k('#gp-fm'), aprovar_quem_contou: k('#gp-qc'), papeis_aprovacao: papeis } }));
       m.close(); toast('Parâmetros salvos'); render(root); } catch (e) { fail(e); }
   };
 }

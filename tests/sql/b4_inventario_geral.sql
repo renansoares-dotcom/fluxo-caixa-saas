@@ -43,7 +43,8 @@ insert into produtos(id, empresa_id, codigo, descricao, tipo, unidade, controla_
   ('b4000000-0000-0000-0000-0000000000a4', :E, 'B4-ZER', 'ITEM ZERADO B4', 'uso_consumo', 'UN', false, null),
   ('b4000000-0000-0000-0000-0000000000a5', :E, 'B4-ACH', 'ITEM ACHADO B4', 'uso_consumo', 'UN', false, null),
   ('b4000000-0000-0000-0000-0000000000b1', :B, 'B4-PAP', 'PAPEL A4 B4', 'uso_consumo', 'CX', false, 'b4000000-0000-0000-0000-0000000000e3'),
-  ('b4000000-0000-0000-0000-0000000000b2', :B, 'B4-TON', 'TONER B4', 'uso_consumo', 'UN', false, 'b4000000-0000-0000-0000-0000000000e3');
+  ('b4000000-0000-0000-0000-0000000000b2', :B, 'B4-TON', 'TONER B4', 'uso_consumo', 'UN', false, 'b4000000-0000-0000-0000-0000000000e3'),
+  ('b4000000-0000-0000-0000-0000000000b3', :B, 'B4-TIN', 'TINTA COM LOTE B4', 'uso_consumo', 'KG', true, 'b4000000-0000-0000-0000-0000000000e3');
 create temp view b4 as select (select id from est_tipos_movimento where empresa_id = :E::uuid and codigo = 'COMPRA') compra, (select id from est_tipos_movimento where empresa_id = :E::uuid and codigo = 'PERDA') perda;
 grant select on b4 to authenticated;
 create temp table _g (k text primary key, id uuid, j jsonb); grant all on _g to authenticated;
@@ -103,6 +104,19 @@ select pg_temp.falha(format('select * from public.est_ig_detalhe(%L)', (select i
 select pg_temp.entrar(:LEI::uuid);
 select pg_temp.falha(format('select * from public.est_ig_lista(%L)', pg_temp.igl('e1')), 'perfil sem estoque pedindo a lista');
 
+-- contagem cega de verdade: quem conta não lê saldo, movimento nem custo do local em andamento; os demais leem
+select pg_temp.entrar(:CMP::uuid);
+select pg_temp.ok((select count(*) = 0 from est_saldos where local_id = 'b4000000-0000-0000-0000-0000000000e1')
+  and (select count(*) = 0 from est_movimentos where local_id = 'b4000000-0000-0000-0000-0000000000e1')
+  and (select count(*) = 0 from est_custos where produto_id = 'b4000000-0000-0000-0000-0000000000a1')
+  and (select count(*) = 0 from est_saldos where local_id = 'b4000000-0000-0000-0000-0000000000e2')
+  and (select count(*) > 0 from est_saldos where local_id not in ('b4000000-0000-0000-0000-0000000000e1', 'b4000000-0000-0000-0000-0000000000e2')),
+  'quem conta não lê o saldo, o Kardex nem o custo do local que conta nem do que vai auditar; os outros locais continuam visíveis');
+select pg_temp.entrar(:ADM::uuid);
+select pg_temp.ok((select count(*) = 2 from est_saldos where local_id = 'b4000000-0000-0000-0000-0000000000e1'), 'quem não conta nem audita o local continua lendo o saldo');
+select pg_temp.falha($$insert into est_movimentos(empresa_id, data, produto_id, local_id, tipo_movimento_id, quantidade, custo_unitario, documento, ig_inventario_id)
+  select 'e000000a-0000-0000-0000-000000000000', current_date, 'b4000000-0000-0000-0000-0000000000a1', 'b4000000-0000-0000-0000-0000000000e1', compra, 1, 10, 'X', (select id from _g where k = 'ig') from b4$$, 'lançamento à mão marcado como ajuste do inventário');
+
 -- ============================================================ congelamento
 select pg_temp.entrar(:ADM::uuid);
 select pg_temp.falha(format('select pg_temp.mov(%L, %L, 1, 10, current_date)', 'a1', 'e1'), 'lançamento em local congelado');
@@ -155,6 +169,19 @@ select pg_temp.falha(format('select * from public.est_ig_detalhe(%L)', (select i
 select pg_temp.ok((select bool_and(situacao = 'confirmar' and quantidade = 57) from public.est_ig_lista(pg_temp.igl('e1'))), 'o outro vê a quantidade proposta para confirmar');
 select pg_temp.ok(public.est_ig_terceira(pg_temp.item('e1', 'a2'), 57) = 'concluido', 'confirmada pelos dois: item resolvido e local concluído');
 
+-- recontagem pedida por quem gerencia, sem cancelar o inventário: o item volta para a terceira contagem dos dois
+select pg_temp.entrar(:CMP::uuid);
+select pg_temp.ok((select count(*) = 2 from est_saldos where local_id = 'b4000000-0000-0000-0000-0000000000e1'), 'local concluído: quem contou volta a ler o saldo');
+select pg_temp.falha(format('select public.est_ig_recontar(%L, array[%L]::uuid[], %L)', pg_temp.igl('e2'), pg_temp.item('e2', 'a3'), 'conferir de novo'), 'compras pedindo recontagem');
+select pg_temp.entrar(:FIN::uuid);
+select pg_temp.falha(format('select public.est_ig_recontar(%L, array[%L]::uuid[], %L)', pg_temp.igl('e2'), pg_temp.item('e1', 'a1'), 'conferir de novo'), 'recontagem de item de outro local');
+select pg_temp.ok(public.est_ig_recontar(pg_temp.igl('e2'), array[pg_temp.item('e2', 'a3')], 'caixa aberta na prateleira') = 'terceira', 'recontagem pedida: o local volta para a terceira contagem');
+select pg_temp.falha(format('select public.est_ig_aprovar(%L, true)', (select id from _g where k = 'ig')), 'aprovar com recontagem pendente');
+select pg_temp.entrar(:PRD::uuid);
+select public.est_ig_terceira(pg_temp.item('e2', 'a3'), 10, 'recontado, confere');
+select pg_temp.entrar(:CMP::uuid);
+select pg_temp.ok(public.est_ig_terceira(pg_temp.item('e2', 'a3'), 10) = 'concluido', 'recontagem confirmada pelos dois: local concluído de novo');
+
 -- local concluído: movimento de hoje volta a passar; com data até a referência, só depois de aprovar
 select pg_temp.entrar(:ADM::uuid);
 select pg_temp.mov('a1', 'e1', 1, 10, current_date);
@@ -166,7 +193,7 @@ select pg_temp.ok((select count(*) = 5 from public.est_ig_detalhe((select id fro
   and (select diferenca = -3 and valor = -60 and final = 57 from public.est_ig_detalhe((select id from _g where k = 'ig')) where codigo = 'B4-MAS')
   and (select diferenca = 3 and incluido from public.est_ig_detalhe((select id from _g where k = 'ig')) where codigo = 'B4-ACH'), 'resultado: falta de 3 kg de master (R$ 60) e sobra de 3 do item achado');
 select pg_temp.ok((select itens = 2 and itens_certos = 1 and pct_itens = 50 and auditados = 2 and divergiu_auditoria = 1 from public.est_ig_acuracidade((select id from _g where k = 'ig')) where local_id = 'b4000000-0000-0000-0000-0000000000e1')
-  and (select itens = 3 and divergiu_auditoria = 0 from public.est_ig_acuracidade((select id from _g where k = 'ig')) where local_id = 'b4000000-0000-0000-0000-0000000000e2'), 'acuracidade por local');
+  and (select itens = 3 and divergiu_auditoria = 1 from public.est_ig_acuracidade((select id from _g where k = 'ig')) where local_id = 'b4000000-0000-0000-0000-0000000000e2'), 'acuracidade por local (o item recontado conta como divergência da auditoria)');
 select pg_temp.falha(format('select public.est_ig_aprovar(%L)', (select id from _g where k = 'ig')), 'sobra sem custo: pede o custo ou a confirmação');
 select public.est_ig_custo((select id from _g where k = 'ach'), 4);
 select pg_temp.entrar(:CMP::uuid);
@@ -187,6 +214,9 @@ select pg_temp.falha(format('select pg_temp.mov(%L, %L, 1, 10, %L)', 'a1', 'e1',
 select pg_temp.mov('a1', 'e1', 1, 10, current_date);   -- e o local voltou a movimentar
 reset role;
 delete from est_fechamentos where empresa_id = :E::uuid; delete from est_fechamento_saldos where empresa_id = :E::uuid;
+select pg_temp.entrar(:ADM::uuid);
+select pg_temp.falha(format('select pg_temp.mov(%L, %L, 1, 10, %L)', 'a1', 'e1', (select ref from _d)), 'mês reaberto, mas o local foi inventariado: data até a referência continua barrada');
+reset role;
 
 -- número inválido não entra no Kardex
 select pg_temp.entrar(:ADM::uuid);
@@ -205,6 +235,24 @@ select pg_temp.ok((select responsavel_id = :PRD::uuid and auditor_id = :CMP::uui
 select public.est_ig_cancelar((select id from _g where k = 'ig2'), 'aberto por engano');
 select pg_temp.entrar(:ADM::uuid);
 select pg_temp.mov('a1', 'e1', 1, 10, current_date);   -- cancelado: descongela
+
+-- ============================================================ desfazer o inventário aprovado
+reset role;
+select public._est_fechar(:E::uuid, (select ref from _d));   -- como ficou depois da aprovação: mês fechado
+select pg_temp.entrar(:FIN::uuid);
+select pg_temp.falha(format('select public.est_ig_estornar(%L, %L)', (select id from _g where k = 'ig'), 'contagem refeita por erro geral'), 'financeiro desfazendo inventário aprovado');
+select pg_temp.entrar(:ADM::uuid);
+select pg_temp.falha(format('select public.est_ig_estornar(%L, %L)', (select id from _g where k = 'ig'), 'x'), 'desfazer sem motivo');
+insert into _g(k, j) select 'est', public.est_ig_estornar((select id from _g where k = 'ig'), 'contagem refeita por erro geral');
+reset role;
+select pg_temp.ok((select (j->>'estornos')::int = 2 and (j->>'mes_reaberto')::boolean from _g where k = 'est')
+  and (select situacao = 'estornado' from est_ig_inventarios where id = (select id from _g where k = 'ig'))
+  and not exists (select 1 from est_fechamentos where empresa_id = :E::uuid)
+  and (select quantidade = 60 from est_saldos where produto_id = 'b4000000-0000-0000-0000-0000000000a2')
+  and (select coalesce(sum(quantidade), 0) = 0 from est_saldos where produto_id = 'b4000000-0000-0000-0000-0000000000a5'), 'inventário desfeito: ajustes estornados na referência, mês reaberto, master de volta a 60 e o achado a zero');
+select pg_temp.entrar(:ADM::uuid);
+select pg_temp.falha(format('select public.est_ig_estornar(%L, %L)', (select id from _g where k = 'ig'), 'contagem refeita por erro geral'), 'desfazer duas vezes');
+select pg_temp.mov('a1', 'e1', 1, 10, (select ref from _d));   -- desfeito: a data de referência volta a aceitar movimento
 select pg_temp.falha($$select public.est_ig_config_salvar('e000000b-0000-0000-0000-000000000000', '{}'::jsonb)$$, 'parâmetros de outra empresa');
 
 -- ============================================================ implantação pelo primeiro inventário (empresa B, sem auditoria por parâmetro)
@@ -219,17 +267,23 @@ select pg_temp.entrar(:FIN::uuid);
 select pg_temp.ok((select count(*) = 2 from public.est_ig_lista(pg_temp.igl('e3'))), 'a lista vem dos produtos que têm o local como padrão');
 select public.est_ig_contar(pg_temp.item('e3', 'b1'), 12);
 select public.est_ig_contar(pg_temp.item('e3', 'b2'), 4);
+select pg_temp.falha(format('select public.est_ig_incluir(%L, %L)', pg_temp.igl('e3'), 'b4000000-0000-0000-0000-0000000000b3'), 'produto com lote incluído sem lote');
+insert into _g(k, id) select 'lt', public.est_ig_incluir_lote(pg_temp.igl('e3'), 'b4000000-0000-0000-0000-0000000000b3', 'lt-01');
+select pg_temp.ok((select public.est_ig_incluir_lote(pg_temp.igl('e3'), 'b4000000-0000-0000-0000-0000000000b3', 'LT-01') = (select id from _g where k = 'lt')), 'lote criado na contagem; o mesmo código não duplica');
+select public.est_ig_contar((select id from _g where k = 'lt'), 5);
 select pg_temp.ok(public.est_ig_concluir_contagem(pg_temp.igl('e3')) = 'concluido', 'sem auditoria: a contagem conclui o local');
 select pg_temp.falha(format('select public.est_ig_aprovar(%L, true)', (select id from _g where k = 'igb')), 'quem contou aprovando');
 select pg_temp.entrar(:ADB::uuid);
 select public.est_ig_custo(pg_temp.item('e3', 'b1'), 25);
 select public.est_ig_custo(pg_temp.item('e3', 'b2'), 300);
+select public.est_ig_custo((select id from _g where k = 'lt'), 2);
 insert into _g(k, j) select 'aprb', public.est_ig_aprovar((select id from _g where k = 'igb'));
 reset role;
-select pg_temp.ok((select (j->>'implantacao')::boolean and (j->>'ajustes')::int = 2 and (j->>'valor')::numeric = 1500 from _g where k = 'aprb')
+select pg_temp.ok((select (j->>'implantacao')::boolean and (j->>'ajustes')::int = 3 and (j->>'valor')::numeric = 1510 from _g where k = 'aprb')
   and (select implantado_em = (select ref from _d) from est_config where empresa_id = :B::uuid)
-  and (select count(*) = 2 from est_movimentos m join est_tipos_movimento t on t.id = m.tipo_movimento_id where m.empresa_id = :B::uuid and m.documento like 'IG %' and t.codigo = 'SI')
-  and (select quantidade = 12 and valor = 300 from est_saldos where produto_id = 'b4000000-0000-0000-0000-0000000000b1'), 'o contado virou saldo inicial (R$ 1.500) e o estoque ficou implantado na data de referência');
+  and (select count(*) = 3 and bool_and(m.ig_inventario_id is not null) from est_movimentos m join est_tipos_movimento t on t.id = m.tipo_movimento_id where m.empresa_id = :B::uuid and m.documento like 'IG %' and t.codigo = 'SI')
+  and (select count(*) = 1 from est_lotes where produto_id = 'b4000000-0000-0000-0000-0000000000b3' and codigo = 'LT-01' and origem = 'inventario')
+  and (select quantidade = 12 and valor = 300 from est_saldos where produto_id = 'b4000000-0000-0000-0000-0000000000b1'), 'o contado virou saldo inicial (R$ 1.510, com o lote criado na contagem) e o estoque ficou implantado na data de referência');
 delete from est_fechamentos where empresa_id = :B::uuid; delete from est_fechamento_saldos where empresa_id = :B::uuid;
 delete from membros where empresa_id = :B::uuid and user_id = :FIN::uuid;
 select pg_temp.ok((select count(*) = 0 from est_saldos s cross join lateral (select coalesce(sum(m.quantidade), 0) q, coalesce(sum(m.valor), 0) v from est_movimentos m

@@ -1,7 +1,7 @@
 ---
 titulo: Inventário Geral — o inventário do dia 01
 tela: Compras › Estoque › Inventário Geral (EST010)
-versao: 1.1
+versao: 1.2
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -13,8 +13,10 @@ atualizado: 2026-11-22
 - entrega a **guia cega** de contagem, no celular, no leitor de código de barras ou impressa;
 - manda a **auditoria cega** para outra pessoa;
 - pede a **terceira contagem** quando contagem e auditoria não batem;
+- deixa quem gerencia **pedir recontagem** de itens sem cancelar o inventário;
 - lança os **ajustes na data de referência** e **fecha o mês** na aprovação;
-- mostra a **acuracidade** de cada local.
+- mostra a **acuracidade** de cada local;
+- permite ao administrador **desfazer** um inventário aprovado.
 
 > Exemplo: no dia 01/12 abre-se o inventário com data de referência 30/11. Cada responsável conta o seu setor; outro responsável audita. Aprovado o inventário, o Kardex de 30/11 passa a ser exatamente o que foi contado.
 
@@ -24,7 +26,8 @@ O **Inventário Cíclico** (EST009) continua existindo para as contagens pequena
 
 | O que | Quem |
 |---|---|
-| Abrir, cancelar, trocar pessoas, informar custo | Administrador, Financeiro e Diretor |
+| Abrir, cancelar, trocar pessoas, informar custo, pedir recontagem | Administrador, Financeiro e Diretor |
+| Desfazer um inventário aprovado | Administrador |
 | Contar | A pessoa escolhida para o local |
 | Auditar | O auditor do local (nunca quem contou) |
 | Terceira contagem | Quem contou e quem auditou o local |
@@ -98,6 +101,8 @@ Para falta ou férias, use **Trocar pessoas** na linha do local. Quem já contou
 
 A lista de contagem **não traz o saldo do sistema**. Quem conta registra o que vê.
 
+A contagem é cega em toda a plataforma: enquanto o local não termina, quem conta e quem audita **não veem o saldo, o Kardex, a posição do estoque nem o custo** dos itens daquele local, em nenhuma tela. Os outros locais continuam visíveis. Terminado o local, tudo volta a aparecer. O parâmetro **Contagem cega** (seção 10) liga e desliga essa regra.
+
 ![Figura 3 — Contagem cega pelo celular ou pelo leitor: a lista não traz o saldo do sistema (dados fictícios)](img/inventario-geral-3.jpg)
 
 ### 5.1 Contar um item
@@ -112,7 +117,12 @@ Para corrigir, clique em **Corrigir** na linha, enquanto a contagem do local nã
 
 ### 5.2 Item encontrado fora da lista
 
-Leia a etiqueta ou digite o código. A plataforma avisa que o item não está na lista do local e pergunta se deve incluir. Produto que controla lote exige a etiqueta do lote.
+Leia a etiqueta ou digite o código. A plataforma avisa que o item não está na lista do local e pergunta se deve incluir.
+
+Produto que controla lote:
+
+- com etiqueta de lote: leia a etiqueta;
+- sem etiqueta (comum na implantação): leia o código do produto e digite o **código do lote** escrito na embalagem. A plataforma cria o lote ali mesmo, com origem "inventário". Digitar de novo o mesmo código não duplica o lote.
 
 ### 5.3 Concluir a contagem
 
@@ -150,13 +160,23 @@ Quem contou e quem auditou contam **juntos** o item divergente. Agora os dois ve
 
 O item só fica resolvido com a confirmação dos dois. Resolvido o último item, o local fica **Concluído**.
 
+### 6.3 Recontagem pedida por quem gerencia
+
+Ao conferir o resultado, quem gerencia ou aprova pode desconfiar de um item de um local já concluído.
+
+1. No **Resultado**, marque a caixa dos itens na última coluna (um local por vez).
+2. Clique em **Pedir recontagem dos marcados** e informe o motivo.
+3. Os itens voltam para a **terceira contagem**, feita e confirmada por quem contou e quem auditou. Local sem auditor volta para a contagem.
+
+O local fica congelado de novo até a recontagem terminar. O inventário não precisa ser cancelado. Quem conta ou audita o local não pede a recontagem dele.
+
 ## 7. Congelamento dos locais
 
 | Momento | O que a plataforma faz |
 |---|---|
 | Local contando, em auditoria ou em terceira contagem | Não aceita nenhum movimento no local: nota, requisição, transferência, produção ou lançamento à mão. |
 | Local concluído, inventário ainda não aprovado | Aceita movimento com data **depois** da data de referência. Movimento com data até a referência fica barrado. |
-| Inventário aprovado | O mês da referência é fechado. |
+| Inventário aprovado | O mês da referência é fechado. Mesmo que o mês seja reaberto, o local inventariado não aceita movimento com data até a referência. |
 | Inventário cancelado | Os locais são liberados e nada é ajustado. |
 | Contagem cíclica | Não pode ser criada em local que está no inventário geral em andamento. |
 
@@ -182,6 +202,17 @@ Assim, a posição guardada no fechamento é o próprio inventário.
 
 O botão **Relatório** emite o resultado no padrão da plataforma: acuracidade por local e a lista das diferenças.
 
+### 8.1 Desfazer um inventário aprovado
+
+Se o inventário foi aprovado com erro, o **administrador** usa **Desfazer inventário** no painel, com o motivo.
+
+- Todos os ajustes são estornados na **data de referência**.
+- O mês que o inventário fechou é **reaberto**.
+- No inventário de implantação, o estoque volta a constar como não implantado.
+- O inventário fica na lista como **Desfeito**.
+
+Só o último inventário aprovado pode ser desfeito, e só se não houver outro aberto. Se uma saída lançada depois não deixar saldo para devolver uma sobra, a mensagem diz o item e o local.
+
 ## 9. O primeiro inventário serve de implantação
 
 Enquanto o estoque não foi implantado, o inventário geral aparece marcado como **implantação**:
@@ -202,6 +233,7 @@ Enquanto o estoque não foi implantado, o inventário geral aparece marcado como
 | Sempre auditar os divergentes | Ligado | O item que divergiu do sistema além da tolerância entra sempre. |
 | Contagem × auditoria: diferença aceita (%) | 0,5 | Acima disso o item vai para a terceira contagem. |
 | Contagem × sistema: tolerância (% e R$) | 2 e 100 | Define o item "dentro da tolerância" na acuracidade e o divergente da amostra. |
+| Contagem cega | Ligado | Quem conta ou audita não vê saldo, Kardex nem custo do local enquanto ele não termina. |
 | Fechar o mês ao aprovar | Ligado | Fecha o mês da data de referência. |
 | Quem contou ou auditou pode aprovar | Desligado | Exceção para equipe pequena. |
 | Quem aprova | Administrador, Diretor, Financeiro | Perfis que aprovam o inventário. |
@@ -230,7 +262,7 @@ Com amostra 0% e as duas regras desligadas não há auditoria: a contagem conclu
 
 ## 13. Dúvidas comuns
 
-**Quem conta consegue ver o saldo do sistema em outra tela?** Durante a contagem o local está congelado, mas o Kardex continua visível para quem tem acesso a ele. A guia e a tela de contagem não mostram o saldo. Para contagem cega de verdade, quem conta deve ter um perfil sem consulta ao estoque, ou a empresa combina a regra com a equipe.
+**Quem conta consegue ver o saldo do sistema em outra tela?** Não. Com o parâmetro **Contagem cega** ligado (padrão), o saldo, o Kardex e o custo do local somem para quem conta e para quem audita até o local terminar. Quem gerencia e não está escalado no local continua vendo tudo.
 
 **Posso abrir o inventário no meio do mês?** Pode. A data de referência é livre, desde que não seja futura nem de mês fechado. O mês só é fechado quando a referência é o último dia de um mês já terminado.
 
@@ -238,7 +270,7 @@ Com amostra 0% e as duas regras desligadas não há auditoria: a contagem conclu
 
 **E se a nota chegar durante a contagem?** A entrada no local congelado é barrada. Lance depois que o local for concluído.
 
-**Errei a contagem depois de concluir.** A auditoria existe para isso: o item vai para a terceira contagem. Se o erro for geral, quem gerencia cancela o inventário e abre outro.
+**Errei a contagem depois de concluir.** A auditoria existe para isso: o item vai para a terceira contagem. Para um item, quem gerencia pede recontagem (seção 6.3). Se o erro for geral, quem gerencia cancela o inventário e abre outro. Depois de aprovado, só o administrador desfaz (seção 8.1).
 
 ## 14. Histórico de versões
 
@@ -246,3 +278,4 @@ Com amostra 0% e as duas regras desligadas não há auditoria: a contagem conclu
 |---|---|---|
 | 1.0 | 22/11/2026 | Primeira versão: inventário geral com data de referência, congelamento dos locais, contagem cega, auditoria cega por rodízio, terceira contagem, ajustes na data de referência, fechamento do mês, acuracidade por local e implantação pelo primeiro inventário. |
 | 1.1 | 22/11/2026 | Controle de corte: a contagem é comparada com o saldo do congelamento. Ajuste pelo custo da data de referência. Terceira contagem com justificativa obrigatória e confirmação da outra pessoa. Quem conta ou audita só vê o resultado depois que o seu local termina. Local com auditoria não fica sem auditor. Contagem cíclica barrada em local do inventário geral. Erro da aprovação aponta o item. |
+| 1.2 | 22/11/2026 | Contagem cega em toda a plataforma (saldo, Kardex e custo escondidos de quem conta ou audita, por parâmetro). Recontagem pedida por quem gerencia, sem cancelar o inventário. Desfazer inventário aprovado (administrador). Lote criado na própria contagem. Local inventariado não aceita movimento com data até a referência, mesmo com o mês reaberto. |
