@@ -1641,11 +1641,11 @@ window.RPC.pag_remessa_gravar = () => null;
       { item_id: 'ri4', n_item: 4, cprod: 'ETQ-100', xprod: 'ETIQUETA 100X150 ROLO', ucom: 'RL', produto_codigo: 'IN-052', produto_descricao: 'ETIQUETA 100X150', qtd_nota: 30, contada: null, avariada: 0 }],
     rc2: [{ item_id: 'rj1', n_item: 1, cprod: 'PEBD-2022', xprod: 'POLIETILENO BAIXA DENSIDADE 2022N SC 25KG', ucom: 'SC', produto_codigo: 'MP-001', produto_descricao: 'RESINA PEBD LINEAR', qtd_nota: 180, contada: 180, avariada: 1, qtd_entra: 179, divergencia: 'avariado 1' }] };
   Object.assign(window.RPC, {
-    est_receb_fila: () => [['rn1', null, 0], ['rn2', null, 0], ['rn3', 'rc3', 2]].map(([id, rid, cont]) => { const x = NFS.find(y => y.id === id); const it = rid ? RI[rid].length : (id === 'rn1' ? 2 : 6);
-      return { nota_id: id, numero: x.numero, serie: x.serie, emit_nome: x.emit_nome, emit_doc: x.emit_doc, emissao: x.emissao, v_nf: x.v_nf, itens: it, recebimento_id: rid, situacao: rid ? 'conferindo' : 'a_receber', conferente_nome: rid ? 'Beatriz Rocha' : null, contados: cont, dias: Math.round((Date.parse('2026-11-22') - Date.parse(x.emissao)) / 864e5) }; }),
+    est_receb_fila: () => [['rn1', null, 0], ['rn2', 'rcd', 0], ['rn3', 'rc3', 2]].map(([id, rid, cont]) => { const x = NFS.find(y => y.id === id); const it = RI[rid] ? RI[rid].length : (id === 'rn1' ? 2 : 6);
+      return { nota_id: id, numero: x.numero, serie: x.serie, emit_nome: x.emit_nome, emit_doc: x.emit_doc, emissao: x.emissao, v_nf: x.v_nf, itens: it, recebimento_id: rid, situacao: rid === 'rcd' ? 'dispensa_pedida' : rid ? 'conferindo' : 'a_receber', conferente_nome: rid ? 'Beatriz Rocha' : null, contados: cont, dias: Math.round((Date.parse('2026-11-22') - Date.parse(x.emissao)) / 864e5) }; }),
     est_receb_itens: (a) => (RI[a.p_receb] || []).map(i => ({ ...i, qtd_nota: a.p_receb === 'rc3' ? null : i.qtd_nota, etiqueta: null })),
     est_receb_nota: (a) => { const r = DB.est_recebimentos.find(x => x.id === a.p_receb); const x = NFS.find(y => y.id === r?.nota_id); return x ? [{ numero: x.numero, serie: x.serie, emit_nome: x.emit_nome, emissao: x.emissao }] : []; },
-    est_receb_iniciar: () => 'rc3', est_receb_contar: () => null, est_receb_concluir: () => ({ divergencias: 1, lancados: 3 }), est_receb_dispensar: () => null, est_receb_salvar: () => null });
+    est_receb_iniciar: () => 'rc3', est_receb_contar: () => null, est_receb_concluir: () => ({ divergencias: 1, lancados: 3 }), est_receb_dispensar: () => null, est_receb_dispensa_decidir: () => 'dispensado', est_receb_salvar: () => null });
 }
 
 // Programação inteligente (SQL 121) — OPs de impressão FICTÍCIAS com cores e impedimentos

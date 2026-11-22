@@ -1,7 +1,7 @@
 ---
 titulo: Recebimento de Notas — conferência na chegada
 tela: Compras › Estoque › Recebimento de Notas (EST011)
-versao: 1.1
+versao: 1.2
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -24,8 +24,11 @@ Isso também resolve o **corte do inventário**: material faturado e ainda em tr
 | O que | Quem |
 |---|---|
 | Ver a fila de notas a receber | Quem atende o almoxarifado, Administrador, Financeiro, Diretor e Compras |
-| Conferir, concluir e dispensar | Quem atende o almoxarifado (os perfis e pessoas definidos em Requisição de Material › Parâmetros) |
+| Conferir, concluir e pedir a dispensa | Quem atende o almoxarifado (os perfis e pessoas definidos em Requisição de Material › Parâmetros), menos o perfil Compras |
+| Aprovar ou recusar a dispensa | Administrador, Financeiro e Diretor (nunca quem pediu) |
 | Ver a quantidade da nota | Quem não está conferindo; quem confere só vê depois de concluir (conferência cega) |
+
+**Por que Compras não confere.** Quem compra conhece a quantidade do pedido, e a conferência só funciona feita por outra pessoa. O perfil Compras só confere se a pessoa estiver nomeada entre quem atende o almoxarifado, em Requisição de Material › Parâmetros.
 | Ligar, desligar e mudar os parâmetros | Administrador |
 
 ## 3. A tela
@@ -42,7 +45,7 @@ O menu é **Compras › Estoque › Recebimento de Notas**.
 1. Na linha da nota, clique em **Conferir**.
 2. Leia a etiqueta do produto com o leitor, ou digite o código do produto ou do fornecedor. No celular, use **Ler pela câmera**.
 3. Digite **quanto chegou**, na unidade da nota (sacos, caixas, rolos).
-4. Se parte veio avariada, digite em **Avariado** quanto, dessa quantidade, chegou avariada.
+4. Se parte veio avariada, digite em **Avariado** quanto, dessa quantidade, chegou avariada. O avariado entra no local **Avariados**, fora do custo médio, até Compras resolver com o fornecedor (seção 9).
 5. Clique em **Registrar** e passe ao próximo item.
 
 ![Figura 2 — Conferência cega pelo celular ou pelo leitor: o que chegou e o que chegou avariado (dados fictícios)](img/recebimento-2.jpg)
@@ -78,7 +81,14 @@ Depois de concluído, o recebimento mostra, por item, a quantidade da nota, o qu
 
 ## 7. Nota sem material
 
-Nota de serviço, energia ou frete não tem material para receber. Na linha da nota, clique em **Sem material** e informe o motivo. A nota sai da fila e fica na lista como **Dispensada**.
+Nota de serviço, energia ou frete não tem material para receber.
+
+1. Quem confere clica em **Sem material** e informa o motivo. A nota fica na fila como **Dispensa pedida**.
+2. Administrador, financeiro e diretor recebem o aviso.
+3. Um deles clica em **Aprovar dispensa** ou em **Recusar**, com o motivo. Quem pediu a dispensa não a aprova.
+4. Aprovada, a nota sai da fila e fica na lista como **Dispensada**. Recusada, volta para a fila a receber.
+
+A aprovação existe porque dispensar uma nota de material tira essa nota do estoque: é o controle contra o desvio de mercadoria.
 
 ## 8. Parâmetros
 
@@ -99,6 +109,7 @@ Nota de serviço, energia ou frete não tem material para receber. Na linha da n
 - A quantidade contada na unidade da nota é convertida pelo fator do de-para (por exemplo, 1 saco = 25 kg).
 - Item sem de-para pode ser conferido. Ele entra no estoque quando o de-para for feito, com a quantidade que chegou e a data da chegada.
 - Item que não chegou nada em bom estado não entra no estoque e não gera pendência.
+- **Avariados.** O que chega avariado entra no local **Avariados (aguardando devolução ao fornecedor ou descarte)**, ao custo da nota, mas fora do custo médio dos outros locais. Quando Compras decidir, lança-se pelo Kardex a saída desse local: **Devolução a fornecedor** (com a nota de devolução) ou **Perda / sucata**.
 - A entrada segue as regras do estoque: não lança em mês fechado nem em local congelado pelo inventário geral.
 
 ## 10. Dúvidas comuns
@@ -117,3 +128,4 @@ Nota de serviço, energia ou frete não tem material para receber. Na linha da n
 |---|---|---|
 | 1.0 | 22/11/2026 | Primeira versão: entrada da nota de compra pelo recebimento conferido, conferência cega pelo celular, leitor ou câmera, data da chegada, custo da nota, divergências avisadas a Compras, nota sem material dispensada e parâmetros (SQL 186). |
 | 1.1 | 22/11/2026 | Nota e itens fora das outras telas para quem confere, durante a conferência. Chegada respeita mês fechado, limite de dias e local congelado (nada é gravado se não couber). Sobra além da nota não entra. Fila sem notas já lançadas pela emissão. |
+| 1.2 | 22/11/2026 | Dispensa de nota pedida por quem confere e aprovada por administrador, financeiro ou diretor. Perfil Compras não confere, a não ser nomeado. Avariado entra no local Avariados, fora do custo médio (SQL 188). |

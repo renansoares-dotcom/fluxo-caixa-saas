@@ -69,10 +69,11 @@ insert into _b select 'd2', public.alm_devolver((select (j->>'id')::uuid from _b
   jsonb_build_array(jsonb_build_object('entrega_item_id', (select j #>> '{}' from _b where k = 'ei'), 'quantidade', 1, 'estado', 'avariada')), 'Rolo amassado', null, 'OPERADORA LIMA');
 reset role;
 select pg_temp.ok((select (j->>'valor')::numeric = 60 and (j->>'itens')::int = 1 from _b where k = 'd') and (select (j->>'valor')::numeric = 0 from _b where k = 'd2'), 'devolução de 2 a R$ 30 (custo da saída), não ao custo médio de hoje; avariado sem valor');
-select pg_temp.ok((select quantidade = 16 and valor = 780 from est_saldos where produto_id = 'b5000000-0000-0000-0000-0000000000a1'), 'saldo 4 + 10 + 2 = 16, valor 120 + 600 + 60 = 780: o avariado não voltou');
+select pg_temp.ok((select quantidade = 16 and valor = 780 from est_saldos s join est_locais l on l.id = s.local_id where s.produto_id = 'b5000000-0000-0000-0000-0000000000a1' and l.codigo = 'UC'), 'saldo 4 + 10 + 2 = 16, valor 120 + 600 + 60 = 780: o avariado não voltou ao uso e consumo');
+select pg_temp.ok((select quantidade = 1 and valor = 0 from est_saldos s join est_locais l on l.id = s.local_id where s.produto_id = 'b5000000-0000-0000-0000-0000000000a1' and l.codigo = 'AVA'), 'o avariado ficou no local de avariados, sem valor, até o descarte');
 select pg_temp.ok((select m.centro_custo_id is not distinct from s.centro_custo_id and t.codigo = 'DEVALM' from est_movimentos m join est_tipos_movimento t on t.id = m.tipo_movimento_id
     join alm_entrega_itens ei on ei.id = (select (j #>> '{}')::uuid from _b where k = 'ei') join est_movimentos s on s.id = ei.movimento_id
-   where m.documento like 'DV %' and m.produto_id = 'b5000000-0000-0000-0000-0000000000a1'), 'a devolução volta no mesmo centro de custo da saída, com o tipo Devolução ao almoxarifado');
+   where m.documento like 'DV %' and m.produto_id = 'b5000000-0000-0000-0000-0000000000a1' and m.custo_unitario > 0), 'a devolução volta no mesmo centro de custo da saída, com o tipo Devolução ao almoxarifado');
 select pg_temp.ok((select qtd_devolvida = 3 from alm_entrega_itens where id = (select (j #>> '{}')::uuid from _b where k = 'ei')), 'entregue 6, devolvido 3');
 select pg_temp.entrar(:ADM::uuid);
 select pg_temp.falha(format('select public.alm_devolver(%L, %L::jsonb, %L, null, %L)', (select j->>'id' from _b where k = 'r'),
@@ -85,7 +86,7 @@ select pg_temp.falha($$insert into est_movimentos(empresa_id, data, produto_id, 
 reset role;
 select public._est_recalc(:E::uuid, 'b5000000-0000-0000-0000-0000000000a1', null);
 select pg_temp.ok((select d.custo_unitario = s.custo_unitario from est_movimentos d join alm_devolucao_itens di on di.movimento_id = d.id join alm_entrega_itens e on e.id = di.entrega_item_id
-   join est_movimentos s on s.id = e.movimento_id where d.produto_id = 'b5000000-0000-0000-0000-0000000000a1' limit 1), 'depois do recálculo, a devolução continua ao custo da saída');
+   join est_movimentos s on s.id = e.movimento_id where d.produto_id = 'b5000000-0000-0000-0000-0000000000a1' and di.estado = 'boa' limit 1), 'depois do recálculo, a devolução continua ao custo da saída');
 select pg_temp.entrar(:ADM::uuid);
 
 -- prazo

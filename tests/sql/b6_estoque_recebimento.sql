@@ -68,6 +68,10 @@ select pg_temp.falha($$select public.est_receb_iniciar('b6000000-0000-0000-0000-
 select pg_temp.entrar(:ADB::uuid);
 select pg_temp.falha($$select public.est_receb_iniciar('b6000000-0000-0000-0000-0000000000c3')$$, 'outra empresa conferindo');
 select pg_temp.entrar(:CMP::uuid);
+select pg_temp.falha($$select public.est_receb_iniciar('b6000000-0000-0000-0000-0000000000c3')$$, 'perfil Compras conferindo sem estar nomeado entre os almoxarifes');
+reset role;
+update alm_config set almoxarifes = array[:CMP::uuid] where empresa_id = :E::uuid;   -- nomeado: passa a conferir
+select pg_temp.entrar(:CMP::uuid);
 select pg_temp.ok((select count(*) = 1 and bool_and(situacao = 'a_receber' and itens = 2) from public.est_receb_fila(:E::uuid) where numero = 9103), 'a nota aparece na fila a receber');
 select pg_temp.ok(not exists (select 1 from public.est_receb_fila(:E::uuid) where numero in (9101, 9102)), 'notas de antes do início não aparecem');
 insert into _r(k, id) select 'r', public.est_receb_iniciar('b6000000-0000-0000-0000-0000000000c3');
@@ -123,7 +127,9 @@ select public.est_receb_contar((select item_id from public.est_receb_itens((sele
 select public.est_receb_contar((select item_id from public.est_receb_itens((select id from _r where k = 'r4')) where n_item = 2), 2, 0);
 select public.est_receb_concluir((select id from _r where k = 'r4'));
 reset role;
-select pg_temp.ok((select quantidade = 200 and custo_unitario = 10 from est_movimentos where nfe_item_id = 'b6000000-0000-0000-0000-0000000001c4'), 'avariado: chegaram 10 sacos, 2 avariados; entram 8 × 25 = 200 kg');
+select pg_temp.ok((select quantidade = 200 and custo_unitario = 10 from est_movimentos m join est_locais l on l.id = m.local_id where m.nfe_item_id = 'b6000000-0000-0000-0000-0000000001c4' and l.codigo <> 'AVA'), 'avariado: chegaram 10 sacos, 2 avariados; entram 8 × 25 = 200 kg no local do produto');
+select pg_temp.ok((select quantidade = 50 and custo_unitario = 10 from est_movimentos m join est_locais l on l.id = m.local_id where m.nfe_item_id = 'b6000000-0000-0000-0000-0000000001c4' and l.codigo = 'AVA' and not l.compoe_custo),
+  'os 2 sacos avariados (50 kg) ficam no local de avariados, fora do custo médio, até a devolução ou o descarte');
 
 -- chegou mais que a nota: entra só o da nota; o excesso fica na divergência
 reset role;
@@ -142,8 +148,23 @@ select pg_temp.nota('c5', 9105, current_date, 1, 100);
 select pg_temp.entrar(:CMP::uuid);
 select pg_temp.falha($$select public.est_receb_dispensar('b6000000-0000-0000-0000-0000000000c5', 'x')$$, 'dispensar sem motivo');
 select public.est_receb_dispensar('b6000000-0000-0000-0000-0000000000c5', 'Nota de serviço de manutenção, sem material');
+select pg_temp.ok((select situacao = 'dispensa_pedida' from public.est_receb_fila(:E::uuid) where numero = 9105), 'a dispensa fica pedida, na fila, até a decisão');
+select pg_temp.falha($$select public.est_receb_iniciar('b6000000-0000-0000-0000-0000000000c5')$$, 'conferir nota com a dispensa pedida');
+select pg_temp.falha(format('select public.est_receb_dispensa_decidir(%L, true)', (select id from est_recebimentos where nota_id = 'b6000000-0000-0000-0000-0000000000c5' and situacao = 'dispensa_pedida')), 'quem confere aprovando a dispensa');
+select pg_temp.entrar(:FIN::uuid);
+select pg_temp.falha(format('select public.est_receb_dispensa_decidir(%L, false)', (select id from est_recebimentos where nota_id = 'b6000000-0000-0000-0000-0000000000c5' and situacao = 'dispensa_pedida')), 'recusar sem motivo');
+select pg_temp.ok(public.est_receb_dispensa_decidir((select id from est_recebimentos where nota_id = 'b6000000-0000-0000-0000-0000000000c5' and situacao = 'dispensa_pedida'), true) = 'dispensado', 'financeiro aprova a dispensa');
+select pg_temp.entrar(:CMP::uuid);
 select pg_temp.ok(not exists (select 1 from public.est_receb_fila(:E::uuid) where numero = 9105), 'nota dispensada sai da fila');
 select pg_temp.falha($$select public.est_receb_iniciar('b6000000-0000-0000-0000-0000000000c5')$$, 'conferir nota dispensada');
+reset role;
+select pg_temp.nota('c8', 9108, current_date, 1, 100);
+select pg_temp.entrar(:CMP::uuid);
+select public.est_receb_dispensar('b6000000-0000-0000-0000-0000000000c8', 'Achei que era frete');
+select pg_temp.entrar(:FIN::uuid);
+select pg_temp.ok(public.est_receb_dispensa_decidir((select id from est_recebimentos where nota_id = 'b6000000-0000-0000-0000-0000000000c8' and situacao = 'dispensa_pedida'), false, 'É resina: conferir') = 'recusado', 'dispensa recusada');
+select pg_temp.entrar(:CMP::uuid);
+select pg_temp.ok((select situacao = 'a_receber' from public.est_receb_fila(:E::uuid) where numero = 9108), 'recusada, a nota volta para a fila a receber');
 
 -- conferência aberta (parâmetro): quem confere vê a quantidade da nota
 select pg_temp.entrar(:ADM::uuid);

@@ -1,4 +1,4 @@
-// Compras › Estoque › Recebimento de Notas (EST011) — SQL 186 e 187, 22/11/2026.
+// Compras › Estoque › Recebimento de Notas (EST011) — SQL 186, 187 e 188, 22/11/2026.
 // Com a entrada pelo recebimento ligada, a nota de compra fica "a receber" e só entra no estoque quando quem atende o almoxarifado
 // confere o material na chegada: item a item, pelo celular, leitor ou câmera; a conferência é cega por parâmetro; entra o que chegou
 // em bom estado, na data da chegada, ao custo da nota; falta, sobra e avaria vão como aviso para Compras.
@@ -7,8 +7,9 @@ import { $, $$, esc, money, fail, toast, modal, dateBR, parseNum, today } from '
 
 export const title = 'Recebimento de Notas';
 let D = null;
+const aprova = () => ['admin', 'financeiro', 'diretor'].includes(state.papel);
 const n = (v, d = 4) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: d }));
-const SIT = { a_receber: ['A receber', 'aberto'], conferindo: ['Conferindo', 'negoc'], conferido: ['Recebida', 'pago'], dispensado: ['Dispensada', ''], cancelado: ['Cancelada', ''] };
+const SIT = { a_receber: ['A receber', 'aberto'], conferindo: ['Conferindo', 'negoc'], dispensa_pedida: ['Dispensa pedida', 'vencido'], conferido: ['Recebida', 'pago'], dispensado: ['Dispensada', ''], cancelado: ['Cancelada', ''] };
 const badge = (s) => `<span class="badge ${SIT[s]?.[1] || ''}">${SIT[s]?.[0] || s}</span>`;
 const ir = (root, r) => { history.replaceState(null, '', '#/estoque/recebimento' + (r ? '?r=' + r : '')); render(root); };
 
@@ -38,13 +39,15 @@ async function lista(root) {
     ${ligado ? '' : `<div class="card small" style="border-left:3px solid var(--warn);margin-bottom:12px">A entrada pelo recebimento está <b>desligada</b>: a nota de compra entra no estoque na data de emissão, sem conferência.${isAdmin() ? ' Ligue em Parâmetros.' : ''}</div>`}
     ${ligado && !D.cfg.implantado_em ? '<div class="card small" style="border-left:3px solid var(--warn);margin-bottom:12px">O estoque ainda não foi implantado: as conferências ficam registradas, e o que chegar a partir da implantação entra no estoque.</div>' : ''}
     ${ligado ? `<div class="kpis" style="margin-bottom:12px"><div class="kpi"><div class="k-label">A receber</div><div class="k-value">${fila.filter(f => f.situacao === 'a_receber').length}</div><div class="k-sub">notas emitidas a partir de ${dateBR(D.cfg.receb_desde)}</div></div>
-      <div class="kpi"><div class="k-label">Em conferência</div><div class="k-value">${fila.filter(f => f.situacao === 'conferindo').length}</div><div class="k-sub">começadas e não concluídas</div></div>
+      <div class="kpi"><div class="k-label">Em conferência</div><div class="k-value">${fila.filter(f => f.situacao === 'conferindo').length}</div><div class="k-sub">${fila.filter(f => f.situacao === 'dispensa_pedida').length ? fila.filter(f => f.situacao === 'dispensa_pedida').length + ' dispensa(s) para aprovar' : 'começadas e não concluídas'}</div></div>
       <div class="kpi"><div class="k-label">Mais antiga</div><div class="k-value ${fila.some(f => f.dias > 15) ? 'warn' : ''}">${fila.length ? Math.max(...fila.map(f => f.dias)) + ' dias' : '—'}</div><div class="k-sub">desde a emissão</div></div>
       <div class="kpi"><div class="k-label">Com divergência</div><div class="k-value">${feitos.filter(f => f.divergencias > 0).length}</div><div class="k-sub">nas últimas 100 recebidas</div></div></div>
     <div class="card flush" style="margin-bottom:12px"><div style="padding:10px 14px"><b>Notas a receber</b></div><div class="table-wrap"><table><thead><tr><th>NF</th><th>Fornecedor</th><th>Emissão</th><th class="num">Dias</th><th class="num">Itens</th>${fila.some(f => f.v_nf != null) ? '<th class="num">Valor</th>' : ''}<th>Situação</th><th></th></tr></thead><tbody>
       ${fila.map(f => `<tr><td><b>${f.numero}</b>${f.serie ? `<span class="muted small">-${esc(f.serie)}</span>` : ''}</td><td>${esc(f.emit_nome || f.emit_doc || '')}</td><td>${dateBR(f.emissao)}</td><td class="num ${f.dias > 15 ? 'warn' : ''}">${f.dias}</td>
         <td class="num">${f.situacao === 'conferindo' ? `${f.contados} de ${f.itens}` : f.itens}</td>${fila.some(x => x.v_nf != null) ? `<td class="num">${money(f.v_nf)}</td>` : ''}<td>${badge(f.situacao)}${f.conferente_nome ? ` <span class="muted small">${esc(f.conferente_nome)}</span>` : ''}</td>
-        <td style="white-space:nowrap">${D.pode ? `<button class="btn primary small" data-conf="${f.nota_id}">${f.situacao === 'conferindo' ? 'Continuar' : 'Conferir'}</button> <button class="btn ghost small" data-disp="${f.nota_id}" data-num="${f.numero}">Sem material</button>` : ''}</td></tr>`).join('')
+        <td style="white-space:nowrap">${f.situacao === 'dispensa_pedida'
+          ? (aprova() ? `<button class="btn primary small" data-dap="${f.recebimento_id}" data-num="${f.numero}">Aprovar dispensa</button> <button class="btn ghost small" data-dre="${f.recebimento_id}" data-num="${f.numero}">Recusar</button>` : '<span class="small muted">aguardando aprovação</span>')
+          : D.pode ? `<button class="btn primary small" data-conf="${f.nota_id}">${f.situacao === 'conferindo' ? 'Continuar' : 'Conferir'}</button> <button class="btn ghost small" data-disp="${f.nota_id}" data-num="${f.numero}">Sem material</button>` : ''}</td></tr>`).join('')
         || '<tr><td colspan="8" class="empty">Nenhuma nota a receber.</td></tr>'}</tbody></table></div></div>
     <div class="card flush"><div style="padding:10px 14px"><b>Recebidas e dispensadas</b></div><div class="table-wrap"><table><thead><tr><th>Nº</th><th>NF</th><th>Fornecedor</th><th>Chegada</th><th>Conferida por</th><th>Situação</th><th class="num">Divergências</th></tr></thead><tbody>
       ${feitos.map(r => `<tr data-r="${r.id}" style="cursor:pointer"><td>${r.numero}</td><td>${r.nfe_notas?.numero ?? ''}</td><td>${esc(r.nfe_notas?.emit_nome || '')}</td><td>${r.data ? dateBR(r.data) : '—'}</td><td>${esc(r.conferente_nome || '')}</td>
@@ -54,7 +57,11 @@ async function lista(root) {
   $$('[data-r]', root).forEach(tr => tr.onclick = () => ir(root, tr.dataset.r));
   $$('[data-disp]', root).forEach(b => b.onclick = async () => {
     const mot = (prompt(`NF ${b.dataset.num}: por que não há material para receber? (ex.: nota de serviço, energia, frete)`) || '').trim(); if (!mot) return;
-    try { await q(sb.rpc('est_receb_dispensar', { p_nota: b.dataset.disp, p_motivo: mot })); toast('Nota dispensada'); render(root); } catch (e) { fail(e); } });
+    try { await q(sb.rpc('est_receb_dispensar', { p_nota: b.dataset.disp, p_motivo: mot })); toast('Dispensa pedida: administrador, financeiro ou diretor aprovam'); render(root); } catch (e) { fail(e); } });
+  $$('[data-dap]', root).forEach(b => b.onclick = async () => { if (!confirm(`Aprovar a dispensa da NF ${b.dataset.num}? A nota sai da fila e não entra no estoque.`)) return;
+    try { await q(sb.rpc('est_receb_dispensa_decidir', { p_receb: b.dataset.dap, p_aprova: true })); toast('Dispensa aprovada'); render(root); } catch (e) { fail(e); } });
+  $$('[data-dre]', root).forEach(b => b.onclick = async () => { const mot = (prompt(`Por que a dispensa da NF ${b.dataset.num} foi recusada?`) || '').trim(); if (!mot) return;
+    try { await q(sb.rpc('est_receb_dispensa_decidir', { p_receb: b.dataset.dre, p_aprova: false, p_motivo: mot })); toast('Dispensa recusada: a nota volta para a fila'); render(root); } catch (e) { fail(e); } });
 }
 
 async function conferir(root, r) {

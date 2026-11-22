@@ -1,7 +1,7 @@
 ---
 titulo: Requisição de Material — pedir, aprovar e entregar pelo almoxarifado
 tela: Painéis › Requisição de Material (PAI015)
-versao: 1.7
+versao: 1.8
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -129,7 +129,7 @@ Material que sobrou volta ao almoxarifado pela própria requisição de onde sai
 1. Abra a requisição e clique em **Receber devolução** (só quem atende o almoxarifado).
 2. Informe a quantidade devolvida de cada item e o **estado**:
    - **Em bom estado**: volta ao estoque;
-   - **Avariado**: fica registrado, mas não volta ao estoque.
+   - **Avariado**: não volta ao estoque utilizável. Vai para o local **Avariados**, sem valor (o consumo do setor continua), até ser descartado pelo Kardex.
 3. Leia o crachá de quem devolve, ou escolha a pessoa.
 4. Informe o motivo e clique em **Registrar a devolução**.
 
@@ -207,3 +207,4 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 | 1.5 | 22/11/2026 | A primeira entrega exige os parâmetros definidos. Quem entrega não retira para si mesmo. |
 | 1.6 | 22/11/2026 | Devolução ao almoxarifado: volta ao custo da saída, no mesmo local, lote e centro de custo; material avariado registrado sem voltar ao estoque; prazo por parâmetro (SQL 185). |
 | 1.7 | 22/11/2026 | A devolução acompanha o custo recalculado da saída. Durante o inventário geral, quem conta ou audita não vê no catálogo os itens do seu local. |
+| 1.8 | 22/11/2026 | Material devolvido avariado vai para o local Avariados, sem valor, até o descarte (SQL 188). |
