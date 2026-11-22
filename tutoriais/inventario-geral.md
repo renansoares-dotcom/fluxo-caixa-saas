@@ -1,7 +1,7 @@
 ---
 titulo: Inventário Geral — o inventário do dia 01
 tela: Compras › Estoque › Inventário Geral (EST010)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -28,7 +28,7 @@ O **Inventário Cíclico** (EST009) continua existindo para as contagens pequena
 | Contar | A pessoa escolhida para o local |
 | Auditar | O auditor do local (nunca quem contou) |
 | Terceira contagem | Quem contou e quem auditou o local |
-| Ver o resultado, com o saldo do sistema | Quem gerencia ou aprova |
+| Ver o resultado, com o saldo do sistema | Quem gerencia ou aprova, desde que não esteja contando nem auditando um local ainda em andamento |
 | Aprovar | Os perfis marcados em **Parâmetros** |
 | Alterar os parâmetros | Administrador |
 
@@ -57,11 +57,19 @@ Os responsáveis recebem um aviso com o local que vão contar.
 
 ### 3.2 O que entra na lista de cada local
 
-- tudo que tinha **saldo** no local na data de referência;
+- tudo que tem **saldo** no local no momento da abertura;
 - tudo que **se movimentou** no local nos últimos 12 meses, mesmo com saldo zero;
 - os produtos que têm o local como **local padrão** no cadastro.
 
 O que for encontrado e não estiver na lista é incluído na hora da contagem (seção 5.2).
+
+### 3.3 Controle de corte
+
+A contagem é comparada com o **saldo do local no momento em que ele foi congelado**. Esse saldo inclui o que já tinha sido lançado depois da data de referência, por exemplo uma nota lançada na manhã do dia 01 antes da abertura. A diferença encontrada é lançada na **data de referência**.
+
+> Exemplo: referência 30/11. No dia 01/12, antes de abrir o inventário, entrou uma nota de 500 kg. O sistema mostra 2.500 kg no congelamento. A contagem deu 2.480 kg. A falta de 20 kg é lançada em 30/11.
+
+A abertura espera terminar qualquer lançamento que esteja em andamento naquele instante.
 
 ## 4. O painel do inventário
 
@@ -80,9 +88,11 @@ Cada pessoa vê o botão da sua vez: **Contar**, **Auditar** ou **Terceira conta
 
 Quem gerencia ou aprova vê também o **Resultado**: sistema, contado, auditado, terceira contagem, a quantidade que vale, a diferença e o valor. Quem conta e quem audita **não veem** essa parte.
 
+Isso vale também para o gerente que foi escalado para contar ou auditar: ele só vê o resultado depois que o **seu** local terminar.
+
 ### 4.1 Trocar pessoas
 
-Para falta ou férias, use **Trocar pessoas** na linha do local. Quem já contou itens de um local não pode passar a auditá-lo.
+Para falta ou férias, use **Trocar pessoas** na linha do local. Quem já contou itens de um local não pode passar a auditá-lo. Local que tem auditoria não pode ficar sem auditor.
 
 ## 5. Contagem cega
 
@@ -133,9 +143,12 @@ Ao **Concluir a auditoria**:
 
 ### 6.2 Terceira contagem
 
-Quem contou e quem auditou contam **juntos** o item divergente. Agora os dois veem as duas quantidades. Qualquer um dos dois registra a quantidade que vale, com a justificativa.
+Quem contou e quem auditou contam **juntos** o item divergente. Agora os dois veem as duas quantidades.
 
-Resolvido o último item, o local fica **Concluído**.
+1. Um dos dois registra a quantidade que vale, com a **justificativa** da diferença (obrigatória).
+2. O outro abre a mesma tela e clica em **Confirmar**. Se não concordar, registra outra quantidade, e é a vez do primeiro confirmar.
+
+O item só fica resolvido com a confirmação dos dois. Resolvido o último item, o local fica **Concluído**.
 
 ## 7. Congelamento dos locais
 
@@ -145,6 +158,7 @@ Resolvido o último item, o local fica **Concluído**.
 | Local concluído, inventário ainda não aprovado | Aceita movimento com data **depois** da data de referência. Movimento com data até a referência fica barrado. |
 | Inventário aprovado | O mês da referência é fechado. |
 | Inventário cancelado | Os locais são liberados e nada é ajustado. |
+| Contagem cíclica | Não pode ser criada em local que está no inventário geral em andamento. |
 
 > O que for produzido ou recebido durante a contagem fica separado fisicamente e é lançado depois que o local for concluído.
 
@@ -162,7 +176,7 @@ Na aprovação a plataforma:
 
 Assim, a posição guardada no fechamento é o próprio inventário.
 
-**Custo das sobras.** A sobra entra pelo custo médio do produto. Produto que ainda não tem custo médio entra como saldo inicial, pelo custo do inventário. Se o item estiver sem custo, o resultado mostra o botão **Custo**; sem informar, a plataforma pede confirmação para entrar a custo zero.
+**Custo dos ajustes.** O ajuste sai pelo custo médio do produto **na data de referência**, e não pelo custo de hoje: a plataforma recalcula o produto antes de fechar o mês. A sobra entra pelo custo médio do produto. Produto que ainda não tem custo médio entra como saldo inicial, pelo custo do inventário. Se o item estiver sem custo, o resultado mostra o botão **Custo**; sem informar, a plataforma pede confirmação para entrar a custo zero.
 
 **Quem aprova.** Quem contou ou auditou não aprova o mesmo inventário, a não ser que a exceção esteja ligada nos parâmetros.
 
@@ -220,6 +234,8 @@ Com amostra 0% e as duas regras desligadas não há auditoria: a contagem conclu
 
 **Posso abrir o inventário no meio do mês?** Pode. A data de referência é livre, desde que não seja futura nem de mês fechado. O mês só é fechado quando a referência é o último dia de um mês já terminado.
 
+**A aprovação deu erro em um item.** A mensagem diz o item e o local. O caso mais comum é uma saída lançada depois de o local ser concluído, que não deixa saldo para a falta apontada. Estorne essa saída, aprove o inventário e lance a saída de novo.
+
 **E se a nota chegar durante a contagem?** A entrada no local congelado é barrada. Lance depois que o local for concluído.
 
 **Errei a contagem depois de concluir.** A auditoria existe para isso: o item vai para a terceira contagem. Se o erro for geral, quem gerencia cancela o inventário e abre outro.
@@ -229,3 +245,4 @@ Com amostra 0% e as duas regras desligadas não há auditoria: a contagem conclu
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 22/11/2026 | Primeira versão: inventário geral com data de referência, congelamento dos locais, contagem cega, auditoria cega por rodízio, terceira contagem, ajustes na data de referência, fechamento do mês, acuracidade por local e implantação pelo primeiro inventário. |
+| 1.1 | 22/11/2026 | Controle de corte: a contagem é comparada com o saldo do congelamento. Ajuste pelo custo da data de referência. Terceira contagem com justificativa obrigatória e confirmação da outra pessoa. Quem conta ou audita só vê o resultado depois que o seu local termina. Local com auditoria não fica sem auditor. Contagem cíclica barrada em local do inventário geral. Erro da aprovação aponta o item. |

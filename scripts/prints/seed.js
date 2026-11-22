@@ -1592,12 +1592,12 @@ window.RPC.pag_remessa_gravar = () => null;
   // Inventário geral (SQL 182) — o inventário do dia 01, FICTÍCIO: três locais, um contando, um em auditoria e um concluído
   DB.est_ig_config = [{ empresa_id: E, amostra_pct: 100, amostra_classe_a: true, amostra_divergentes: true, tolerancia_pct: 2, tolerancia_valor: 100, dif_auditoria_pct: 0.5, papeis_aprovacao: ['admin', 'diretor', 'financeiro'], aprovar_quem_contou: false, fechar_mes: true }];
   DB.est_ig_inventarios = [
-    { id: 'ig-2', empresa_id: E, numero: 2, referencia: '2026-10-31', implantacao: false, situacao: 'aberto', observacao: 'Inventário do dia 01', criado_nome: 'Ana Souza', criado_em: '2026-11-01T06:50:00Z' },
+    { id: 'ig-2', empresa_id: E, numero: 2, referencia: '2026-10-31', implantacao: false, situacao: 'aberto', observacao: 'Inventário do dia 01', criado_nome: 'Renata Alves', criado_em: '2026-11-01T06:50:00Z' },
     { id: 'ig-1', empresa_id: E, numero: 1, referencia: '2026-09-30', implantacao: true, situacao: 'aprovado', criado_nome: 'Ana Souza', criado_em: '2026-10-01T06:45:00Z', decidido_nome: 'Carlos Lima', decidido_em: '2026-10-01T15:20:00Z', ajustes: 148, valor_ajuste: 412380.5, mes_fechado: true }];
   const G = (k, cod, resp, rn, aud, an, sit, extra = {}) => ({ id: 'igl-' + k, inventario_id: 'ig-2', empresa_id: E, local_id: lc(cod), responsavel_id: resp, responsavel_nome: rn, auditor_id: aud, auditor_nome: an, situacao: sit, ...extra });
-  DB.est_ig_locais = [G(1, 'MP', 'u1', 'Renata Alves', 'u4', 'Beatriz Rocha', 'contando', { iniciado_em: '2026-11-01T07:05:00Z' }),
-    G(2, 'INS', 'u4', 'Beatriz Rocha', 'u2', 'Ana Souza', 'auditando', { iniciado_em: '2026-11-01T07:00:00Z', contado_em: '2026-11-01T08:10:00Z' }),
-    G(3, 'UC', 'u2', 'Ana Souza', 'u1', 'Renata Alves', 'concluido', { iniciado_em: '2026-11-01T07:00:00Z', contado_em: '2026-11-01T07:48:00Z', auditado_em: '2026-11-01T08:35:00Z', concluido_em: '2026-11-01T08:52:00Z' })].filter(l => l.local_id);
+  DB.est_ig_locais = [G(1, 'MP', 'u4', 'Beatriz Rocha', 'u2', 'Ana Souza', 'contando', { iniciado_em: '2026-11-01T07:05:00Z' }),
+    G(2, 'INS', 'u2', 'Ana Souza', 'u3', 'Carlos Lima', 'auditando', { iniciado_em: '2026-11-01T07:00:00Z', contado_em: '2026-11-01T08:10:00Z' }),
+    G(3, 'UC', 'u3', 'Carlos Lima', 'u4', 'Beatriz Rocha', 'concluido', { iniciado_em: '2026-11-01T07:00:00Z', contado_em: '2026-11-01T07:48:00Z', auditado_em: '2026-11-01T08:35:00Z', concluido_em: '2026-11-01T08:52:00Z' })].filter(l => l.local_id);
   const igl = (k) => DB.est_ig_locais.find(l => l.id === 'igl-' + k) || {};
   const X = (k, loc, cod, desc, un, sis, custo, cont, aud, ter, fim, sit, just) => ({ item_id: 'igi-' + k, ig_local_id: 'igl-' + loc, local_id: igl(loc).local_id, produto_id: 'pi-' + cod, codigo: cod, descricao: desc, unidade: un, lote: null, saldo_ref: sis, custo,
     contado: cont, na_amostra: loc !== 1, auditado: aud, terceira: ter, final: fim, situacao: sit, incluido: cod === 'UC-044', justificativa: just || null, diferenca: (fim ?? cont) == null ? null : (fim ?? cont) - sis, valor: (fim ?? cont) == null ? null : Math.round(((fim ?? cont) - sis) * custo * 100) / 100, movimento_id: null });

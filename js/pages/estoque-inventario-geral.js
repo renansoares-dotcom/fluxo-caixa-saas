@@ -1,4 +1,4 @@
-// Compras › Estoque › Inventário Geral (EST010) — SQL 182, 22/11/2026.
+// Compras › Estoque › Inventário Geral (EST010) — SQL 182 e 183, 22/11/2026.
 // O inventário do dia 01: data de referência, locais congelados, contagem cega por quem responde pelo local, auditoria cega por outra
 // pessoa (rodízio), terceira contagem quando divergem, ajustes na data de referência e fechamento do mês na aprovação.
 // A lista de itens vem só por função: quem conta não recebe o saldo; quem audita não recebe o saldo nem a contagem.
@@ -83,12 +83,13 @@ async function novo(root) {
 
 // ------------------------------------------------------------ painel do inventário
 async function painel(root, g) {
-  const eu = state.user.id, vejo = gerencia() || aprova();
+  const eu = state.user.id, cego = g.situacao === 'aberto' && D.igl.some(l => l.situacao !== 'concluido' && [l.responsavel_id, l.auditor_id].includes(eu));
+  const vejo = (gerencia() || aprova()) && !cego;   // quem conta ou audita só vê o resultado depois que o seu local terminar
   const [and, det, acu] = await Promise.all([q(sb.rpc('est_ig_andamento', { p_inventario: g.id })).catch(() => []),
     vejo ? q(sb.rpc('est_ig_detalhe', { p_inventario: g.id })).catch(() => []) : [], vejo ? q(sb.rpc('est_ig_acuracidade', { p_inventario: g.id })).catch(() => []) : []]);
   const A = Object.fromEntries(and.map(a => [a.ig_local_id, a])), AC = Object.fromEntries(acu.map(a => [a.ig_local_id, a]));
   const s = SIT[g.situacao], aberto = g.situacao === 'aberto', pronto = aberto && D.igl.length && D.igl.every(l => l.situacao === 'concluido');
-  const dif = det.filter(i => i.final != null ? +i.final !== +i.saldo_ref : (i.contado != null && +i.contado !== +i.saldo_ref));
+  const dif = det.filter(i => i.final != null ? +i.final !== +i.saldo_ref : (i.contado != null && +i.contado !== +i.saldo_ref));   // saldo_ref = saldo do local no congelamento
   const semCusto = det.filter(i => +(i.final ?? i.contado ?? 0) > +i.saldo_ref && !+i.custo);
   const tot = { itens: det.length, sobra: dif.filter(i => +i.valor > 0).reduce((t, i) => t + +i.valor, 0), falta: dif.filter(i => +i.valor < 0).reduce((t, i) => t + +i.valor, 0) };
   const acao = (l) => { if (!aberto) return ''; const b = (t) => `<button class="btn primary small" data-ir="${l.id}">${t}</button>`;
@@ -119,8 +120,8 @@ async function painel(root, g) {
         <div style="display:flex;gap:8px;align-items:center"><select id="pg-fl"><option value="">Todos os locais</option>${D.igl.map(l => `<option value="${l.id}">${esc(D.loc[l.local_id]?.nome || '')}</option>`).join('')}</select>
         <label style="display:flex;flex-direction:row;gap:6px;align-items:center;font-weight:400;margin:0;white-space:nowrap"><input type="checkbox" id="pg-sd" checked> Só as diferenças</label></div></div>
       ${semCusto.length && aberto ? `<div class="small" style="padding:0 14px 10px;color:var(--warn)">${semCusto.length} item(ns) com sobra não têm custo: informe o custo na linha (botão Custo) antes de aprovar.</div>` : ''}
-      <div class="table-wrap"><table class="small"><thead><tr><th>Local</th><th>Item</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Auditado</th><th class="num">3ª contagem</th><th class="num">Vale</th><th class="num">Diferença</th><th class="num">Custo</th><th class="num">Valor</th><th></th></tr></thead>
-      <tbody id="pg-tb"></tbody></table></div></div>` : '<div class="card small muted">O resultado, com o saldo do sistema e as diferenças, fica visível para quem gerencia ou aprova o inventário.</div>'}`;
+      <div class="table-wrap"><table class="small"><thead><tr><th>Local</th><th>Item</th><th class="num" title="Saldo do local no momento em que foi congelado">Sistema</th><th class="num">Contado</th><th class="num">Auditado</th><th class="num">3ª contagem</th><th class="num">Vale</th><th class="num">Diferença</th><th class="num" title="Custo na data de referência">Custo</th><th class="num">Valor</th><th></th></tr></thead>
+      <tbody id="pg-tb"></tbody></table></div></div>` : `<div class="card small muted">${cego ? 'Você conta ou audita um local deste inventário: o resultado, com o saldo do sistema, aparece depois que o seu local terminar.' : 'O resultado, com o saldo do sistema e as diferenças, fica visível para quem gerencia ou aprova o inventário.'}</div>`}`;
   const SL = Object.fromEntries(D.igl.map(l => [l.id, l.situacao]));
   const linhas = () => { const fl = $('#pg-fl', root).value, sd = $('#pg-sd', root).checked, L = det.filter(i => (!fl || i.ig_local_id === fl) && (!sd || dif.includes(i)));
     $('#pg-tb', root).innerHTML = L.map(i => `<tr><td>${esc(D.loc[i.local_id]?.codigo || '')}</td><td>${esc(i.codigo)} ${esc(i.descricao)}${i.lote ? ` · lote ${esc(i.lote)}` : ''}${i.incluido ? ' <span class="badge negoc">achado</span>' : ''}${i.justificativa ? `<div class="muted">${esc(i.justificativa)}</div>` : ''}</td>
@@ -191,7 +192,7 @@ async function contar(root, g, gl) {
   let its; try { its = await q(sb.rpc('est_ig_lista', { p_ig_local: gl.id })); } catch (e) { fail(e); return ir(root, g.id); }
   const papel = its[0]?.papel || (gl.situacao === 'terceira' ? 'terceira' : gl.auditor_id === state.user.id && gl.situacao !== 'contando' ? 'auditor' : 'contador');
   const vez = (papel === 'contador' && gl.situacao === 'contando') || (papel === 'auditor' && gl.situacao === 'auditando') || papel === 'terceira';
-  const T = { contador: ['Contagem', 'Concluir a contagem', 'contagem cega: o saldo do sistema não aparece'], auditor: ['Auditoria', 'Concluir a auditoria', 'auditoria cega: você não vê o saldo nem a contagem'], terceira: ['Terceira contagem', '', 'contagem e auditoria diferentes: contem juntos e registrem a quantidade que vale'] }[papel];
+  const T = { contador: ['Contagem', 'Concluir a contagem', 'contagem cega: o saldo do sistema não aparece'], auditor: ['Auditoria', 'Concluir a auditoria', 'auditoria cega: você não vê o saldo nem a contagem'], terceira: ['Terceira contagem', '', 'contagem e auditoria diferentes: contem juntos; um registra a quantidade que vale e o outro confirma'] }[papel];
   const rot = (i) => `${esc(i.codigo || '')} ${esc(i.descricao || '')}${i.lote ? ` · lote ${esc(i.lote)}` : ''}`;
   const falta = its.filter(i => !i.feito), temCam = 'BarcodeDetector' in window && !!navigator.mediaDevices?.getUserMedia;
   its.sort((a, b) => (a.feito ? 1 : 0) - (b.feito ? 1 : 0));
@@ -205,7 +206,8 @@ async function contar(root, g, gl) {
       : `<div class="card small muted" style="margin-bottom:12px">${papel === 'contador' ? 'A contagem deste local foi concluída.' : 'Aguardando a sua vez neste local.'}</div>`}
     <div class="card flush"><div class="table-wrap"><table class="small"><thead><tr><th>Item</th><th>Un.</th>${papel === 'terceira' ? '<th class="num">Contagem</th><th class="num">Auditoria</th>' : ''}<th class="num">${papel === 'terceira' ? 'Vale' : 'Quantidade'}</th><th></th></tr></thead><tbody>
       ${its.map(i => `<tr><td>${rot(i)}${i.incluido ? ' <span class="badge negoc">achado</span>' : ''}</td><td>${esc(i.unidade || '')}</td>${papel === 'terceira' ? `<td class="num">${n(i.contado)}</td><td class="num">${n(i.auditado)}</td>` : ''}
-        <td class="num">${i.feito ? `<b>${n(i.quantidade)}</b>` : '<span class="muted">a contar</span>'}</td><td>${vez ? `<button class="btn ghost small" data-it="${i.item_id}">${i.feito ? 'Corrigir' : 'Contar'}</button>` : ''}</td></tr>`).join('')
+        <td class="num">${i.feito ? `<b>${n(i.quantidade)}</b>` : i.situacao === 'aguarda_outro' ? `${n(i.quantidade)} <span class="badge aberto">aguarda a outra pessoa confirmar</span>` : i.situacao === 'confirmar' ? `${n(i.quantidade)} <span class="badge negoc">proposta</span>` : '<span class="muted">a contar</span>'}</td>
+        <td style="white-space:nowrap">${vez && i.situacao === 'confirmar' ? `<button class="btn primary small" data-conf="${i.item_id}">Confirmar ${n(i.quantidade)}</button> ` : ''}${vez && !(papel === 'terceira' && i.feito) ? `<button class="btn ghost small" data-it="${i.item_id}">${i.feito ? 'Corrigir' : papel === 'terceira' && i.quantidade != null ? 'Outra quantidade' : 'Contar'}</button>` : ''}</td></tr>`).join('')
         || `<tr><td colspan="6" class="empty">Nenhum item na lista. ${papel === 'contador' ? 'Leia a etiqueta ou digite o código do que encontrar no local.' : ''}</td></tr>`}</tbody></table></div></div>`;
   let fluxo = null, quadro = 0; const parar = () => { cancelAnimationFrame(quadro); fluxo?.getTracks().forEach(t => t.stop()); fluxo = null; };
   $('#ct-v', root).onclick = () => { parar(); ir(root, g.id); };
@@ -230,6 +232,8 @@ async function contar(root, g, gl) {
     } catch (err) { fail(err); }
   };
   $$('[data-it]', root).forEach(b => b.onclick = () => { const i = its.find(x => x.item_id === b.dataset.it); $('#ct-cod', root).value = i.codigo || ''; escolher(i); });
+  $$('[data-conf]', root).forEach(b => b.onclick = async () => { const i = its.find(x => x.item_id === b.dataset.conf);
+    try { const r = await q(sb.rpc('est_ig_terceira', { p_item: i.item_id, p_qtd: i.quantidade, p_justificativa: null })); toast(r === 'concluido' ? 'Confirmado: local concluído' : 'Confirmado'); parar(); r === 'concluido' ? ir(root, g.id) : render(root); } catch (err) { fail(err); } });
   $('#ct-f', root).onsubmit = async (e) => {
     e.preventDefault(); if (!alvo) return toast('Leia a etiqueta do item', true);
     // o leitor manda Enter depois do código: isso escolhe o item, não registra a quantidade
@@ -237,8 +241,9 @@ async function contar(root, g, gl) {
     recemLido = false;
     const qv = parseNum($('#ct-q', root).value); if (!(qv >= 0) || $('#ct-q', root).value.trim() === '') return toast('Informe a quantidade', true);
     try {
-      if (papel === 'terceira') { const r = await q(sb.rpc('est_ig_terceira', { p_item: alvo.item_id, p_qtd: qv, p_justificativa: prompt('Justificativa da diferença (opcional)') || null }));
-        toast(r === 'concluido' ? 'Local concluído' : 'Registrado'); parar(); return r === 'concluido' ? ir(root, g.id) : render(root); }
+      if (papel === 'terceira') { const just = (prompt('Justificativa da diferença entre a contagem e a auditoria (obrigatória)') || '').trim(); if (just.length < 5) return toast('Informe a justificativa', true);
+        const r = await q(sb.rpc('est_ig_terceira', { p_item: alvo.item_id, p_qtd: qv, p_justificativa: just }));
+        toast(r === 'concluido' ? 'Local concluído' : r === 'confirmar' ? 'Registrado: falta a outra pessoa confirmar' : 'Registrado'); parar(); return r === 'concluido' ? ir(root, g.id) : render(root); }
       await q(sb.rpc('est_ig_contar', { p_item: alvo.item_id, p_qtd: qv })); toast('Registrado'); parar(); render(root);
     } catch (err) { fail(err); }
   };
