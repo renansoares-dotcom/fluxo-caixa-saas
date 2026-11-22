@@ -429,6 +429,9 @@ DB.log_carga_notas = DB.log_carga_notas || [];
   DB.est_saldos = Object.values(sal);
   DB.est_custos = Object.entries(cus).map(([pid, x]) => ({ produto_id: pid, empresa_id: E, quantidade: x.q, valor: x.v, custo_medio: x.cm, ultima_entrada: '2026-10-29' }));
   DB.est_fechamentos = [{ empresa_id: E, mes: '2026-09-01', fechado_em: '2026-10-05T12:00:00Z' }];
+  // posição guardada no fechamento de setembro (SQL 179): os saldos fictícios, um pouco menores
+  DB.est_fechamento_saldos = (DB.est_saldos || []).filter(x => x.empresa_id === E && +x.quantidade > 0).map((x, i) => ({ id: i + 1, empresa_id: E, mes: '2026-09-01', produto_id: x.produto_id, local_id: x.local_id, lote_id: x.lote_id || null,
+    quantidade: Math.round(+x.quantidade * 0.8), valor: Math.round(+x.valor * 0.8 * 100) / 100 }));
 }
 
 // regime tributário (SQL 078) — fictício: a empresa de exemplo entrou no Simples e optou pelo IBS/CBS no regime regular em 2027
@@ -1561,7 +1564,7 @@ window.RPC.pag_remessa_gravar = () => null;
 
 // Inventário cíclico (SQL 120) — contagens FICTÍCIAS no estoque já implantado
 {
-  DB.est_config = DB.est_config && DB.est_config.length ? DB.est_config.map(c => ({ ...c, implantado_em: c.implantado_em || '2026-10-01' })) : [{ empresa_id: E, implantado_em: '2026-10-01' }];
+  DB.est_config = DB.est_config && DB.est_config.length ? DB.est_config.map(c => ({ dias_retroativos: 60, custo_desvio_pct: 50, exigir_documento: true, papeis_consulta: ['leitura'], ...c, implantado_em: c.implantado_em || '2026-10-01' })) : [{ empresa_id: E, implantado_em: '2026-10-01', dias_retroativos: 60, custo_desvio_pct: 50, exigir_documento: true, papeis_consulta: ['leitura'] }];
   DB.est_inv_config = [{ empresa_id: E, dias_a: 30, dias_b: 60, dias_c: 120, itens_por_contagem: 20, tolerancia_pct: 2, tolerancia_valor: 100, contagem_cega: true, recontar: true, papeis_aprovacao: ['admin', 'diretor', 'financeiro'] }];
   const lc = (c) => DB.est_locais.find(l => l.codigo === c)?.id;
   const PR = (codigo, descricao, unidade, tipo = 'materia_prima') => { let p = DB.produtos.find(x => x.codigo === codigo); if (!p) { p = { id: 'pi-' + codigo, empresa_id: E, codigo, descricao, unidade, tipo, ativo: true }; DB.produtos.push(p); } return p.id; };

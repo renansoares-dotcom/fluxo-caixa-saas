@@ -1,7 +1,7 @@
 // Estoque › Parâmetros (SQL 075): locais (partições), famílias de item, tipos de movimento, regras por CFOP e fechamento do mês.
 // Leitura: quem participa. Alteração: administrador e financeiro (o banco confere). Reabrir mês: administrador.
-import { sb, state, q, podeEditar, isAdmin, loadCadastros } from '../lib/data.js';
-import { $, $$, esc, dateBR, toast, fail, modal, confirmDialog, exportXLSX, erroTela } from '../lib/ui.js';
+import { sb, state, q, fetchAll, podeEditar, isAdmin, loadCadastros } from '../lib/data.js';
+import { $, $$, esc, money, dateBR, toast, fail, modal, confirmDialog, exportXLSX, erroTela } from '../lib/ui.js';
 import { FINALIDADES, POSSE, TIPOS_SPED, SENTIDOS, DOCUMENTOS, PAPEIS, periodoAberto } from '../lib/estoque-kardex.js';
 
 import { abaEtiquetas } from '../lib/etiquetas-ui.js';
@@ -21,9 +21,11 @@ async function carregar() {
     q(sb.from('est_regras_cfop').select('*').eq('empresa_id', e).order('sentido').order('cfop').order('prioridade')),
     q(sb.from('est_fechamentos').select('*').eq('empresa_id', e).order('mes', { ascending: false })),
     q(sb.from('prod_setores').select('id,nome,ordem').eq('empresa_id', e).order('ordem')).catch(() => [])]);
-  const cfg = await q(sb.from('est_config').select('papeis_consulta').eq('empresa_id', e).maybeSingle()).catch(() => undefined);   // undefined = SQL 178 pendente
+  const cfg = await q(sb.from('est_config').select('*').eq('empresa_id', e).maybeSingle()).catch(() => undefined);   // undefined = SQL 178 pendente
   await loadCadastros().catch(() => {});
-  D = { consulta: cfg === undefined ? null : (cfg?.papeis_consulta || ['leitura']), locais, familias, tipos, regras, fech, setores, loc: Object.fromEntries(locais.map(l => [l.id, l])), fam: Object.fromEntries(familias.map(f => [f.id, f])), tm: Object.fromEntries(tipos.map(t => [t.id, t])) };
+  // travas do lançamento à mão (SQL 179): empresa sem configuração gravada usa 60 dias, 50 % e documento obrigatório
+  const travas = cfg === undefined ? null : cfg ? { dias: cfg.dias_retroativos, desvio: cfg.custo_desvio_pct, doc: cfg.exigir_documento !== false } : { dias: 60, desvio: 50, doc: true };
+  D = { travas, consulta: cfg === undefined ? null : (cfg?.papeis_consulta || ['leitura']), locais, familias, tipos, regras, fech, setores, loc: Object.fromEntries(locais.map(l => [l.id, l])), fam: Object.fromEntries(familias.map(f => [f.id, f])), tm: Object.fromEntries(tipos.map(t => [t.id, t])) };
 }
 
 export async function render(root) {
@@ -180,8 +182,10 @@ function fechamento(root, ed) {
   const sug = per.abertoDesde || new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().slice(0, 10);
   corpo(root, `<div class="card"><p style="margin-top:0">Fechar o mês trava o estoque: nenhum movimento com data até o fim do mês fechado é aceito (correções entram por estorno com data do mês aberto). Fechar um mês fecha também os anteriores. Só o administrador reabre.</p>
     ${ed ? `<div class="toolbar" style="margin:0"><label>Mês<input type="month" id="ep-mes" value="${sug.slice(0, 7)}"></label><button class="btn primary" id="ep-fechar">Fechar o mês</button>${isAdmin() && per.fechadoAte ? `<button class="btn" id="ep-reabrir">Reabrir ${MES(per.fechadoAte)}</button>` : ''}</div>` : ''}</div>
-    <div class="card flush"><div class="table-wrap"><table><thead><tr><th>Mês</th><th>Fechado em</th></tr></thead><tbody>
-    ${D.fech.map(f => `<tr><td>${MES(f.mes)}</td><td>${dateBR(f.fechado_em)}</td></tr>`).join('') || '<tr><td colspan="2" class="empty">Nenhum mês fechado.</td></tr>'}</tbody></table></div></div>`);
+    <div class="card flush"><div class="table-wrap"><table><thead><tr><th>Mês</th><th>Fechado em</th><th></th></tr></thead><tbody>
+    ${D.fech.map(f => `<tr><td>${MES(f.mes)}</td><td>${dateBR(f.fechado_em)}</td><td class="r"><button class="btn small ghost" data-pos="${f.mes}">Posição do estoque</button></td></tr>`).join('') || '<tr><td colspan="3" class="empty">Nenhum mês fechado.</td></tr>'}</tbody></table></div></div>
+    <p class="small muted">Ao fechar, a plataforma guarda a posição do estoque no último dia do mês (quantidade e valor por produto e local). É o inventário de fim de mês.</p>`);
+  $$('[data-pos]', root).forEach(b => b.onclick = () => posicao(b.dataset.pos));
   $('#ep-fechar', root) && ($('#ep-fechar', root).onclick = async () => {
     const m = $('#ep-mes', root).value; if (!m) return toast('Escolha o mês', true);
     if (!await confirmDialog(`Fechar o estoque de ${m.slice(5)}/${m.slice(0, 4)}?`)) return;
@@ -201,9 +205,48 @@ function acesso(root) {
     <p style="margin-top:0">Saldo por local, custo médio, valor do estoque e movimentos do Kardex são vistos por <b>Administrador, Financeiro, Diretor, Compras e Produção</b>. Os perfis abaixo são liberados à parte. Motorista e colaborador do portal nunca consultam.</p>
     ${OP.map(([k, t, d]) => `<label style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;margin:10px 0"><input type="checkbox" class="ac-p" value="${k}" style="width:auto;margin:3px 0 0;flex:none" ${D.consulta.includes(k) ? 'checked' : ''} ${adm ? '' : 'disabled'}><span><b>${t}</b><br><span class="small muted">${d}</span></span></label>`).join('')}
     <p class="small muted">Quem pede material pela Requisição de Material continua vendo o catálogo e o saldo disponível, sem o custo.</p>
-    ${adm ? '<div class="toolbar" style="margin:8px 0 0"><span class="spacer"></span><button class="btn primary" id="ac-ok">Salvar</button></div>' : '<p class="small muted">Só o administrador altera.</p>'}</div>`);
+    ${adm ? '<div class="toolbar" style="margin:8px 0 0"><span class="spacer"></span><button class="btn primary" id="ac-ok">Salvar</button></div>' : '<p class="small muted">Só o administrador altera.</p>'}</div>
+    <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Travas do lançamento à mão</h3>
+    <p style="margin-top:0">Valem para o que é lançado pela tela do Kardex. O que a plataforma lança sozinha (notas, requisições, inventário) não passa por elas. Nenhum lançamento à mão aceita data futura.</p>
+    <div class="grid2">
+      <label>Dias para trás aceitos<input type="number" min="0" step="1" id="tv-dias" value="${D.travas.dias ?? ''}" placeholder="sem limite" ${adm ? '' : 'disabled'}><span class="small muted">Além disso, só o administrador lança. Em branco = sem limite.</span></label>
+      <label>Diferença de custo aceita (%)<input type="number" min="1" step="1" id="tv-desvio" value="${D.travas.desvio ?? ''}" placeholder="sem trava" ${adm ? '' : 'disabled'}><span class="small muted">Entrada com custo mais distante do custo médio que isso só é lançada por administrador, financeiro ou diretor. Em branco = sem trava.</span></label>
+    </div>
+    <label style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;margin:10px 0"><input type="checkbox" id="tv-doc" style="width:auto;margin:3px 0 0;flex:none" ${D.travas.doc ? 'checked' : ''} ${adm ? '' : 'disabled'}><span><b>Exigir o documento</b><br><span class="small muted">Compra, produção e saldo inicial lançados à mão só entram com o número da nota, da ordem ou do inventário.</span></span></label>
+    ${adm ? '<div class="toolbar" style="margin:8px 0 0"><span class="spacer"></span><button class="btn primary" id="tv-ok">Salvar</button></div>' : ''}</div>`);
+  $('#tv-ok', root) && ($('#tv-ok', root).onclick = async (ev) => {
+    const n = (id) => $(id, root).value.trim() === '' ? null : +$(id, root).value, dias = n('#tv-dias'), desvio = n('#tv-desvio');
+    if ((dias != null && !(dias >= 0)) || (desvio != null && !(desvio > 0))) return toast('Confira os valores', true);
+    ev.target.disabled = true;
+    try { await q(sb.rpc('est_travas_salvar', { p_empresa: state.empresa.id, p_dias: dias, p_desvio: desvio, p_documento: $('#tv-doc', root).checked })); toast('Travas salvas'); await recarregar(root); } catch (err) { fail(err); ev.target.disabled = false; }
+  });
   $('#ac-ok', root) && ($('#ac-ok', root).onclick = async (ev) => {
     ev.target.disabled = true;
     try { await q(sb.rpc('est_consulta_salvar', { p_empresa: state.empresa.id, p_papeis: $$('.ac-p:checked', root).map(x => x.value) })); toast('Acesso salvo'); await recarregar(root); } catch (err) { fail(err); ev.target.disabled = false; }
   });
+}
+
+// posição do estoque guardada no fechamento do mês (SQL 179)
+async function posicao(mes) {
+  let L;
+  try { L = await fetchAll(() => sb.from('est_fechamento_saldos').select('produto_id,local_id,lote_id,quantidade,valor').eq('empresa_id', state.empresa.id).eq('mes', mes).order('id')); } catch (err) { return fail(err); }
+  if (!L.length) return toast(`Sem posição guardada para ${MES(mes)}: o mês foi fechado antes desta função existir. Reabra e feche de novo para gerar.`, true);
+  const ids = [...new Set(L.map(x => x.produto_id))], P = {};
+  try { for (let i = 0; i < ids.length; i += 200) (await q(sb.from('produtos').select('id,codigo,descricao,unidade').in('id', ids.slice(i, i + 200)))).forEach(p => { P[p.id] = p; }); } catch (err) { return fail(err); }
+  const loc = Object.fromEntries(D.locais.map(l => [l.id, l])), porLocal = {};
+  for (const x of L) { const k = x.local_id; (porLocal[k] ||= { v: 0, p: new Set() }); porLocal[k].v += +x.valor; porLocal[k].p.add(x.produto_id); }
+  const total = L.filter(x => loc[x.local_id]?.compoe_custo !== false).reduce((s, x) => s + +x.valor, 0);
+  // um produto com vários lotes no mesmo local aparece numa linha só
+  const junta = {};
+  for (const x of L) { const k = x.local_id + '|' + x.produto_id; (junta[k] ||= { local: loc[x.local_id]?.nome || '', codigo: P[x.produto_id]?.codigo || '', descricao: P[x.produto_id]?.descricao || '', un: P[x.produto_id]?.unidade || '', quantidade: 0, valor: 0 }); junta[k].quantidade += +x.quantidade; junta[k].valor += +x.valor; }
+  const linhas = Object.values(junta)
+    .sort((a, b) => a.local.localeCompare(b.local) || a.codigo.localeCompare(b.codigo));
+  const m = modal({ title: `Posição do estoque em ${MES(mes)}`, wide: true, body: `<p style="margin-top:0">Valor do estoque no último dia do mês: <b>${money(total)}</b> <span class="small muted">(locais que compõem o custo)</span></p>
+    <div class="table-wrap" style="max-height:26vh"><table><thead><tr><th>Local</th><th class="num">Produtos</th><th class="num">Valor</th></tr></thead><tbody>
+    ${Object.entries(porLocal).sort((a, b) => b[1].v - a[1].v).map(([k, v]) => `<tr><td>${esc(loc[k]?.nome || '')}</td><td class="num">${v.p.size}</td><td class="num">${money(v.v)}</td></tr>`).join('')}</tbody></table></div>
+    <h3 style="margin:14px 0 6px">Por produto</h3>
+    <div class="table-wrap" style="max-height:34vh"><table id="pos-tab"><thead><tr><th>Local</th><th>Código</th><th>Produto</th><th>Un.</th><th class="num">Quantidade</th><th class="num">Valor</th></tr></thead><tbody>
+    ${linhas.map(x => `<tr><td>${esc(x.local)}</td><td class="mono">${esc(x.codigo)}</td><td>${esc(x.descricao)}</td><td>${esc(x.un)}</td><td class="num">${x.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}</td><td class="num">${money(x.valor)}</td></tr>`).join('')}</tbody></table></div>`,
+    foot: '<button class="btn" id="pos-x">Excel</button><button class="btn" data-close>Fechar</button>' });
+  $('#pos-x', m.el).onclick = () => exportXLSX($('#pos-tab', m.el), `posicao-estoque-${mes.slice(0, 7)}`, { titulo: `Posição do estoque em ${MES(mes)}` });
 }

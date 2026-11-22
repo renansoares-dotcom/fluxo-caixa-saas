@@ -47,6 +47,11 @@ create temp view ids as select
   (select id from est_tipos_movimento where empresa_id = 'e000000a-0000-0000-0000-000000000000' and codigo = 'REQINT') reqint;
 grant select on ids to authenticated;
 
+-- SQL 179: as travas do lançamento à mão (limite de dias, desvio de custo, documento) ficam desligadas nos testes antigos,
+-- que usam datas fixas; o teste b1 liga e exercita cada uma
+insert into est_config(empresa_id, dias_retroativos, custo_desvio_pct, exigir_documento)
+  select id, null, null, false from empresas where id in ('e000000a-0000-0000-0000-000000000000', 'e000000b-0000-0000-0000-000000000000')
+  on conflict (empresa_id) do update set dias_retroativos = null, custo_desvio_pct = null, exigir_documento = false;
 select pg_temp.entrar('f0000000-0000-0000-0000-00000000000f');   -- compras movimenta
 insert into est_movimentos(empresa_id, data, produto_id, local_id, lote_id, tipo_movimento_id, quantidade, custo_unitario)
   select 'e000000a-0000-0000-0000-000000000000', '2026-10-01', 'aa000000-0000-0000-0000-000000000001', mp, 'ab000000-0000-0000-0000-000000000001', compra, 1000, 8 from ids;
@@ -78,7 +83,7 @@ select pg_temp.falha($q$update est_movimentos set quantidade = 1 where quantidad
 select pg_temp.falha($q$delete from est_movimentos where quantidade = -300$q$, 'use o estorno', 'movimento não se exclui');
 select pg_temp.entrar('f0000000-0000-0000-0000-00000000000f');
 select est_estornar((select id from est_movimentos where quantidade = -300), '2026-10-09', 'teste');
-select pg_temp.falha($q$select est_estornar((select id from est_movimentos where quantidade = -300))$q$, 'já estornado', 'estorno uma vez só');
+select pg_temp.falha($q$select est_estornar((select id from est_movimentos where quantidade = -300), current_date, 'de novo')$q$, 'já estornado', 'estorno uma vez só');
 reset role;
 select pg_temp.ok((select quantidade = 1500 and valor = 13500 from est_custos where produto_id = 'aa000000-0000-0000-0000-000000000001'), 'estorno devolve ao custo da saída');
 -- leitura não movimenta nem altera parâmetro

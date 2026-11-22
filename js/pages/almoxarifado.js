@@ -258,7 +258,7 @@ function detalhe(r, root) {
       <td class="num">${qtd(i.quantidade)} ${esc(i.unidade || '')}</td><td class="num">${qtd(i.qtd_entregue)}</td><td class="num ${A.pendente(i) ? 'warn' : ''}">${qtd(A.pendente(i))}</td></tr>`).join('')}</tbody></table></div>
     <h3 style="margin:14px 0 6px">Entregas</h3>
     ${r.entregas.length ? `<div class="table-wrap"><table><thead><tr><th>Quando</th><th>Entregue por</th><th>Retirado por</th><th>Identificação</th>${verValor ? '<th class="num">Valor</th>' : ''}<th>Observação</th></tr></thead><tbody>
-      ${r.entregas.map(e => `<tr><td>${quando(e.entregue_em)}</td><td>${esc(e.entregue_nome || '')}</td><td><b>${esc(e.retirou_nome)}</b></td><td>${e.cracha_lido ? '<span class="badge pago">crachá lido</span>' : e.retirou_colaborador_id ? 'colaborador da lista' : '<span class="warn">nome digitado</span>'}</td>
+      ${r.entregas.map(e => `<tr><td>${quando(e.entregue_em)}</td><td>${esc(e.entregue_nome || '')}</td><td><b>${esc(e.retirou_nome)}</b>${e.estornada_em ? ' <span class="badge vencido">estornada</span>' : ''}</td><td>${e.cracha_lido ? '<span class="badge pago">crachá lido</span>' : e.retirou_colaborador_id ? 'colaborador da lista' : '<span class="warn">nome digitado</span>'}</td>
         ${verValor ? `<td class="num">${money(e.valor)}</td>` : ''}<td class="wrap small">${esc(e.observacao || '')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">Nada foi entregue ainda.</p>'}`,
     foot: `${podeCancelar ? `<button class="btn danger" id="de-can">${r.situacao === 'parcial' ? 'Encerrar o que falta' : 'Cancelar'}</button>` : ''}${r.entregas.length ? '<button class="btn" id="de-imp">Comprovante</button>' : ''}<span class="spacer"></span><button class="btn" data-close>Fechar</button>
       ${D.aprov && r.situacao === 'aprovacao' ? '<button class="btn" id="de-rec">Recusar</button><button class="btn primary" id="de-apr">Aprovar</button>' : ''}${D.almox && ['aberta', 'parcial'].includes(r.situacao) ? '<button class="btn primary" id="de-ent">Entregar</button>' : ''}` });
@@ -277,7 +277,7 @@ function comprovante(r) {
       <h2>2. Itens</h2><table><thead><tr><th>Código</th><th>Item</th><th class="n">Pedido</th><th class="n">Entregue</th><th class="n">Falta</th></tr></thead><tbody>
         ${r.itens.map(i => `<tr><td>${esc(i.codigo)}</td><td>${esc(i.descricao)}</td><td class="n">${qtd(i.quantidade)} ${esc(i.unidade || '')}</td><td class="n">${qtd(i.qtd_entregue)}</td><td class="n">${qtd(A.pendente(i))}</td></tr>`).join('')}</tbody></table>
       <h2>3. Entregas</h2><table><thead><tr><th>Data e hora</th><th>Entregue por</th><th>Retirado por</th><th>Identificação</th></tr></thead><tbody>
-        ${r.entregas.map(e => `<tr><td>${quando(e.entregue_em)}</td><td>${esc(e.entregue_nome || '')}</td><td>${esc(e.retirou_nome)}</td><td>${e.cracha_lido ? 'Crachá lido' : e.retirou_colaborador_id ? 'Colaborador da lista' : 'Nome digitado'}</td></tr>`).join('')}</tbody></table>
+        ${r.entregas.map(e => `<tr><td>${quando(e.entregue_em)}</td><td>${esc(e.entregue_nome || '')}</td><td>${esc(e.retirou_nome)}${e.estornada_em ? ' (estornada)' : ''}</td><td>${e.cracha_lido ? 'Crachá lido' : e.retirou_colaborador_id ? 'Colaborador da lista' : 'Nome digitado'}</td></tr>`).join('')}</tbody></table>
       <div class="ass"><div>Almoxarifado</div><div>Quem retirou</div></div>` });
 }
 

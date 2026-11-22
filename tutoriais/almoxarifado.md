@@ -1,8 +1,8 @@
 ---
 titulo: Requisição de Material — pedir, aprovar e entregar pelo almoxarifado
 tela: Painéis › Requisição de Material (PAI015)
-versao: 1.2
-atualizado: 2026-11-21
+versao: 1.3
+atualizado: 2026-11-22
 ---
 ## 1. Para que serve
 
@@ -38,6 +38,8 @@ Os papéis são parâmetros: dá para incluir perfis ou nomear pessoas específi
 ![Figura 1 — Nova requisição: itens do catálogo, saldo disponível e quantidade (dados fictícios)](img/almoxarifado-2.jpg)
 
 O setor e o centro de custo vêm do cadastro do colaborador. Se o pedido tiver item **controlado** ou passar do valor limite, ele vai antes para aprovação, e a plataforma diz o motivo. Os demais vão direto para o almoxarifado.
+
+O valor limite vale para **o dia**: os pedidos da mesma pessoa, ou para a mesma pessoa, somam. Dividir um pedido grande em vários pequenos não foge da aprovação.
 
 O almoxarife pode pedir em nome de outra pessoa, pelo campo **Para quem**.
 
@@ -139,7 +141,7 @@ Aba **Parâmetros** (administrador e diretor).
 
 Cada item entregue vira uma saída no Kardex, com o tipo **Requisição interna**, o documento "RM" e o número da requisição, o nome de quem retirou e o centro de custo. O valor é o custo médio do item no momento da entrega.
 
-A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não lança em mês fechado e respeita quem pode movimentar cada local. Uma entrega lançada por engano é corrigida por estorno, no Kardex.
+A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não lança em mês fechado e respeita quem pode movimentar cada local. Uma entrega lançada por engano é corrigida por estorno, no Kardex, por quem atende o almoxarifado. O material volta para o saldo e a quantidade volta para a requisição, que deixa de constar como entregue; a entrega fica marcada como **estornada** na ficha.
 
 ## 11. Dúvidas comuns
 
@@ -159,3 +161,4 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 | 1.0 | 21/11/2026 | Primeira versão: requisição, aprovação na exceção, fila do almoxarifado, entrega com identificação por crachá, retirada no balcão, baixa automática no Kardex, comprovante, relatório e parâmetros (SQL 176) |
 | 1.1 | 21/11/2026 | Quem pediu não aprova a própria requisição (exceção por parâmetro). Mudanças nos parâmetros e nos itens controlados ficam na trilha de auditoria. |
 | 1.2 | 21/11/2026 | O crachá lido passa a ser conferido no banco na entrega e no balcão (existe, está ativo e é de quem retira). |
+| 1.3 | 22/11/2026 | O valor limite passa a valer para o dia. O estorno de uma entrega devolve a quantidade à requisição e marca a entrega como estornada. |

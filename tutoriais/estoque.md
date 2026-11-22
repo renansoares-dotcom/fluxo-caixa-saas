@@ -1,8 +1,8 @@
 ---
 titulo: Estoque e produtos
 tela: Estoque › Implantação do Estoque (EST007), Posição de Estoque (EST001), Reposição de Estoque (EST008), Inventário Cíclico (EST009), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
-versao: 1.9
-atualizado: 2026-11-21
+versao: 2.0
+atualizado: 2026-11-22
 ---
 ## 1. Para que serve
 
@@ -260,6 +260,8 @@ Quem aprova vê, para cada item, o saldo do sistema, o contado, o recontado, a d
 
 Quem aprova recebe um aviso quando uma contagem chega para aprovação.
 
+**Item movimentado depois de contado volta para recontar.** Se houve entrada ou saída do item entre a contagem e a aprovação, o saldo guardado na contagem já não vale. A aprovação devolve esses itens para recontagem e avisa quantos foram. Quem prefere parar o item enquanto conta pode ligar o **bloqueio do item em contagem** nos Parâmetros (7.4): nenhum movimento do item naquele local é aceito até a contagem terminar.
+
 **Quem contou não aprova a própria contagem.** A plataforma recusa a aprovação quando o aprovador é a mesma pessoa que contou algum item. Em empresa com uma pessoa só nessa função, a exceção pode ser liberada em **Parâmetros** (7.4).
 
 ### 7.4 Parâmetros
@@ -272,6 +274,8 @@ Em **Parâmetros** (administrador e financeiro), ajuste:
 - se a contagem é cega;
 - se a primeira contagem fora da tolerância pede recontagem;
 - se quem contou pode aprovar a própria contagem (exceção, desligada por padrão);
+- se o item movimentado depois de contado volta para recontar (ligado por padrão);
+- se a movimentação do item fica bloqueada enquanto ele está em contagem (desligado por padrão);
 - quem aprova os ajustes.
 
 ## 8. Regras e travas
@@ -310,3 +314,4 @@ Em **Parâmetros** (administrador e financeiro), ajuste:
 | 1.7 | 08/11/2026 | Nova tela Reposição de Estoque (EST008): mínimo, ponto de pedido e máximo pelo consumo real e pelo nível de serviço, prazo de entrega real, cobertura, giro, parados, aplicar no cadastro e requisição de compra. |
 | 1.8 | 08/11/2026 | Nova tela Inventário Cíclico (EST009): contagens pela curva ABC e pela frequência de cada classe, contagem cega pelo celular com leitura da etiqueta, recontagem fora da tolerância, aprovação com ajustes AJ+/AJ− no Kardex e parâmetros na tela. |
 | 1.9 | 21/11/2026 | Inventário Cíclico: quem contou não aprova a própria contagem (exceção por parâmetro); item sem lote não entra duas vezes na mesma contagem. |
+| 2.0 | 22/11/2026 | Inventário Cíclico: item movimentado depois de contado volta para recontar; bloqueio opcional do item em contagem. |

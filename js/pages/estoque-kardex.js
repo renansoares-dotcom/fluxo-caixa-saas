@@ -175,11 +175,12 @@ async function estornar(mv, p, root, pai) {
   const t = D.tm[mv.tipo_movimento_id];
   const m = modal({ title: 'Estornar movimento', body: `<p style="margin-top:0">${dateBR(mv.data)} · ${esc(t?.nome || '')} · ${esc(D.loc[mv.local_id]?.nome || '')} · <b>${qtd(mv.quantidade)} ${esc(p.unidade)}</b> a ${unit(mv.custo_unitario)}</p>
     ${mv.transferencia_id ? '<p class="small"><span class="badge vencido">transferência</span> O estorno desfaz a transferência inteira: a saída da origem e a entrada no destino.</p>' : ''}
-    <div class="grid2"><label>Data do estorno<input type="date" id="es-dt" value="${today()}"></label><label>Motivo<input id="es-mot" placeholder="obrigatório"></label></div>
+    <div class="grid2"><label>Data do estorno<input type="date" id="es-dt" value="${today()}" min="${mv.data}" max="${today()}"></label><label>Motivo<input id="es-mot" placeholder="obrigatório"></label></div>
     <p class="small muted">Gera o movimento inverso, ao mesmo custo. O original continua no kardex.</p>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="es-ok">Estornar</button>' });
   $('#es-ok', m.el).onclick = async () => {
-    const mot = $('#es-mot', m.el).value.trim(); if (!mot) return toast('Informe o motivo', true);
+    const mot = $('#es-mot', m.el).value.trim(); if (mot.length < 3) return toast('Informe o motivo', true);
+    const dt = $('#es-dt', m.el).value; if (!dt || dt < mv.data || dt > today()) return toast('A data do estorno fica entre a data do movimento e hoje', true);
     try { await q(sb.rpc('est_estornar', { p_mov: mv.id, p_data: $('#es-dt', m.el).value, p_motivo: mot })); toast('Estornado'); m.close(); pai.close(); await recarregar(root); kardexProduto(D.prod[p.id], root); } catch (err) { fail(err); }
   };
 }
@@ -229,6 +230,8 @@ function movimento(root, { produto = null, transferencia = false } = {}) {
     const qv = num(V('mv-q')); if (!(qv > 0)) return toast('Informe a quantidade', true);
     const entradaCusto = !transferencia && t.sentido === 'E' && t.afeta_custo, cu = num(V('mv-cu'));
     if (entradaCusto && !(cu >= 0 && V('mv-cu'))) return toast('Informe o custo unitário', true);
+    if (entradaCusto && t.documento !== 'nenhum' && D.cfg?.exigir_documento !== false && !V('mv-doc')) return toast('Informe o documento (nota, ordem ou inventário): este tipo forma o custo médio', true);
+    if (V('mv-dt') > today()) return toast('A data não pode ser futura', true);
     if (transferencia && V('mv-l') === V('mv-d')) return toast('Origem e destino iguais', true);
     ev.target.disabled = true;
     try {

@@ -43,7 +43,7 @@ create temp table _g (k text primary key, id uuid); grant all on _g to authentic
 
 -- tipos sensíveis nascem restritos
 select pg_temp.ok((select bool_and(papeis_manual = '{financeiro,diretor}') from est_tipos_movimento where empresa_id = :E::uuid and codigo in ('SI', 'AJ+', 'AJ-')), 'saldo inicial e ajustes: só financeiro, diretor (e admin)');
-select pg_temp.ok((select papeis_manual is null from est_tipos_movimento where empresa_id = :E::uuid and codigo = 'COMPRA'), 'os demais tipos seguem livres');
+select pg_temp.ok((select papeis_manual = '{financeiro,diretor,compras}' from est_tipos_movimento where empresa_id = :E::uuid and codigo = 'COMPRA') and (select papeis_manual is null from est_tipos_movimento where empresa_id = :E::uuid and codigo = 'PERDA'), 'compra restrita a quem compra (SQL 179); perda e requisição seguem livres');
 
 -- 1. recálculo: empresa A não mexe no produto da empresa B
 select pg_temp.entrar(:ADB::uuid);
@@ -93,9 +93,9 @@ select pg_temp.ok((select quantidade = 71 from est_saldos where produto_id = 'a9
 select public.est_estornar((select id from est_movimentos where transferencia_id = (select id from _g where k = 't1') and quantidade < 0), current_date, 'local errado');
 select pg_temp.ok((select quantidade = 101 from est_saldos where produto_id = 'a9000000-0000-0000-0000-0000000000a1' and local_id = (select mp from a9)) and (select quantidade = 0 from est_saldos where produto_id = 'a9000000-0000-0000-0000-0000000000a1' and local_id = (select uc from a9)), 'estornar uma perna desfaz a transferência inteira');
 select pg_temp.ok((select count(*) = 2 from est_movimentos where estorno_de in (select id from est_movimentos where transferencia_id = (select id from _g where k = 't1'))), 'dois estornos, um por perna');
-select pg_temp.falha(format('select public.est_estornar(%L)', (select id from est_movimentos where transferencia_id = (select id from _g where k = 't1') and quantidade > 0 and estorno_de is null)), 'a outra perna já foi estornada junto');
-select public.est_estornar((select id from _g where k = 's1'));
-select pg_temp.falha(format('select public.est_estornar(%L)', (select id from _g where k = 's1')), 'estorno em dobro');
+select pg_temp.falha(format('select public.est_estornar(%L, current_date, %L)', (select id from est_movimentos where transferencia_id = (select id from _g where k = 't1') and quantidade > 0 and estorno_de is null), 'de novo'), 'a outra perna já foi estornada junto');
+select public.est_estornar((select id from _g where k = 's1'), current_date, 'lançado errado');
+select pg_temp.falha(format('select public.est_estornar(%L, current_date, %L)', (select id from _g where k = 's1'), 'de novo'), 'estorno em dobro');
 reset role;
 select pg_temp.falha(format($$insert into est_movimentos(empresa_id, data, produto_id, local_id, tipo_movimento_id, quantidade, estorno_de) select 'e000000a-0000-0000-0000-000000000000', current_date, 'a9000000-0000-0000-0000-0000000000a1', mp, perda, 10, %L from a9$$, (select id from _g where k = 's1')), 'índice único: segundo estorno do mesmo movimento, mesmo pela plataforma');
 
@@ -146,6 +146,6 @@ select pg_temp.ok((select count(*) = 1 from est_pendencias where nota_id = 'a900
 
 -- outra empresa
 select pg_temp.entrar(:ADB::uuid);
-select pg_temp.falha(format('select public.est_estornar(%L)', (select id from _g where k = 'c1')), 'outra empresa não estorna');
+select pg_temp.falha(format('select public.est_estornar(%L, current_date, %L)', (select id from _g where k = 'c1'), 'teste'), 'outra empresa não estorna');
 \o
 \echo a9_estoque_correcoes ok

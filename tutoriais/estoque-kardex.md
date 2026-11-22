@@ -1,8 +1,8 @@
 ---
 titulo: Kardex e parâmetros do estoque
 tela: Estoque › Kardex (EST002) e Parâmetros do Estoque (EST005)
-versao: 1.5
-atualizado: 2026-11-21
+versao: 1.6
+atualizado: 2026-11-22
 ---
 ## 1. Para que serve
 
@@ -55,13 +55,15 @@ Clique no produto para abrir o **kardex do produto**. Ele mostra:
 ### 3.2 Lançar um movimento
 
 1. Clique em **Novo movimento**.
-2. Escolha o **tipo de movimento**: por exemplo, compra, requisição para a produção, requisição interna ou perda. A lista mostra só os tipos que o seu perfil pode lançar à mão (veja 4.3). **Saldo inicial** e **ajuste de inventário** vêm restritos ao administrador, ao financeiro e ao diretor.
+2. Escolha o **tipo de movimento**: por exemplo, compra, requisição para a produção, requisição interna ou perda. A lista mostra só os tipos que o seu perfil pode lançar à mão (veja 4.3). De início, **saldo inicial** e **ajuste de inventário** são do financeiro e do diretor; **compra** e os tipos de nota fiscal, de quem compra; **produção** e **apara**, da produção. O administrador lança todos.
 3. Informe a **data**, o **produto**, o **local** e a **quantidade**. O local já vem preenchido: primeiro o do tipo de movimento; depois o local padrão do produto.
 4. Se o produto controla lote, informe o **lote**. Um lote novo é criado na hora, com o **lote do fornecedor**.
 5. Nas entradas que formam custo (compra, produção e saldo inicial), informe o **custo unitário**, sem os impostos recuperáveis.
 6. Clique em **Lançar**.
 
 As demais entradas e todas as saídas usam o **custo médio do momento**. O saldo do local aparece embaixo do formulário antes de lançar.
+
+O lançamento à mão passa pelas **travas** definidas em Parâmetros › Acesso (4.6): não aceita data futura, tem um limite de dias para trás, exige o documento nas entradas que formam custo e barra o custo muito diferente do custo médio do produto.
 
 O movimento fica gravado com o usuário que lançou, a data e a hora. Estorno, transferência e movimento de nota fiscal não podem ser lançados por aqui: cada um tem o seu caminho (3.3, 3.4 e a entrada automática pelas notas).
 
@@ -77,7 +79,17 @@ O movimento **não se altera nem se exclui**. Para corrigir:
 2. Clique no movimento errado.
 3. Informe a **data** e o **motivo** e clique em **Estornar**.
 
-O estorno lança o movimento inverso ao mesmo custo; o original fica no histórico. Numa **transferência**, estornar qualquer uma das duas linhas desfaz a transferência inteira: a saída da origem e a entrada no destino. Cada movimento só pode ser estornado uma vez. Depois, lance o movimento certo.
+O estorno lança o movimento inverso ao mesmo custo; o original fica no histórico. Numa **transferência**, estornar qualquer uma das duas linhas desfaz a transferência inteira: a saída da origem e a entrada no destino. Cada movimento só pode ser estornado uma vez, e um estorno não se estorna: lance o movimento de novo.
+
+Regras do estorno:
+
+- o **motivo** é obrigatório;
+- a data fica entre a data do movimento e hoje;
+- quem não pode lançar o tipo também não o estorna;
+- movimento de **nota fiscal** só é estornado por administrador, financeiro ou diretor;
+- saída de **Requisição de Material** só é estornada por quem atende o almoxarifado. A quantidade volta para a requisição, que deixa de constar como entregue.
+
+Depois, lance o movimento certo.
 
 ### 3.5 Recalcular
 
@@ -128,6 +140,8 @@ Cada tipo de movimento tem:
 
 Os tipos marcados **sistema** são usados pela plataforma: podem ser desativados, mas não excluídos.
 
+Depois que um tipo tem movimentos, o **sentido** e o **forma custo** dele não mudam mais. O mesmo vale para a **posse**, o **compõe custo** e o **controla saldo** de um local com movimentos. Para mudar, crie outro tipo ou outro local.
+
 ### 4.4 Regras por CFOP
 
 As regras dizem o que cada item de NF-e faz no estoque:
@@ -139,23 +153,36 @@ As regras dizem o que cada item de NF-e faz no estoque:
 
 O CFOP completo vale mais que o final. A regra de uma família vale mais que a de qualquer item. No empate, vale a menor prioridade.
 
-> Os movimentos automáticos pelas notas de entrada e de saída entram na próxima etapa. Revise as regras antes.
+> As notas só movimentam o estoque sozinhas depois que o estoque é implantado e o automático é ligado, na tela Implantação do Estoque. Revise as regras antes.
 
 ### 4.5 Fechamento do Mês
 
 **Fechar o mês** trava o estoque: nenhum movimento com data até o fim do mês fechado é aceito. Fechar um mês fecha também os anteriores. As correções entram por estorno, com data do mês aberto. Só o administrador reabre.
 
+Ao fechar, a plataforma guarda a **posição do estoque** no último dia do mês: quantidade e valor de cada produto em cada local. Na lista de meses fechados, **Posição do estoque** mostra o total por local e por produto, com exportação para Excel. É o inventário de fim de mês. Reabrir o mês apaga a posição, que é guardada de novo no próximo fechamento.
+
 ### 4.6 Acesso
 
 A aba **Acesso** define quem consulta saldo por local, custo médio, valor do estoque e movimentos.
 
-![Figura 3 — Acesso: quem consulta saldo, custo e movimentos (dados fictícios)](img/estoque-kardex-3.jpg)
+![Figura 3 — Acesso: quem consulta o estoque e as travas do lançamento à mão (dados fictícios)](img/estoque-kardex-3.jpg)
 
 - **Administrador, Financeiro, Diretor, Compras e Produção** sempre consultam.
 - **Leitura** vem ligado e **Vendas** vem desligado; só o administrador muda.
-- **Motorista** e **colaborador do portal** nunca consultam.
+- **Motorista** e **colaborador do portal** nunca consultam, nem pelas telas de reposição, inventário e implantação.
+- Em empresa com a verificação em duas etapas obrigatória, administrador, financeiro e diretor só consultam e movimentam o estoque depois de passar por ela.
 
 Quem pede material pela Requisição de Material continua vendo o catálogo e o saldo disponível, sem o custo.
+
+A mesma aba traz as **travas do lançamento à mão**, que só o administrador altera:
+
+| Trava | Padrão | O que faz |
+|---|---|---|
+| Dias para trás aceitos | 60 | Data mais antiga que isso só é lançada pelo administrador. Em branco, não há limite |
+| Diferença de custo aceita | 50% | Entrada com custo mais distante do custo médio que isso só é lançada por administrador, financeiro ou diretor. Em branco, não há trava |
+| Exigir o documento | Ligado | Compra, produção e saldo inicial lançados à mão só entram com o número da nota, da ordem ou do inventário |
+
+As travas valem para o que é lançado pela tela. O que a plataforma lança sozinha (notas, requisições, inventário) não passa por elas.
 
 ## 5. Regras e travas
 
@@ -166,7 +193,9 @@ Quem pede material pela Requisição de Material continua vendo o catálogo e o 
 - Movimento não se altera nem se exclui: só por estorno, e cada movimento só pode ser estornado uma vez.
 - Mês fechado não aceita movimento, e o recálculo não altera o que está em mês fechado.
 - A entrada que forma custo (compra, produção, saldo inicial) só é lançada com o custo unitário informado.
-- Numa transferência, a saída e a entrada usam o mesmo custo.
+- Numa transferência, a saída e a entrada usam o mesmo custo. Não se transfere entre um local que compõe o custo e outro que não compõe: isso mudaria o valor do estoque sem um tipo de baixa.
+- O produto de um lote não muda. Bloquear e liberar lote é da Qualidade.
+- Não se fecha um mês que ainda não começou. Fechar e reabrir ficam na trilha de auditoria.
 - O lote informado precisa ser do mesmo produto.
 - Cada tipo de movimento só é lançado à mão pelos perfis definidos em **Parâmetros › Tipos de movimento**.
 - **Recalcular** só alcança produto da própria empresa.
@@ -202,3 +231,4 @@ Quem pede material pela Requisição de Material continua vendo o catálogo e o 
 | 1.3 | 07/11/2026 | Travas da qualidade: quarentena e reprovado só saem pela qualidade, lote bloqueado não sai, entrada com plano de recebimento vai para a quarentena. |
 | 1.4 | 21/11/2026 | Quem lança cada tipo de movimento à mão passa a ser parâmetro (saldo inicial e ajuste de inventário restritos por padrão). Estorno de transferência desfaz as duas pernas de uma vez. Lote conferido contra o produto. Trilha de auditoria nos parâmetros. Nota cancelada sem saldo para estornar vira pendência. |
 | 1.5 | 21/11/2026 | Movimentos por período (De e Até). Kardex do produto em páginas de 200 movimentos. Movimento com data antiga recalcula sozinho; o recálculo respeita o mês fechado. Nova aba Acesso: quem consulta saldo, custo e movimentos. Entrada que forma custo exige o custo. |
+| 1.6 | 22/11/2026 | Travas do lançamento à mão (data futura, limite de dias, documento, diferença de custo). Compra, produção e tipos de nota restritos por perfil. Estorno com motivo, data e perfil conferidos, ligado à requisição de origem. Parâmetros estruturais congelados depois do primeiro movimento. Posição do estoque guardada no fechamento. |

@@ -22,8 +22,8 @@ end $$;
 \set ADB '''b0000000-0000-0000-0000-00000000000b'''
 insert into produtos(id, empresa_id, codigo, descricao, tipo, unidade) values ('a7000000-0000-0000-0000-0000000000a1', :E, 'A7-RES', 'RESINA A7', 'materia_prima', 'KG'), ('a7000000-0000-0000-0000-0000000000a2', :E, 'A7-MB', 'MASTER A7', 'materia_prima', 'KG');
 insert into est_lotes(id, empresa_id, produto_id, codigo) values ('a7000000-0000-0000-0000-0000000000c1', :E, 'a7000000-0000-0000-0000-0000000000a1', 'NF100-1'), ('a7000000-0000-0000-0000-0000000000c2', :E, 'a7000000-0000-0000-0000-0000000000a1', 'NF100-2');
-select pg_temp.ok((select bool_and(etiqueta ~ '^P[0-9]{7,}$') and count(distinct etiqueta) = 2 from produtos where id::text like 'a7%'), 'produto novo nasce com etiqueta P única');
-select pg_temp.ok((select bool_and(etiqueta ~ '^L[0-9]{7,}$') and count(distinct etiqueta) = 2 from est_lotes where id::text like 'a7%'), 'lote novo nasce com etiqueta L única');
+select pg_temp.ok((select bool_and(etiqueta ~ '^P[0-9]{7,}$') and count(distinct etiqueta) = 2 from produtos where id in ('a7000000-0000-0000-0000-0000000000a1', 'a7000000-0000-0000-0000-0000000000a2')), 'produto novo nasce com etiqueta P única');
+select pg_temp.ok((select bool_and(etiqueta ~ '^L[0-9]{7,}$') and count(distinct etiqueta) = 2 from est_lotes where id in ('a7000000-0000-0000-0000-0000000000c1', 'a7000000-0000-0000-0000-0000000000c2')), 'lote novo nasce com etiqueta L única');
 select pg_temp.ok((select count(*) = 0 from produtos where etiqueta is null) and (select count(*) = 0 from est_lotes where etiqueta is null), 'nenhum produto ou lote sem etiqueta');
 select pg_temp.ok((select count(*) = count(distinct etiqueta) from (select etiqueta from produtos union all select etiqueta from est_lotes) x), 'códigos não se repetem entre produtos e lotes');
 -- o código não muda

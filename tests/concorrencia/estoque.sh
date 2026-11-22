@@ -32,9 +32,9 @@ wait
 
 # 2) dois estornos do mesmo movimento ao mesmo tempo: só um pode passar
 M=$("${P[@]}" -c "select id from est_movimentos where produto_id = '$PR' and quantidade = -60 and estorno_de is null")
-( "${P[@]}" -c "$entrar" -c "begin" -c "select public.est_estornar('$M')" -c "select pg_sleep(2)" -c "commit" >/tmp/conc-a.log 2>&1; echo $? >/tmp/conc-a.rc ) &
+( "${P[@]}" -c "$entrar" -c "begin" -c "select public.est_estornar('$M', current_date, 'teste de concorrencia')" -c "select pg_sleep(2)" -c "commit" >/tmp/conc-a.log 2>&1; echo $? >/tmp/conc-a.rc ) &
 sleep 0.7
-"${P[@]}" -c "$entrar" -c "select public.est_estornar('$M')" >/tmp/conc-b.log 2>&1; echo $? >/tmp/conc-b.rc
+"${P[@]}" -c "$entrar" -c "select public.est_estornar('$M', current_date, 'teste de concorrencia')" >/tmp/conc-b.log 2>&1; echo $? >/tmp/conc-b.rc
 wait
 [ "$(cat /tmp/conc-a.rc)" = 0 ] || { cat /tmp/conc-a.log; falhou "o primeiro estorno devia passar"; }
 [ "$(cat /tmp/conc-b.rc)" != 0 ] && grep -q "estornado" /tmp/conc-b.log || { cat /tmp/conc-b.log; falhou "o segundo estorno devia ser barrado"; }
