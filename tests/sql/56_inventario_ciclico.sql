@@ -48,6 +48,11 @@ select public.est_inv_aprovar((select id from cg), false, 'conferir a prateleira
 select pg_temp.ok((select situacao = 'recontar' from est_inv_itens where contagem_id = (select id from cg) and produto_id = '56000000-0000-0000-0000-0000000000f1'), 'volta para recontar');
 select public.est_inv_contar((select id from est_inv_itens where contagem_id = (select id from cg) and produto_id = '56000000-0000-0000-0000-0000000000f1'), 96);
 select public.est_inv_enviar((select id from cg));
+-- SQL 181: quem contou é reconhecido pelo usuário, não só pelo e-mail: o mesmo usuário não aprova a própria contagem
+select pg_temp.falha($$select public.est_inv_aprovar((select id from cg), true)$$, 'quem contou não aprova (por usuário)');
+reset role;
+insert into est_inv_config(empresa_id, aprovar_propria) select empresa_id, true from est_inv_contagens where id = (select id from cg) on conflict (empresa_id) do update set aprovar_propria = true;
+select pg_temp.entrar((select current_setting('request.jwt.claim.sub', true))::uuid);
 select pg_temp.ok(public.est_inv_aprovar((select id from cg), true) = 1, 'um ajuste');
 select pg_temp.ok((select sum(quantidade) from est_saldos where produto_id = '56000000-0000-0000-0000-0000000000f1') = 96, 'saldo ajustado para 96');
 select pg_temp.ok((select situacao = 'ajustado' and movimento_id is not null from est_inv_itens where contagem_id = (select id from cg) and produto_id = '56000000-0000-0000-0000-0000000000f1'), 'item ajustado');

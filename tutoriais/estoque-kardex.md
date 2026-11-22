@@ -1,7 +1,7 @@
 ---
 titulo: Kardex e parâmetros do estoque
 tela: Estoque › Kardex (EST002) e Parâmetros do Estoque (EST005)
-versao: 1.7
+versao: 1.8
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -63,7 +63,7 @@ Clique no produto para abrir o **kardex do produto**. Ele mostra:
 
 As demais entradas e todas as saídas usam o **custo médio do momento**. O saldo do local aparece embaixo do formulário antes de lançar.
 
-O lançamento à mão passa pelas **travas** definidas em Parâmetros › Acesso (4.6): não aceita data futura, tem um limite de dias para trás, exige o documento nas entradas que formam custo e barra o custo muito diferente do custo médio do produto. Quando o produto ainda não tem custo médio, o primeiro custo lançado à mão é confirmado por administrador, financeiro ou diretor.
+O lançamento à mão passa pelas **travas** definidas em Parâmetros › Acesso (4.6): não aceita data futura, tem um limite de dias para trás, exige o documento em toda entrada (nota, ordem ou inventário) e barra o custo muito diferente do custo médio do produto. Quando o produto ainda não tem custo médio, o primeiro custo lançado à mão é confirmado por administrador, financeiro ou diretor.
 
 Uma **saída com data antiga** só entra se o saldo do local não ficar negativo em nenhum dia dali em diante. A transferência segue o mesmo limite de dias para trás.
 
@@ -81,7 +81,7 @@ O movimento **não se altera nem se exclui**. Para corrigir:
 2. Clique no movimento errado.
 3. Informe a **data** e o **motivo** e clique em **Estornar**.
 
-O estorno lança o movimento inverso ao mesmo custo; o original fica no histórico. Numa **transferência**, estornar qualquer uma das duas linhas desfaz a transferência inteira: a saída da origem e a entrada no destino. Cada movimento só pode ser estornado uma vez, e um estorno não se estorna: lance o movimento de novo.
+O estorno lança o movimento inverso ao mesmo custo; o original fica no histórico. Há uma exceção: se a entrada estornada já foi consumida em parte a outro custo médio, o estorno sai ao custo médio de agora, para o valor do estoque nunca ficar negativo. Numa **transferência**, estornar qualquer uma das duas linhas desfaz a transferência inteira: a saída da origem e a entrada no destino. Cada movimento só pode ser estornado uma vez, e um estorno não se estorna: lance o movimento de novo.
 
 Regras do estorno:
 
@@ -143,7 +143,7 @@ Cada tipo de movimento tem:
 
 Os tipos marcados **sistema** são usados pela plataforma: podem ser desativados, mas não excluídos.
 
-Depois que um tipo tem movimentos, o **sentido** e o **forma custo** dele não mudam mais. O mesmo vale para a **posse**, o **compõe custo** e o **controla saldo** de um local com movimentos. Para mudar, crie outro tipo ou outro local.
+Criar um tipo e alterar o sentido, o "forma custo", o documento e quem lança à mão é só do administrador; o financeiro altera o restante. Depois que um tipo tem movimentos, o **sentido** e o **forma custo** dele não mudam mais. O mesmo vale para a **posse**, o **compõe custo** e o **controla saldo** de um local com movimentos. Para mudar, crie outro tipo ou outro local.
 
 ### 4.4 Regras por CFOP
 
@@ -183,7 +183,7 @@ A mesma aba traz as **travas do lançamento à mão**, que só o administrador a
 |---|---|---|
 | Dias para trás aceitos | 60 | Data mais antiga que isso só é lançada pelo administrador. Em branco, não há limite |
 | Diferença de custo aceita | 50% | Entrada com custo mais distante do custo médio que isso só é lançada por administrador, financeiro ou diretor. Em branco, não há trava |
-| Exigir o documento | Ligado | Compra, produção e saldo inicial lançados à mão só entram com o número da nota, da ordem ou do inventário |
+| Exigir o documento | Ligado | Toda entrada lançada à mão (compra, produção, saldo inicial, devolução de cliente, apara, retorno de terceiros) só entra com o número da nota, da ordem ou do inventário |
 
 As travas valem para o que é lançado pela tela. O que a plataforma lança sozinha (notas, requisições, inventário) não passa por elas.
 
@@ -196,7 +196,7 @@ As travas valem para o que é lançado pela tela. O que a plataforma lança sozi
 - Movimento não se altera nem se exclui: só por estorno, e cada movimento só pode ser estornado uma vez.
 - Mês fechado não aceita movimento, e o recálculo não altera o que está em mês fechado.
 - A entrada que forma custo (compra, produção, saldo inicial) só é lançada com o custo unitário informado.
-- Numa transferência, a saída e a entrada usam o mesmo custo. Não se transfere entre um local que compõe o custo e outro que não compõe: isso mudaria o valor do estoque sem um tipo de baixa.
+- Numa transferência, a saída e a entrada usam o mesmo custo e o mesmo valor: transferir não muda o valor do produto. Não se transfere entre um local que compõe o custo e outro que não compõe: isso mudaria o valor do estoque sem um tipo de baixa.
 - O produto de um lote não muda. Bloquear e liberar lote é da Qualidade.
 - Só se fecha um mês que já terminou. Fechar e reabrir ficam na trilha de auditoria. O fechamento espera os lançamentos em andamento, para a posição guardada bater com o Kardex.
 - No recálculo, o estorno acompanha o custo do movimento que ele desfaz.
@@ -238,3 +238,4 @@ As travas valem para o que é lançado pela tela. O que a plataforma lança sozi
 | 1.5 | 21/11/2026 | Movimentos por período (De e Até). Kardex do produto em páginas de 200 movimentos. Movimento com data antiga recalcula sozinho; o recálculo respeita o mês fechado. Nova aba Acesso: quem consulta saldo, custo e movimentos. Entrada que forma custo exige o custo. |
 | 1.6 | 22/11/2026 | Travas do lançamento à mão (data futura, limite de dias, documento, diferença de custo). Compra, produção e tipos de nota restritos por perfil. Estorno com motivo, data e perfil conferidos, ligado à requisição de origem. Parâmetros estruturais congelados depois do primeiro movimento. Posição do estoque guardada no fechamento. |
 | 1.7 | 22/11/2026 | Perda e requisição direta restritas por perfil. Primeiro custo de um produto confirmado por administrador, financeiro ou diretor. Saída com data antiga não deixa saldo negativo em nenhum dia. Estorno de movimento de outro documento é feito pelo documento. Só se fecha mês terminado. |
+| 1.8 | 22/11/2026 | Documento exigido em toda entrada lançada à mão. Estorno de entrada já consumida sai ao custo médio corrente. Criação de tipo e campos sensíveis só pelo administrador. Transferência sem diferença de centavo. |

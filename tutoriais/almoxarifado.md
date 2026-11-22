@@ -1,7 +1,7 @@
 ---
 titulo: Requisição de Material — pedir, aprovar e entregar pelo almoxarifado
 tela: Painéis › Requisição de Material (PAI015)
-versao: 1.4
+versao: 1.5
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -139,6 +139,10 @@ Aba **Parâmetros** (administrador e diretor).
 | Locais do almoxarifado | Insumos, Manutenção e Uso e consumo | De quais locais de estoque o almoxarifado entrega |
 | Itens controlados | Nenhum | Item marcado sempre pede aprovação, em qualquer quantidade |
 
+A primeira entrega só é registrada depois que os parâmetros forem salvos uma vez: assim a empresa decide, antes de começar, quem atende, quem aprova, o valor que pede aprovação e se o crachá é obrigatório.
+
+**Quem entrega não retira para si mesmo.** Quando quem atende o almoxarifado precisa de material, outra pessoa do almoxarifado registra a entrega. A regra só não vale se a exceção "quem pediu pode aprovar a própria requisição" estiver ligada.
+
 **O que aparece no catálogo.** Os produtos ativos que têm saldo em um local do almoxarifado, ou cujo local de entrada é um desses locais. Para um material novo aparecer, cadastre o produto em Estoque › Produtos com o local de entrada no almoxarifado.
 
 ## 10. Como a entrega entra no estoque
@@ -167,3 +171,4 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 | 1.2 | 21/11/2026 | O crachá lido passa a ser conferido no banco na entrega e no balcão (existe, está ativo e é de quem retira). |
 | 1.3 | 22/11/2026 | O valor limite passa a valer para o dia. O estorno de uma entrega devolve a quantidade à requisição e marca a entrega como estornada. |
 | 1.4 | 22/11/2026 | Pedido só de itens do catálogo do almoxarifado. Valores (custo, valor do pedido e da entrega) só para quem atende e quem aprova. |
+| 1.5 | 22/11/2026 | A primeira entrega exige os parâmetros definidos. Quem entrega não retira para si mesmo. |

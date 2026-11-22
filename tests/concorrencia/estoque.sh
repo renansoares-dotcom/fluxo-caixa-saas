@@ -66,4 +66,21 @@ TIN=$("${P[@]}" -c "select m.id from tin_pesagens p join est_movimentos m on m.i
 "${P[@]}" -c "$entrar_adm" -c "select public.est_estornar('$TIN', current_date, 'direto pelo Kardex')" >/tmp/conc-b.log 2>&1 && falhou "estorno direto da baixa de uma pesagem devia ser barrado"
 grep -q "outro documento" /tmp/conc-b.log || { cat /tmp/conc-b.log; falhou "mensagem esperada: lançado por outro documento"; }
 [ "$("${P[@]}" -c "select count(*) from est_movimentos where estorno_de = '$TIN'")" = 0 ] || falhou "não devia existir estorno da pesagem"
+# 5) duas saídas com data antiga ao mesmo tempo: só uma pode passar (antes, as duas passavam e o Kardex ficava negativo num dia do meio)
+PR2='c0c00000-0000-0000-0000-0000000000a2'
+"${P[@]}" >/dev/null <<SQL || falhou "preparação da saída retroativa"
+insert into produtos(id, empresa_id, codigo, descricao, tipo, unidade, controla_lote) values ('$PR2', '$E', 'CONC-2', 'ITEM DA SAIDA RETROATIVA', 'uso_consumo', 'UN', false) on conflict (id) do nothing;
+delete from est_inv_contagens where empresa_id = '$E' and situacao in ('aberta', 'em_aprovacao');
+insert into est_movimentos(empresa_id, data, produto_id, local_id, tipo_movimento_id, quantidade, custo_unitario)
+  select '$E', current_date - d, '$PR2', (select id from est_locais where empresa_id = '$E' and codigo = 'UC'), (select id from est_tipos_movimento where empresa_id = '$E' and codigo = 'COMPRA'), 10, 10
+    from (values (20), (2)) x(d) where not exists (select 1 from est_movimentos where produto_id = '$PR2');
+SQL
+antiga="insert into est_movimentos(empresa_id, data, produto_id, local_id, tipo_movimento_id, quantidade) select '$E', current_date - 10, '$PR2', (select id from est_locais where empresa_id = '$E' and codigo = 'UC'), (select id from est_tipos_movimento where empresa_id = '$E' and codigo = 'PERDA'), -8;"
+( "${P[@]}" -c "$entrar_adm" -c "begin" -c "$antiga" -c "select pg_sleep(2)" -c "commit" >/tmp/conc-a.log 2>&1; echo $? >/tmp/conc-a.rc ) &
+sleep 0.7
+"${P[@]}" -c "$entrar_adm" -c "$antiga" >/tmp/conc-b.log 2>&1; echo $? >/tmp/conc-b.rc
+wait
+[ "$(cat /tmp/conc-a.rc)" = 0 ] || { cat /tmp/conc-a.log; falhou "a primeira saída retroativa devia passar"; }
+[ "$(cat /tmp/conc-b.rc)" != 0 ] && grep -q "Saldo insuficiente" /tmp/conc-b.log || { cat /tmp/conc-b.log; falhou "a segunda saída retroativa devia ser barrada"; }
+[ "$("${P[@]}" -c "select (min(saldo_local_apos) >= 0)::text from est_movimentos where produto_id = '$PR2'")" = true ] || falhou "o Kardex não devia ter saldo negativo em nenhum dia"
 echo "concorrencia do estoque ok"

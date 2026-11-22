@@ -1,7 +1,7 @@
 ---
 titulo: Estoque e produtos
 tela: Estoque › Implantação do Estoque (EST007), Posição de Estoque (EST001), Reposição de Estoque (EST008), Inventário Cíclico (EST009), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
-versao: 2.1
+versao: 2.2
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -262,9 +262,9 @@ Quem aprova vê, para cada item, o saldo do sistema, o contado, o recontado, a d
 
 Quem aprova recebe um aviso quando uma contagem chega para aprovação.
 
-**Item movimentado depois de contado volta para recontar.** Se houve entrada ou saída do item entre a contagem e a aprovação, o saldo guardado na contagem já não vale. A aprovação devolve esses itens para recontagem e avisa quantos foram. Quem prefere parar o item enquanto conta pode ligar o **bloqueio do item em contagem** nos Parâmetros (7.4): nenhum movimento do item naquele local é aceito até a contagem terminar.
+**Item movimentado depois de contado volta para recontar.** Se houve entrada ou saída do item entre a contagem e a aprovação, o saldo guardado na contagem já não vale. A aprovação devolve esses itens para recontagem e avisa quantos foram. Quem prefere parar o item enquanto conta pode ligar o **bloqueio do item em contagem** nos Parâmetros (7.4): nenhum movimento do item naquele local é aceito até a contagem terminar, venha do lançamento à mão, de transferência, de requisição de material, de nota fiscal ou de estorno. O ajuste da própria contagem é o único que passa.
 
-**Quem contou não aprova a própria contagem.** A plataforma recusa a aprovação quando o aprovador é a mesma pessoa que contou algum item. Em empresa com uma pessoa só nessa função, a exceção pode ser liberada em **Parâmetros** (7.4).
+**Quem contou não aprova a própria contagem.** A plataforma guarda todos os usuários que contaram ou recontaram cada item e recusa a aprovação quando o aprovador é um deles. Em empresa com uma pessoa só nessa função, a exceção pode ser liberada em **Parâmetros** (7.4).
 
 ### 7.4 Parâmetros
 
@@ -320,3 +320,4 @@ Quem aprova e as duas exceções de aprovação (a própria contagem e o item mo
 | 1.9 | 21/11/2026 | Inventário Cíclico: quem contou não aprova a própria contagem (exceção por parâmetro); item sem lote não entra duas vezes na mesma contagem. |
 | 2.0 | 22/11/2026 | Inventário Cíclico: item movimentado depois de contado volta para recontar; bloqueio opcional do item em contagem. |
 | 2.1 | 22/11/2026 | Inventário Cíclico: a contagem reconhece a etiqueta da plataforma e ganhou leitura pela câmera; uma contagem por local; exceções de aprovação só pelo administrador; aprovação com a verificação em duas etapas. |
+| 2.2 | 22/11/2026 | Inventário Cíclico: o bloqueio do item em contagem vale para todo tipo de movimento; quem contou é guardado por usuário. |
