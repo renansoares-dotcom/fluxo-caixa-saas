@@ -112,8 +112,15 @@ select pg_temp.ok((select count(*) = 0 from est_saldos where local_id = 'b400000
   and (select count(*) = 0 from est_saldos where local_id = 'b4000000-0000-0000-0000-0000000000e2')
   and (select count(*) > 0 from est_saldos where local_id not in ('b4000000-0000-0000-0000-0000000000e1', 'b4000000-0000-0000-0000-0000000000e2')),
   'quem conta não lê o saldo, o Kardex nem o custo do local que conta nem do que vai auditar; os outros locais continuam visíveis');
+select pg_temp.ok(not exists (select 1 from public.est_inv_abc(:E::uuid) where produto_id in ('b4000000-0000-0000-0000-0000000000a1', 'b4000000-0000-0000-0000-0000000000a3'))
+  and not exists (select 1 from public.est_reposicao(:E::uuid) where produto_id in ('b4000000-0000-0000-0000-0000000000a1', 'b4000000-0000-0000-0000-0000000000a3'))
+  and not exists (select 1 from public.alm_catalogo(:E::uuid) where produto_id in ('b4000000-0000-0000-0000-0000000000a3', 'b4000000-0000-0000-0000-0000000000a4')),
+  'curva ABC, reposição e catálogo do almoxarifado também escondem os itens que a pessoa conta ou audita');
+select pg_temp.falha($$select public.est_implantacao_situacao('e000000a-0000-0000-0000-000000000000')$$, 'consulta agregada do estoque durante a contagem');
+select pg_temp.falha($$select public.tin_previsao('e000000a-0000-0000-0000-000000000000')$$, 'previsão de tintas durante a contagem');
 select pg_temp.entrar(:ADM::uuid);
 select pg_temp.ok((select count(*) = 2 from est_saldos where local_id = 'b4000000-0000-0000-0000-0000000000e1'), 'quem não conta nem audita o local continua lendo o saldo');
+select pg_temp.ok(exists (select 1 from public.est_inv_abc(:E::uuid) where produto_id = 'b4000000-0000-0000-0000-0000000000a1'), 'e continua vendo o item na curva ABC');
 select pg_temp.falha($$insert into est_movimentos(empresa_id, data, produto_id, local_id, tipo_movimento_id, quantidade, custo_unitario, documento, ig_inventario_id)
   select 'e000000a-0000-0000-0000-000000000000', current_date, 'b4000000-0000-0000-0000-0000000000a1', 'b4000000-0000-0000-0000-0000000000e1', compra, 1, 10, 'X', (select id from _g where k = 'ig') from b4$$, 'lançamento à mão marcado como ajuste do inventário');
 
@@ -186,6 +193,9 @@ select pg_temp.ok(public.est_ig_terceira(pg_temp.item('e2', 'a3'), 10) = 'conclu
 select pg_temp.entrar(:ADM::uuid);
 select pg_temp.mov('a1', 'e1', 1, 10, current_date);
 select pg_temp.falha(format('select pg_temp.mov(%L, %L, 1, 10, %L)', 'a1', 'e1', (select ref from _d)), 'movimento com data até a referência antes da aprovação');
+select pg_temp.entrar(:FIN::uuid);
+select pg_temp.falha(format('select public.est_ig_recontar(%L, array[%L]::uuid[], %L)', pg_temp.igl('e1'), pg_temp.item('e1', 'a1'), 'conferir de novo'), 'recontagem depois que o local voltou a movimentar');
+select pg_temp.entrar(:ADM::uuid);
 
 -- ============================================================ resultado, acuracidade e aprovação
 select pg_temp.entrar(:FIN::uuid);
@@ -217,6 +227,10 @@ delete from est_fechamentos where empresa_id = :E::uuid; delete from est_fechame
 select pg_temp.entrar(:ADM::uuid);
 select pg_temp.falha(format('select pg_temp.mov(%L, %L, 1, 10, %L)', 'a1', 'e1', (select ref from _d)), 'mês reaberto, mas o local foi inventariado: data até a referência continua barrada');
 reset role;
+
+-- código de tipo do sistema não muda
+select pg_temp.entrar(:ADM::uuid);
+select pg_temp.falha($$update est_tipos_movimento set codigo = 'COMPRAX' where empresa_id = 'e000000a-0000-0000-0000-000000000000' and codigo = 'COMPRA'$$, 'mudar o código de um tipo do sistema');
 
 -- número inválido não entra no Kardex
 select pg_temp.entrar(:ADM::uuid);

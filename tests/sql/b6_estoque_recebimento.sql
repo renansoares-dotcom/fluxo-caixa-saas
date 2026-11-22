@@ -74,9 +74,15 @@ insert into _r(k, id) select 'r', public.est_receb_iniciar('b6000000-0000-0000-0
 select pg_temp.ok(public.est_receb_iniciar('b6000000-0000-0000-0000-0000000000c3') = (select id from _r where k = 'r'), 'iniciar de novo retoma a mesma conferência');
 select pg_temp.falha($$select * from est_recebimento_itens$$, 'leitura direta dos itens');
 select pg_temp.ok((select count(*) = 2 and bool_and(qtd_nota is null) from public.est_receb_itens((select id from _r where k = 'r'))), 'conferência cega: quem confere não vê a quantidade da nota');
+select pg_temp.ok((select bool_and(v_nf is null) from public.est_receb_fila(:E::uuid)), 'quem confere não vê o valor da nota na fila');
 select pg_temp.ok((select produto_codigo = 'B6-RES' and ucom = 'SC' from public.est_receb_itens((select id from _r where k = 'r')) where n_item = 1), 'o item mostra o produto do de-para e a unidade da nota');
 select pg_temp.entrar(:FIN::uuid);
 select pg_temp.ok((select bool_and(qtd_nota is not null) from public.est_receb_itens((select id from _r where k = 'r'))), 'financeiro (fora da conferência) vê a quantidade da nota');
+select pg_temp.ok((select count(*) = 2 from nfe_itens where nota_id = 'b6000000-0000-0000-0000-0000000000c3'), 'financeiro lê os itens da nota');
+select pg_temp.entrar(:ADM::uuid);
+select pg_temp.ok((select count(*) = 0 from nfe_itens where nota_id = 'b6000000-0000-0000-0000-0000000000c3') and (select count(*) = 0 from nfe_notas where id = 'b6000000-0000-0000-0000-0000000000c3'),
+  'quem pode conferir não lê a nota nem os itens enquanto a conferência está aberta');
+select pg_temp.ok((select numero = 9103 from public.est_receb_nota((select id from _r where k = 'r'))), 'o cabeçalho da conferência vem pela função');
 select pg_temp.entrar(:CMP::uuid);
 insert into _r(k, id) select 'i1', item_id from public.est_receb_itens((select id from _r where k = 'r')) where n_item = 1;
 insert into _r(k, id) select 'i2', item_id from public.est_receb_itens((select id from _r where k = 'r')) where n_item = 2;
@@ -86,6 +92,14 @@ select public.est_receb_contar((select id from _r where k = 'i1'), 3, 0);   -- a
 select pg_temp.falha(format('select public.est_receb_concluir(%L)', (select id from _r where k = 'r')), 'concluir com item sem conferência');
 select pg_temp.falha(format('select public.est_receb_concluir(%L, current_date + 1, null, true)', (select id from _r where k = 'r')), 'chegada com data futura');
 select pg_temp.falha(format('select public.est_receb_concluir(%L, current_date - 4, null, true)', (select id from _r where k = 'r')), 'chegada antes da emissão');
+reset role;
+insert into est_fechamentos(empresa_id, mes) values (:E, date_trunc('month', current_date - 1)::date);
+select pg_temp.entrar(:CMP::uuid);
+select pg_temp.falha(format('select public.est_receb_concluir(%L, current_date - 1, null, true)', (select id from _r where k = 'r')), 'chegada em mês fechado');
+reset role;
+delete from est_fechamentos where empresa_id = :E::uuid;
+select pg_temp.ok((select situacao = 'conferindo' from est_recebimentos where id = (select id from _r where k = 'r')), 'a conferência continua aberta para corrigir a data');
+select pg_temp.entrar(:CMP::uuid);
 insert into _r(k, j) select 'c', public.est_receb_concluir((select id from _r where k = 'r'), current_date - 1, 'Um saco a menos', true);
 reset role;
 select pg_temp.ok((select (j->>'divergencias')::int = 2 and (j->>'lancados')::int = 1 from _r where k = 'c'), 'concluída: duas divergências (faltou 1 saco; item sem de-para não chegou) e uma entrada lançada');
@@ -110,6 +124,18 @@ select public.est_receb_contar((select item_id from public.est_receb_itens((sele
 select public.est_receb_concluir((select id from _r where k = 'r4'));
 reset role;
 select pg_temp.ok((select quantidade = 200 and custo_unitario = 10 from est_movimentos where nfe_item_id = 'b6000000-0000-0000-0000-0000000001c4'), 'avariado: chegaram 10 sacos, 2 avariados; entram 8 × 25 = 200 kg');
+
+-- chegou mais que a nota: entra só o da nota; o excesso fica na divergência
+reset role;
+select pg_temp.nota('c7', 9107, current_date, 4, 1000);
+select pg_temp.entrar(:CMP::uuid);
+insert into _r(k, id) select 'r7', public.est_receb_iniciar('b6000000-0000-0000-0000-0000000000c7');
+select public.est_receb_contar((select item_id from public.est_receb_itens((select id from _r where k = 'r7')) where n_item = 1), 6, 0);
+select public.est_receb_concluir((select id from _r where k = 'r7'), current_date, null, true);
+reset role;
+select pg_temp.ok((select quantidade = 100 and valor = 1000 from est_movimentos where nfe_item_id = 'b6000000-0000-0000-0000-0000000001c7')
+  and (select divergencia like 'sobrou 2%' from est_recebimento_itens ri join est_recebimentos r on r.id = ri.recebimento_id where r.nota_id = 'b6000000-0000-0000-0000-0000000000c7' and ri.qtd_nota = 4),
+  'chegaram 6 sacos para 4 na nota: entram 100 kg (R$ 1.000), e a sobra de 2 fica para Compras');
 
 -- nota sem material: dispensada com motivo
 select pg_temp.nota('c5', 9105, current_date, 1, 100);

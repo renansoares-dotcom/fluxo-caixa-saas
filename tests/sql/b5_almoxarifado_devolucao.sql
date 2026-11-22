@@ -81,6 +81,13 @@ select pg_temp.falha(format('select public.est_estornar(%L, current_date, %L)', 
 select pg_temp.falha($$insert into est_movimentos(empresa_id, data, produto_id, local_id, tipo_movimento_id, quantidade, custo_unitario, documento)
   select 'e000000a-0000-0000-0000-000000000000', current_date, 'b5000000-0000-0000-0000-0000000000a1', uc, (select id from est_tipos_movimento where empresa_id = 'e000000a-0000-0000-0000-000000000000' and codigo = 'DEVALM'), 1, 30, 'X' from b5$$, 'devolução lançada à mão no Kardex');
 
+-- recálculo: a devolução acompanha o custo recalculado da saída
+reset role;
+select public._est_recalc(:E::uuid, 'b5000000-0000-0000-0000-0000000000a1', null);
+select pg_temp.ok((select d.custo_unitario = s.custo_unitario from est_movimentos d join alm_devolucao_itens di on di.movimento_id = d.id join alm_entrega_itens e on e.id = di.entrega_item_id
+   join est_movimentos s on s.id = e.movimento_id where d.produto_id = 'b5000000-0000-0000-0000-0000000000a1' limit 1), 'depois do recálculo, a devolução continua ao custo da saída');
+select pg_temp.entrar(:ADM::uuid);
+
 -- prazo
 select public.alm_devolucao_salvar(:E::uuid, 1);
 reset role;

@@ -146,9 +146,9 @@ async function painel(root, g) {
     const mot = (prompt(`Motivo da recontagem de ${M.length} item(ns)`) || '').trim(); if (mot.length < 5) return toast('Informe o motivo', true);
     try { await q(sb.rpc('est_ig_recontar', { p_ig_local: ls[0], p_itens: M.map(x => x.value), p_motivo: mot })); toast('Recontagem pedida: quem conta e quem audita foram avisados'); render(root); } catch (e) { fail(e); } });
   $('#pg-des', root) && ($('#pg-des', root).onclick = async () => {
-    const mot = (prompt(`Desfazer o inventário nº ${g.numero}? Todos os ajustes são estornados na data de referência e o mês é reaberto. Motivo:`) || '').trim(); if (!mot) return;
+    const mot = (prompt(`Desfazer o inventário nº ${g.numero}? Todos os ajustes são estornados na data de referência, e o mês de ${dateBR(g.referencia).slice(3)} e os seguintes que estiverem fechados são reabertos. Motivo:`) || '').trim(); if (!mot) return;
     if (mot.length < 10) return toast('Informe o motivo (pelo menos 10 letras)', true);
-    try { const r = await q(sb.rpc('est_ig_estornar', { p_inventario: g.id, p_motivo: mot })); toast(`${r.estornos} ajuste(s) estornado(s)${r.mes_reaberto ? ' e mês reaberto' : ''}`); render(root); } catch (e) { fail(e); } });
+    try { const r = await q(sb.rpc('est_ig_estornar', { p_inventario: g.id, p_motivo: mot })); toast(`${r.estornos} ajuste(s) estornado(s)${r.mes_reaberto ? ` · meses reabertos: ${r.meses_reabertos}` : ''}`); render(root); } catch (e) { fail(e); } });
   $('#pg-ok', root) && ($('#pg-ok', root).onclick = async () => {
     const fecha = D.cfg.fechar_mes ? ' e o mês da data de referência é fechado' : '';
     if (!confirm(`Aprovar o inventário nº ${g.numero}? ${dif.length} ajuste(s) entram no Kardex em ${dateBR(g.referencia)}${fecha}.`)) return;
@@ -217,7 +217,8 @@ async function contar(root, g, gl) {
       : `<div class="card small muted" style="margin-bottom:12px">${papel === 'contador' ? 'A contagem deste local foi concluída.' : 'Aguardando a sua vez neste local.'}</div>`}
     <div class="card flush"><div class="table-wrap"><table class="small"><thead><tr><th>Item</th><th>Un.</th>${papel === 'terceira' ? '<th class="num">Contagem</th><th class="num">Auditoria</th>' : ''}<th class="num">${papel === 'terceira' ? 'Vale' : 'Quantidade'}</th><th></th></tr></thead><tbody id="ct-tb"></tbody></table></div></div>`;
   // fila local: a quantidade registrada sem internet fica guardada no aparelho e é enviada quando a conexão volta
-  const CH = 'ig-fila-' + gl.id, lerFila = () => { try { return JSON.parse(localStorage.getItem(CH) || '[]'); } catch { return []; } };
+  const CH = `ig-fila-${gl.id}-${state.user.id}-${papel}-${gl.situacao}`,   // por pessoa, papel e fase: no aparelho compartilhado, ninguém envia a contagem do outro
+    lerFila = () => { try { return JSON.parse(localStorage.getItem(CH) || '[]'); } catch { return []; } };
   const gravarFila = (L) => { try { L.length ? localStorage.setItem(CH, JSON.stringify(L)) : localStorage.removeItem(CH); } catch { /* sem armazenamento: a fila fica só na memória desta tela */ } };
   let fila = lerFila();
   for (const f of fila) { const i = its.find(x => x.item_id === f.item); if (i) { i.quantidade = f.qtd; i.feito = true; i.naFila = true; } }

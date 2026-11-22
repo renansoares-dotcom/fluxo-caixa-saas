@@ -1,4 +1,4 @@
-// Compras › Estoque › Recebimento de Notas (EST011) — SQL 186, 22/11/2026.
+// Compras › Estoque › Recebimento de Notas (EST011) — SQL 186 e 187, 22/11/2026.
 // Com a entrada pelo recebimento ligada, a nota de compra fica "a receber" e só entra no estoque quando quem atende o almoxarifado
 // confere o material na chegada: item a item, pelo celular, leitor ou câmera; a conferência é cega por parâmetro; entra o que chegou
 // em bom estado, na data da chegada, ao custo da nota; falta, sobra e avaria vão como aviso para Compras.
@@ -58,7 +58,7 @@ async function lista(root) {
 }
 
 async function conferir(root, r) {
-  const [its, nota] = await Promise.all([q(sb.rpc('est_receb_itens', { p_receb: r.id })), q(sb.from('nfe_notas').select('numero,serie,emit_nome,emissao').eq('id', r.nota_id).maybeSingle()).catch(() => null)]);
+  const [its, nota] = await Promise.all([q(sb.rpc('est_receb_itens', { p_receb: r.id })), q(sb.rpc('est_receb_nota', { p_receb: r.id })).then(x => x?.[0] || null).catch(() => null)]);
   const cega = its.every(i => i.qtd_nota == null), falta = its.filter(i => i.contada == null), temCam = 'BarcodeDetector' in window && !!navigator.mediaDevices?.getUserMedia;
   const rot = (i) => `${esc(i.xprod || '')} <span class="muted small">${esc(i.cprod || '')}${i.produto_codigo ? ' → ' + esc(i.produto_codigo) : ' · sem de-para'}</span>`;
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Conferência — NF ${nota?.numero ?? ''} ${esc(nota?.emit_nome || '')}</h2>
@@ -128,7 +128,7 @@ async function conferir(root, r) {
 }
 
 async function ficha(root, r) {
-  const [its, nota] = await Promise.all([q(sb.rpc('est_receb_itens', { p_receb: r.id })), q(sb.from('nfe_notas').select('numero,serie,emit_nome,emissao').eq('id', r.nota_id).maybeSingle()).catch(() => null)]);
+  const [its, nota] = await Promise.all([q(sb.rpc('est_receb_itens', { p_receb: r.id })), q(sb.rpc('est_receb_nota', { p_receb: r.id })).then(x => x?.[0] || null).catch(() => null)]);
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Recebimento nº ${r.numero} — NF ${nota?.numero ?? ''} ${esc(nota?.emit_nome || '')} ${badge(r.situacao)}</h2>
       <div class="muted small">Emissão ${dateBR(nota?.emissao)}${r.data ? ' · chegada ' + dateBR(r.data) : ''} · ${esc(r.conferente_nome || '')}${r.observacao ? ' · ' + esc(r.observacao) : ''}</div></div>
     <button class="btn ghost" id="fc-v">← Recebimento</button></div>

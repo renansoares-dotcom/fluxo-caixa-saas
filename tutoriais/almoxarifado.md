@@ -1,7 +1,7 @@
 ---
 titulo: Requisição de Material — pedir, aprovar e entregar pelo almoxarifado
 tela: Painéis › Requisição de Material (PAI015)
-versao: 1.6
+versao: 1.7
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -138,7 +138,7 @@ Material que sobrou volta ao almoxarifado pela própria requisição de onde sai
 Como a devolução entra no estoque:
 
 - volta ao **mesmo local e lote** de onde saiu;
-- pelo **custo em que saiu**, e não pelo custo médio de hoje;
+- pelo **custo em que saiu**, e não pelo custo médio de hoje; se o custo da saída for recalculado depois (por uma compra com data antiga, por exemplo), a devolução acompanha;
 - no **mesmo centro de custo** da entrega, que tem o consumo reduzido;
 - com o tipo **Devolução ao almoxarifado** e o documento "DV" e o número da devolução.
 
@@ -206,3 +206,4 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 | 1.4 | 22/11/2026 | Pedido só de itens do catálogo do almoxarifado. Valores (custo, valor do pedido e da entrega) só para quem atende e quem aprova. |
 | 1.5 | 22/11/2026 | A primeira entrega exige os parâmetros definidos. Quem entrega não retira para si mesmo. |
 | 1.6 | 22/11/2026 | Devolução ao almoxarifado: volta ao custo da saída, no mesmo local, lote e centro de custo; material avariado registrado sem voltar ao estoque; prazo por parâmetro (SQL 185). |
+| 1.7 | 22/11/2026 | A devolução acompanha o custo recalculado da saída. Durante o inventário geral, quem conta ou audita não vê no catálogo os itens do seu local. |

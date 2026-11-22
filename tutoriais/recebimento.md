@@ -1,7 +1,7 @@
 ---
 titulo: Recebimento de Notas — conferência na chegada
 tela: Compras › Estoque › Recebimento de Notas (EST011)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -47,7 +47,7 @@ O menu é **Compras › Estoque › Recebimento de Notas**.
 
 ![Figura 2 — Conferência cega pelo celular ou pelo leitor: o que chegou e o que chegou avariado (dados fictícios)](img/recebimento-2.jpg)
 
-Na **conferência cega** (padrão), a tela não mostra a quantidade da nota: quem confere conta o que está na frente dele. A comparação é feita pela plataforma.
+Na **conferência cega** (padrão), a tela não mostra a quantidade da nota: quem confere conta o que está na frente dele. A comparação é feita pela plataforma. Enquanto a conferência está aberta, a nota e os itens dela também ficam fora das outras telas (notas fiscais, pedidos de compra) para quem pode conferir, e o valor da nota não aparece na fila.
 
 O leitor envia Enter depois do código. A plataforma entende esse Enter como a escolha do item, e não como registro da quantidade.
 
@@ -58,12 +58,13 @@ Para corrigir um item, clique em **Corrigir** na linha, enquanto a conferência 
 Clique em **Concluir o recebimento**, confira a **data da chegada** (hoje, por padrão) e confirme.
 
 - Item sem conferência fica como **não chegou** (zero).
-- A data da chegada não pode ser futura nem anterior à emissão.
+- A data da chegada não pode ser futura, anterior à emissão, de mês fechado nem além do limite de dias para trás do estoque.
+- Se algum item não puder entrar no estoque (por exemplo, o local está congelado pelo inventário), nada é gravado: a conferência continua aberta, com a mensagem do item, para corrigir a data ou esperar a liberação.
 - Depois de concluída, a conferência não muda.
 
 A plataforma então:
 
-1. lança no estoque o que chegou em bom estado, na data da chegada, ao custo unitário da nota;
+1. lança no estoque o que chegou em bom estado, na data da chegada, ao custo unitário da nota, **até a quantidade da nota**: o que chegou a mais não entra e fica como divergência (sobrou) para Compras resolver com o fornecedor;
 2. registra as divergências (faltou, sobrou, avariado) de cada item;
 3. avisa Compras e o administrador quando houver divergência.
 
@@ -93,6 +94,8 @@ Nota de serviço, energia ou frete não tem material para receber. Na linha da n
 ## 9. Regras
 
 - Só passam pela conferência as **notas de compra** (entrada, emitidas por terceiros, autorizadas). Notas emitidas pela própria empresa seguem como antes.
+- Nota que já entrou no estoque pela emissão não aparece na fila.
+- A mesma linha de nota nunca entra duas vezes no estoque, mesmo que duas pessoas processem ao mesmo tempo.
 - A quantidade contada na unidade da nota é convertida pelo fator do de-para (por exemplo, 1 saco = 25 kg).
 - Item sem de-para pode ser conferido. Ele entra no estoque quando o de-para for feito, com a quantidade que chegou e a data da chegada.
 - Item que não chegou nada em bom estado não entra no estoque e não gera pendência.
@@ -113,3 +116,4 @@ Nota de serviço, energia ou frete não tem material para receber. Na linha da n
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 22/11/2026 | Primeira versão: entrada da nota de compra pelo recebimento conferido, conferência cega pelo celular, leitor ou câmera, data da chegada, custo da nota, divergências avisadas a Compras, nota sem material dispensada e parâmetros (SQL 186). |
+| 1.1 | 22/11/2026 | Nota e itens fora das outras telas para quem confere, durante a conferência. Chegada respeita mês fechado, limite de dias e local congelado (nada é gravado se não couber). Sobra além da nota não entra. Fila sem notas já lançadas pela emissão. |

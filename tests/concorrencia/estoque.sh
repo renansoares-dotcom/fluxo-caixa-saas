@@ -98,4 +98,17 @@ wait
 [ "$("${P[@]}" -c "select (i.saldo_ref = s.quantidade)::text from est_ig_itens i join est_ig_inventarios g on g.id = i.inventario_id join est_saldos s on s.produto_id = i.produto_id and s.local_id = i.local_id where g.empresa_id = '$E' and g.situacao = 'aberto' and i.produto_id = '$PR'")" = true ] || falhou "o saldo do congelamento devia trazer o lançamento que estava em andamento"
 "${P[@]}" -c "$entrar_adm" -c "$entrada" >/tmp/conc-b.log 2>&1 && falhou "local congelado devia barrar o lançamento"
 "${P[@]}" -c "update est_ig_inventarios set situacao = 'cancelado', motivo = 'teste de concorrencia' where empresa_id = '$E' and situacao = 'aberto'" >/dev/null
+# 7) a mesma linha de nota processada por duas sessões ao mesmo tempo: entra uma vez só
+"${P[@]}" >/dev/null <<SQL2 || falhou "preparação da nota"
+insert into produto_fornecedores(empresa_id, produto_id, emit_doc, codigo_fornecedor, fator) values ('$E', '$PR', '12312312000112', 'CONC-NF', 1) on conflict do nothing;
+insert into nfe_notas(id, empresa_id, chave, numero, emissao, tipo, emissao_propria, situacao, emit_doc, emit_nome) values ('c0c00000-0000-0000-0000-0000000000f1', '$E', 'CONC-NF', 77007, current_date, 'entrada', false, 'autorizada', '12312312000112', 'FORNECEDOR CONC') on conflict (id) do nothing;
+insert into nfe_itens(id, empresa_id, nota_id, n_item, cprod, cfop, qcom, vprod) values ('c0c00000-0000-0000-0000-0000000000f2', '$E', 'c0c00000-0000-0000-0000-0000000000f1', 1, 'CONC-NF', '5101', 3, 30) on conflict (id) do nothing;
+delete from est_movimentos where nfe_item_id = 'c0c00000-0000-0000-0000-0000000000f2' and false;
+SQL2
+( "${P[@]}" -c "begin" -c "select public._est_item('c0c00000-0000-0000-0000-0000000000f2')" -c "select pg_sleep(2)" -c "commit" >/tmp/conc-a.log 2>&1; echo $? >/tmp/conc-a.rc ) &
+sleep 0.7
+"${P[@]}" -c "select public._est_item('c0c00000-0000-0000-0000-0000000000f2')" >/tmp/conc-b.log 2>&1; echo $? >/tmp/conc-b.rc
+wait
+[ "$("${P[@]}" -c "select count(*) from est_movimentos where nfe_item_id = 'c0c00000-0000-0000-0000-0000000000f2' and estorno_de is null")" = 1 ] || { cat /tmp/conc-a.log /tmp/conc-b.log; falhou "a mesma linha de nota entrou mais de uma vez"; }
+grep -q "^ja$" /tmp/conc-b.log || { cat /tmp/conc-b.log; falhou "a segunda chamada devia responder que a linha já foi lançada"; }
 echo "concorrencia do estoque ok"

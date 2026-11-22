@@ -1,7 +1,7 @@
 ---
 titulo: Inventário Geral — o inventário do dia 01
 tela: Compras › Estoque › Inventário Geral (EST010)
-versao: 1.3
+versao: 1.4
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -101,7 +101,7 @@ Para falta ou férias, use **Trocar pessoas** na linha do local. Quem já contou
 
 A lista de contagem **não traz o saldo do sistema**. Quem conta registra o que vê.
 
-A contagem é cega em toda a plataforma: enquanto o local não termina, quem conta e quem audita **não veem o saldo, o Kardex, a posição do estoque nem o custo** dos itens daquele local, em nenhuma tela. Os outros locais continuam visíveis. Terminado o local, tudo volta a aparecer. O parâmetro **Contagem cega** (seção 10) liga e desliga essa regra.
+A contagem é cega em toda a plataforma: enquanto o local não termina, quem conta e quem audita **não veem o saldo, o Kardex, a posição do estoque nem o custo** dos itens daquele local, em nenhuma tela. Isso vale também para a Reposição de Estoque, a curva ABC, o catálogo do almoxarifado e as peças da manutenção: os itens do local somem dessas telas para quem conta ou audita. As consultas que somam o estoque inteiro (situação da implantação, prontidão da produção, rastreio e previsão de tintas) ficam indisponíveis para essa pessoa até o local terminar. Os outros locais continuam visíveis. Terminado o local, tudo volta a aparecer. O parâmetro **Contagem cega** (seção 10) liga e desliga essa regra.
 
 ![Figura 3 — Contagem cega pelo celular ou pelo leitor: a lista não traz o saldo do sistema (dados fictícios)](img/inventario-geral-3.jpg)
 
@@ -117,7 +117,7 @@ Depois de registrar, o campo do código volta a ficar pronto para a próxima lei
 
 Para corrigir, clique em **Corrigir** na linha, enquanto a contagem do local não foi concluída.
 
-**Sem internet no local.** Se a conexão cair durante a contagem, a quantidade fica **guardada no aparelho**, com a marca **a enviar** na linha. Quando a internet volta, a plataforma envia sozinha. A contagem só pode ser concluída depois que tudo foi enviado. Não feche o navegador nem limpe os dados do aparelho enquanto houver itens a enviar.
+**Sem internet no local.** Se a conexão cair durante a contagem, a quantidade fica **guardada no aparelho**, separada por pessoa e por fase (contagem, auditoria, terceira contagem), com a marca **a enviar** na linha. Quando a internet volta, a plataforma envia sozinha. A contagem só pode ser concluída depois que tudo foi enviado. Não feche o navegador nem limpe os dados do aparelho enquanto houver itens a enviar.
 
 ### 5.2 Item encontrado fora da lista
 
@@ -172,7 +172,9 @@ Ao conferir o resultado, quem gerencia ou aprova pode desconfiar de um item de u
 2. Clique em **Pedir recontagem dos marcados** e informe o motivo.
 3. Os itens voltam para a **terceira contagem**, feita e confirmada por quem contou e quem auditou. Local sem auditor volta para a contagem.
 
-O local fica congelado de novo até a recontagem terminar. O inventário não precisa ser cancelado. Quem conta ou audita o local não pede a recontagem dele.
+O local fica congelado de novo até a recontagem terminar. O inventário não precisa ser cancelado.
+
+A recontagem não é aceita se o local já movimentou depois de concluído: a contagem de agora já não seria comparável ao saldo do congelamento, e o movimento seria contado duas vezes. Nesse caso, ajuste o item pelo Kardex depois da aprovação. Quem conta ou audita o local não pede a recontagem dele.
 
 ## 7. Congelamento dos locais
 
@@ -211,7 +213,7 @@ O botão **Relatório** emite o resultado no padrão da plataforma: acuracidade 
 Se o inventário foi aprovado com erro, o **administrador** usa **Desfazer inventário** no painel, com o motivo.
 
 - Todos os ajustes são estornados na **data de referência**.
-- O mês que o inventário fechou é **reaberto**.
+- O mês que o inventário fechou é **reaberto**, junto com os meses seguintes que estiverem fechados. A mensagem final lista os meses reabertos.
 - No inventário de implantação, o estoque volta a constar como não implantado.
 - O inventário fica na lista como **Desfeito**.
 
@@ -284,3 +286,4 @@ Com amostra 0% e as duas regras desligadas não há auditoria: a contagem conclu
 | 1.1 | 22/11/2026 | Controle de corte: a contagem é comparada com o saldo do congelamento. Ajuste pelo custo da data de referência. Terceira contagem com justificativa obrigatória e confirmação da outra pessoa. Quem conta ou audita só vê o resultado depois que o seu local termina. Local com auditoria não fica sem auditor. Contagem cíclica barrada em local do inventário geral. Erro da aprovação aponta o item. |
 | 1.2 | 22/11/2026 | Contagem cega em toda a plataforma (saldo, Kardex e custo escondidos de quem conta ou audita, por parâmetro). Recontagem pedida por quem gerencia, sem cancelar o inventário. Desfazer inventário aprovado (administrador). Lote criado na própria contagem. Local inventariado não aceita movimento com data até a referência, mesmo com o mês reaberto. |
 | 1.3 | 22/11/2026 | Contagem mais rápida no celular: registrar não recarrega a tela. Sem internet, a quantidade fica guardada no aparelho e é enviada quando a conexão volta. |
+| 1.4 | 22/11/2026 | Contagem cega também na Reposição, na curva ABC, no catálogo do almoxarifado e nas consultas agregadas. Recontagem barrada depois que o local voltou a movimentar. Desfazer informa os meses reabertos. Fila sem internet separada por pessoa e fase. |

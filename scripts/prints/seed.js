@@ -1644,6 +1644,7 @@ window.RPC.pag_remessa_gravar = () => null;
     est_receb_fila: () => [['rn1', null, 0], ['rn2', null, 0], ['rn3', 'rc3', 2]].map(([id, rid, cont]) => { const x = NFS.find(y => y.id === id); const it = rid ? RI[rid].length : (id === 'rn1' ? 2 : 6);
       return { nota_id: id, numero: x.numero, serie: x.serie, emit_nome: x.emit_nome, emit_doc: x.emit_doc, emissao: x.emissao, v_nf: x.v_nf, itens: it, recebimento_id: rid, situacao: rid ? 'conferindo' : 'a_receber', conferente_nome: rid ? 'Beatriz Rocha' : null, contados: cont, dias: Math.round((Date.parse('2026-11-22') - Date.parse(x.emissao)) / 864e5) }; }),
     est_receb_itens: (a) => (RI[a.p_receb] || []).map(i => ({ ...i, qtd_nota: a.p_receb === 'rc3' ? null : i.qtd_nota, etiqueta: null })),
+    est_receb_nota: (a) => { const r = DB.est_recebimentos.find(x => x.id === a.p_receb); const x = NFS.find(y => y.id === r?.nota_id); return x ? [{ numero: x.numero, serie: x.serie, emit_nome: x.emit_nome, emissao: x.emissao }] : []; },
     est_receb_iniciar: () => 'rc3', est_receb_contar: () => null, est_receb_concluir: () => ({ divergencias: 1, lancados: 3 }), est_receb_dispensar: () => null, est_receb_salvar: () => null });
 }
 
