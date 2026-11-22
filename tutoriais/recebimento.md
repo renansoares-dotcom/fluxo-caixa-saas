@@ -1,7 +1,7 @@
 ---
 titulo: Recebimento de Notas — conferência na chegada
 tela: Compras › Estoque › Recebimento de Notas (EST011)
-versao: 1.3
+versao: 1.4
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -50,7 +50,7 @@ O menu é **Compras › Estoque › Recebimento de Notas**.
 
 ![Figura 2 — Conferência cega pelo celular ou pelo leitor: o que chegou e o que chegou avariado (dados fictícios)](img/recebimento-2.jpg)
 
-Na **conferência cega** (padrão), a tela não mostra a quantidade da nota: quem confere conta o que está na frente dele. A comparação é feita pela plataforma. Enquanto a conferência está aberta, a nota e os itens dela também ficam fora das outras telas (notas fiscais, pedidos de compra) para quem pode conferir, e o valor da nota não aparece na fila.
+Na **conferência cega** (padrão), a tela não mostra a quantidade da nota: quem confere conta o que está na frente dele. A comparação é feita pela plataforma. Enquanto a conferência está aberta, a nota e os itens dela também ficam fora das outras telas (notas fiscais, pedidos de compra, compras do produto, ativo imobilizado) para quem pode conferir, e o valor da nota não aparece na fila. As consultas que somam várias notas (de-para pendente, compras por item) ficam indisponíveis para essa pessoa até a conferência terminar: por isso, conclua a conferência começada assim que o material for contado.
 
 O leitor envia Enter depois do código. A plataforma entende esse Enter como a escolha do item, e não como registro da quantidade.
 
@@ -133,3 +133,4 @@ A aprovação existe porque dispensar uma nota de material tira essa nota do est
 | 1.1 | 22/11/2026 | Nota e itens fora das outras telas para quem confere, durante a conferência. Chegada respeita mês fechado, limite de dias e local congelado (nada é gravado se não couber). Sobra além da nota não entra. Fila sem notas já lançadas pela emissão. |
 | 1.2 | 22/11/2026 | Dispensa de nota pedida por quem confere e aprovada por administrador, financeiro ou diretor. Perfil Compras não confere, a não ser nomeado. Avariado entra no local Avariados, fora do custo médio (SQL 188). |
 | 1.3 | 22/11/2026 | Falta e avaria na chegada travam o pagamento da nota, no mesmo bloqueio do confronto pedido × nota de Compras (SQL 189). |
+| 1.4 | 22/11/2026 | Conferência cega também nas compras do produto, no ativo imobilizado e nas consultas que somam várias notas (SQL 190). |

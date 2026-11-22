@@ -111,4 +111,20 @@ sleep 0.7
 wait
 [ "$("${P[@]}" -c "select count(*) from est_movimentos where nfe_item_id = 'c0c00000-0000-0000-0000-0000000000f2' and estorno_de is null")" = 1 ] || { cat /tmp/conc-a.log /tmp/conc-b.log; falhou "a mesma linha de nota entrou mais de uma vez"; }
 grep -q "^ja$" /tmp/conc-b.log || { cat /tmp/conc-b.log; falhou "a segunda chamada devia responder que a linha já foi lançada"; }
+# 8) duas pessoas concluem a mesma conferência de recebimento ao mesmo tempo: entra uma vez só
+"${P[@]}" >/dev/null <<SQL3 || falhou "preparação do recebimento"
+update est_config set entrada_por = 'recebimento', receb_desde = current_date - 1, receb_cega = true where empresa_id = '$E';
+insert into nfe_notas(id, empresa_id, chave, numero, emissao, tipo, emissao_propria, situacao, emit_doc, emit_nome) values ('c0c00000-0000-0000-0000-0000000000f3', '$E', 'CONC-RC', 77008, current_date, 'entrada', false, 'autorizada', '12312312000112', 'FORNECEDOR CONC') on conflict (id) do nothing;
+insert into nfe_itens(id, empresa_id, nota_id, n_item, cprod, cfop, qcom, vprod, vuncom) values ('c0c00000-0000-0000-0000-0000000000f4', '$E', 'c0c00000-0000-0000-0000-0000000000f3', 1, 'CONC-NF', '5101', 5, 50, 10) on conflict (id) do nothing;
+SQL3
+RC=$("${P[@]}" -c "$entrar_adm" -c "select public.est_receb_iniciar('c0c00000-0000-0000-0000-0000000000f3')" | tail -1)
+"${P[@]}" -c "$entrar_adm" -c "select public.est_receb_contar((select item_id from public.est_receb_itens('$RC') limit 1), 5, 0)" >/dev/null || falhou "contar o recebimento"
+( "${P[@]}" -c "$entrar_adm" -c "begin" -c "select public.est_receb_concluir('$RC')" -c "select pg_sleep(2)" -c "commit" >/tmp/conc-a.log 2>&1; echo $? >/tmp/conc-a.rc ) &
+sleep 0.7
+"${P[@]}" -c "$entrar_adm" -c "select public.est_receb_concluir('$RC')" >/tmp/conc-b.log 2>&1; echo $? >/tmp/conc-b.rc
+wait
+[ "$(cat /tmp/conc-a.rc)" = 0 ] || { cat /tmp/conc-a.log; falhou "a primeira conclusão devia passar"; }
+grep -q "já foi concluída" /tmp/conc-b.log || { cat /tmp/conc-b.log; falhou "a segunda conclusão devia ser barrada"; }
+[ "$("${P[@]}" -c "select count(*) from est_movimentos where nfe_item_id = 'c0c00000-0000-0000-0000-0000000000f4' and estorno_de is null")" = 1 ] || falhou "o recebimento entrou mais de uma vez"
+"${P[@]}" -c "update est_config set entrada_por = 'emissao' where empresa_id = '$E'" >/dev/null
 echo "concorrencia do estoque ok"

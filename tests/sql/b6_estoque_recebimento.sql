@@ -87,6 +87,10 @@ select pg_temp.entrar(:ADM::uuid);
 select pg_temp.ok((select count(*) = 0 from nfe_itens where nota_id = 'b6000000-0000-0000-0000-0000000000c3') and (select count(*) = 0 from nfe_notas where id = 'b6000000-0000-0000-0000-0000000000c3'),
   'quem pode conferir não lê a nota nem os itens enquanto a conferência está aberta');
 select pg_temp.ok((select numero = 9103 from public.est_receb_nota((select id from _r where k = 'r'))), 'o cabeçalho da conferência vem pela função');
+select pg_temp.ok(not exists (select 1 from public.produto_compras(:E::uuid, current_date - 30, current_date) where nota_id = 'b6000000-0000-0000-0000-0000000000c3'), 'as compras do produto não mostram a nota em conferência');
+select pg_temp.falha($$select * from public.produto_depara_pendente('e000000a-0000-0000-0000-000000000000', current_date - 30)$$, 'de-para pendente (soma das notas) durante a conferência cega');
+select pg_temp.entrar(:FIN::uuid);
+select pg_temp.ok(exists (select 1 from public.produto_compras(:E::uuid, current_date - 30, current_date) where nota_id = 'b6000000-0000-0000-0000-0000000000c3'), 'quem não confere continua vendo a nota nas compras do produto');
 select pg_temp.entrar(:CMP::uuid);
 insert into _r(k, id) select 'i1', item_id from public.est_receb_itens((select id from _r where k = 'r')) where n_item = 1;
 insert into _r(k, id) select 'i2', item_id from public.est_receb_itens((select id from _r where k = 'r')) where n_item = 2;
