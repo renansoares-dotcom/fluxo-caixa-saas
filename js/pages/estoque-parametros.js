@@ -6,7 +6,7 @@ import { FINALIDADES, POSSE, TIPOS_SPED, SENTIDOS, DOCUMENTOS, PAPEIS, periodoAb
 
 import { abaEtiquetas } from '../lib/etiquetas-ui.js';
 export const title = 'Parâmetros do Estoque';
-const ABAS = [['locais', 'Locais'], ['familias', 'Famílias de item'], ['tipos', 'Tipos de movimento'], ['regras', 'Regras por CFOP'], ['fechamento', 'Fechamento'], ['etiquetas', 'Etiquetas']];
+const ABAS = [['locais', 'Locais'], ['familias', 'Famílias de item'], ['tipos', 'Tipos de movimento'], ['regras', 'Regras por CFOP'], ['fechamento', 'Fechamento'], ['acesso', 'Acesso'], ['etiquetas', 'Etiquetas']];
 const ui = { aba: 'locais', sentido: 'entrada', busca: '' };
 let D = null;
 const sim = (b) => b ? 'Sim' : '<span class="muted">Não</span>';
@@ -21,8 +21,9 @@ async function carregar() {
     q(sb.from('est_regras_cfop').select('*').eq('empresa_id', e).order('sentido').order('cfop').order('prioridade')),
     q(sb.from('est_fechamentos').select('*').eq('empresa_id', e).order('mes', { ascending: false })),
     q(sb.from('prod_setores').select('id,nome,ordem').eq('empresa_id', e).order('ordem')).catch(() => [])]);
+  const cfg = await q(sb.from('est_config').select('papeis_consulta').eq('empresa_id', e).maybeSingle()).catch(() => undefined);   // undefined = SQL 178 pendente
   await loadCadastros().catch(() => {});
-  D = { locais, familias, tipos, regras, fech, setores, loc: Object.fromEntries(locais.map(l => [l.id, l])), fam: Object.fromEntries(familias.map(f => [f.id, f])), tm: Object.fromEntries(tipos.map(t => [t.id, t])) };
+  D = { consulta: cfg === undefined ? null : (cfg?.papeis_consulta || ['leitura']), locais, familias, tipos, regras, fech, setores, loc: Object.fromEntries(locais.map(l => [l.id, l])), fam: Object.fromEntries(familias.map(f => [f.id, f])), tm: Object.fromEntries(tipos.map(t => [t.id, t])) };
 }
 
 export async function render(root) {
@@ -54,7 +55,7 @@ function pintar(root) {
     try { await q(sb.rpc('est_configurar_padrao', { p_empresa: state.empresa.id })); toast('Parametrização completada'); await recarregar(root); } catch (err) { fail(err); }
   });
   if (ui.aba === 'etiquetas') return abaEtiquetas($('#ep-corpo', root), ['admin', 'diretor'].includes(state.papel));
-  ({ locais, familias, tipos, regras, fechamento })[ui.aba](root, ed);
+  ({ locais, familias, tipos, regras, fechamento, acesso })[ui.aba](root, ed);
 }
 async function recarregar(root) { await carregar(); pintar(root); }
 const corpo = (root, html) => { $('#ep-corpo', root).innerHTML = html; };
@@ -189,5 +190,20 @@ function fechamento(root, ed) {
   $('#ep-reabrir', root) && ($('#ep-reabrir', root).onclick = async () => {
     if (!await confirmDialog(`Reabrir ${MES(per.fechadoAte)}? Movimentos com data nesse mês voltam a ser aceitos.`)) return;
     try { await q(sb.rpc('est_fechar_mes', { p_empresa: state.empresa.id, p_mes: per.fechadoAte, p_reabrir: true })); toast('Mês reaberto'); await recarregar(root); } catch (err) { fail(err); }
+  });
+}
+
+// ------------------------------------------------------------ acesso: quem consulta saldo, custo e movimentos (SQL 178)
+function acesso(root) {
+  if (D.consulta === null) return corpo(root, '<div class="card"><span class="badge vencido">SQL 178 pendente</span> O controle de quem consulta o estoque ainda não foi criado no banco.</div>');
+  const adm = isAdmin(), OP = [['leitura', 'Leitura', 'Perfil só de consulta (diretoria, auditoria, consultoria).'], ['vendas', 'Vendas', 'Passa a ver saldo, custo médio e valor do estoque.']];
+  corpo(root, `<div class="card"><h3 style="margin-top:0">Quem consulta o estoque</h3>
+    <p style="margin-top:0">Saldo por local, custo médio, valor do estoque e movimentos do Kardex são vistos por <b>Administrador, Financeiro, Diretor, Compras e Produção</b>. Os perfis abaixo são liberados à parte. Motorista e colaborador do portal nunca consultam.</p>
+    ${OP.map(([k, t, d]) => `<label style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;margin:10px 0"><input type="checkbox" class="ac-p" value="${k}" style="width:auto;margin:3px 0 0;flex:none" ${D.consulta.includes(k) ? 'checked' : ''} ${adm ? '' : 'disabled'}><span><b>${t}</b><br><span class="small muted">${d}</span></span></label>`).join('')}
+    <p class="small muted">Quem pede material pela Requisição de Material continua vendo o catálogo e o saldo disponível, sem o custo.</p>
+    ${adm ? '<div class="toolbar" style="margin:8px 0 0"><span class="spacer"></span><button class="btn primary" id="ac-ok">Salvar</button></div>' : '<p class="small muted">Só o administrador altera.</p>'}</div>`);
+  $('#ac-ok', root) && ($('#ac-ok', root).onclick = async (ev) => {
+    ev.target.disabled = true;
+    try { await q(sb.rpc('est_consulta_salvar', { p_empresa: state.empresa.id, p_papeis: $$('.ac-p:checked', root).map(x => x.value) })); toast('Acesso salvo'); await recarregar(root); } catch (err) { fail(err); ev.target.disabled = false; }
   });
 }

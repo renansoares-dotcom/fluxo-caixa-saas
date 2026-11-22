@@ -93,9 +93,14 @@ select pg_temp.falha(format('select public.alm_entregar(%L, %L::jsonb, null, %L)
   (select jsonb_agg(jsonb_build_object('item_id', id, 'quantidade', 999, 'local_id', (select uc from a8))) from _i)::text, 'Fulano'), 'entrega maior que o pedido');
 select pg_temp.falha(format('select public.alm_entregar(%L, %L::jsonb, null, %L)', (select j->>'id' from _a where k = 'r1'),
   (select jsonb_agg(jsonb_build_object('item_id', id, 'quantidade', 1, 'local_id', (select mp from a8))) from _i)::text, 'Fulano'), 'local que não é do almoxarifado');
+-- SQL 178: o banco confere o crachá
+select pg_temp.falha(format('select public.alm_entregar(%L, %L::jsonb, null, %L, true, null, %L)', (select j->>'id' from _a where k = 'r1'),
+  (select jsonb_agg(jsonb_build_object('item_id', id, 'quantidade', 1, 'local_id', (select uc from a8))) from _i)::text, 'Outra Pessoa', 'a8crachaoperador000000001'), 'crachá de uma pessoa, retirada por outra');
+select pg_temp.falha(format('select public.alm_entregar(%L, %L::jsonb, %L, null, true, null, %L)', (select j->>'id' from _a where k = 'r1'),
+  (select jsonb_agg(jsonb_build_object('item_id', id, 'quantidade', 1, 'local_id', (select uc from a8))) from _i)::text, 'a8000000-0000-0000-0000-0000000000c2', 'crachaquenaoexiste'), 'crachá inexistente');
 insert into _a select 'e1', public.alm_entregar((select (j->>'id')::uuid from _a where k = 'r1'),
   (select jsonb_agg(jsonb_build_object('item_id', id, 'quantidade', case when produto_id = 'a8000000-0000-0000-0000-0000000000a1' then 5 else 4 end, 'local_id', (select uc from a8))) from _i),
-  'a8000000-0000-0000-0000-0000000000c2', null, true, 'retirou para a recepção');
+  'a8000000-0000-0000-0000-0000000000c2', null, false, 'retirou para a recepção', 'a8crachaoperador000000001');
 select pg_temp.ok((select j->>'situacao' = 'parcial' and (j->>'valor')::numeric = 158 from _a where k = 'e1'), 'entrega em parte: 5×30 + 4×2 = 158');
 reset role;
 select pg_temp.ok((select count(*) = 2 and sum(quantidade) = -9 and bool_and(documento like 'RM %') and bool_and(observacao like '%OPERADOR SOUZA%') from est_movimentos where produto_id in ('a8000000-0000-0000-0000-0000000000a1', 'a8000000-0000-0000-0000-0000000000a3') and quantidade < 0), 'duas saídas no Kardex, com o documento e quem retirou');
@@ -115,7 +120,7 @@ select pg_temp.ok((select count(*) = 0 from alm_entregas where requisicao_id = (
 select pg_temp.ok(public.alm_cancelar((select (j->>'id')::uuid from _a where k = 'r4'), 'Sem saldo; pedir compra') = 'cancelada', 'cancelada pelo almoxarife');
 
 -- balcão: registra e entrega na hora; item controlado no balcão fica aguardando aprovação
-insert into _a select 'b1', public.alm_balcao(:E::uuid, format('[{"produto_id":"a8000000-0000-0000-0000-0000000000a1","quantidade":2,"local_id":"%s"}]', (select uc from a8))::jsonb, 'a8000000-0000-0000-0000-0000000000c2', null, true, 'balcão');
+insert into _a select 'b1', public.alm_balcao(:E::uuid, format('[{"produto_id":"a8000000-0000-0000-0000-0000000000a1","quantidade":2,"local_id":"%s"}]', (select uc from a8))::jsonb, 'a8000000-0000-0000-0000-0000000000c2', null, false, 'balcão', 'a8crachaoperador000000001');
 select pg_temp.ok((select (j->>'entregue')::boolean and j->>'situacao' = 'atendida' and (j->>'valor')::numeric = 60 from _a where k = 'b1'), 'balcão: pedido e entrega na mesma hora');
 select pg_temp.ok((select origem = 'balcao' and setor = 'Extrusão' from alm_requisicoes where id = (select (j->>'id')::uuid from _a where k = 'b1')), 'balcão fica marcado, com o setor de quem retirou');
 insert into _a select 'b2', public.alm_balcao(:E::uuid, format('[{"produto_id":"a8000000-0000-0000-0000-0000000000a2","quantidade":1,"local_id":"%s"}]', (select uc from a8))::jsonb, null, 'Visitante José');
@@ -128,8 +133,8 @@ select public.alm_config_salvar(:E::uuid, null, '{admin,diretor,compras}', '{}',
 select pg_temp.falha(format($$select public.alm_balcao('e000000a-0000-0000-0000-000000000000', '[{"produto_id":"a8000000-0000-0000-0000-0000000000a1","quantidade":1,"local_id":"%s"}]'::jsonb, null, 'Zé', true)$$, (select uc from a8)), 'balcão desligado');
 insert into _a select 'r5', public.alm_requisitar(:E::uuid, '[{"produto_id":"a8000000-0000-0000-0000-0000000000a1","quantidade":40}]'::jsonb);
 select pg_temp.ok((select j->>'situacao' = 'aberta' from _a where k = 'r5'), 'sem limite de valor: 40 resmas não pedem aprovação');
-select pg_temp.falha(format('select public.alm_entregar(%L, %L::jsonb, null, %L, false)', (select j->>'id' from _a where k = 'r5'),
-  (select jsonb_agg(jsonb_build_object('item_id', i.id, 'quantidade', 1, 'local_id', (select uc from a8))) from alm_requisicao_itens i where i.requisicao_id = (select (j->>'id')::uuid from _a where k = 'r5'))::text, 'Zé'), 'crachá obrigatório');
+select pg_temp.falha(format('select public.alm_entregar(%L, %L::jsonb, null, %L, true)', (select j->>'id' from _a where k = 'r5'),
+  (select jsonb_agg(jsonb_build_object('item_id', i.id, 'quantidade', 1, 'local_id', (select uc from a8))) from alm_requisicao_itens i where i.requisicao_id = (select (j->>'id')::uuid from _a where k = 'r5'))::text, 'Zé'), 'crachá obrigatório: dizer que leu, sem o código do crachá, não vale');
 select pg_temp.falha(format('select public.alm_cancelar(%L, null)', (select j->>'id' from _a where k = 'r2')), 'cancelar pedido de outra pessoa pede motivo');
 select pg_temp.entrar(:FIN::uuid);
 select pg_temp.ok(public.alm_aprovador(:E::uuid) and not public.alm_almoxarife(:E::uuid), 'pessoa nomeada aprovadora, sem ser almoxarife');

@@ -1,7 +1,7 @@
 ---
 titulo: Requisição de Material — pedir, aprovar e entregar pelo almoxarifado
 tela: Painéis › Requisição de Material (PAI015)
-versao: 1.1
+versao: 1.2
 atualizado: 2026-11-21
 ---
 ## 1. Para que serve
@@ -125,7 +125,7 @@ Aba **Parâmetros** (administrador e diretor).
 | Parâmetro | Padrão | Efeito |
 |---|---|---|
 | Pedido acima de (R$) pede aprovação | Em branco | Em branco, não há regra de valor. O valor do pedido é estimado pelo custo médio do estoque |
-| Entrega só com o crachá lido | Desligado | Ligado, a entrega e o balcão só são registrados com o crachá lido pelo leitor |
+| Entrega só com o crachá lido | Desligado | Ligado, a entrega e o balcão só são registrados com o crachá lido pelo leitor. O banco confere o código lido: o crachá precisa existir, estar ativo e ser da pessoa que está retirando |
 | Permitir retirada no balcão | Ligado | Desligado, é preciso pedir antes |
 | Quem pediu pode aprovar a própria requisição | Desligado | Ligado, o aprovador pode aprovar o próprio pedido. Use só quando houver um único aprovador |
 | Quem atende e entrega | Administrador, Diretor e Compras | Perfis e pessoas que veem a fila e entregam |
@@ -158,3 +158,4 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 |---|---|---|
 | 1.0 | 21/11/2026 | Primeira versão: requisição, aprovação na exceção, fila do almoxarifado, entrega com identificação por crachá, retirada no balcão, baixa automática no Kardex, comprovante, relatório e parâmetros (SQL 176) |
 | 1.1 | 21/11/2026 | Quem pediu não aprova a própria requisição (exceção por parâmetro). Mudanças nos parâmetros e nos itens controlados ficam na trilha de auditoria. |
+| 1.2 | 21/11/2026 | O crachá lido passa a ser conferido no banco na entrega e no balcão (existe, está ativo e é de quem retira). |

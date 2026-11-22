@@ -11,7 +11,13 @@ const _pe = podeEditar;
 import { abrirLeitura } from '../lib/leitura-ui.js';
 import { etiquetaDe } from '../lib/etiquetas-ui.js';
 export const title = 'Kardex';
-const ui = { aba: 'locais', local: '', busca: '', tipo: '', motivo: '' };
+const ui = { aba: 'locais', local: '', busca: '', tipo: '', motivo: '', de: '', ate: '' };
+const MES01 = () => today().slice(0, 7) + '-01';
+const LIMITE_MOVS = 2000, PAGINA_KARDEX = 200;
+// quem consulta saldo, custo e movimentos (SQL 178): perfis do estoque e os liberados em Parâmetros › Acesso
+const veEstoque = () => [...PODE_MOVIMENTAR, 'admin', 'financeiro', 'diretor'].includes(state.papel) || (D?.cfg?.papeis_consulta || ['leitura']).includes(state.papel);
+// movimentos de um período, direto do banco (a aba não depende mais dos últimos 500)
+const buscarMovs = (de, ate) => q(sb.from('est_movimentos').select('*').eq('empresa_id', state.empresa.id).gte('data', de).lte('data', ate).order('data', { ascending: false }).order('criado_em', { ascending: false }).limit(LIMITE_MOVS));
 let D = null;
 const podeMov = () => PODE_MOVIMENTAR.includes(state.papel);
 
@@ -22,13 +28,15 @@ async function carregar() {
     q(sb.from('est_tipos_movimento').select('*').eq('empresa_id', e).eq('ativo', true).order('sentido').order('nome')),
     fetchAll(() => sb.from('est_saldos').select('*').eq('empresa_id', e).order('id')),
     fetchAll(() => sb.from('est_custos').select('*').eq('empresa_id', e).order('produto_id')),
-    q(sb.from('est_movimentos').select('*').eq('empresa_id', e).order('data', { ascending: false }).order('criado_em', { ascending: false }).limit(500)),
+    buscarMovs(MES01(), today()),
     fetchAll(() => sb.from('est_lotes').select('*').eq('empresa_id', e).order('id')),
     q(sb.from('est_fechamentos').select('mes').eq('empresa_id', e)),
     carregarProdutos(true)]);
   const [cfg, pend] = await Promise.all([q(sb.from('est_config').select('*').eq('empresa_id', e)).catch(() => null),
     fetchAll(() => sb.from('est_pendencias').select('*, nfe_notas(numero,emissao,tipo,emit_nome,dest_nome,emissao_propria), nfe_itens(cprod,xprod,cfop,qcom,ucom)').eq('empresa_id', e).eq('status', 'aberta').order('criado_em')).catch(() => null)]);
-  D = { cfg: cfg?.[0] || null, semB: cfg === null, pend: pend || [], locais, tipos, saldos, custos, movs, lotes, fech, prods, loc: Object.fromEntries(locais.map(l => [l.id, l])), tm: Object.fromEntries(tipos.map(t => [t.id, t])),
+  if (!ui.de) { ui.de = MES01(); ui.ate = today(); }
+  const noPeriodo = ui.de === MES01() && ui.ate === today() ? movs : await buscarMovs(ui.de, ui.ate);
+  D = { cfg: cfg?.[0] || null, semB: cfg === null, pend: pend || [], locais, tipos, saldos, custos, movs: noPeriodo, movsMes: movs, lotes, fech, prods, loc: Object.fromEntries(locais.map(l => [l.id, l])), tm: Object.fromEntries(tipos.map(t => [t.id, t])),
     prod: Object.fromEntries(prods.map(p => [p.id, p])), lote: Object.fromEntries(lotes.map(l => [l.id, l])), custo: Object.fromEntries(custos.map(c => [c.produto_id, c])) };
   // tipos inativos também aparecem no histórico
   const falta = [...new Set(movs.map(m => m.tipo_movimento_id))].filter(id => !D.tm[id]);
@@ -49,9 +57,10 @@ async function recarregar(root) { await carregar(); pintar(root); }
 function pintar(root) {
   const R = resumoLocais(D.saldos, D.locais), per = periodoAberto(D.fech), mes = today().slice(0, 7);
   const comSaldo = new Set(D.saldos.filter(s => +s.quantidade).map(s => s.produto_id));
-  const movMes = D.movs.filter(m => m.data.startsWith(mes));
+  const movMes = D.movsMes.filter(m => m.data.startsWith(mes));
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Kardex</h2><div class="muted small">Estoque oficial: saldo por local e lote, custo médio ponderado móvel por produto. Movimento não se altera nem se exclui — corrige-se por estorno.</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="kx-xls">Excel</button><button class="btn" id="kx-ler">Ler código</button>${podeMov() ? '<button class="btn" id="kx-trf">Transferir</button><button class="btn primary" id="kx-novo">Novo movimento</button>' : ''}</div></div>
+    ${veEstoque() ? '' : '<div class="card"><span class="badge vencido">sem acesso</span> Seu perfil não consulta saldo, custo e movimentos do estoque. Quem libera é o administrador, em Estoque › Parâmetros › Acesso.</div>'}
     ${faixaImplantacao()}
     <div class="kpis">
       <div class="kpi"><div class="k-label">Valor do estoque</div><div class="k-value">${money(R.total)}</div><div class="k-sub">ao custo médio, locais que compõem custo</div></div>
@@ -87,7 +96,7 @@ function corpoAba(root, R) {
       ${R.linhas.filter(x => x.local.ativo || x.itens).map(x => `<tr class="clickable" data-l="${x.local.id}"><td>${esc(x.local.nome)}${x.local.compoe_custo ? '' : ' <span class="badge" title="Não entra no valor do estoque">de terceiros</span>'}</td><td>${FINALIDADES[x.local.finalidade]}</td>
         <td class="num">${x.itens}</td><td class="num">${money(x.valor)}</td><td class="num">${x.local.compoe_custo && R.total ? (x.valor / R.total * 100).toFixed(1).replace('.', ',') + '%' : ''}</td></tr>`).join('')}
       <tr class="row-sec"><td colspan="3">Total (compõe custo)</td><td class="num">${money(R.total)}</td><td></td></tr></tbody></table></div></div>
-      ${!D.movs.length ? '<p class="small muted">Nenhum movimento ainda. O saldo inicial entra pela importação do relatório do Iniflex (tipo "Saldo inicial") ou por "Novo movimento".</p>' : ''}`;
+      ${!D.saldos.length && !D.movsMes.length ? '<p class="small muted">Nenhum movimento ainda. O saldo inicial entra pela importação do relatório do Iniflex (tipo "Saldo inicial") ou por "Novo movimento".</p>' : ''}`;
     $$('tr[data-l]', c).forEach(tr => tr.onclick = () => { ui.local = tr.dataset.l; ui.aba = 'produtos'; pintar(root); });
     return;
   }
@@ -103,8 +112,12 @@ function corpoAba(root, R) {
     return;
   }
   const M = D.movs.filter(m => (!ui.local || m.local_id === ui.local) && casa(D.prod[m.produto_id]));
-  c.innerHTML = `<div class="card flush"><div class="table-wrap" style="max-height:62vh">${tabelaMovs(M, true)}</div></div><p class="small muted">Últimos ${D.movs.length} movimentos da empresa${M.length !== D.movs.length ? ` · ${M.length} no filtro` : ''}.</p>`;
+  c.innerHTML = `<div class="toolbar" style="margin:0 0 8px"><label>De<input type="date" id="kx-de" value="${ui.de}"></label><label>Até<input type="date" id="kx-ate" value="${ui.ate}"></label></div>
+    <div class="card flush"><div class="table-wrap" style="max-height:62vh">${tabelaMovs(M, true)}</div></div><p class="small muted">${D.movs.length} movimento(s) de ${dateBR(ui.de)} a ${dateBR(ui.ate)}${M.length !== D.movs.length ? ` · ${M.length} no filtro` : ''}.${D.movs.length >= LIMITE_MOVS ? ` <span class="warn">Mostrando os ${LIMITE_MOVS} mais recentes: reduza o período.</span>` : ''}</p>`;
   $$('tr[data-p]', c).forEach(tr => tr.onclick = () => kardexProduto(D.prod[tr.dataset.p], root));
+  const periodo = async () => { const de = $('#kx-de', c).value, ate = $('#kx-ate', c).value; if (!de || !ate) return; if (de > ate) return toast('A data inicial é maior que a final', true);
+    try { D.movs = await buscarMovs(de, ate); ui.de = de; ui.ate = ate; corpoAba(root, R); } catch (err) { fail(err); } };
+  $('#kx-de', c).onchange = periodo; $('#kx-ate', c).onchange = periodo;
 }
 
 function tabelaMovs(M, comProduto) {
@@ -120,7 +133,10 @@ function tabelaMovs(M, comProduto) {
 async function kardexProduto(p, root) {
   if (!p) return;
   let M = [];
-  try { M = await fetchAll(() => sb.from('est_movimentos').select('*').eq('produto_id', p.id).order('data', { ascending: false }).order('criado_em', { ascending: false })); } catch (err) { return fail(err); }
+  // os mais recentes primeiro, em páginas: um produto com anos de histórico não carrega tudo de uma vez
+  const pagina = (de) => q(sb.from('est_movimentos').select('*').eq('empresa_id', state.empresa.id).eq('produto_id', p.id).order('data', { ascending: false }).order('criado_em', { ascending: false }).range(de, de + PAGINA_KARDEX - 1));
+  let temMais = false;
+  try { M = await pagina(0); temMais = M.length === PAGINA_KARDEX; } catch (err) { return fail(err); }
   const c = D.custo[p.id], S = D.saldos.filter(s => s.produto_id === p.id && +s.quantidade);
   const estornados = new Set(M.filter(m => m.estorno_de).map(m => m.estorno_de));
   const m = modal({ title: `Kardex — ${p.codigo} ${p.descricao}`, wide: true, body: `
@@ -133,12 +149,21 @@ async function kardexProduto(p, root) {
     ${S.length ? `<h3 style="margin:14px 0 6px">Saldo por local e lote</h3><div class="table-wrap"><table><thead><tr><th>Local</th><th>Lote</th><th class="num">Quantidade</th><th class="num">Valor</th><th>Último movimento</th><th></th></tr></thead><tbody>
       ${S.map(s => `<tr><td>${esc(D.loc[s.local_id]?.nome || '')}</td><td>${esc(D.lote[s.lote_id]?.codigo || '')}${D.lote[s.lote_id]?.lote_fornecedor ? ` <span class="small muted">forn. ${esc(D.lote[s.lote_id].lote_fornecedor)}</span>` : ''}</td><td class="num">${qtd(s.quantidade)}</td><td class="num">${money(s.valor)}</td><td>${dateBR(s.ultimo_movimento)}</td><td><button class="btn small ghost" data-etq="${s.lote_id || ''}" data-q="${s.quantidade}">Etiqueta</button></td></tr>`).join('')}</tbody></table></div>` : ''}
     <h3 style="margin:14px 0 6px">Movimentos</h3><div class="table-wrap" style="max-height:45vh" id="kp-movs">${tabelaMovs(M, false)}</div>
+    <p class="small muted" id="kp-mais-l" ${temMais ? '' : 'hidden'}>Mostrando os ${PAGINA_KARDEX} movimentos mais recentes. <button class="btn small ghost" id="kp-mais">Carregar mais antigos</button></p>
     ${podeMov() ? '<p class="small muted">Clique num movimento para estorná-lo.</p>' : ''}`,
     foot: `${podeEditar() ? '<button class="btn" id="kp-rec" title="Refaz custo e saldos em ordem de data (após lançamentos com data retroativa)">Recalcular</button>' : ''}<span class="spacer"></span>${podeMov() ? '<button class="btn" id="kp-mov">Novo movimento deste produto</button>' : ''}<button class="btn" data-close>Fechar</button>` });
   $$('[data-etq]', m.el).forEach(b => b.onclick = () => { const l = D.lote[b.dataset.etq] || null;
     if (!(l ? l.etiqueta : p.etiqueta)) return toast('As etiquetas precisam do SQL 175.', true);
     etiquetaDe(p, l, { quantidade: +b.dataset.q, fornecedor: '' }); });
-  if (podeMov()) $$('#kp-movs tr[data-m]', m.el).forEach(tr => { const mv = M.find(x => x.id === tr.dataset.m); if (!mv || mv.estorno_de || estornados.has(mv.id)) return; tr.classList.add('clickable'); tr.onclick = () => estornar(mv, p, root, m); });
+  const ligarLinhas = () => { if (podeMov()) $$('#kp-movs tr[data-m]', m.el).forEach(tr => { const mv = M.find(x => x.id === tr.dataset.m); if (!mv || mv.estorno_de || estornados.has(mv.id)) return; tr.classList.add('clickable'); tr.onclick = () => estornar(mv, p, root, m); }); };
+  ligarLinhas();
+  $('#kp-mais', m.el).onclick = async (ev) => {
+    ev.target.disabled = true;
+    try { const mais = await pagina(M.length); M = M.concat(mais); mais.filter(x => x.estorno_de).forEach(x => estornados.add(x.estorno_de));
+      $('#kp-movs', m.el).innerHTML = tabelaMovs(M, false); ligarLinhas();
+      if (mais.length < PAGINA_KARDEX) $('#kp-mais-l', m.el).hidden = true; else { $('#kp-mais-l', m.el).firstChild.textContent = `Mostrando os ${M.length} movimentos mais recentes. `; ev.target.disabled = false; }
+    } catch (err) { fail(err); ev.target.disabled = false; }
+  };
   $('#kp-mov', m.el) && ($('#kp-mov', m.el).onclick = () => { m.close(); movimento(root, { produto: p }); });
   $('#kp-rec', m.el) && ($('#kp-rec', m.el).onclick = async () => {
     if (!await confirmDialog('Recalcular custo médio e saldos deste produto em ordem de data?')) return;

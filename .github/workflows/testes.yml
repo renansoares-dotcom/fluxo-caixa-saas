@@ -49,3 +49,7 @@ jobs:
         run: |
           shopt -s nullglob
           for f in tests/sql/*.sql; do echo "▶ $f"; psql "$BANCO" -X -q -v ON_ERROR_STOP=1 -f "$f"; done
+      - name: Testes de concorrência (tests/concorrencia)
+        run: |
+          shopt -s nullglob
+          for f in tests/concorrencia/*.sh; do echo "▶ $f"; bash "$f"; done

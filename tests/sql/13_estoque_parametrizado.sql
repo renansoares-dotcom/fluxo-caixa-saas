@@ -106,7 +106,10 @@ insert into est_movimentos(empresa_id, data, produto_id, local_id, lote_id, tipo
   select 'e000000a-0000-0000-0000-000000000000', '2026-11-03', 'aa000000-0000-0000-0000-000000000001', mp, 'ab000000-0000-0000-0000-000000000001', req, -100 from ids;
 insert into est_movimentos(empresa_id, data, produto_id, local_id, lote_id, tipo_movimento_id, quantidade, custo_unitario)
   select 'e000000a-0000-0000-0000-000000000000', '2026-11-02', 'aa000000-0000-0000-0000-000000000001', mp, 'ab000000-0000-0000-0000-000000000001', compra, 1500, 13 from ids;
-select pg_temp.ok(est_recalcular('e000000a-0000-0000-0000-000000000000', 'aa000000-0000-0000-0000-000000000001') = 8, 'recalcula os 8 movimentos');
+-- SQL 178: o movimento com data antiga já recalculou o produto sozinho, no fim da transação
+select pg_temp.ok((select custo_unitario = 11 from est_movimentos where quantidade = -100) and (select not recalcular from est_custos where produto_id = 'aa000000-0000-0000-0000-000000000001'), 'movimento retroativo recalcula sozinho');
+-- e o recálculo manual refaz só o período aberto: outubro está fechado e não muda
+select pg_temp.ok(est_recalcular('e000000a-0000-0000-0000-000000000000', 'aa000000-0000-0000-0000-000000000001') = 2, 'recalcula os 2 movimentos do período aberto');
 reset role;
 select pg_temp.ok((select custo_unitario = 11 from est_movimentos where quantidade = -100), 'saída de 03/11 ao custo depois da compra de 02/11: (13.500 + 19.500) / 3.000 = 11');
 select pg_temp.ok((select quantidade = 2900 and valor = 31900 from est_custos where produto_id = 'aa000000-0000-0000-0000-000000000001'), 'custo após o recálculo');

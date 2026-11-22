@@ -1,7 +1,7 @@
 ---
 titulo: Kardex e parâmetros do estoque
 tela: Estoque › Kardex (EST002) e Parâmetros do Estoque (EST005)
-versao: 1.4
+versao: 1.5
 atualizado: 2026-11-21
 ---
 ## 1. Para que serve
@@ -24,7 +24,9 @@ A plataforma passa a ser o **estoque oficial** da empresa. Duas telas:
 |---|---|
 | Administrador e financeiro | Alteram os parâmetros, fecham o mês, recalculam o custo e lançam movimentos. Só o administrador reabre um mês fechado. |
 | Diretor, compras e produção | Consultam e lançam movimentos e transferências nos locais liberados para o perfil deles. |
-| Leitura | Consulta. |
+| Leitura | Consulta, enquanto estiver liberado em **Parâmetros › Acesso** (4.6). |
+| Vendas | Só consulta se o administrador liberar em **Parâmetros › Acesso**. |
+| Motorista e colaborador do portal | Não consultam saldo, custo nem movimentos. |
 
 ## 3. Kardex
 
@@ -43,12 +45,12 @@ Há três visões:
 
 - **Saldo por local**: o valor de cada local e a % do total. Clique no local para ver os produtos dele.
 - **Saldo por produto**: a quantidade, o custo médio, o valor, os locais e os lotes de cada produto.
-- **Movimentos**: os últimos 500 movimentos da empresa.
+- **Movimentos**: os movimentos da empresa no período escolhido em **De** e **Até**. A tela abre no mês corrente. Um período com mais de 2.000 movimentos mostra os 2.000 mais recentes e avisa para reduzir o período.
 
 Clique no produto para abrir o **kardex do produto**. Ele mostra:
 
 - o saldo por local e lote, com o lote do fornecedor;
-- cada movimento, com o saldo no local e o custo médio depois dele.
+- cada movimento, com o saldo no local e o custo médio depois dele. Aparecem os 200 movimentos mais recentes; **Carregar mais antigos** traz os anteriores.
 
 ### 3.2 Lançar um movimento
 
@@ -79,7 +81,9 @@ O estorno lança o movimento inverso ao mesmo custo; o original fica no históri
 
 ### 3.5 Recalcular
 
-**Recalcular** (administrador e financeiro) refaz o custo médio e os saldos do produto em ordem de data. Use depois de lançar um movimento com data anterior a outros já lançados.
+Quando entra um movimento com data anterior a outro já lançado do mesmo produto, a plataforma **recalcula sozinha** o custo médio, os saldos e o "saldo no local" das linhas, em ordem de data, assim que o lançamento é gravado. Não é preciso fazer nada.
+
+O botão **Recalcular** (administrador e financeiro) continua disponível para refazer a conta a pedido. Nos dois casos o recálculo parte do saldo do último **mês fechado** e refaz só o período aberto: o que está fechado não muda.
 
 ## 4. Parâmetros do Estoque
 
@@ -141,6 +145,18 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 
 **Fechar o mês** trava o estoque: nenhum movimento com data até o fim do mês fechado é aceito. Fechar um mês fecha também os anteriores. As correções entram por estorno, com data do mês aberto. Só o administrador reabre.
 
+### 4.6 Acesso
+
+A aba **Acesso** define quem consulta saldo por local, custo médio, valor do estoque e movimentos.
+
+![Figura 3 — Acesso: quem consulta saldo, custo e movimentos (dados fictícios)](img/estoque-kardex-3.jpg)
+
+- **Administrador, Financeiro, Diretor, Compras e Produção** sempre consultam.
+- **Leitura** vem ligado e **Vendas** vem desligado; só o administrador muda.
+- **Motorista** e **colaborador do portal** nunca consultam.
+
+Quem pede material pela Requisição de Material continua vendo o catálogo e o saldo disponível, sem o custo.
+
 ## 5. Regras e travas
 
 - O banco calcula o custo e o saldo; ninguém digita o custo de uma saída.
@@ -148,7 +164,9 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 - O produto que controla lote exige o lote.
 - O sinal da quantidade segue o tipo: entrada soma e saída subtrai.
 - Movimento não se altera nem se exclui: só por estorno, e cada movimento só pode ser estornado uma vez.
-- Mês fechado não aceita movimento.
+- Mês fechado não aceita movimento, e o recálculo não altera o que está em mês fechado.
+- A entrada que forma custo (compra, produção, saldo inicial) só é lançada com o custo unitário informado.
+- Numa transferência, a saída e a entrada usam o mesmo custo.
 - O lote informado precisa ser do mesmo produto.
 - Cada tipo de movimento só é lançado à mão pelos perfis definidos em **Parâmetros › Tipos de movimento**.
 - **Recalcular** só alcança produto da própria empresa.
@@ -183,3 +201,4 @@ O CFOP completo vale mais que o final. A regra de uma família vale mais que a d
 | 1.2 | 29/10/2026 | Imagens das telas, com dados fictícios. |
 | 1.3 | 07/11/2026 | Travas da qualidade: quarentena e reprovado só saem pela qualidade, lote bloqueado não sai, entrada com plano de recebimento vai para a quarentena. |
 | 1.4 | 21/11/2026 | Quem lança cada tipo de movimento à mão passa a ser parâmetro (saldo inicial e ajuste de inventário restritos por padrão). Estorno de transferência desfaz as duas pernas de uma vez. Lote conferido contra o produto. Trilha de auditoria nos parâmetros. Nota cancelada sem saldo para estornar vira pendência. |
+| 1.5 | 21/11/2026 | Movimentos por período (De e Até). Kardex do produto em páginas de 200 movimentos. Movimento com data antiga recalcula sozinho; o recálculo respeita o mês fechado. Nova aba Acesso: quem consulta saldo, custo e movimentos. Entrada que forma custo exige o custo. |

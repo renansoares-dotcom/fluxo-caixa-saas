@@ -374,4 +374,5 @@ export const FIGS = [
   ['relatorios-padrao', 'estoque/kardex', '## 6.', 'Filtros salvos desta tela: aplicar uma variante ou salvar os filtros atuais com um nome', 'produtos|click:#filtros-btn'],
   ['relatorios-padrao', 'relatorios/emitidos', '## 7.', 'Catálogo de códigos: cada relatório recebe o seu código na primeira emissão', 'catalogo'],
   ['relatorios-padrao', 'relatorios/emitidos', '## 8.', 'Parâmetros dos relatórios: registro das emissões, prazo do histórico, variantes da empresa e CNPJ no cabeçalho', 'parametros'],
+  ['estoque-kardex', 'estoque/parametros', '### 4.6', 'Acesso: quem consulta saldo, custo e movimentos', 'click:#ep-abas [data-a="acesso"]'],
 ];

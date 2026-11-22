@@ -155,14 +155,14 @@ function blocoQuem(P) {
     <div id="qr-info" class="small" style="align-self:end;padding-bottom:10px"></div></div>`;
 }
 function ligarQuem(m, P, crachaInicial) {
-  const st = { colaborador_id: null, nome: '', cracha: false }, inp = $('#qr-nome', m.el), info = $('#qr-info', m.el);
+  const st = { colaborador_id: null, nome: '', cracha: false, codigo: null }, inp = $('#qr-nome', m.el), info = $('#qr-info', m.el);
   const mostra = () => { info.innerHTML = st.cracha ? '<span class="badge pago">crachá lido</span>' : st.colaborador_id ? '<span class="muted">colaborador da lista</span>' : st.nome ? '<span class="warn">nome digitado, sem cadastro</span>' : D.cfg.exigir_cracha ? '<span class="warn">a entrega exige o crachá</span>' : ''; };
-  const pelaLista = () => { const v = inp.value.trim(), p = P.find(x => x.nome.toLowerCase() === v.toLowerCase()); st.colaborador_id = p?.colaborador_id || null; st.nome = v; st.cracha = false; mostra(); };
+  const pelaLista = () => { const v = inp.value.trim(), p = P.find(x => x.nome.toLowerCase() === v.toLowerCase()); st.colaborador_id = p?.colaborador_id || null; st.nome = v; st.cracha = false; st.codigo = null; mostra(); };
   const cracha = async (codigo) => {
     try { const r = await rpc('alm_cracha', { p_empresa: state.empresa.id, p_codigo: codigo });
       if (!r?.achou) return toast('Crachá não encontrado nesta empresa', true);
       if (!r.valido) return toast(`Crachá de ${r.nome}: ${r.situacao}. Não vale para retirada.`, true);
-      st.colaborador_id = r.colaborador_id || null; st.nome = r.nome; st.cracha = true; inp.value = r.nome; mostra(); toast(`Crachá lido: ${r.nome}`);
+      st.colaborador_id = r.colaborador_id || null; st.nome = r.nome; st.cracha = true; st.codigo = codigo; inp.value = r.nome; mostra(); toast(`Crachá lido: ${r.nome}`);
     } catch (err) { fail(err); }
   };
   inp.oninput = () => { const c = A.codigoCracha(inp.value); if (c) { inp.value = ''; cracha(c); } else pelaLista(); };
@@ -193,7 +193,7 @@ async function entregar(r, root) {
     ev.target.disabled = true;
     try {
       const x = await rpc('alm_entregar', { p_id: r.id, p_itens: linhas.filter(l => l.quantidade > 0).map(l => ({ item_id: l.item_id, quantidade: l.quantidade, local_id: l.local_id })),
-        p_retirou: quem.colaborador_id, p_retirou_nome: quem.colaborador_id ? null : quem.nome, p_cracha: quem.cracha, p_obs: $('#en-obs', m.el).value.trim() || null });
+        p_retirou: quem.colaborador_id, p_retirou_nome: quem.colaborador_id ? null : quem.nome, p_cracha: quem.cracha, p_obs: $('#en-obs', m.el).value.trim() || null, p_cracha_codigo: quem.cracha ? quem.codigo : null });
       toast(x.situacao === 'atendida' ? `Requisição nº ${r.numero} entregue` : `Requisição nº ${r.numero} entregue em parte`); m.close(); await recarregar(root);
     } catch (err) { fail(err); ev.target.disabled = false; }
   };
@@ -220,7 +220,7 @@ async function balcao(root, crachaInicial = null) {
       for (const [id, v] of sel) { const p = cat.find(x => x.produto_id === id), loc = S.filter(s => s.produto_id === id).sort((a, b) => b.quantidade - a.quantidade)[0];
         if (!loc || +loc.quantidade < v - 1e-9) { ev.target.disabled = false; return toast(`${p.descricao}: saldo insuficiente (${loc ? qtd(loc.quantidade) + ' em ' + loc.local_nome : 'sem saldo'}).`, true); }
         env.push({ produto_id: id, quantidade: v, local_id: loc.local_id }); }
-      const x = await rpc('alm_balcao', { p_empresa: state.empresa.id, p_itens: env, p_retirou: quem.colaborador_id, p_retirou_nome: quem.colaborador_id ? null : quem.nome, p_cracha: quem.cracha, p_motivo: $('#ba-mot', m.el).value.trim() || null });
+      const x = await rpc('alm_balcao', { p_empresa: state.empresa.id, p_itens: env, p_retirou: quem.colaborador_id, p_retirou_nome: quem.colaborador_id ? null : quem.nome, p_cracha: quem.cracha, p_motivo: $('#ba-mot', m.el).value.trim() || null, p_cracha_codigo: quem.cracha ? quem.codigo : null });
       toast(x.entregue ? `Retirada nº ${x.numero} registrada para ${quem.nome}` : `Requisição nº ${x.numero} ficou aguardando aprovação (${x.motivo_aprovacao}). Nada foi entregue.`, !x.entregue);
       m.close(); await recarregar(root);
     } catch (err) { fail(err); ev.target.disabled = false; }
