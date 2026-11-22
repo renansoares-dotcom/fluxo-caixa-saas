@@ -22,14 +22,19 @@ async function carregar() {
   const e = state.empresa.id;
   const [cfg, almox, aprov, abertas, periodo] = await Promise.all([
     q(sb.from('alm_config').select('*').eq('empresa_id', e).maybeSingle()), rpc('alm_almoxarife', { p_empresa: e }), rpc('alm_aprovador', { p_empresa: e }),
-    q(sb.from('alm_requisicoes').select('*').eq('empresa_id', e).in('situacao', A.ABERTAS).order('numero', { ascending: false })),
-    fetchAll(() => sb.from('alm_requisicoes').select('*').eq('empresa_id', e).gte('criado_em', ui.de + 'T00:00:00-03:00').lte('criado_em', ui.ate + 'T23:59:59-03:00').order('numero', { ascending: false }))]);
+    q(sb.from('alm_requisicoes').select(A.COL_REQ).eq('empresa_id', e).in('situacao', A.ABERTAS).order('numero', { ascending: false })),
+    fetchAll(() => sb.from('alm_requisicoes').select(A.COL_REQ).eq('empresa_id', e).gte('criado_em', ui.de + 'T00:00:00-03:00').lte('criado_em', ui.ate + 'T23:59:59-03:00').order('numero', { ascending: false }))]);
   const reqs = [...new Map([...abertas, ...periodo].map(r => [r.id, r])).values()].sort((a, b) => b.numero - a.numero);
   const ids = reqs.map(r => r.id); let itens = [], entregas = [];
   for (let i = 0; i < ids.length; i += 150) {
     const c = ids.slice(i, i + 150);
-    const [a, b] = await Promise.all([q(sb.from('alm_requisicao_itens').select('*').in('requisicao_id', c)), q(sb.from('alm_entregas').select('*').in('requisicao_id', c).order('entregue_em'))]);
+    const [a, b] = await Promise.all([q(sb.from('alm_requisicao_itens').select('*').in('requisicao_id', c)), q(sb.from('alm_entregas').select(A.COL_ENT).in('requisicao_id', c).order('entregue_em'))]);
     itens.push(...a); entregas.push(...b);
+    // valores ao custo médio: só quem atende o almoxarifado ou aprova recebe
+    if (almox || aprov) for (const v of await q(sb.rpc('alm_valores', { p_empresa: e, p_ids: c })).catch(() => []) || []) {
+      const r = reqs.find(x => x.id === v.requisicao_id); if (r) { r.valor_estimado = v.valor_estimado; r.motivo_detalhe = v.motivo_detalhe; }
+      for (const en of b) if (v.entregas && en.id in v.entregas) en.valor = v.entregas[en.id];
+    }
   }
   for (const r of reqs) { r.itens = itens.filter(i => i.requisicao_id === r.id); r.entregas = entregas.filter(x => x.requisicao_id === r.id); }
   D = { cfg: { ...PADRAO, ...(cfg || {}) }, almox: !!almox, aprov: !!aprov, reqs, entregas, catalogo: null, pessoas: null };
@@ -229,7 +234,7 @@ async function balcao(root, crachaInicial = null) {
 
 /* ------------------------------------------------------------------ aprovar, recusar, cancelar */
 async function decidir(r, aprova, root) {
-  if (aprova) { if (!await confirmDialog(`Aprovar a requisição nº ${r.numero} de ${r.para_nome || ''}?\n${r.motivo_aprovacao || ''}`)) return;
+  if (aprova) { if (!await confirmDialog(`Aprovar a requisição nº ${r.numero} de ${r.para_nome || ''}?\n${r.motivo_detalhe || r.motivo_aprovacao || ''}`)) return;
     try { await rpc('alm_decidir', { p_id: r.id, p_aprova: true, p_motivo: null }); toast('Requisição aprovada'); await recarregar(root); } catch (err) { fail(err); } return; }
   motivo(`Recusar a requisição nº ${r.numero}`, 'Motivo da recusa', async (t) => { await rpc('alm_decidir', { p_id: r.id, p_aprova: false, p_motivo: t }); toast('Requisição recusada'); await recarregar(root); });
 }
@@ -249,7 +254,7 @@ function detalhe(r, root) {
       <div><span class="muted">Para quem</span><div><b>${esc(r.para_nome || '')}</b>${r.setor ? ' · ' + esc(r.setor) : ''}</div></div>
       <div><span class="muted">Pedida por</span><div>${esc(r.solicitante_nome || '')} · ${quando(r.criado_em)}</div></div>
       ${r.motivo ? `<div class="full" style="grid-column:1/-1"><span class="muted">Motivo</span><div>${esc(r.motivo)}</div></div>` : ''}
-      ${r.motivo_aprovacao ? `<div class="full" style="grid-column:1/-1"><span class="muted">Aprovação</span><div>${esc(r.motivo_aprovacao)}${r.decidido_em ? ` — ${r.situacao === 'recusada' ? 'recusada' : 'aprovada'} por ${esc(r.decidido_nome || '')} em ${quando(r.decidido_em)}${r.decisao_motivo ? ': ' + esc(r.decisao_motivo) : ''}` : ''}</div></div>` : ''}
+      ${r.motivo_aprovacao ? `<div class="full" style="grid-column:1/-1"><span class="muted">Aprovação</span><div>${esc(r.motivo_detalhe || r.motivo_aprovacao)}${r.decidido_em ? ` — ${r.situacao === 'recusada' ? 'recusada' : 'aprovada'} por ${esc(r.decidido_nome || '')} em ${quando(r.decidido_em)}${r.decisao_motivo ? ': ' + esc(r.decisao_motivo) : ''}` : ''}</div></div>` : ''}
       ${r.encerrado_motivo ? `<div class="full" style="grid-column:1/-1"><span class="muted">Encerramento</span><div>${esc(r.encerrado_motivo)}</div></div>` : ''}
     </div>
     <h3 style="margin:14px 0 6px">Itens</h3>
@@ -282,6 +287,7 @@ function comprovante(r) {
 }
 
 function relatorio() {
+  if (!(D.almox || D.aprov)) return toast('O relatório traz valores ao custo médio: é emitido por quem atende o almoxarifado ou aprova', true);
   const L = A.filtrar(D.reqs, ui), ids = new Set(L.map(r => r.id)), E = D.entregas.filter(e => ids.has(e.requisicao_id)), C = A.consumoPorSetor(L, E), tot = C.reduce((t, x) => t + x.valor, 0);
   abrirRelatorio({ nome: 'Requisições de material', titulo: 'Requisições de material ao almoxarifado', subtitulo: `Pedidas de ${dateBR(ui.de)} a ${dateBR(ui.ate)}`, paisagem: true, tipo: 'relatorio', rodape: 'Fonte: Painéis › Requisição de Material. Valor ao custo médio do estoque.',
     corpo: `<h2>1. Consumo por setor</h2><table><thead><tr><th>Setor</th><th class="n">Requisições com entrega</th><th class="n">Valor entregue (R$)</th><th class="n">% do valor</th></tr></thead><tbody>

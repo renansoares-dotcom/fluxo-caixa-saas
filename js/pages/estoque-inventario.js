@@ -27,7 +27,7 @@ export async function render(root) {
       q(sb.rpc('est_inv_abc', { p_empresa: e })).catch(() => []),
       q(sb.from('est_config').select('implantado_em').eq('empresa_id', e).maybeSingle()).catch(() => null)]);
     const ids = [...new Set(itens.map(i => i.produto_id))], lotes = [...new Set(itens.map(i => i.lote_id).filter(Boolean))];
-    const [prods, lts] = await Promise.all([ids.length ? q(sb.from('produtos').select('id,codigo,descricao,unidade').in('id', ids)) : [], lotes.length ? q(sb.from('est_lotes').select('id,codigo').in('id', lotes)) : []]);
+    const [prods, lts] = await Promise.all([ids.length ? q(sb.from('produtos').select('id,codigo,descricao,unidade,etiqueta').in('id', ids)) : [], lotes.length ? q(sb.from('est_lotes').select('id,codigo,etiqueta').in('id', lotes)) : []]);
     D = { cont, itens, locais, cfg: { dias_a: 30, dias_b: 60, dias_c: 120, itens_por_contagem: 20, tolerancia_pct: 2, tolerancia_valor: 100, contagem_cega: true, recontar: true, papeis_aprovacao: ['admin', 'diretor', 'financeiro'], ...(cfg || {}) },
       abc, implantado: !!impl?.implantado_em, prod: Object.fromEntries(prods.map(p => [p.id, p])), lote: Object.fromEntries(lts.map(l => [l.id, l])), loc: Object.fromEntries(locais.map(l => [l.id, l])) };
     const c = ui.aberta && D.cont.find(x => x.id === ui.aberta);
@@ -70,24 +70,30 @@ function contar(root, c) {
   const its = D.itens.filter(i => i.contagem_id === c.id), cega = D.cfg.contagem_cega;
   const rot = (i) => `${esc(D.prod[i.produto_id]?.codigo || '')} ${esc(D.prod[i.produto_id]?.descricao || '')}${i.lote_id ? ` · lote ${esc(D.lote[i.lote_id]?.codigo || '')}` : ''}`;
   const falta = its.filter(i => ['pendente', 'recontar'].includes(i.situacao));
+  const temCam = 'BarcodeDetector' in window && !!navigator.mediaDevices?.getUserMedia;
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Contagem nº ${c.numero} — ${esc(D.loc[c.local_id]?.nome || '')}</h2><div class="muted small">${its.length - falta.length} de ${its.length} contados${cega ? ' · contagem cega (o saldo do sistema não aparece)' : ''}</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="ct-v">← Contagens</button>${podeEditar() ? '<button class="btn" id="ct-x">Cancelar contagem</button>' : ''}<button class="btn primary" id="ct-env" ${falta.length ? 'disabled' : ''}>Enviar para aprovação</button></div></div>
     <form id="ct-f" class="card" style="display:grid;grid-template-columns:1fr 160px auto;gap:8px;align-items:end;margin-bottom:12px">
-      <label>Leia a etiqueta ou digite o código<input id="ct-cod" autocomplete="off" placeholder="Código do produto ou do lote" style="font-size:1.1em" autofocus></label>
+      <label>Leia a etiqueta ou digite o código<input id="ct-cod" autocomplete="off" placeholder="Etiqueta, código do produto ou do lote" style="font-size:1.1em" autofocus></label>
       <label>Quantidade contada<input id="ct-q" inputmode="decimal" style="font-size:1.1em"></label><button class="btn primary" style="min-height:44px">Registrar</button>
-      <div id="ct-it" class="small" style="grid-column:1/-1"></div></form>
+      <div id="ct-it" class="small" style="grid-column:1/-1"></div>
+      ${temCam ? '<div style="grid-column:1/-1"><button type="button" class="btn" id="ct-cam" style="min-height:44px">Ler pela câmera</button><video id="ct-video" playsinline muted hidden style="width:100%;max-width:420px;border-radius:12px;background:#000;aspect-ratio:4/3;object-fit:cover;display:block;margin-top:8px"></video></div>' : ''}</form>
     <div class="card flush"><div class="table-wrap"><table class="small"><thead><tr><th>Item</th><th>Classe</th>${cega ? '' : '<th class="num">Sistema</th>'}<th class="num">Contado</th><th class="num">Recontado</th><th>Situação</th><th></th></tr></thead><tbody>
       ${its.sort((a, b) => (['recontar', 'pendente'].indexOf(b.situacao)) - (['recontar', 'pendente'].indexOf(a.situacao))).map(i => `<tr><td>${rot(i)}</td><td>${i.classe || ''}</td>${cega ? '' : `<td class="num">${n(i.saldo_sistema)}</td>`}
         <td class="num">${n(i.contado)}</td><td class="num">${n(i.recontado)}</td><td><span class="badge ${SIT_I[i.situacao][1]}">${SIT_I[i.situacao][0]}</span></td>
         <td>${['pendente', 'recontar'].includes(i.situacao) ? `<button class="btn ghost small" data-it="${i.id}">Contar</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>`;
   let alvo = null;
   const escolher = (i) => { alvo = i; $('#ct-it', root).innerHTML = i ? `<b>${rot(i)}</b> · ${D.prod[i.produto_id]?.unidade || ''}${i.situacao === 'recontar' ? ' · <span class="badge aberto">recontar: a primeira contagem ficou fora da tolerância</span>' : ''}` : ''; if (i) $('#ct-q', root).focus(); };
-  const achar = (cod) => { const t = cod.trim().toUpperCase(); return its.find(i => (D.lote[i.lote_id]?.codigo || '').toUpperCase() === t) || its.find(i => (D.prod[i.produto_id]?.codigo || '').toUpperCase() === t); };
+  // a etiqueta da plataforma (L… do lote, P… do produto) vem primeiro; depois o código do lote e o do produto
+  const achar = (cod) => { const t = cod.trim().toUpperCase(), igual = (v) => (v || '').toUpperCase() === t;
+    return its.find(i => igual(D.lote[i.lote_id]?.etiqueta)) || its.find(i => !i.lote_id && igual(D.prod[i.produto_id]?.etiqueta)) || its.find(i => igual(D.lote[i.lote_id]?.codigo))
+      || its.find(i => igual(D.prod[i.produto_id]?.etiqueta)) || its.find(i => igual(D.prod[i.produto_id]?.codigo)); };
+  let recemLido = false;
   $('#ct-cod', root).onchange = async (e) => {
     const cod = e.target.value.replace(/^.*[?&]b=([^&#]+).*$/i, '$1'); if (!cod.trim()) return escolher(null);
-    const i = achar(decodeURIComponent(cod)); if (i) return escolher(i);
+    const i = achar(decodeURIComponent(cod)); if (i) { recemLido = true; return escolher(i); }
     // achado fora da lista: inclui o produto na contagem
-    try { const p = (await q(sb.from('produtos').select('id,codigo,descricao,unidade').eq('empresa_id', state.empresa.id).ilike('codigo', cod.trim()).limit(1)))[0];
+    try { const p = (await q(sb.from('produtos').select('id,codigo,descricao,unidade').eq('empresa_id', state.empresa.id).or(`codigo.ilike.${cod.trim().replace(/[,()*%]/g, '')},etiqueta.eq.${cod.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')}`).limit(1)))[0];
       if (!p) return toast('Código não encontrado', true);
       if (!confirm(`${p.codigo} não está nesta contagem. Incluir?`)) return;
       await q(sb.rpc('est_inv_incluir', { p_contagem: c.id, p_produto: p.id, p_lote: null })); toast('Item incluído'); render(root);
@@ -96,12 +102,33 @@ function contar(root, c) {
   $$('[data-it]', root).forEach(b => b.onclick = () => { const i = its.find(x => x.id === b.dataset.it); $('#ct-cod', root).value = D.prod[i.produto_id]?.codigo || ''; escolher(i); });
   $('#ct-f', root).onsubmit = async (e) => {
     e.preventDefault(); if (!alvo) return toast('Leia a etiqueta do item', true);
+    // o leitor manda Enter depois do código: isso escolhe o item, não registra a contagem
+    if (recemLido && $('#ct-q', root).value.trim() === '') { recemLido = false; return $('#ct-q', root).focus(); }
+    recemLido = false;
     const qv = parseNum($('#ct-q', root).value); if (!(qv >= 0) || $('#ct-q', root).value.trim() === '') return toast('Informe a quantidade', true);
     let just = null; if (alvo.situacao === 'recontar') just = prompt('Justificativa da diferença (opcional)') || null;
     try { const r = await q(sb.rpc('est_inv_contar', { p_item: alvo.id, p_qtd: qv, p_justificativa: just }));
       toast(r === 'ok' ? 'Contagem confere' : r === 'recontar' ? 'Fora da tolerância: reconte o item' : 'Divergência registrada para aprovação'); render(root); } catch (err) { fail(err); }
   };
-  $('#ct-v', root).onclick = () => abrir(root, null);
+  // câmera do celular: lê a etiqueta (código de barras ou QR) e escolhe o item
+  let fluxo = null, quadro = 0; const parar = () => { cancelAnimationFrame(quadro); fluxo?.getTracks().forEach(t => t.stop()); fluxo = null; };
+  const cam = $('#ct-cam', root);
+  if (cam) cam.onclick = async () => {
+    const v = $('#ct-video', root);
+    if (fluxo) { parar(); v.hidden = true; cam.textContent = 'Ler pela câmera'; return; }
+    try {
+      fluxo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      v.srcObject = fluxo; v.hidden = false; await v.play(); cam.textContent = 'Parar a câmera';
+      const det = new window.BarcodeDetector({ formats: ['code_128', 'qr_code', 'code_39'] }); let ultimo = '', quando = 0;
+      const ciclo = async () => {
+        if (!fluxo || !v.isConnected) return parar();
+        try { const t = (await det.detect(v))[0]?.rawValue; if (t && (t !== ultimo || Date.now() - quando > 4000)) { ultimo = t; quando = Date.now(); const c = $('#ct-cod', root); c.value = t; c.dispatchEvent(new Event('change')); } } catch { /* quadro sem código */ }
+        quadro = requestAnimationFrame(ciclo);
+      };
+      ciclo();
+    } catch (err) { parar(); fail(new Error('Não foi possível abrir a câmera: ' + (err.message || err))); }
+  };
+  $('#ct-v', root).onclick = () => { parar(); abrir(root, null); };
   $('#ct-env', root).onclick = async () => { try { await q(sb.rpc('est_inv_enviar', { p_contagem: c.id })); toast('Enviada para aprovação'); render(root); } catch (err) { fail(err); } };
   $('#ct-x', root) && ($('#ct-x', root).onclick = () => cancelar(c, root));
 }

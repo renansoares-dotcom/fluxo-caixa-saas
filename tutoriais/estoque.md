@@ -1,7 +1,7 @@
 ---
 titulo: Estoque e produtos
 tela: Estoque › Implantação do Estoque (EST007), Posição de Estoque (EST001), Reposição de Estoque (EST008), Inventário Cíclico (EST009), Produtos (EST003), De-para de Fornecedores (EST004) e Cadastro pelas Notas de Entrada (EST006)
-versao: 2.0
+versao: 2.1
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -237,10 +237,12 @@ Primeiro entram a classe A e os itens há mais tempo sem contar. Os indicadores 
 ![Figura 8 — Contagem pelo celular: leitura da etiqueta, quantidade e recontagem (dados fictícios)](img/estoque-8.jpg)
 
 1. Abra a contagem na lista.
-2. Leia a etiqueta com o leitor ou a câmera, ou digite o código do produto ou do lote. O item aparece em destaque.
+2. Leia a etiqueta com o leitor, ou toque em **Ler pela câmera** no celular, ou digite o código. Vale a etiqueta impressa pela plataforma (a do lote, que começa com L, ou a do produto, que começa com P), o código do lote e o código do produto. O item aparece em destaque e o cursor vai para a quantidade.
+
+   O botão da câmera só aparece nos navegadores que leem código de barras dentro da página (Chrome no Android, por exemplo). Nos demais, use o leitor ou digite.
 3. Digite a **quantidade contada** e clique em **Registrar**.
 
-Na **contagem cega** (padrão), quem conta não vê o saldo do sistema; o saldo é guardado na hora da contagem.
+Na **contagem cega** (padrão), a tela de contagem não mostra o saldo do sistema; o saldo é guardado na hora da contagem. A contagem cega vale para a tela: quem tem acesso ao Kardex consegue consultar o saldo por lá. Para uma contagem independente, escolha para contar alguém que não consulta o estoque no dia a dia.
 
 Se a diferença passar da tolerância, o item volta como **Recontar**. Na recontagem, você pode informar uma justificativa (por exemplo, "big bag rasgado").
 
@@ -277,6 +279,8 @@ Em **Parâmetros** (administrador e financeiro), ajuste:
 - se o item movimentado depois de contado volta para recontar (ligado por padrão);
 - se a movimentação do item fica bloqueada enquanto ele está em contagem (desligado por padrão);
 - quem aprova os ajustes.
+
+Quem aprova e as duas exceções de aprovação (a própria contagem e o item movimentado depois de contado) só o administrador altera. Cada local tem uma contagem por vez: não se gera outra enquanto houver uma aberta ou aguardando aprovação. Em empresa com a verificação em duas etapas obrigatória, a aprovação exige a segunda etapa.
 
 ## 8. Regras e travas
 
@@ -315,3 +319,4 @@ Em **Parâmetros** (administrador e financeiro), ajuste:
 | 1.8 | 08/11/2026 | Nova tela Inventário Cíclico (EST009): contagens pela curva ABC e pela frequência de cada classe, contagem cega pelo celular com leitura da etiqueta, recontagem fora da tolerância, aprovação com ajustes AJ+/AJ− no Kardex e parâmetros na tela. |
 | 1.9 | 21/11/2026 | Inventário Cíclico: quem contou não aprova a própria contagem (exceção por parâmetro); item sem lote não entra duas vezes na mesma contagem. |
 | 2.0 | 22/11/2026 | Inventário Cíclico: item movimentado depois de contado volta para recontar; bloqueio opcional do item em contagem. |
+| 2.1 | 22/11/2026 | Inventário Cíclico: a contagem reconhece a etiqueta da plataforma e ganhou leitura pela câmera; uma contagem por local; exceções de aprovação só pelo administrador; aprovação com a verificação em duas etapas. |

@@ -2805,6 +2805,7 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
   const saldoDe = (pid) => DB.est_saldos.filter(s => s.produto_id === pid && [uc.id, ins?.id].includes(s.local_id)).reduce((t, s) => t + +s.quantidade, 0);
   Object.assign(window.RPC, {
     alm_almoxarife: () => true, alm_aprovador: () => true,
+    alm_valores: (a) => (a.p_ids || []).map(id => { const r = DB.alm_requisicoes.find(x => x.id === id); return r ? { requisicao_id: id, valor_estimado: r.valor_estimado, motivo_detalhe: r.motivo_detalhe || r.motivo_aprovacao || null, entregas: Object.fromEntries(DB.alm_entregas.filter(e => e.requisicao_id === id).map(e => [e.id, e.valor])) } : null; }).filter(Boolean),
     alm_catalogo: () => P.map(p => ({ produto_id: p.id, codigo: p.codigo, descricao: p.descricao, unidade: p.unidade, saldo: saldoDe(p.id), controlado: ctrl.has(p.id), custo: p.custo, etiqueta: p.etiqueta })).sort((a, b) => a.descricao.localeCompare(b.descricao)),
     alm_saldos: (a) => DB.est_saldos.filter(s => a.p_produtos.includes(s.produto_id) && s.local_id === uc.id && +s.quantidade).map(s => ({ produto_id: s.produto_id, local_id: s.local_id, local_nome: uc.nome, quantidade: +s.quantidade })),
     alm_pessoas: () => K.map(k => ({ colaborador_id: k.id, nome: k.nome, matricula: k.matricula, setor: k.setor })),

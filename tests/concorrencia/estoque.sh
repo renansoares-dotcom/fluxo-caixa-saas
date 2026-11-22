@@ -40,4 +40,30 @@ wait
 [ "$(cat /tmp/conc-b.rc)" != 0 ] && grep -q "estornado" /tmp/conc-b.log || { cat /tmp/conc-b.log; falhou "o segundo estorno devia ser barrado"; }
 [ "$("${P[@]}" -c "select count(*) from est_movimentos where estorno_de = '$M'")" = 1 ] || falhou "devia existir um único estorno"
 [ "$("${P[@]}" -c "select quantidade::int from est_saldos where produto_id = '$PR'")" = 100 ] || falhou "saldo após o estorno devia ser 100"
+# 3) fechar o mês enquanto um lançamento com data do mês passado está em andamento: a posição guardada tem de incluir o lançamento
+ADMIN='a0000000-0000-0000-0000-00000000000a'
+entrar_adm="select set_config('request.jwt.claim.sub', '$ADMIN', false); select set_config('request.jwt.claims', json_build_object('sub', '$ADMIN', 'role', 'authenticated', 'email', 'a@t.com')::text, false); set role authenticated;"
+MESP=$("${P[@]}" -c "select (date_trunc('month', current_date) - interval '1 month')::date")
+ULT=$("${P[@]}" -c "select (date_trunc('month', current_date) - interval '1 day')::date")
+"${P[@]}" >/dev/null <<SQL || falhou "preparação do fechamento"
+delete from est_fechamentos where empresa_id = '$E'; delete from est_fechamento_saldos where empresa_id = '$E';
+update est_config set dias_retroativos = null, custo_desvio_pct = null, exigir_documento = false where empresa_id = '$E';
+SQL
+entrada="insert into est_movimentos(empresa_id, data, produto_id, local_id, tipo_movimento_id, quantidade, custo_unitario) select '$E', '$ULT', '$PR', (select id from est_locais where empresa_id = '$E' and codigo = 'UC'), (select id from est_tipos_movimento where empresa_id = '$E' and codigo = 'COMPRA'), 7, 10;"
+( "${P[@]}" -c "$entrar_adm" -c "begin" -c "$entrada" -c "select pg_sleep(2)" -c "commit" >/tmp/conc-a.log 2>&1; echo $? >/tmp/conc-a.rc ) &
+sleep 0.7
+"${P[@]}" -c "$entrar_adm" -c "select public.est_fechar_mes('$E', '$MESP')" >/tmp/conc-b.log 2>&1; echo $? >/tmp/conc-b.rc
+wait
+[ "$(cat /tmp/conc-a.rc)" = 0 ] || { cat /tmp/conc-a.log; falhou "o lançamento em andamento devia terminar"; }
+[ "$(cat /tmp/conc-b.rc)" = 0 ] || { cat /tmp/conc-b.log; falhou "o fechamento devia esperar e concluir"; }
+[ "$("${P[@]}" -c "select (coalesce((select sum(quantidade) from est_fechamento_saldos where empresa_id = '$E' and mes = '$MESP' and produto_id = '$PR'), 0) = (select coalesce(sum(quantidade), 0) from est_movimentos where produto_id = '$PR' and data <= '$ULT'))::text")" = true ] || falhou "a posição do fechamento devia incluir o lançamento que estava em andamento"
+"${P[@]}" -c "$entrar_adm" -c "$entrada" >/tmp/conc-b.log 2>&1 && falhou "lançamento em mês fechado devia ser barrado"
+"${P[@]}" -c "delete from est_fechamentos where empresa_id = '$E'; delete from est_fechamento_saldos where empresa_id = '$E';" >/dev/null
+
+# 4) estorno feito direto (como a tela do Kardex faz) de um movimento lançado por outro módulo: barrado
+TIN=$("${P[@]}" -c "select m.id from tin_pesagens p join est_movimentos m on m.id = p.movimento_id where m.empresa_id = '$E' and not exists (select 1 from est_movimentos e where e.estorno_de = m.id) limit 1")
+[ -n "$TIN" ] || falhou "não há pesagem de tinta com movimento para testar"
+"${P[@]}" -c "$entrar_adm" -c "select public.est_estornar('$TIN', current_date, 'direto pelo Kardex')" >/tmp/conc-b.log 2>&1 && falhou "estorno direto da baixa de uma pesagem devia ser barrado"
+grep -q "outro documento" /tmp/conc-b.log || { cat /tmp/conc-b.log; falhou "mensagem esperada: lançado por outro documento"; }
+[ "$("${P[@]}" -c "select count(*) from est_movimentos where estorno_de = '$TIN'")" = 0 ] || falhou "não devia existir estorno da pesagem"
 echo "concorrencia do estoque ok"

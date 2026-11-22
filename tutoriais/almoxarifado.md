@@ -1,7 +1,7 @@
 ---
 titulo: Requisição de Material — pedir, aprovar e entregar pelo almoxarifado
 tela: Painéis › Requisição de Material (PAI015)
-versao: 1.3
+versao: 1.4
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -38,6 +38,10 @@ Os papéis são parâmetros: dá para incluir perfis ou nomear pessoas específi
 ![Figura 1 — Nova requisição: itens do catálogo, saldo disponível e quantidade (dados fictícios)](img/almoxarifado-2.jpg)
 
 O setor e o centro de custo vêm do cadastro do colaborador. Se o pedido tiver item **controlado** ou passar do valor limite, ele vai antes para aprovação, e a plataforma diz o motivo. Os demais vão direto para o almoxarifado.
+
+Só entram no pedido os itens do **catálogo do almoxarifado**: os que têm saldo num local do almoxarifado ou têm um desses locais como local padrão. Produto acabado e matéria-prima não se pedem por aqui.
+
+Quem pede não vê valores: nem o custo dos itens, nem o valor do pedido, nem o valor entregue. Esses valores aparecem só para quem atende o almoxarifado e para quem aprova, e o relatório é emitido por eles.
 
 O valor limite vale para **o dia**: os pedidos da mesma pessoa, ou para a mesma pessoa, somam. Dividir um pedido grande em vários pequenos não foge da aprovação.
 
@@ -162,3 +166,4 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 | 1.1 | 21/11/2026 | Quem pediu não aprova a própria requisição (exceção por parâmetro). Mudanças nos parâmetros e nos itens controlados ficam na trilha de auditoria. |
 | 1.2 | 21/11/2026 | O crachá lido passa a ser conferido no banco na entrega e no balcão (existe, está ativo e é de quem retira). |
 | 1.3 | 22/11/2026 | O valor limite passa a valer para o dia. O estorno de uma entrega devolve a quantidade à requisição e marca a entrega como estornada. |
+| 1.4 | 22/11/2026 | Pedido só de itens do catálogo do almoxarifado. Valores (custo, valor do pedido e da entrega) só para quem atende e quem aprova. |

@@ -1,7 +1,7 @@
 ---
 titulo: Kardex e parâmetros do estoque
 tela: Estoque › Kardex (EST002) e Parâmetros do Estoque (EST005)
-versao: 1.6
+versao: 1.7
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -55,7 +55,7 @@ Clique no produto para abrir o **kardex do produto**. Ele mostra:
 ### 3.2 Lançar um movimento
 
 1. Clique em **Novo movimento**.
-2. Escolha o **tipo de movimento**: por exemplo, compra, requisição para a produção, requisição interna ou perda. A lista mostra só os tipos que o seu perfil pode lançar à mão (veja 4.3). De início, **saldo inicial** e **ajuste de inventário** são do financeiro e do diretor; **compra** e os tipos de nota fiscal, de quem compra; **produção** e **apara**, da produção. O administrador lança todos.
+2. Escolha o **tipo de movimento**: por exemplo, compra, requisição para a produção, requisição interna ou perda. A lista mostra só os tipos que o seu perfil pode lançar à mão (veja 4.3). De início, **saldo inicial**, **ajuste de inventário** e **perda** são do financeiro e do diretor; **compra**, **requisição interna** e os tipos de nota fiscal, de quem compra; **produção**, **apara** e **requisição para a produção**, da produção. O administrador lança todos.
 3. Informe a **data**, o **produto**, o **local** e a **quantidade**. O local já vem preenchido: primeiro o do tipo de movimento; depois o local padrão do produto.
 4. Se o produto controla lote, informe o **lote**. Um lote novo é criado na hora, com o **lote do fornecedor**.
 5. Nas entradas que formam custo (compra, produção e saldo inicial), informe o **custo unitário**, sem os impostos recuperáveis.
@@ -63,7 +63,9 @@ Clique no produto para abrir o **kardex do produto**. Ele mostra:
 
 As demais entradas e todas as saídas usam o **custo médio do momento**. O saldo do local aparece embaixo do formulário antes de lançar.
 
-O lançamento à mão passa pelas **travas** definidas em Parâmetros › Acesso (4.6): não aceita data futura, tem um limite de dias para trás, exige o documento nas entradas que formam custo e barra o custo muito diferente do custo médio do produto.
+O lançamento à mão passa pelas **travas** definidas em Parâmetros › Acesso (4.6): não aceita data futura, tem um limite de dias para trás, exige o documento nas entradas que formam custo e barra o custo muito diferente do custo médio do produto. Quando o produto ainda não tem custo médio, o primeiro custo lançado à mão é confirmado por administrador, financeiro ou diretor.
+
+Uma **saída com data antiga** só entra se o saldo do local não ficar negativo em nenhum dia dali em diante. A transferência segue o mesmo limite de dias para trás.
 
 O movimento fica gravado com o usuário que lançou, a data e a hora. Estorno, transferência e movimento de nota fiscal não podem ser lançados por aqui: cada um tem o seu caminho (3.3, 3.4 e a entrada automática pelas notas).
 
@@ -87,7 +89,8 @@ Regras do estorno:
 - a data fica entre a data do movimento e hoje;
 - quem não pode lançar o tipo também não o estorna;
 - movimento de **nota fiscal** só é estornado por administrador, financeiro ou diretor;
-- saída de **Requisição de Material** só é estornada por quem atende o almoxarifado. A quantidade volta para a requisição, que deixa de constar como entregue.
+- saída de **Requisição de Material** só é estornada por quem atende o almoxarifado. A quantidade volta para a requisição, que deixa de constar como entregue;
+- movimento lançado por outro documento (pesagem de tinta, peça de ordem de serviço, aditivo da recuperadora) não se estorna pelo Kardex: desfaça pelo documento, para ele e o estoque ficarem iguais.
 
 Depois, lance o movimento certo.
 
@@ -195,7 +198,9 @@ As travas valem para o que é lançado pela tela. O que a plataforma lança sozi
 - A entrada que forma custo (compra, produção, saldo inicial) só é lançada com o custo unitário informado.
 - Numa transferência, a saída e a entrada usam o mesmo custo. Não se transfere entre um local que compõe o custo e outro que não compõe: isso mudaria o valor do estoque sem um tipo de baixa.
 - O produto de um lote não muda. Bloquear e liberar lote é da Qualidade.
-- Não se fecha um mês que ainda não começou. Fechar e reabrir ficam na trilha de auditoria.
+- Só se fecha um mês que já terminou. Fechar e reabrir ficam na trilha de auditoria. O fechamento espera os lançamentos em andamento, para a posição guardada bater com o Kardex.
+- No recálculo, o estorno acompanha o custo do movimento que ele desfaz.
+- O lote só aceita produto da mesma empresa; lote com movimentos só tem o código corrigido por administrador ou financeiro.
 - O lote informado precisa ser do mesmo produto.
 - Cada tipo de movimento só é lançado à mão pelos perfis definidos em **Parâmetros › Tipos de movimento**.
 - **Recalcular** só alcança produto da própria empresa.
@@ -232,3 +237,4 @@ As travas valem para o que é lançado pela tela. O que a plataforma lança sozi
 | 1.4 | 21/11/2026 | Quem lança cada tipo de movimento à mão passa a ser parâmetro (saldo inicial e ajuste de inventário restritos por padrão). Estorno de transferência desfaz as duas pernas de uma vez. Lote conferido contra o produto. Trilha de auditoria nos parâmetros. Nota cancelada sem saldo para estornar vira pendência. |
 | 1.5 | 21/11/2026 | Movimentos por período (De e Até). Kardex do produto em páginas de 200 movimentos. Movimento com data antiga recalcula sozinho; o recálculo respeita o mês fechado. Nova aba Acesso: quem consulta saldo, custo e movimentos. Entrada que forma custo exige o custo. |
 | 1.6 | 22/11/2026 | Travas do lançamento à mão (data futura, limite de dias, documento, diferença de custo). Compra, produção e tipos de nota restritos por perfil. Estorno com motivo, data e perfil conferidos, ligado à requisição de origem. Parâmetros estruturais congelados depois do primeiro movimento. Posição do estoque guardada no fechamento. |
+| 1.7 | 22/11/2026 | Perda e requisição direta restritas por perfil. Primeiro custo de um produto confirmado por administrador, financeiro ou diretor. Saída com data antiga não deixa saldo negativo em nenhum dia. Estorno de movimento de outro documento é feito pelo documento. Só se fecha mês terminado. |

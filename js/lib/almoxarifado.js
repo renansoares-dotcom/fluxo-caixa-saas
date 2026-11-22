@@ -1,4 +1,7 @@
 // Requisição de material ao almoxarifado (SQL 176), parte pura: situações, pendências, validação da entrega e indicadores.
+// colunas que qualquer participante da requisição lê; os valores (custo) vêm à parte, por alm_valores, só para quem atende e quem aprova (SQL 180)
+export const COL_REQ = 'id,empresa_id,numero,situacao,origem,solicitante_id,solicitante_nome,colaborador_id,para_nome,setor,centro_custo_id,motivo,motivo_aprovacao,decidido_por,decidido_nome,decidido_em,decisao_motivo,encerrado_motivo,criado_em,atualizado_em';
+export const COL_ENT = 'id,empresa_id,requisicao_id,entregue_por,entregue_nome,retirou_colaborador_id,retirou_nome,cracha_lido,observacao,entregue_em,estornada_em';
 export const SIT = { aprovacao: ['Aguardando aprovação', 'warn'], aberta: ['Aguardando entrega', 'previsto'], parcial: ['Entregue em parte', 'warn'], atendida: ['Entregue', 'pago'],
   encerrada: ['Encerrada com pendência', ''], recusada: ['Recusada', 'vencido'], cancelada: ['Cancelada', ''] };
 export const ABERTAS = ['aprovacao', 'aberta', 'parcial'];

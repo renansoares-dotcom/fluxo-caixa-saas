@@ -49,7 +49,7 @@ select pg_temp.falha($$select * from public.alm_saldos('e000000a-0000-0000-0000-
 -- qualquer pessoa pede: sem regra, vai direto para o almoxarifado; setor vem do cadastro da pessoa
 insert into _a select 'r1', public.alm_requisitar(:E::uuid, '[{"produto_id":"a8000000-0000-0000-0000-0000000000a1","quantidade":5},{"produto_id":"a8000000-0000-0000-0000-0000000000a3","quantidade":10,"observacao":"tamanho M"}]'::jsonb, 'Reposição do administrativo');
 select pg_temp.ok((select j->>'situacao' = 'aberta' and (j->>'numero')::int >= 1 from _a where k = 'r1'), 'pedido comum: aberta, sem aprovação');
-select pg_temp.ok((select setor = 'Administrativo' and para_nome = 'LEITORA DA SILVA' and valor_estimado = 170 and origem = 'pedido' from alm_requisicoes where id = (select (j->>'id')::uuid from _a where k = 'r1')), 'setor, pessoa e valor estimado (5×30 + 10×2)');
+select pg_temp.ok((select setor = 'Administrativo' and para_nome = 'LEITORA DA SILVA' and origem = 'pedido' from alm_requisicoes where id = (select (j->>'id')::uuid from _a where k = 'r1')), 'setor, pessoa e valor estimado (5×30 + 10×2)');
 select pg_temp.falha($$select public.alm_requisitar('e000000a-0000-0000-0000-000000000000', '[]'::jsonb)$$, 'sem item');
 select pg_temp.falha($$select public.alm_requisitar('e000000a-0000-0000-0000-000000000000', '[{"produto_id":"a8000000-0000-0000-0000-0000000000a1","quantidade":0}]'::jsonb)$$, 'quantidade zero');
 select pg_temp.falha($$select public.alm_requisitar('e000000a-0000-0000-0000-000000000000', '[{"produto_id":"a8000000-0000-0000-0000-0000000000a1","quantidade":1},{"produto_id":"a8000000-0000-0000-0000-0000000000a1","quantidade":2}]'::jsonb)$$, 'item repetido');
@@ -66,7 +66,12 @@ select pg_temp.entrar(:LEI::uuid);
 insert into _a select 'r2', public.alm_requisitar(:E::uuid, '[{"produto_id":"a8000000-0000-0000-0000-0000000000a2","quantidade":1}]'::jsonb, 'Toner da recepção');
 select pg_temp.ok((select j->>'situacao' = 'aprovacao' and j->>'motivo_aprovacao' like 'item controlado: TONER%' from _a where k = 'r2'), 'item controlado pede aprovação');
 insert into _a select 'r3', public.alm_requisitar(:E::uuid, '[{"produto_id":"a8000000-0000-0000-0000-0000000000a1","quantidade":20}]'::jsonb);
-select pg_temp.ok((select j->>'situacao' = 'aprovacao' and j->>'motivo_aprovacao' like 'valor estimado de R$ 600,00 acima do limite de R$ 500,00' from _a where k = 'r3'), 'valor acima do limite pede aprovação');
+select pg_temp.ok((select j->>'situacao' = 'aprovacao' and j->>'motivo_aprovacao' = 'valor acima do limite' from _a where k = 'r3'), 'valor acima do limite pede aprovação, sem mostrar valores a quem pediu');
+-- SQL 180: quem pediu não lê valores (custo) da requisição nem da entrega
+select pg_temp.falha($$select valor_estimado from alm_requisicoes$$, 'quem pediu não lê o valor estimado');
+select pg_temp.falha($$select motivo_detalhe from alm_requisicoes$$, 'quem pediu não lê o detalhe com valores');
+select pg_temp.falha($$select valor from alm_entregas$$, 'quem pediu não lê o valor da entrega');
+select pg_temp.ok((select count(*) = 0 from public.alm_valores('e000000a-0000-0000-0000-000000000000', array(select id from alm_requisicoes))), 'nem pela consulta de valores');
 select pg_temp.falha(format('select public.alm_decidir(%L, true)', (select j->>'id' from _a where k = 'r2')), 'quem pediu não aprova');
 select pg_temp.ok((select count(*) = 3 from alm_requisicoes), 'quem pediu vê as suas 3');
 select pg_temp.entrar(:FIN::uuid);
@@ -139,6 +144,9 @@ select pg_temp.falha(format('select public.alm_cancelar(%L, null)', (select j->>
 select pg_temp.entrar(:FIN::uuid);
 select pg_temp.ok(public.alm_aprovador(:E::uuid) and not public.alm_almoxarife(:E::uuid), 'pessoa nomeada aprovadora, sem ser almoxarife');
 select pg_temp.ok((select count(*) >= 6 from alm_requisicoes), 'aprovador vê todas');
+select pg_temp.ok((select valor_estimado = 170 from public.alm_valores('e000000a-0000-0000-0000-000000000000', array[(select (j->>'id')::uuid from _a where k = 'r1')]))
+  and (select motivo_detalhe = 'valor estimado de R$ 600,00 acima do limite de R$ 500,00' from public.alm_valores('e000000a-0000-0000-0000-000000000000', array[(select (j->>'id')::uuid from _a where k = 'r3')]))
+  and (select (select sum(v::numeric) from jsonb_each_text(entregas) x(k, v)) > 0 from public.alm_valores('e000000a-0000-0000-0000-000000000000', array[(select (j->>'id')::uuid from _a where k = 'r1')])), 'quem aprova lê valor estimado, detalhe e valor das entregas');
 select pg_temp.entrar(:ADB::uuid);
 select pg_temp.ok((select count(*) = 0 from alm_requisicoes) and (select count(*) = 0 from alm_config), 'outra empresa não vê nada');
 select pg_temp.falha($$select * from public.alm_catalogo('e000000a-0000-0000-0000-000000000000')$$, 'outra empresa não vê o catálogo');

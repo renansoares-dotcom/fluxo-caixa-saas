@@ -52,6 +52,8 @@ grant select on ids to authenticated;
 insert into est_config(empresa_id, dias_retroativos, custo_desvio_pct, exigir_documento)
   select id, null, null, false from empresas where id in ('e000000a-0000-0000-0000-000000000000', 'e000000b-0000-0000-0000-000000000000')
   on conflict (empresa_id) do update set dias_retroativos = null, custo_desvio_pct = null, exigir_documento = false;
+-- SQL 180: perda e requisição direta voltam a ficar livres nas empresas de teste
+update est_tipos_movimento set papeis_manual = null where codigo in ('PERDA', 'REQPROD', 'REQINT') and empresa_id in ('e000000a-0000-0000-0000-000000000000', 'e000000b-0000-0000-0000-000000000000');
 select pg_temp.entrar('f0000000-0000-0000-0000-00000000000f');   -- compras movimenta
 insert into est_movimentos(empresa_id, data, produto_id, local_id, lote_id, tipo_movimento_id, quantidade, custo_unitario)
   select 'e000000a-0000-0000-0000-000000000000', '2026-10-01', 'aa000000-0000-0000-0000-000000000001', mp, 'ab000000-0000-0000-0000-000000000001', compra, 1000, 8 from ids;

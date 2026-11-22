@@ -62,7 +62,10 @@ select pg_temp.falha($$select pg_temp.compra('a1', 'mp', 100, 10, current_date +
 select pg_temp.falha($$select pg_temp.compra('a1', 'mp', 100, 10, '1990-01-01', 'NF 1')$$, 'compra com data de 1990');
 select pg_temp.falha($$select pg_temp.compra('a1', 'mp', 100, 10, current_date - 61, 'NF 1')$$, 'compra além dos 60 dias');
 select pg_temp.falha($$select pg_temp.compra('a1', 'mp', 100, 10, current_date, null)$$, 'compra sem documento');
+select pg_temp.falha($$select pg_temp.compra('a1', 'mp', 1000, 10, current_date - 30, 'NF 100')$$, 'primeiro custo do produto por quem compra (SQL 180)');
+select pg_temp.entrar(:FIN::uuid);
 insert into _g(k, id) select 'c1', pg_temp.compra('a1', 'mp', 1000, 10, current_date - 30, 'NF 100');
+select pg_temp.entrar(:CMP::uuid);
 select pg_temp.falha($$select pg_temp.compra('a1', 'mp', 1, 99999, current_date, 'NF 101')$$, 'custo fora da faixa por quem compra');
 select pg_temp.falha($$select pg_temp.compra('a1', 'mp', 1, 0.01, current_date, 'NF 101')$$, 'custo de um centavo por quem compra');
 select pg_temp.compra('a1', 'mp', 100, 14, current_date, 'NF 102');   -- 40 % acima: dentro da faixa
@@ -90,8 +93,9 @@ select pg_temp.falha(format('select public.est_estornar(%L, current_date, %L)', 
 -- saída de requisição: o estorno devolve a quantidade à requisição
 select pg_temp.entrar(:ADM::uuid);
 select public.alm_config_salvar(:E::uuid, 500, '{admin,diretor,compras}', '{}', '{admin,diretor}', '{}', false, true, null, true);
-select pg_temp.entrar(:CMP::uuid);
+select pg_temp.entrar(:FIN::uuid);
 select pg_temp.compra('a2', 'uc', 100, 30, current_date, 'NF 200');
+select pg_temp.entrar(:CMP::uuid);
 insert into _g(k, j) select 'r1', public.alm_requisitar(:E::uuid, '[{"produto_id":"b1000000-0000-0000-0000-0000000000a2","quantidade":15}]'::jsonb, 'Toner da recepção');
 select public.alm_entregar((select (j->>'id')::uuid from _g where k = 'r1'),
   (select jsonb_agg(jsonb_build_object('item_id', i.id, 'quantidade', 15, 'local_id', (select uc from b1))) from alm_requisicao_itens i where i.requisicao_id = (select (j->>'id')::uuid from _g where k = 'r1')),
@@ -116,9 +120,8 @@ insert into _g(k, j) select 'l2', public.alm_requisitar(:E::uuid, '[{"produto_id
 select pg_temp.ok((select j->>'situacao' = 'aberta' from _g where k = 'l2'), 'o pedido de outra pessoa, dentro do limite, segue direto');
 
 -- ============================================================ 3. inventário
-select pg_temp.entrar(:CMP::uuid);
-select pg_temp.compra('a3', 'uc', 100, 10, current_date, 'NF 300');
 select pg_temp.entrar(:FIN::uuid);
+select pg_temp.compra('a3', 'uc', 100, 10, current_date, 'NF 300');
 insert into _g(k, id) select 'inv', public.est_inv_gerar(:E::uuid, (select uc from b1), null, array['b1000000-0000-0000-0000-0000000000a3']::uuid[]);
 select public.est_inv_contar(i.id, 90) from est_inv_itens i where contagem_id = (select id from _g where k = 'inv');
 select public.est_inv_contar(i.id, 90, 'caixa aberta, faltam 10') from est_inv_itens i where contagem_id = (select id from _g where k = 'inv') and situacao = 'recontar';
