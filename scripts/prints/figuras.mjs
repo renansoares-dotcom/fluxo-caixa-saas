@@ -82,6 +82,10 @@ export const FIGS = [
   ['conciliacao', 'conciliacao', '### 4.1', 'Aceitar sugestões pela faixa de confiança', 'click:#aceitar'],
   ['conciliacao', 'conciliacao', '### 4.1.1', 'Parâmetros: janelas de dias, faixas de confiança e os pontos de cada critério', 'click:#cpar'],
   ['conciliacao', 'conciliacao', '## 3.', 'Extratos por conta: último extrato, formato, pendentes e as contas atrasadas', 'click:#exts'],
+  ['inventario-geral', 'estoque/inventario-geral', '## 3.', 'Inventário Geral: os inventários já feitos e o que está em andamento'],
+  ['inventario-geral', 'estoque/inventario-geral?i=ig-2', '## 4.', 'Painel do inventário: situação de cada local, acuracidade e o resultado'],
+  ['inventario-geral', 'estoque/inventario-geral?i=ig-2&l=igl-1', '## 5.', 'Contagem cega pelo celular ou pelo leitor: a lista não traz o saldo do sistema'],
+  ['inventario-geral', 'estoque/inventario-geral', '## 10.', 'Parâmetros: amostra da auditoria, tolerâncias e quem aprova', 'click:#ig-par'],
   ['estoque-kardex', 'estoque/kardex', '## 3.', 'Kardex: saldo por local ao custo médio'],
   ['estoque-kardex', 'estoque/parametros', '## 4.', 'Parâmetros do Estoque: os locais'],
   // formulários e listas revistos na auditoria de design (11/2026); a numeração segue a ordem do texto (inserir.mjs)

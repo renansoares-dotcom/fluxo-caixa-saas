@@ -1588,6 +1588,41 @@ window.RPC.pag_remessa_gravar = () => null;
   const hoje = Date.parse('2026-11-08');
   window.RPC.est_inv_abc = () => [...it.map((x, k) => ({ produto_id: x.p, classe: x.cl, valor: x.s * x.cu, ultima_contagem: k < 5 ? '2026-11-06T10:00:00Z' : null })),
     ...Array.from({ length: 34 }, (_, k) => ({ produto_id: 'abc-' + k, classe: k < 4 ? 'A' : k < 12 ? 'B' : 'C', valor: 1000, ultima_contagem: k % 3 ? new Date(hoje - (k * 6) * 864e5).toISOString() : null }))];
+
+  // Inventário geral (SQL 182) — o inventário do dia 01, FICTÍCIO: três locais, um contando, um em auditoria e um concluído
+  DB.est_ig_config = [{ empresa_id: E, amostra_pct: 100, amostra_classe_a: true, amostra_divergentes: true, tolerancia_pct: 2, tolerancia_valor: 100, dif_auditoria_pct: 0.5, papeis_aprovacao: ['admin', 'diretor', 'financeiro'], aprovar_quem_contou: false, fechar_mes: true }];
+  DB.est_ig_inventarios = [
+    { id: 'ig-2', empresa_id: E, numero: 2, referencia: '2026-10-31', implantacao: false, situacao: 'aberto', observacao: 'Inventário do dia 01', criado_nome: 'Ana Souza', criado_em: '2026-11-01T06:50:00Z' },
+    { id: 'ig-1', empresa_id: E, numero: 1, referencia: '2026-09-30', implantacao: true, situacao: 'aprovado', criado_nome: 'Ana Souza', criado_em: '2026-10-01T06:45:00Z', decidido_nome: 'Carlos Lima', decidido_em: '2026-10-01T15:20:00Z', ajustes: 148, valor_ajuste: 412380.5, mes_fechado: true }];
+  const G = (k, cod, resp, rn, aud, an, sit, extra = {}) => ({ id: 'igl-' + k, inventario_id: 'ig-2', empresa_id: E, local_id: lc(cod), responsavel_id: resp, responsavel_nome: rn, auditor_id: aud, auditor_nome: an, situacao: sit, ...extra });
+  DB.est_ig_locais = [G(1, 'MP', 'u1', 'Renata Alves', 'u4', 'Beatriz Rocha', 'contando', { iniciado_em: '2026-11-01T07:05:00Z' }),
+    G(2, 'INS', 'u4', 'Beatriz Rocha', 'u2', 'Ana Souza', 'auditando', { iniciado_em: '2026-11-01T07:00:00Z', contado_em: '2026-11-01T08:10:00Z' }),
+    G(3, 'UC', 'u2', 'Ana Souza', 'u1', 'Renata Alves', 'concluido', { iniciado_em: '2026-11-01T07:00:00Z', contado_em: '2026-11-01T07:48:00Z', auditado_em: '2026-11-01T08:35:00Z', concluido_em: '2026-11-01T08:52:00Z' })].filter(l => l.local_id);
+  const igl = (k) => DB.est_ig_locais.find(l => l.id === 'igl-' + k) || {};
+  const X = (k, loc, cod, desc, un, sis, custo, cont, aud, ter, fim, sit, just) => ({ item_id: 'igi-' + k, ig_local_id: 'igl-' + loc, local_id: igl(loc).local_id, produto_id: 'pi-' + cod, codigo: cod, descricao: desc, unidade: un, lote: null, saldo_ref: sis, custo,
+    contado: cont, na_amostra: loc !== 1, auditado: aud, terceira: ter, final: fim, situacao: sit, incluido: cod === 'UC-044', justificativa: just || null, diferenca: (fim ?? cont) == null ? null : (fim ?? cont) - sis, valor: (fim ?? cont) == null ? null : Math.round(((fim ?? cont) - sis) * custo * 100) / 100, movimento_id: null });
+  const det = [
+    X(1, 1, 'MP-001', 'RESINA PEBD LINEAR', 'KG', 1800, 8.4, 1795, null, null, null, 'contado'), X(2, 1, 'MP-007', 'RESINA PEAD SOPRO', 'KG', 3950, 8.9, 3950, null, null, null, 'contado'),
+    X(3, 1, 'MP-002', 'MASTERBATCH BRANCO', 'KG', 1820, 14.2, null, null, null, null, 'pendente'), X(4, 1, 'MP-019', 'ADITIVO ANTIBLOQUEIO', 'KG', 375, 22.4, null, null, null, null, 'pendente'),
+    X(5, 1, 'MP-021', 'MASTERBATCH PRETO', 'KG', 640, 12.9, 640, null, null, null, 'contado'), X(6, 1, 'MP-030', 'ADITIVO DESLIZANTE', 'KG', 210, 19.8, null, null, null, null, 'pendente'),
+    X(7, 2, 'IN-010', 'TINTA FLEXO AZUL', 'KG', 86, 41.5, 84, 84, null, null, 'contado'), X(8, 2, 'IN-014', 'SOLVENTE ACETATO', 'L', 400, 9.7, 380, null, null, null, 'contado'),
+    X(9, 2, 'IN-031', 'TUBETE 76 MM', 'UN', 1250, 1.85, 1250, 1250, null, null, 'contado'), X(10, 2, 'IN-040', 'FITA ADESIVA 48 MM', 'RL', 96, 6.2, 96, null, null, null, 'contado'),
+    X(11, 3, 'UC-003', 'LUVA DE MALHA', 'PAR', 240, 4.9, 236, 236, null, 236, 'conferido'), X(12, 3, 'UC-011', 'ESTILETE INDUSTRIAL', 'UN', 60, 12.5, 60, 60, null, 60, 'conferido'),
+    X(13, 3, 'UC-020', 'DESENGRAXANTE 5 L', 'UN', 18, 64, 15, 16, 16, 16, 'resolvido', 'Dois galões estavam na manutenção'), X(14, 3, 'UC-027', 'PROTETOR AURICULAR', 'UN', 500, 1.2, 500, 500, null, 500, 'conferido'),
+    X(15, 3, 'UC-044', 'ÓCULOS DE PROTEÇÃO', 'UN', 0, 9.8, 12, 12, null, 12, 'conferido')].filter(i => i.local_id);
+  Object.assign(window.RPC, {
+    est_ig_pessoas: () => DB.membros.filter(m => ['admin', 'financeiro', 'diretor', 'compras'].includes(m.papel)).map(m => ({ user_id: m.user_id, nome: m.nome, papel: m.papel })),
+    est_ig_detalhe: (a) => (a.p_inventario === 'ig-2' ? det : []),
+    est_ig_andamento: (a) => (a.p_inventario !== 'ig-2' ? [] : DB.est_ig_locais.map(l => { const L = det.filter(i => i.ig_local_id === l.id); return { ig_local_id: l.id, itens: L.length, contados: L.filter(i => i.contado != null).length,
+      na_amostra: L.filter(i => i.na_amostra).length, auditados: L.filter(i => i.auditado != null).length, divergentes: 0, resolvidos: L.filter(i => i.situacao === 'resolvido').length }; })),
+    est_ig_acuracidade: (a) => (a.p_inventario !== 'ig-2' ? [] : DB.est_ig_locais.map(l => { const L = det.filter(i => i.ig_local_id === l.id && i.contado != null), ok = L.filter(i => Math.abs(i.diferenca) <= i.saldo_ref * 0.02 && Math.abs(i.valor) <= 100).length;
+      const vs = L.reduce((t, i) => t + i.saldo_ref * i.custo, 0), vd = L.reduce((t, i) => t + Math.abs(i.valor), 0);
+      return { ig_local_id: l.id, local_id: l.local_id, itens: L.length, itens_certos: ok, pct_itens: L.length ? Math.round(1000 * ok / L.length) / 10 : null, valor_sistema: vs, valor_diferenca: vd, pct_valor: vs ? Math.round(1000 * (1 - vd / vs)) / 10 : null,
+        auditados: L.filter(i => i.auditado != null).length, divergiu_auditoria: L.filter(i => i.terceira != null).length, pct_auditoria: null, minutos_contagem: l.contado_em ? Math.round((Date.parse(l.contado_em) - Date.parse(l.iniciado_em)) / 6e4) : null, minutos_auditoria: null }; })),
+    est_ig_lista: (a) => det.filter(i => i.ig_local_id === a.p_ig_local).map(i => ({ item_id: i.item_id, produto_id: i.produto_id, codigo: i.codigo, descricao: i.descricao, unidade: i.unidade, etiqueta: null, lote_id: null, lote: null, lote_etiqueta: null,
+      quantidade: i.contado, feito: i.contado != null, incluido: i.incluido, situacao: i.situacao, papel: 'contador', contado: null, auditado: null })),
+    est_ig_contar: () => null, est_ig_incluir: () => 'igi-x', est_ig_concluir_contagem: () => 'auditando', est_ig_concluir_auditoria: () => 'concluido', est_ig_terceira: () => 'concluido',
+    est_ig_aprovar: () => ({ ajustes: 5, valor: -214.6, mes_fechado: true, implantacao: false }), est_ig_cancelar: () => null, est_ig_trocar: () => null, est_ig_custo: () => null, est_ig_config_salvar: () => null, est_ig_abrir: () => 'ig-2' });
 }
 
 // Programação inteligente (SQL 121) — OPs de impressão FICTÍCIAS com cores e impedimentos
