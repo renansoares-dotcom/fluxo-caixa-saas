@@ -1623,6 +1623,28 @@ window.RPC.pag_remessa_gravar = () => null;
       quantidade: i.contado, feito: i.contado != null, incluido: i.incluido, situacao: i.situacao, papel: 'contador', contado: null, auditado: null })),
     est_ig_contar: () => null, est_ig_incluir: () => 'igi-x', est_ig_concluir_contagem: () => 'auditando', est_ig_concluir_auditoria: () => 'concluido', est_ig_terceira: () => 'concluido',
     est_ig_aprovar: () => ({ ajustes: 5, valor: -214.6, mes_fechado: true, implantacao: false }), est_ig_cancelar: () => null, est_ig_trocar: () => null, est_ig_custo: () => null, est_ig_config_salvar: () => null, est_ig_abrir: () => 'ig-2' });
+
+  // Recebimento conferido (SQL 186) — notas FICTÍCIAS a receber, uma conferência em andamento e as recebidas
+  DB.est_config = (DB.est_config || []).map(c => ({ ...c, entrada_por: 'recebimento', receb_desde: '2026-11-01', receb_cega: true, receb_tolerancia_pct: 0.5 }));
+  const NF = (id, numero, emit_nome, emissao, v_nf) => ({ id, numero, serie: '1', emit_nome, emit_doc: '11222333000155', emissao, v_nf });
+  const NFS = [NF('rn1', 48213, 'PETROQUÍMICA EXEMPLO', '2026-11-19', 61250), NF('rn2', 9921, 'TINTAS GRÁFICAS EXEMPLO', '2026-11-20', 8420.5), NF('rn3', 1530, 'EMBALAGENS ALFA', '2026-11-21', 3190),
+    NF('rn4', 77801, 'DISTRIBUIDORA DE RESINAS ALFA', '2026-11-12', 40500), NF('rn5', 3312, 'FITAS E ADESIVOS BETA', '2026-11-10', 960)];
+  DB.nfe_notas = [...(DB.nfe_notas || []), ...NFS.map(x => ({ ...x, empresa_id: E, tipo: 'entrada', emissao_propria: false, situacao: 'autorizada' }))];
+  DB.est_recebimentos = [
+    { id: 'rc3', empresa_id: E, numero: 14, nota_id: 'rn3', situacao: 'conferindo', conferente_nome: 'Beatriz Rocha', iniciado_em: '2026-11-22T13:05:00Z', divergencias: 0 },
+    { id: 'rc2', empresa_id: E, numero: 13, nota_id: 'rn4', situacao: 'conferido', data: '2026-11-14', conferente_nome: 'Beatriz Rocha', conferido_em: '2026-11-14T10:20:00Z', divergencias: 1, observacao: 'Um saco rasgado', nfe_notas: { numero: 77801, emit_nome: 'DISTRIBUIDORA DE RESINAS ALFA', emissao: '2026-11-12' } },
+    { id: 'rc1', empresa_id: E, numero: 12, nota_id: 'rn5', situacao: 'conferido', data: '2026-11-11', conferente_nome: 'Carlos Lima', conferido_em: '2026-11-11T15:00:00Z', divergencias: 0, nfe_notas: { numero: 3312, emit_nome: 'FITAS E ADESIVOS BETA', emissao: '2026-11-10' } }];
+  const RI = { rc3: [
+      { item_id: 'ri1', n_item: 1, cprod: 'CX-TB76', xprod: 'TUBETE PAPELAO 76MM CX 100', ucom: 'CX', produto_codigo: 'IN-031', produto_descricao: 'TUBETE 76 MM', qtd_nota: 12, contada: 12, avariada: 0 },
+      { item_id: 'ri2', n_item: 2, cprod: 'FT-48', xprod: 'FITA ADESIVA 48X100 TRANSP', ucom: 'RL', produto_codigo: 'IN-040', produto_descricao: 'FITA ADESIVA 48 MM', qtd_nota: 144, contada: 140, avariada: 4 },
+      { item_id: 'ri3', n_item: 3, cprod: 'SC-60X90', xprod: 'SACO PLASTICO 60X90 PCT 100', ucom: 'PCT', produto_codigo: null, produto_descricao: null, qtd_nota: 20, contada: null, avariada: 0 },
+      { item_id: 'ri4', n_item: 4, cprod: 'ETQ-100', xprod: 'ETIQUETA 100X150 ROLO', ucom: 'RL', produto_codigo: 'IN-052', produto_descricao: 'ETIQUETA 100X150', qtd_nota: 30, contada: null, avariada: 0 }],
+    rc2: [{ item_id: 'rj1', n_item: 1, cprod: 'PEBD-2022', xprod: 'POLIETILENO BAIXA DENSIDADE 2022N SC 25KG', ucom: 'SC', produto_codigo: 'MP-001', produto_descricao: 'RESINA PEBD LINEAR', qtd_nota: 180, contada: 180, avariada: 1, qtd_entra: 179, divergencia: 'avariado 1' }] };
+  Object.assign(window.RPC, {
+    est_receb_fila: () => [['rn1', null, 0], ['rn2', null, 0], ['rn3', 'rc3', 2]].map(([id, rid, cont]) => { const x = NFS.find(y => y.id === id); const it = rid ? RI[rid].length : (id === 'rn1' ? 2 : 6);
+      return { nota_id: id, numero: x.numero, serie: x.serie, emit_nome: x.emit_nome, emit_doc: x.emit_doc, emissao: x.emissao, v_nf: x.v_nf, itens: it, recebimento_id: rid, situacao: rid ? 'conferindo' : 'a_receber', conferente_nome: rid ? 'Beatriz Rocha' : null, contados: cont, dias: Math.round((Date.parse('2026-11-22') - Date.parse(x.emissao)) / 864e5) }; }),
+    est_receb_itens: (a) => (RI[a.p_receb] || []).map(i => ({ ...i, qtd_nota: a.p_receb === 'rc3' ? null : i.qtd_nota, etiqueta: null })),
+    est_receb_iniciar: () => 'rc3', est_receb_contar: () => null, est_receb_concluir: () => ({ divergencias: 1, lancados: 3 }), est_receb_dispensar: () => null, est_receb_salvar: () => null });
 }
 
 // Programação inteligente (SQL 121) — OPs de impressão FICTÍCIAS com cores e impedimentos
