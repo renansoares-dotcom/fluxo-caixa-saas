@@ -2,7 +2,7 @@
 // mostrar o saldo por local e movimentar (transferir ou dar saída) sem escolher produto e lote na mão.
 import { sb, state, q } from './data.js';
 import { $, $$, esc, modal, toast, fail, dateBR, today } from './ui.js';
-import { PADRAO, TIPOS_CODIGO, expandir, documentoEtiquetas, htmlEtiqueta, cssEtiquetas } from './etiquetas.js';
+import { PADRAO, TIPOS_CODIGO, expandir, documentoEtiquetas, htmlEtiqueta, cssEtiquetas, documentoEnderecos, htmlEndereco, cssEnderecos } from './etiquetas.js';
 import { EMPRESA_REL } from './relatorio-base.js';
 
 const PODE_MOVIMENTAR = ['admin', 'financeiro', 'diretor', 'compras', 'producao'];
@@ -76,9 +76,47 @@ export async function etiquetasDaNota(nota) {
 /** etiqueta de um lote ou de um produto (Kardex) */
 export const etiquetaDe = (p, l, extra = {}) => imprimirEtiquetas([itemDe(p, l, extra)], { titulo: `Etiqueta — ${p.codigo}${l ? ' · lote ' + l.codigo : ''}` });
 
+/** etiquetas de prateleira (SQL 193): lista = [{ etiqueta, codigo, local, descricao }] */
+export async function imprimirEnderecos(lista) {
+  if (!lista?.length) return toast('Nenhum endereço para imprimir', true);
+  if (lista.length > 1500) return toast('Muitas etiquetas de uma vez (máximo 1.500). Imprima por estante.', true);
+  const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
+  try {
+    const cfg = await etqConfig(), svgs = {};
+    for (const x of lista) svgs[x.etiqueta] = await desenhar(x.etiqueta, cfg.codigo);
+    w.document.write(documentoEnderecos(lista, cfg, svgs, EMPRESA_REL)); w.document.close();
+  } catch (err) { w.close(); fail(err); }
+}
+
+/** etiqueta de prateleira lida: o que deve estar no endereço e o saldo de cada produto no local */
+export async function enderecoLido(r) {
+  const e = state.empresa?.id; if (!e) return;
+  let en, loc, PE, P = [], S = [];
+  try {
+    en = await q(sb.from('est_enderecos').select('*').eq('empresa_id', e).eq('etiqueta', r.codigo).maybeSingle());
+    if (!en) return toast(`Etiqueta ${r.codigo}: endereço não encontrado nesta empresa.`, true);
+    [loc, PE] = await Promise.all([q(sb.from('est_locais').select('id,nome').eq('id', en.local_id).single()), q(sb.from('est_produto_enderecos').select('produto_id').eq('endereco_id', en.id))]);
+    const ids = PE.map(x => x.produto_id);
+    if (ids.length) [P, S] = await Promise.all([q(sb.from('produtos').select('id,codigo,descricao,unidade').in('id', ids).order('descricao')),
+      q(sb.from('est_saldos').select('produto_id,quantidade').eq('local_id', en.local_id).in('produto_id', ids))]);
+  } catch (err) { return pendente(err) || /est_enderecos/.test(err?.message || '') ? toast('Os endereços precisam do SQL 193.', true) : fail(err); }
+  const saldo = (id) => S.filter(x => x.produto_id === id).reduce((t, x) => t + +x.quantidade, 0), viuSaldo = S.length > 0;
+  const m = modal({ title: `Endereço ${en.codigo} — ${loc.nome}`, wide: true, body: `
+    <div class="grid-form small"><div><span class="muted">Etiqueta lida</span><div style="font-family:monospace"><b>${esc(r.codigo)}</b></div></div>
+      <div><span class="muted">Endereço</span><div><b>${esc(en.codigo)}</b>${en.descricao ? ' · ' + esc(en.descricao) : ''}${en.ativo ? '' : ' <span class="badge vencido">inativo</span>'}</div></div>
+      <div><span class="muted">Produtos neste endereço</span><div><b>${P.length}</b></div></div></div>
+    <h3 style="margin:14px 0 6px">O que deve estar aqui</h3>
+    <div class="table-wrap"><table><thead><tr><th>Produto</th><th class="num">Saldo no local</th></tr></thead><tbody>
+    ${P.map(p => `<tr><td class="wrap"><b>${esc(p.codigo)}</b> ${esc(p.descricao)}</td><td class="num">${viuSaldo ? `${qtd(saldo(p.id))} ${esc(p.unidade || '')}` : '—'}</td></tr>`).join('') || '<tr><td colspan="2" class="empty">Nenhum produto neste endereço. Use Endereçar com o leitor: leia esta etiqueta e depois a de cada produto.</td></tr>'}</tbody></table></div>
+    ${P.length && !viuSaldo ? '<p class="small muted">Saldo não exibido: sem saldo no local ou local em contagem cega.</p>' : ''}`,
+    foot: `<a class="btn ghost" href="#/estoque/enderecos?l=${en.local_id}" data-close>Endereços</a><span class="spacer"></span><button class="btn" data-close>Fechar</button><a class="btn primary" href="#/estoque/enderecos?l=${en.local_id}&modo=leitor&e=${en.id}" data-close>Endereçar aqui</a>` });
+  return m;
+}
+
 /** etiqueta lida: saldo por local e movimentação */
 export async function etiquetaLida(r) {
   const e = state.empresa?.id; if (!e) return;
+  if (r.alvo === 'endereco') return enderecoLido(r);
   let p, l = null, S, LOC, TM;
   try {
     if (r.alvo === 'lote') {
@@ -170,6 +208,25 @@ export async function abaEtiquetas(c, ed) {
     try { await q(sb.rpc('etq_config_salvar', { p_empresa: state.empresa.id, p_codigo: g.codigo, p_largura: g.largura_mm, p_altura: g.altura_mm, p_copias: g.copias, p_fornecedor: g.mostrar_fornecedor })); toast('Parâmetros da etiqueta salvos'); }
     catch (err) { pendente(err) ? toast('Os parâmetros da etiqueta precisam do SQL 175.', true) : fail(err); }
     ev.target.disabled = false; });
+  // etiqueta de prateleira (SQL 193): tamanho próprio, o mesmo tipo de código
+  const ex2 = { etiqueta: 'E0000789', codigo: 'A-03-2', local: 'Almoxarifado', descricao: 'Estante A, prateleira 3, nível 2' };
+  c.firstElementChild.insertAdjacentHTML('afterend', `<div class="card" style="max-width:980px;margin-top:14px"><h2 style="margin-top:0">Etiqueta de prateleira</h2>
+    <p class="small muted" style="margin-top:0">Identifica o endereço (estante, prateleira e nível) em Estoque › Endereços. Usa o mesmo tipo de código da etiqueta de mercadoria; o tamanho é próprio, porque costuma ser uma tira.</p>
+    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start"><div class="grid-form" style="flex:1;min-width:300px">
+      <label>Largura (mm)<input type="number" id="pe-ew" min="30" max="210" value="${cfg.end_largura_mm}" ${ed ? '' : 'disabled'}></label>
+      <label>Altura (mm)<input type="number" id="pe-eh" min="15" max="297" value="${cfg.end_altura_mm}" ${ed ? '' : 'disabled'}></label>
+      ${ed ? '<div class="span2"><button class="btn primary" id="pe-eok">Salvar</button> <button class="btn" id="pe-eteste">Imprimir etiqueta de teste</button></div>' : ''}</div>
+      <div><div class="small muted" style="margin-bottom:6px">Prévia (dados fictícios)</div><div id="pe-eprev" style="border:1px solid var(--line);background:#fff;color:#000;display:inline-block"></div></div></div></div>`);
+  const lidoE = () => ({ ...lido(), end_largura_mm: +$('#pe-ew', c).value || 100, end_altura_mm: +$('#pe-eh', c).value || 40 });
+  const previaE = async () => { const g = lidoE(); try { const svg = await desenhar(ex2.etiqueta, g.codigo);
+    $('#pe-eprev', c).innerHTML = `<style>${cssEnderecos(g).replace(/@page\{[^}]*\}/, '').replace(/html,body\{[^}]*\}/, '').replace(/body\{[^}]*\}/g, '').replace(/@media screen\{.*$/s, '')}</style><div style="font-family:Arial,Helvetica,sans-serif">${htmlEndereco(ex2, g, svg, EMPRESA_REL)}</div>`; } catch { $('#pe-eprev', c).textContent = 'Não foi possível desenhar a prévia.'; } };
+  ['pe-ew', 'pe-eh', 'pe-cod'].forEach(id => $('#' + id, c).addEventListener('change', previaE)); previaE();
+  $('#pe-eok', c) && ($('#pe-eok', c).onclick = async (ev) => { const g = lidoE(); ev.target.disabled = true;
+    try { await q(sb.rpc('etq_config_endereco_salvar', { p_empresa: state.empresa.id, p_largura: g.end_largura_mm, p_altura: g.end_altura_mm })); toast('Tamanho da etiqueta de prateleira salvo'); }
+    catch (err) { /etq_config_endereco_salvar|schema cache/.test(err?.message || '') ? toast('A etiqueta de prateleira precisa do SQL 193.', true) : fail(err); }
+    ev.target.disabled = false; });
+  $('#pe-eteste', c) && ($('#pe-eteste', c).onclick = async () => { const g = lidoE(); const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
+    try { w.document.write(documentoEnderecos([ex2], g, { [ex2.etiqueta]: await desenhar(ex2.etiqueta, g.codigo) }, EMPRESA_REL)); w.document.close(); } catch (err) { w.close(); fail(err); } });
   $('#pe-teste', c) && ($('#pe-teste', c).onclick = async () => { const g = lido(); const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
     try { w.document.write(documentoEtiquetas([exemplo], g, { [exemplo.etiqueta]: await desenhar(exemplo.etiqueta, g.codigo) }, EMPRESA_REL)); w.document.close(); } catch (err) { w.close(); fail(err); } });
 }

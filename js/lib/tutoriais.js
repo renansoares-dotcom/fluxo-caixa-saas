@@ -62,6 +62,8 @@ export const MANUAIS = [
     resumo: 'Roteiro da implantação, espelho do Iniflex, ponto de pedido e requisição automática, cadastro de produtos e de-para de fornecedores.' },
   { id: 'recebimento', titulo: 'Recebimento de Notas — conferência na chegada', area: 'Compras', rotas: ['estoque/recebimento'],
     resumo: 'A nota de compra entra no estoque quando o material é conferido na chegada: conferência cega pelo celular ou leitor, data da chegada, custo da nota e aviso de divergência para Compras.' },
+  { id: 'enderecos', titulo: 'Endereços e etiquetas — organizar o almoxarifado', area: 'Compras', rotas: ['estoque/enderecos'],
+    resumo: 'Estante, prateleira e nível de cada produto, etiqueta de prateleira, endereçamento com o leitor, etiquetas de mercadoria em lote e guia de contagem na ordem do corredor.' },
   { id: 'inventario-geral', titulo: 'Inventário Geral — o inventário do dia 01', area: 'Compras', rotas: ['estoque/inventario-geral'],
     resumo: 'Inventário completo por local: data de referência, locais congelados, contagem cega, auditoria cega por outra pessoa, terceira contagem, ajustes na data de referência e fechamento do mês.' },
   { id: 'estoque-kardex', titulo: 'Kardex e parâmetros do estoque', area: 'Compras', rotas: ['estoque/kardex', 'estoque/parametros'],

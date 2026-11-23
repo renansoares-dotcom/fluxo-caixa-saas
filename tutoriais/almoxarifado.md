@@ -1,7 +1,7 @@
 ---
 titulo: Requisição de Material — pedir, aprovar e entregar pelo almoxarifado
 tela: Painéis › Requisição de Material (PAI015)
-versao: 1.8
+versao: 1.9
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -78,7 +78,7 @@ A aba **Atender** é a fila do almoxarifado, da requisição mais antiga para a 
 ![Figura 3 — Atender: fila das requisições liberadas para entrega (dados fictícios)](img/almoxarifado-3.jpg)
 
 1. Clique em **Entregar**.
-2. Confira a quantidade de cada item. A plataforma sugere o local com mais saldo e limita a entrega ao que existe.
+2. Confira a quantidade de cada item. A plataforma sugere o local com mais saldo e limita a entrega ao que existe. Se o produto tem endereço (Estoque › Endereços), ele aparece ao lado do local, e os itens vêm na ordem do corredor.
 3. **Identifique quem está retirando.** Leia o crachá com o leitor, escolha a pessoa na lista ou digite o nome.
 4. Clique em **Registrar a entrega**.
 
@@ -208,3 +208,4 @@ A entrega segue as regras do estoque: não deixa o saldo ficar negativo, não la
 | 1.6 | 22/11/2026 | Devolução ao almoxarifado: volta ao custo da saída, no mesmo local, lote e centro de custo; material avariado registrado sem voltar ao estoque; prazo por parâmetro (SQL 185). |
 | 1.7 | 22/11/2026 | A devolução acompanha o custo recalculado da saída. Durante o inventário geral, quem conta ou audita não vê no catálogo os itens do seu local. |
 | 1.8 | 22/11/2026 | Material devolvido avariado vai para o local Avariados, sem valor, até o descarte (SQL 188). |
+| 1.9 | 22/11/2026 | Entrega mostra o endereço de cada item ao lado do local e lista os itens na ordem do corredor (SQL 193). |

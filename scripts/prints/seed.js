@@ -2893,3 +2893,26 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
     alm_config_salvar: () => null, alm_controlar: (a) => { a.p_sim ? ctrl.add(a.p_produto) : ctrl.delete(a.p_produto); return null; },
   });
 }
+
+// ---------- endereçamento (SQL 193) — almoxarifado de estantes FICTÍCIO: A a D, 4 prateleiras, 2 níveis ----------
+{
+  const E0 = DB.empresas[0].id, uc = DB.est_locais.find(l => l.finalidade === 'uso_consumo'), mp = DB.est_locais.find(l => l.codigo === 'MP');
+  uc.enderecado = true;
+  let n = 4100, o = 0; DB.est_enderecos = [];
+  const gera = (loc, ests, prat, niv) => { for (const e of ests) for (let p = 1; p <= prat; p++) for (let v = 1; v <= Math.max(niv, 1); v++) {
+    const codigo = `${e}-${String(p).padStart(2, '0')}${niv ? '-' + v : ''}`;
+    DB.est_enderecos.push({ id: `en-${loc.codigo}-${codigo}`, empresa_id: E0, local_id: loc.id, codigo, estante: e, prateleira: String(p).padStart(2, '0'), nivel: niv ? String(v) : null, descricao: null, ordem: (o += 10), etiqueta: 'E' + String(++n).padStart(7, '0'), ativo: true }); } };
+  gera(uc, ['A', 'B', 'C', 'D'], 4, 2); if (mp) gera(mp, ['R1', 'R2'], 3, 0);
+  DB.est_enderecos.push({ id: 'en-UC-PISO-01', empresa_id: E0, local_id: uc.id, codigo: 'PISO-01', estante: 'PISO', prateleira: '01', nivel: null, descricao: 'Paletes perto da porta', ordem: (o += 10), etiqueta: 'E' + String(++n).padStart(7, '0'), ativo: true });
+  const en = (loc, c) => DB.est_enderecos.find(x => x.local_id === loc.id && x.codigo === c)?.id, pr = (c) => DB.produtos.find(p => p.codigo === c)?.id;
+  DB.est_produto_enderecos = [['UC-101', 'A-01-1'], ['UC-102', 'A-01-2'], ['UC-103', 'A-02-1'], ['UC-104', 'B-01-1'], ['UC-106', 'B-01-2'], ['UC-010', 'B-02-1'], ['UC-105', 'PISO-01']]
+    .map(([p, e]) => ({ produto_id: pr(p), local_id: uc.id, empresa_id: E0, endereco_id: en(uc, e) })).filter(x => x.produto_id && x.endereco_id);
+  const ENDMP = { 'MP-001': 'R1-01', 'MP-007': 'R1-02', 'MP-021': 'R1-03', 'MP-002': 'R2-01', 'MP-019': 'R2-02' };
+  const lista0 = window.RPC.est_ig_lista;
+  window.RPC.est_ig_lista = (a) => lista0(a).map(i => { const e = ENDMP[i.codigo] && mp && DB.est_enderecos.find(x => x.local_id === mp.id && x.codigo === ENDMP[i.codigo]);
+    return { ...i, endereco_id: e?.id || null, endereco: e?.codigo || null, endereco_ordem: e?.ordem ?? null }; }).sort((x, y) => (x.endereco_ordem ?? 1e9) - (y.endereco_ordem ?? 1e9));
+  Object.assign(window.RPC, { est_end_gerar: () => 18, est_end_salvar: () => 'en-novo', est_end_excluir: () => 1, est_end_ordenar: () => null,
+    est_end_atribuir: (a) => ({ atribuidos: a.p_itens.filter(x => x.endereco_id).length, removidos: a.p_itens.filter(x => !x.endereco_id).length,
+      trocados: a.p_itens.map(x => { const ant = DB.est_produto_enderecos.find(y => y.produto_id === x.produto_id && y.local_id === x.local_id); const de = ant && DB.est_enderecos.find(e => e.id === ant.endereco_id)?.codigo, para = DB.est_enderecos.find(e => e.id === x.endereco_id)?.codigo;
+        return de && para && de !== para ? { produto: x.produto_id, de, para } : null; }).filter(Boolean) }), etq_config_endereco_salvar: () => null });
+}

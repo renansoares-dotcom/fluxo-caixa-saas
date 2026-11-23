@@ -1,7 +1,7 @@
 ---
 titulo: Inventário Geral — o inventário do dia 01
 tela: Compras › Estoque › Inventário Geral (EST010)
-versao: 1.4
+versao: 1.5
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -117,6 +117,10 @@ Depois de registrar, o campo do código volta a ficar pronto para a próxima lei
 
 Para corrigir, clique em **Corrigir** na linha, enquanto a contagem do local não foi concluída.
 
+**Na ordem do corredor.** Os itens que têm endereço (Estoque › Endereços) aparecem com o endereço na frente e na ordem das prateleiras. O que não tem endereço vem no fim, por descrição.
+
+**Endereçar enquanto conta (opcional).** Leia a **etiqueta da prateleira** antes de contar o que está nela. Aparece "Endereço atual", e cada item registrado em seguida fica também nesse endereço. **Parar** volta a contar sem gravar endereço. O endereço não mostra saldo: a contagem continua cega. Veja o manual Endereços e etiquetas.
+
 **Sem internet no local.** Se a conexão cair durante a contagem, a quantidade fica **guardada no aparelho**, separada por pessoa e por fase (contagem, auditoria, terceira contagem), com a marca **a enviar** na linha. Quando a internet volta, a plataforma envia sozinha. A contagem só pode ser concluída depois que tudo foi enviado. Não feche o navegador nem limpe os dados do aparelho enquanto houver itens a enviar.
 
 ### 5.2 Item encontrado fora da lista
@@ -136,7 +140,7 @@ Depois de concluída, a contagem não pode mais ser alterada por quem contou.
 
 ### 5.4 Guia cega impressa
 
-No painel, **Guia cega** imprime a lista do local sem quantidades, com espaço para anotar, hora de início e fim e assinatura. Serve para o local sem sinal de celular. As quantidades anotadas são digitadas depois, na mesma tela de contagem.
+No painel, **Guia cega** imprime a lista do local sem quantidades, na ordem do corredor e com a coluna Endereço, com espaço para anotar, hora de início e fim e assinatura. Serve para o local sem sinal de celular. As quantidades anotadas são digitadas depois, na mesma tela de contagem.
 
 ## 6. Auditoria cega e terceira contagem
 
@@ -257,7 +261,7 @@ Com amostra 0% e as duas regras desligadas não há auditoria: a contagem conclu
 
 ## 12. Roteiro do dia 01
 
-1. **Antes**: confira se todo produto tem cadastro e, de preferência, etiqueta. Separe fisicamente o que chegar ou for produzido durante a contagem.
+1. **Antes**: confira se todo produto tem cadastro e, de preferência, etiqueta. Se o local for reorganizado, gere os endereços e cole as etiquetas de prateleira (Estoque › Endereços). Separe fisicamente o que chegar ou for produzido durante a contagem.
 2. **Abrir** o inventário com a data de referência do último dia do mês anterior.
 3. **Contar**: cada responsável conta o seu local e conclui.
 4. **Auditar**: cada auditor confere o local que recebeu.
@@ -287,3 +291,4 @@ Com amostra 0% e as duas regras desligadas não há auditoria: a contagem conclu
 | 1.2 | 22/11/2026 | Contagem cega em toda a plataforma (saldo, Kardex e custo escondidos de quem conta ou audita, por parâmetro). Recontagem pedida por quem gerencia, sem cancelar o inventário. Desfazer inventário aprovado (administrador). Lote criado na própria contagem. Local inventariado não aceita movimento com data até a referência, mesmo com o mês reaberto. |
 | 1.3 | 22/11/2026 | Contagem mais rápida no celular: registrar não recarrega a tela. Sem internet, a quantidade fica guardada no aparelho e é enviada quando a conexão volta. |
 | 1.4 | 22/11/2026 | Contagem cega também na Reposição, na curva ABC, no catálogo do almoxarifado e nas consultas agregadas. Recontagem barrada depois que o local voltou a movimentar. Desfazer informa os meses reabertos. Fila sem internet separada por pessoa e fase. |
+| 1.5 | 22/11/2026 | Lista de contagem e guia cega na ordem do corredor, com o endereço. Quem conta pode ler a etiqueta da prateleira e gravar o endereço dos itens contados (SQL 193). |

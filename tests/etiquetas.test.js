@@ -37,3 +37,31 @@ test('etiqueta: conteúdo, tipo de código e tamanho da página', () => {
   const doc = documentoEtiquetas(expandir([{ ...e, copias: 2 }]), PADRAO, { L0000123: svg }, 'EMPRESA');
   assert.equal(doc.split('class="etq"').length - 1, 2); assert.match(doc, /Etiquetas \(2\)/);
 });
+
+// ---------------------------------------------------------------- SQL 193: endereço de prateleira
+import { estantes, codigosEndereco, porEndereco, htmlEndereco, cssEnderecos } from '../js/lib/etiquetas.js';
+test('etiqueta de prateleira: E + 7 dígitos é endereço', () => {
+  assert.deepEqual(codigoEtiqueta(' e0000789 '), { codigo: 'E0000789', alvo: 'endereco' });
+  assert.equal(codigoEtiqueta('E123'), null);
+});
+test('estantes: intervalo de letras, de números e lista', () => {
+  assert.deepEqual(estantes('a-d').lista, ['A', 'B', 'C', 'D']);
+  assert.deepEqual(estantes('1-3').lista, ['1', '2', '3']);
+  assert.deepEqual(estantes('01-03').lista, ['01', '02', '03']);
+  assert.deepEqual(estantes('A-B, P; A').lista, ['A', 'B', 'P']);
+  assert.ok(estantes('A-3').erro); assert.ok(estantes('F-A').erro); assert.ok(estantes('').erro); assert.ok(estantes('A_1').erro);
+});
+test('códigos gerados: a mesma regra do banco', () => {
+  assert.deepEqual(codigosEndereco(['B', 'A'], 2, 2), ['A-01-1', 'A-01-2', 'A-02-1', 'A-02-2', 'B-01-1', 'B-01-2', 'B-02-1', 'B-02-2']);
+  assert.deepEqual(codigosEndereco(['P'], 3, 0, 1), ['P-1', 'P-2', 'P-3']);
+});
+test('ordem do corredor: sem endereço vai para o fim', () => {
+  const L = [{ descricao: 'ZINCO' }, { descricao: 'LUVA', endereco_ordem: 20 }, { descricao: 'ABRACADEIRA', endereco_ordem: 10 }, { descricao: 'ARRUELA' }];
+  assert.deepEqual(L.sort(porEndereco).map(x => x.descricao), ['ABRACADEIRA', 'LUVA', 'ARRUELA', 'ZINCO']);
+});
+test('etiqueta de prateleira: endereço grande, local, número e tamanho próprio', () => {
+  const h = htmlEndereco({ etiqueta: 'E0000789', codigo: 'A-03-2', local: 'Almoxarifado', descricao: '<luvas>' }, { codigo: 'barras' }, { barras: '<svg id="b"></svg>', qr: '<svg id="q"></svg>' }, 'IPLAMM');
+  assert.match(h, /A-03-2/); assert.match(h, /class="loc">Almoxarifado</); assert.doesNotMatch(h, /IPLAMM/); assert.match(h, /E0000789/); assert.match(h, /&lt;luvas&gt;/);
+  assert.match(h, /id="b"/); assert.doesNotMatch(h, /id="q"/);
+  assert.match(cssEnderecos({ end_largura_mm: 80, end_altura_mm: 30 }), /@page\{size:80mm 30mm/);
+});

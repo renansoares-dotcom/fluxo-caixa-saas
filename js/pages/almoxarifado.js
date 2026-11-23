@@ -227,10 +227,14 @@ async function entregar(r, root) {
   let S, P;
   try { [S, P] = await Promise.all([rpc('alm_saldos', { p_empresa: state.empresa.id, p_produtos: r.itens.map(i => i.produto_id) }), pessoas()]); } catch (err) { return fail(err); }
   const L = A.sugerirEntrega(r.itens, S);
+  // endereço de cada produto em cada local (SQL 193): aparece ao lado do local e a lista sai na ordem do corredor
+  let PE = []; try { PE = await q(sb.from('est_produto_enderecos').select('produto_id,local_id,est_enderecos(codigo,ordem)').in('produto_id', r.itens.map(i => i.produto_id))); } catch { /* sem o SQL 193 */ }
+  const endDe = (p, l) => PE.find(x => x.produto_id === p && x.local_id === l)?.est_enderecos;
+  L.sort((a, b) => (endDe(a.produto_id, a.local_id)?.ordem ?? Infinity) - (endDe(b.produto_id, b.local_id)?.ordem ?? Infinity));
   const m = modal({ title: `Entregar a requisição nº ${r.numero} — ${r.para_nome || ''}`, wide: true, body: `
     <div class="table-wrap"><table><thead><tr><th>Item</th><th class="num">Falta entregar</th><th>Sai de</th><th style="width:130px">Entregar agora</th></tr></thead><tbody>
     ${L.map((l, i) => `<tr><td class="wrap"><b>${esc(l.codigo)}</b> ${esc(l.descricao)}</td><td class="num">${qtd(l.falta)} ${esc(l.unidade || '')}</td>
-      <td>${l.semSaldo ? '<span class="neg">sem saldo no almoxarifado</span>' : `<select data-l="${i}">${l.locais.map(s => `<option value="${s.local_id}" data-q="${s.quantidade}">${esc(s.local_nome)} (${qtd(s.quantidade)})</option>`).join('')}</select>`}</td>
+      <td>${l.semSaldo ? '<span class="neg">sem saldo no almoxarifado</span>' : `<select data-l="${i}">${l.locais.map(s => `<option value="${s.local_id}" data-q="${s.quantidade}">${esc(s.local_nome)} (${qtd(s.quantidade)})${endDe(l.produto_id, s.local_id) ? ' · ' + esc(endDe(l.produto_id, s.local_id).codigo) : ''}</option>`).join('')}</select>`}</td>
       <td><input inputmode="decimal" data-q="${i}" value="${l.quantidade ? qtd(l.quantidade) : ''}" ${l.semSaldo ? 'disabled' : ''}></td></tr>`).join('')}</tbody></table></div>
     <p class="small muted">Sem saldo para tudo? Entregue o que tem: a requisição fica "entregue em parte" e o restante continua na fila.</p>
     ${blocoQuem(P)}
