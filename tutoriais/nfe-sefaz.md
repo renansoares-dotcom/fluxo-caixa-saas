@@ -1,10 +1,12 @@
 ---
-titulo: NF-e da SEFAZ — notas contra o CNPJ e manifestação
-tela: CPD › Fiscal › NF-e da SEFAZ (FIS004)
-versao: 1.0
-atualizado: 2026-11-08
+titulo: Notas Recebidas da SEFAZ — notas contra o CNPJ e manifestação
+tela: CPD › Notas Recebidas da SEFAZ (Manifestação) (FIS004)
+versao: 1.1
+atualizado: 2026-11-23
 ---
 ## 1. Para que serve
+
+> **Esta tela × Notas Fiscais.** Esta é a **caixa de entrada** das notas dos fornecedores: chegam da SEFAZ e são manifestadas aqui. **Notas Fiscais (Entradas e Saídas)** é a **base fiscal**: guarda todas as notas já importadas, de entrada e de saída, e é de onde saem consultas, impostos e relatórios. A nota daqui só passa a valer depois de importada lá.
 
 Busca **sozinha na SEFAZ** todas as NF-e emitidas **contra o CNPJ da empresa** (as notas dos fornecedores), pelo serviço oficial **Distribuição DF-e**. Assim a nota de entrada chega à plataforma mesmo quando o fornecedor esquece de mandar o XML por e-mail.
 
@@ -33,7 +35,7 @@ Os filtros separam as notas **pendentes**, com **XML disponível**, **só resumo
 
 Cada linha mostra a emissão, o emitente e o CNPJ, a chave de acesso, o valor, a situação (e se a NF-e foi **cancelada** pelo emitente), a manifestação já feita e o **prazo da conclusiva** (em laranja quando faltam 15 dias ou menos).
 
-![Figura 1 — NF-e da SEFAZ: notas emitidas contra o CNPJ, situação, manifestação e prazo da conclusiva](img/nfe-sefaz-1.jpg)
+![Figura 1 — Notas Recebidas da SEFAZ: notas emitidas contra o CNPJ, situação, manifestação e prazo da conclusiva](img/nfe-sefaz-1.jpg)
 
 ## 3. Importar os XML
 
@@ -80,6 +82,8 @@ A consulta usa o **CNPJ** e a **UF** do cadastro da empresa e o **certificado A1
 
 ## 7. Problemas comuns
 
+**A lista está vazia e a consulta aparece "desligada".** A busca automática nunca foi ligada. A tela mostra o aviso com os três passos: publicar a ponte da SEFAZ na Vercel com o certificado A1, gravar os segredos `SEFAZ_PONTE_URL` e `SEFAZ_PONTE_CHAVE` no Supabase e marcar "Consultar a SEFAZ a cada hora" em Parâmetros. Enquanto isso, importe os XML pelo arquivo em Notas Fiscais.
+
 **"com erro" na consulta.** O motivo aparece no aviso vermelho. Os mais comuns: certificado vencido ou de outro CNPJ, ponte fora do ar, CNPJ ou UF errados no cadastro da empresa.
 
 **A nota ficou só no resumo.** A ciência ainda não foi feita (parâmetro desligado) ou a SEFAZ ainda não liberou o XML; ele chega numa das próximas consultas.
@@ -93,3 +97,4 @@ A consulta usa o **CNPJ** e a **UF** do cadastro da empresa e o **certificado A1
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 08/11/2026 | Primeira versão: consulta horária à Distribuição DF-e, ciência automática, importação em Notas Fiscais, manifestação conclusiva com prazo e parâmetros (melhoria 9.1). |
+| 1.1 | 23/11/2026 | Nome no menu: Notas Recebidas da SEFAZ (Manifestação). Frase no topo explicando a diferença para Notas Fiscais e aviso quando a busca automática está desligada, com os passos para ligar. |

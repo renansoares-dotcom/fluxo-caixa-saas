@@ -5,7 +5,7 @@ import { $, $$, esc, fail, toast, modal, money, dateBR } from '../lib/ui.js';
 import { importarXmls } from './notas.js';
 import { SITUACOES, MANIFESTACOES, filtrar, prazoConclusiva, podeManifestar } from '../lib/dfe.js';
 
-export const title = 'NF-e da SEFAZ';
+export const title = 'Notas Recebidas da SEFAZ (Manifestação)';
 const ui = { filtro: 'pendentes' };
 
 export async function render(root) {
@@ -19,9 +19,13 @@ export async function render(root) {
       q(sb.from('dfe_documentos').select('id,chave,nsu,emitente_doc,emitente_nome,emissao,valor,situacao_nfe,situacao,manifestacao,manifestado_em,manifestacao_erro,nota_id,recebido_em').eq('empresa_id', e).order('emissao', { ascending: false }).limit(500)),
     ]);
   } catch (err) { root.innerHTML = `<div class="card"><div class="empty">${/dfe_/.test(err.message || '') ? 'Esta tela precisa do SQL 140.' : 'Não foi possível carregar.'}</div></div>`; return; }
-  if (!R) { root.innerHTML = '<div class="card"><div class="empty">As NF-e da SEFAZ são do administrador, diretor, financeiro e compras.</div></div>'; return; }
+  if (!R) { root.innerHTML = '<div class="card"><div class="empty">As notas recebidas da SEFAZ são do administrador, diretor, financeiro e compras.</div></div>'; return; }
   const admin = state.papel === 'admin', V = filtrar(L, ui.filtro), dt = (t) => t ? new Date(t).toLocaleString('pt-BR', { timeZone: 'America/Recife', dateStyle: 'short', timeStyle: 'short' }) : '–';
-  root.innerHTML = `<div class="kpis" style="margin-bottom:12px">
+  const desligada = !C?.ativo ? `<div class="card" style="border-left:3px solid var(--warn);margin-bottom:12px"><b>A busca automática na SEFAZ está desligada${C ? '' : ' (nunca foi ligada)'}.</b> Por isso a lista está vazia.
+      ${admin ? `<div class="small" style="margin-top:6px">Para ligar: 1) publicar a ponte da SEFAZ na Vercel com o certificado A1 da empresa; 2) gravar no Supabase os segredos <code>SEFAZ_PONTE_URL</code> e <code>SEFAZ_PONTE_CHAVE</code>; 3) aqui em <b>Parâmetros</b>, marcar "Consultar a SEFAZ a cada hora". Enquanto isso, importe os XML pelo arquivo em <a href="#/notas">Notas Fiscais</a>.</div>`
+        : '<div class="small" style="margin-top:6px">Fale com o administrador. Enquanto isso, as notas entram pelo arquivo XML em Notas Fiscais.</div>'}</div>` : '';
+  root.innerHTML = `<div class="small muted" style="margin:0 0 10px">A caixa de entrada das notas dos fornecedores: a plataforma busca na SEFAZ as NF-e emitidas contra o CNPJ da empresa e você faz a manifestação. Depois de importada, a nota passa a valer em <a href="#/notas">Notas Fiscais</a>.</div>
+    ${desligada}<div class="kpis" style="margin-bottom:12px">
       <div class="kpi"><div class="k-label">XML para importar</div><div class="k-value ${R.xml ? 'warn' : ''}">${R.xml}</div><div class="k-sub">${money(R.valor_pendente)} em notas pendentes</div></div>
       <div class="kpi"><div class="k-label">Só o resumo</div><div class="k-value">${R.resumo}</div><div class="k-sub">o XML chega depois da ciência</div></div>
       <div class="kpi"><div class="k-label">Importadas</div><div class="k-value">${R.importadas}</div><div class="k-sub">${R.ignoradas} ignorada(s)</div></div>
@@ -87,7 +91,7 @@ function manifestar(d, root) {
 function parametros(C, root) {
   const c = C || { ativo: false, ambiente: 'producao', ciencia_automatica: true, avisar: true, papeis: ['admin', 'financeiro', 'compras'] };
   const papeis = [['admin', 'Administrador'], ['diretor', 'Diretor'], ['financeiro', 'Financeiro'], ['compras', 'Compras']];
-  const m = modal({ title: 'Parâmetros — NF-e da SEFAZ', body: `<div class="form">
+  const m = modal({ title: 'Parâmetros — Notas Recebidas da SEFAZ', body: `<div class="form">
     <label class="chk"><input type="checkbox" id="sp-on" ${c.ativo ? 'checked' : ''}> Consultar a SEFAZ a cada hora</label>
     <label>Ambiente<select id="sp-amb"><option value="producao" ${c.ambiente === 'producao' ? 'selected' : ''}>Produção</option><option value="homologacao" ${c.ambiente === 'homologacao' ? 'selected' : ''}>Homologação (testes)</option></select></label>
     <label class="chk"><input type="checkbox" id="sp-ci" ${c.ciencia_automatica ? 'checked' : ''}> Manifestar "Ciência da Operação" sozinho para liberar o XML completo</label>

@@ -61,10 +61,10 @@ async function notaLida(k) {
     botoes = '<button class="btn primary" id="lt-imp">Importar agora</button>';
   } else if (dfe) {
     situacao = `<span class="badge previsto">Na SEFAZ</span> ${dfe.situacao === 'importada' ? 'Consta como importada, mas não foi encontrada em Notas Fiscais.' : 'A SEFAZ enviou só o resumo desta nota; o XML completo chega depois da ciência da operação.'}`;
-    botoes = '<a class="btn primary" href="#/notas/sefaz" data-close>Abrir NF-e da SEFAZ</a>';
+    botoes = '<a class="btn primary" href="#/notas/sefaz" data-close>Abrir Notas Recebidas da SEFAZ</a>';
   } else {
     situacao = `<span class="badge vencido">Não está na plataforma</span> ${propria ? 'É uma nota emitida pela própria empresa que ainda não foi importada.' : 'Esta nota ainda não foi importada nem chegou da SEFAZ.'}`;
-    botoes = `${propria ? '' : '<a class="btn" href="#/notas/sefaz" data-close>NF-e da SEFAZ</a>'}<a class="btn primary" href="#/notas" data-close>Importar o XML em Notas Fiscais</a>`;
+    botoes = `${propria ? '' : '<a class="btn" href="#/notas/sefaz" data-close>Notas Recebidas da SEFAZ</a>'}<a class="btn primary" href="#/notas" data-close>Importar o XML em Notas Fiscais</a>`;
   }
   aberta?.close?.();
   const m = aberta = modal({ title: `${k.documento} nº ${k.numero} lida`, body: `

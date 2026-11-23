@@ -13,7 +13,7 @@ import { conversaNoModal } from '../lib/mini-chat.js';
 
 import { abrirLeitura, tratarLeitura } from '../lib/leitura-ui.js';
 import { reconhecer } from '../lib/leitura.js';
-export const title = 'Notas Fiscais';
+export const title = 'Notas Fiscais (Entradas e Saídas)';
 /** importa XML já carregados (ex.: os que vieram da SEFAZ) pelo mesmo importador dos arquivos */
 export const importarXmls = (xmls, aoTerminar) => importar(null, xmls, aoTerminar);
 
@@ -34,6 +34,7 @@ export async function render(root) {
   const ab = state.abrir?.tipo === 'nota' ? state.abrir : null;
   if (ab) { delete state.abrir; ui.tipo = ab.tipo_nf; ui.campo = 'emissao'; ui.mes = ab.emissao.slice(0, 7); ui.de = `${ui.mes}-01`; ui.ate = fimMes(ui.mes); ui.aba = 'notas'; ui.fin = ''; ui.busca = ''; }
   root.innerHTML = `
+    <div class="small muted" style="margin:0 0 10px">A base fiscal da plataforma: todas as NF-e já importadas, de entrada e de saída, com itens, impostos, parcelas e eventos. As notas dos fornecedores chegam também, sozinhas, por <a href="#/notas/sefaz">Notas Recebidas da SEFAZ</a>, onde são manifestadas antes de entrar aqui.</div>
     <div class="card"><div class="card-head" style="margin-bottom:0">
       <div class="toolbar" id="flt">
         <label>Filtrar por<select name="campo"><option value="emissao" ${ui.campo === 'emissao' ? 'selected' : ''}>Data de emissão</option><option value="vencimento" ${ui.campo === 'vencimento' ? 'selected' : ''}>Data de vencimento</option></select></label>

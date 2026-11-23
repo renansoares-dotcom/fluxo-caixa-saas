@@ -1,10 +1,12 @@
 ---
 titulo: Notas fiscais e apuração de impostos
-tela: CPD › Notas Fiscais (FIS001) e Apuração de Impostos (FIS002)
-versao: 1.11
-atualizado: 2026-11-19
+tela: CPD › Notas Fiscais (Entradas e Saídas) (FIS001) e Apuração de Impostos (FIS002)
+versao: 1.12
+atualizado: 2026-11-23
 ---
 ## 1. Para que serve
+
+> **Notas Fiscais × Notas Recebidas da SEFAZ.** **Notas Fiscais (Entradas e Saídas)** é a base fiscal: todas as notas já importadas, de entrada e de saída. **Notas Recebidas da SEFAZ (Manifestação)** é a caixa de entrada das notas dos fornecedores: a plataforma as busca na SEFAZ, você manifesta e importa, e então elas aparecem aqui.
 
 - **Notas Fiscais**: importa os **XML das NF-e**, de entrada e de saída, com os itens, os impostos, as parcelas e os eventos. A tela também:
   - consulta as notas por período;
@@ -369,3 +371,4 @@ O que cada consulta alimenta:
 | 1.9 | 18/11/2026 | Ligação com a Receita Federal (Apuração Assistida da CBS): testar a conexão, consultas de créditos, recolhimentos, débitos e pagamentos, geração do DARF do recolhimento pelo adquirente com PIX, código de barras e título a pagar. |
 | 1.10 | 18/11/2026 | Geração do DARF pela plataforma travada: a ligação com a Receita Federal fica só em teste de conexão e consultas. |
 | 1.11 | 19/11/2026 | Conferência IBS/CBS pela tabela oficial de classificação da Receita Federal (cClassTrib, vigência, CST, NCM do anexo e tipo de documento). Ligação com a Receita: botão Tentar de novo, aviso de limite de chamadas e prazo de 48 horas do arquivo. |
+| 1.12 | 23/11/2026 | Nome no menu: Notas Fiscais (Entradas e Saídas), com uma frase no topo explicando a diferença para Notas Recebidas da SEFAZ. |

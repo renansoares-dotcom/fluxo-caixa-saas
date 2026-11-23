@@ -1,8 +1,8 @@
 ---
 titulo: Leitor de código de barras — DANFE e etiquetas de mercadoria
 tela: Notas Fiscais (FIS001), Compras › Recebimentos (CMP004), Kardex (EST002) e Parâmetros do Estoque (EST005)
-versao: 1.1
-atualizado: 2026-11-21
+versao: 1.2
+atualizado: 2026-11-23
 ---
 ## 1. Para que serve
 
@@ -41,7 +41,7 @@ A janela mostra o emitente, o número, a série, o mês de emissão e a chave. A
 |---|---|---|
 | **Importada** | A nota já está em Notas Fiscais | **Abrir a nota** ou **Conferir com o PC**, quando houver pedido de compra aprovado e em aberto do mesmo fornecedor |
 | **Na SEFAZ** (com XML) | A nota chegou da SEFAZ e ainda não foi importada | **Importar agora**; em seguida a plataforma mostra a nota como importada |
-| **Na SEFAZ** (só resumo) | A SEFAZ ainda não liberou o XML completo | Abrir NF-e da SEFAZ; o XML chega depois da ciência da operação |
+| **Na SEFAZ** (só resumo) | A SEFAZ ainda não liberou o XML completo | Abrir Notas Recebidas da SEFAZ; o XML chega depois da ciência da operação |
 | **Não está na plataforma** | Não foi importada nem chegou da SEFAZ | Importar o XML em Notas Fiscais, ou aguardar a próxima consulta à SEFAZ |
 
 ![Figura 2 — Nota lida e já importada, com o atalho para conferir com o pedido de compra (dados fictícios)](img/leitor-codigo-barras-1.jpg)
@@ -135,3 +135,4 @@ A aba mostra a prévia da etiqueta e tem o botão **Imprimir etiqueta de teste**
 |---|---|---|
 | 1.0 | 21/11/2026 | Primeira versão: leitura da chave do DANFE em qualquer tela, janela Ler DANFE, situação da nota e atalho para a conferência do recebimento |
 | 1.1 | 21/11/2026 | Etiqueta de mercadoria por lote e por produto (código de barras e QR), impressão pelas notas e pelo Kardex, leitura da etiqueta com saldo por local, transferência e saída, parâmetros da etiqueta (SQL 175) |
+| 1.2 | 23/11/2026 | Nome da tela FIS004 atualizado: Notas Recebidas da SEFAZ. |
