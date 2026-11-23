@@ -2916,3 +2916,52 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
       trocados: a.p_itens.map(x => { const ant = DB.est_produto_enderecos.find(y => y.produto_id === x.produto_id && y.local_id === x.local_id); const de = ant && DB.est_enderecos.find(e => e.id === ant.endereco_id)?.codigo, para = DB.est_enderecos.find(e => e.id === x.endereco_id)?.codigo;
         return de && para && de !== para ? { produto: x.produto_id, de, para } : null; }).filter(Boolean) }), etq_config_endereco_salvar: () => null });
 }
+
+// ---------- arquivo morto (SQL 194) — caixas FICTÍCIAS ----------
+{
+  const E0 = DB.empresas[0].id; let n = 5200;
+  const T = [['fiscal', 'Notas fiscais de entrada e saída', 5, true], ['fiscal', 'Livros e apurações fiscais', 5, true], ['fiscal', 'Guias de recolhimento de tributos', 5, true],
+    ['contabil', 'Livros contábeis e balanços', 10, false], ['financeiro', 'Comprovantes de pagamento e recebimento', 5, true], ['financeiro', 'Extratos bancários', 5, true],
+    ['rh', 'Registro de empregados (livro ou fichas)', null, false], ['rh', 'Folha de pagamento e recibos', 10, false], ['rh', 'Rescisões', 5, false], ['rh', 'Saúde e segurança do trabalho (ASO, PPP, laudos)', 20, false],
+    ['administrativo', 'Contratos com clientes e fornecedores', 5, true], ['juridico', 'Processos judiciais e administrativos', null, false]];
+  DB.arq_tipos = T.map(([area, nome, prazo_anos, conf], i) => ({ id: 'at' + i, empresa_id: E0, area, nome, prazo_anos, prazo_confirmado: conf, confirmado_nome: conf ? 'Carlos Lima' : null, confirmado_em: conf ? '2026-11-20T10:00:00Z' : null, observacao: conf ? 'Confirmado com a contabilidade' : null, ativo: true }));
+  const tp = (nome) => DB.arq_tipos.find(t => t.nome === nome);
+  DB.arq_config = [{ empresa_id: E0, papeis_gestor: ['admin', 'financeiro', 'diretor'], arquivistas: [], papeis_consulta: ['admin', 'financeiro', 'diretor', 'compras'], papeis_descarte: ['admin', 'diretor'], emprestimo_dias: 7, descarte_suspenso: false }];
+  DB.arq_locais = [{ id: 'al1', empresa_id: E0, nome: 'Sala do arquivo (mezanino)', ativo: true }];
+  DB.arq_enderecos = []; let o = 0;
+  for (const e of ['A', 'B', 'C', 'D']) for (let p = 1; p <= 4; p++) DB.arq_enderecos.push({ id: `ae-${e}${p}`, empresa_id: E0, local_id: 'al1', codigo: `${e}-0${p}`, ordem: (o += 10), descricao: null, etiqueta: 'S' + String(++n).padStart(7, '0'), ativo: true });
+  const desc = (prazo, fim) => (prazo == null ? null : `${+fim.slice(0, 4) + 1 + prazo}-01-01`);
+  DB.arq_itens = []; DB.arq_caixas = [];
+  const CX = (num, area, setor, titulo, end, itens, extra = {}) => { const id = 'ac' + num;
+    itens.forEach(([nome, ini, fim, d], k) => DB.arq_itens.push({ caixa_id: id, empresa_id: E0, tipo_id: tp(nome).id, descricao: d || null, inicio: ini, fim, ordem: k + 1 }));
+    const ts = itens.map(([nome, , fim]) => ({ t: tp(nome), fim })), perm = ts.some(x => x.t.prazo_anos == null);
+    DB.arq_caixas.push({ id, empresa_id: E0, numero: num, etiqueta: 'C' + String(++n).padStart(7, '0'), area, setor, titulo, endereco_id: end ? 'ae-' + end : null,
+      periodo_inicio: itens.map(i => i[1]).sort()[0], periodo_fim: itens.map(i => i[2]).sort().pop(), permanente: perm, prazo_pendente: ts.some(x => !x.t.prazo_confirmado && x.t.prazo_anos != null),
+      descartar_em: perm ? null : ts.map(x => desc(x.t.prazo_anos, x.fim)).sort().pop(), reter: false, situacao: 'arquivada', ...extra }); };
+  CX(1, 'fiscal', 'Fiscal', 'Notas fiscais de entrada — 2018', 'A1', [['Notas fiscais de entrada e saída', '2018-01-01', '2018-12-31', 'Jan a dez']]);
+  CX(2, 'fiscal', 'Fiscal', 'Notas fiscais de saída — 2019', 'A1', [['Notas fiscais de entrada e saída', '2019-01-01', '2019-12-31']]);
+  CX(3, 'fiscal', 'Fiscal', 'Apurações de ICMS e IPI — 2019 e 2020', 'A2', [['Livros e apurações fiscais', '2019-01-01', '2020-12-31'], ['Guias de recolhimento de tributos', '2019-01-01', '2020-12-31']]);
+  CX(4, 'contabil', 'Contabilidade', 'Balancetes e razão — 2017', 'A3', [['Livros contábeis e balanços', '2017-01-01', '2017-12-31']]);
+  CX(5, 'financeiro', 'Contas a pagar', 'Comprovantes de pagamento — 1º semestre 2020', 'B1', [['Comprovantes de pagamento e recebimento', '2020-01-01', '2020-06-30']]);
+  CX(6, 'financeiro', 'Tesouraria', 'Extratos bancários — 2021', 'B1', [['Extratos bancários', '2021-01-01', '2021-12-31']], { situacao: 'emprestada' });
+  CX(7, 'rh', 'Departamento Pessoal', 'Fichas de registro — 2010 a 2015', 'C1', [['Registro de empregados (livro ou fichas)', '2010-01-01', '2015-12-31']]);
+  CX(8, 'rh', 'Departamento Pessoal', 'Folhas e recibos — 2016', 'C2', [['Folha de pagamento e recibos', '2016-01-01', '2016-12-31']]);
+  CX(9, 'rh', 'Departamento Pessoal', 'Rescisões — 2018', 'C2', [['Rescisões', '2018-01-01', '2018-12-31']]);
+  CX(10, 'administrativo', 'Administrativo', 'Contratos encerrados — 2017 a 2019', 'D1', [['Contratos com clientes e fornecedores', '2017-01-01', '2019-12-31']], { reter: true, reter_motivo: 'Recuperação judicial: manter até o encerramento' });
+  CX(11, 'juridico', 'Jurídico', 'Processos trabalhistas encerrados', 'D2', [['Processos judiciais e administrativos', '2012-01-01', '2020-12-31']]);
+  CX(12, 'fiscal', 'Fiscal', 'Notas fiscais de entrada — 2024', null, [['Notas fiscais de entrada e saída', '2024-01-01', '2024-12-31']]);
+  const ha = (d) => { const x = new Date(); x.setDate(x.getDate() - d); return x.toISOString(); }, dia = (d) => ha(-d).slice(0, 10);
+  DB.arq_emprestimos = [
+    { id: 'ap1', empresa_id: E0, caixa_id: 'ac3', situacao: 'pedido', pedido_por: 'u5', pedido_nome: 'Diego Martins', pedido_em: ha(0), motivo: 'Conferir a apuração de ICMS de 2019 para o contador' },
+    { id: 'ap2', empresa_id: E0, caixa_id: 'ac6', situacao: 'retirada', para_nome: 'Escritório de contabilidade', motivo: 'Conciliação de 2021', retirado_nome: 'Ana Souza', retirado_em: ha(12), previsto: dia(-3), pedido_em: ha(12) },
+    { id: 'ap3', empresa_id: E0, caixa_id: 'ac1', situacao: 'devolvida', para_nome: 'Beatriz Rocha', motivo: 'Nota de 2018 para a auditoria', retirado_em: ha(30), previsto: dia(-23), devolvido_em: ha(25), pedido_em: ha(30) }];
+  DB.arq_descartes = [{ id: 'ad1', empresa_id: E0, numero: 1, situacao: 'proposto', proposto_por: 'u2', proposto_nome: 'Ana Souza', proposto_em: ha(1), observacao: 'Notas de 2018 vencidas' }];
+  DB.arq_descarte_caixas = [{ descarte_id: 'ad1', caixa_id: 'ac1' }];
+  Object.assign(window.RPC, { _arq_gestor: () => true, _arq_aprova: () => true, _arq_consulta: () => true,
+    arq_descartaveis: () => DB.arq_caixas.filter(c => c.descartar_em && c.descartar_em <= dia(365) && c.situacao !== 'descartada' && c.id !== 'ac1').map(c => ({ caixa_id: c.id, numero: c.numero, area: c.area, titulo: c.titulo, periodo_inicio: c.periodo_inicio, periodo_fim: c.periodo_fim, descartar_em: c.descartar_em,
+      impede: c.situacao === 'emprestada' ? 'está retirada' : c.reter ? 'retida: ' + c.reter_motivo : c.prazo_pendente ? 'prazo de guarda ainda não confirmado' : c.descartar_em > dia(0) ? 'guarda até ' + c.descartar_em : null })).sort((a, b) => a.descartar_em.localeCompare(b.descartar_em)),
+    arq_pessoas: () => DB.membros.filter(m => m.papel !== 'motorista').map(m => ({ user_id: m.user_id, nome: m.nome, papel: m.papel })),
+    arq_caixa_salvar: () => 'ac1', arq_caixa_mover: () => 1, arq_emp_pedir: () => 'ap9', arq_emp_retirar: () => 'ap9', arq_emp_devolver: () => null, arq_emp_cancelar: () => null,
+    arq_descarte_propor: () => 'ad9', arq_descarte_decidir: () => null, arq_descarte_executar: () => 1, arq_descarte_cancelar: () => null, arq_tipo_salvar: () => 'at0', arq_configurar: () => 20,
+    arq_local_salvar: () => 'al1', arq_end_gerar: () => 16, arq_config_salvar: () => null });
+}

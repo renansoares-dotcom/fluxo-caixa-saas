@@ -5,11 +5,11 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 export const PADRAO = { codigo: 'ambos', largura_mm: 100, altura_mm: 70, copias: 1, mostrar_fornecedor: true, end_largura_mm: 100, end_altura_mm: 40 };
 export const TIPOS_CODIGO = { ambos: 'Código de barras e QR', barras: 'Só código de barras', qr: 'Só QR' };
 
-/** o texto lido é um código de etiqueta? devolve { codigo, alvo: 'lote' | 'produto' | 'endereco' } ou null */
+/** o texto lido é um código de etiqueta? devolve { codigo, alvo: 'lote' | 'produto' | 'endereco' | 'caixa' | 'arq_endereco' } ou null */
 export function codigoEtiqueta(txt) {
   const t = String(txt ?? '').trim().toUpperCase();
-  const m = /^([LPE])(\d{7,12})$/.exec(t);
-  return m ? { codigo: t, alvo: { L: 'lote', P: 'produto', E: 'endereco' }[m[1]] } : null;
+  const m = /^([LPECS])(\d{7,12})$/.exec(t);   // C = caixa do arquivo morto, S = prateleira do arquivo (SQL 194)
+  return m ? { codigo: t, alvo: { L: 'lote', P: 'produto', E: 'endereco', C: 'caixa', S: 'arq_endereco' }[m[1]] } : null;
 }
 
 /** estantes digitadas: "A-F", "A, B, C", "1-12" ou uma mistura ("A-C, P"). Devolve a lista em maiúsculas, sem repetir, ou { erro } */
@@ -122,3 +122,44 @@ export function documentoEnderecos(lista, cfg = PADRAO, svgs = {}, empresa = '',
     <div class="barra"><button onclick="print()">Imprimir</button></div>${lista.map(e => htmlEndereco(e, cfg, svgs[e.etiqueta] || {}, empresa)).join('')}
     ${auto ? '<script>window.onload=()=>setTimeout(()=>print(),400)</script>' : ''}</body></html>`;
 }
+
+// ---------------------------------------------------------------- arquivo morto (SQL 194): etiqueta da caixa-arquivo
+export const AREAS_ARQ = { administrativo: 'Administrativo', financeiro: 'Financeiro', fiscal: 'Fiscal', contabil: 'Contábil', rh: 'RH', juridico: 'Jurídico', comercial: 'Comercial', compras: 'Compras', outro: 'Outro' };
+const dBR = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('/') : '');
+/** período da caixa em texto curto: 2019, 2018 a 2019, ou 03/2019 a 08/2019 quando é parte de um ano */
+export function periodoCaixa(ini, fim) {
+  if (!ini || !fim) return '';
+  const [ai, mi] = ini.split('-'), [af, mf] = fim.split('-');
+  if (ai === af) return mi === '01' && mf === '12' ? ai : `${mi}/${ai} a ${mf}/${af}`;
+  return `${ai} a ${af}`;
+}
+/** até quando a caixa fica guardada (a data de descarte é o primeiro dia em que pode sair) */
+export function guardaCaixa(c) {
+  if (c.permanente) return 'Guarda permanente';
+  if (!c.descartar_em) return 'Prazo de guarda a definir';
+  const d = new Date(c.descartar_em + 'T12:00:00'); d.setDate(d.getDate() - 1);
+  return `Guardar até ${d.toISOString().slice(0, 10).split('-').reverse().join('/')}${c.prazo_pendente ? ' (prazo a confirmar)' : ''}`;
+}
+export function cssCaixas(cfg = PADRAO) {
+  const W = +cfg.largura_mm || 100, H = +cfg.altura_mm || 70, u = Math.min(H / 70, W / 100), mm = (v) => (v * u).toFixed(2) + 'mm';
+  return cssEtiquetas(cfg) + `
+.etq .cx{display:flex;justify-content:space-between;align-items:baseline;margin-top:${mm(1)}} .etq .cx b{font-size:${mm(9)};line-height:1}
+.etq .cx span{font-size:${mm(3.6)};font-weight:bold;text-transform:uppercase}
+.etq .gd{font-size:${mm(3.2)};font-weight:bold;margin-top:${mm(0.9)}}`;
+}
+/** c = { numero, etiqueta, area, setor, titulo, periodo_inicio, periodo_fim, descartar_em, permanente, prazo_pendente, endereco, local } */
+export function htmlCaixa(c, cfg = PADRAO, svg = {}, empresa = '') {
+  const tipo = cfg.codigo || 'ambos', barras = tipo !== 'qr' && svg.barras, qr = tipo !== 'barras' && svg.qr;
+  const per = periodoCaixa(c.periodo_inicio, c.periodo_fim);
+  return `<div class="etq"><div class="topo"><b>${esc(empresa)} · Arquivo</b>${c.endereco ? `<span class="vol">${esc([c.local, c.endereco].filter(Boolean).join(' · '))}</span>` : ''}</div>
+    <div class="cx"><b>CAIXA ${String(c.numero).padStart(4, '0')}</b><span>${esc(AREAS_ARQ[c.area] || c.area)}${c.setor ? ' · ' + esc(c.setor) : ''}</span></div>
+    <div class="desc">${esc(c.titulo)}</div>${per ? `<div class="lin">Período <b>${esc(per)}</b></div>` : ''}
+    <div class="gd">${esc(guardaCaixa(c))}</div>
+    <div class="base"><div class="bar">${barras ? svg.barras : ''}<div class="num">${esc(c.etiqueta)}</div></div>${qr ? `<div class="qr">${svg.qr}</div>` : ''}</div></div>`;
+}
+export function documentoCaixas(lista, cfg = PADRAO, svgs = {}, empresa = '', { auto = true } = {}) {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Etiquetas de caixa (${lista.length})</title><style>${cssCaixas(cfg)}</style></head><body>
+    <div class="barra"><button onclick="print()">Imprimir</button></div>${lista.map(c => htmlCaixa(c, cfg, svgs[c.etiqueta] || {}, empresa)).join('')}
+    ${auto ? '<script>window.onload=()=>setTimeout(()=>print(),400)</script>' : ''}</body></html>`;
+}
+export { dBR };

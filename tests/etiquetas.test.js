@@ -65,3 +65,21 @@ test('etiqueta de prateleira: endereço grande, local, número e tamanho própri
   assert.match(h, /id="b"/); assert.doesNotMatch(h, /id="q"/);
   assert.match(cssEnderecos({ end_largura_mm: 80, end_altura_mm: 30 }), /@page\{size:80mm 30mm/);
 });
+
+// ---------------------------------------------------------------- SQL 194: arquivo morto
+import { periodoCaixa, guardaCaixa, htmlCaixa } from '../js/lib/etiquetas.js';
+test('etiquetas do arquivo: C = caixa, S = prateleira do arquivo', () => {
+  assert.equal(codigoEtiqueta('C0000042').alvo, 'caixa'); assert.equal(codigoEtiqueta('s0000042').alvo, 'arq_endereco');
+});
+test('período da caixa e guarda', () => {
+  assert.equal(periodoCaixa('2019-01-01', '2019-12-31'), '2019');
+  assert.equal(periodoCaixa('2019-03-01', '2019-08-31'), '03/2019 a 08/2019');
+  assert.equal(periodoCaixa('2018-01-01', '2019-12-31'), '2018 a 2019');
+  assert.equal(guardaCaixa({ descartar_em: '2025-01-01' }), 'Guardar até 31/12/2024');
+  assert.equal(guardaCaixa({ permanente: true }), 'Guarda permanente');
+  assert.match(guardaCaixa({ descartar_em: '2026-01-01', prazo_pendente: true }), /prazo a confirmar/);
+});
+test('etiqueta da caixa: número, área, título, guarda e código', () => {
+  const h = htmlCaixa({ numero: 42, etiqueta: 'C0000042', area: 'rh', setor: 'DP', titulo: 'Rescisões <2018>', periodo_inicio: '2018-01-01', periodo_fim: '2018-12-31', descartar_em: '2024-01-01', endereco: 'A-01', local: 'Sala 2' }, { codigo: 'ambos' }, { barras: '<svg id="b"/>', qr: '<svg id="q"/>' }, 'IPLAMM');
+  assert.match(h, /CAIXA 0042/); assert.match(h, /RH · DP/); assert.match(h, /&lt;2018&gt;/); assert.match(h, /Guardar até 31\/12\/2023/); assert.match(h, /Sala 2 · A-01/); assert.match(h, /C0000042/);
+});

@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { FIGS } from './figuras.mjs';
 const OUT = new URL('../../tutoriais/img/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const so = process.argv[2]?.split(',');
-const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1366, height: 820 } });
+const b = await chromium.launch({ args: ['--lang=pt-BR'] }); const p = await b.newPage({ viewport: { width: 1366, height: 820 }, locale: 'pt-BR' });
 p.on('pageerror', e => console.log('ERR', e.message));
 await p.addInitScript(() => { try { localStorage.setItem('fc-empresa', 'emp1'); } catch {} });
 await p.goto('http://localhost:8840/index.html#/lancamentos'); await p.waitForTimeout(3500);
