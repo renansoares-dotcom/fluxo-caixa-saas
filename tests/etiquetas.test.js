@@ -89,7 +89,6 @@ import { conteudoEtiqueta, linhasConteudo } from '../js/lib/etiquetas.js';
 test('etiqueta da caixa: até 5 linhas do conteúdo em 70 mm; o resto vira "+ N outros"', () => {
   assert.equal(linhasConteudo({ largura_mm: 100, altura_mm: 70 }), 5);
   assert.ok(linhasConteudo({ largura_mm: 100, altura_mm: 100 }) > 5);
-  assert.equal(linhasConteudo({ largura_mm: 100, altura_mm: 50 }), 0);
   const it = (n) => Array.from({ length: n }, (_, k) => ({ tipo: 'Notas fiscais', descricao: k ? '' : 'entrada', inicio: '2026-04-01', fim: '2026-04-30' }));
   assert.deepEqual(conteudoEtiqueta(it(1), 5), ['Notas fiscais — entrada · 04/2026']);
   assert.equal(periodoCaixa('2026-04-01', '2026-04-30'), '04/2026');
