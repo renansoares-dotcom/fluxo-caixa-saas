@@ -4,8 +4,8 @@
 // descarte com proposta, aprovação por outra pessoa, execução e termo.
 import { sb, state, q, fetchAll } from '../lib/data.js';
 import { $, $$, esc, fail, toast, modal, dateBR, today, exportXLSX } from '../lib/ui.js';
-import { AREAS_ARQ, periodoCaixa, guardaCaixa, codigoEtiqueta, estantes, codigosEndereco } from '../lib/etiquetas.js';
-import { imprimirCaixas, imprimirEnderecos } from '../lib/etiquetas-ui.js';
+import { AREAS_ARQ, periodoCaixa, guardaCaixa, codigoEtiqueta, estantes, codigosEndereco, numPasta } from '../lib/etiquetas.js';
+import { imprimirCaixas, imprimirEnderecos, imprimirPastas } from '../lib/etiquetas-ui.js';
 import { aoLer } from '../lib/leitura-ui.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 
@@ -35,8 +35,14 @@ export async function render(root) {
       fetchAll(() => sb.from('arq_caixas').select('*').eq('empresa_id', e).order('numero')),
       fetchAll(() => sb.from('arq_itens').select('caixa_id,tipo_id,descricao,inicio,fim,ordem').eq('empresa_id', e)),
       q(sb.from('arq_emprestimos').select('*').eq('empresa_id', e).order('pedido_em', { ascending: false, nullsFirst: false }).limit(300))]);
+    // pastas e digitalização (SQL 195); sem o SQL, a tela funciona sem elas
+    const [pastas, arqs] = await Promise.all([fetchAll(() => sb.from('arq_pastas').select('*').eq('empresa_id', e).order('numero')).catch(() => null),
+      fetchAll(() => sb.from('arq_arquivos').select('*').eq('empresa_id', e).order('enviado_em')).catch(() => [])]);
     D = { cfg: { ...CFG0, ...(cfg || {}) }, gestor, aprova, tipos, tipo: Object.fromEntries(tipos.map(t => [t.id, t])), locais, loc: Object.fromEntries(locais.map(l => [l.id, l])),
-      ends, end: Object.fromEntries(ends.map(x => [x.id, x])), caixas, cx: Object.fromEntries(caixas.map(c => [c.id, c])), itens, emps, root };
+      ends, end: Object.fromEntries(ends.map(x => [x.id, x])), caixas, cx: Object.fromEntries(caixas.map(c => [c.id, c])), itens, emps, root,
+      pastas: pastas || [], temPastas: pastas !== null, arqs };
+    D.pastasDe = (id) => D.pastas.filter(p => p.caixa_id === id).sort((a, b) => a.numero - b.numero);
+    D.arqsDe = (id) => D.arqs.filter(a => a.pasta_id === id);
     D.itensDe = (id) => D.itens.filter(i => i.caixa_id === id).sort((a, b) => a.ordem - b.ordem);
     if (!ui.sala) ui.sala = locais.find(l => l.ativo)?.id || '';
     // primeira vez: quem cuida do arquivo já recebe os tipos de documento com prazo SUGERIDO (o descarte continua travado até confirmar)
@@ -47,6 +53,7 @@ export async function render(root) {
     }
     const etq = codigoEtiqueta(par.get('etq'));
     if (etq?.alvo === 'caixa') { const c = caixas.find(x => x.etiqueta === etq.codigo); history.replaceState(null, '', '#/arquivo'); pintar(root); return c ? ficha(c) : toast(`Etiqueta ${etq.codigo}: caixa não encontrada ou sem acesso.`, true); }
+    if (etq?.alvo === 'pasta') { const pa = D.pastas.find(x => x.etiqueta === etq.codigo); history.replaceState(null, '', '#/arquivo'); pintar(root); return pa ? pasta(pa) : toast(`Etiqueta ${etq.codigo}: pasta não encontrada ou sem acesso.`, true); }
     if (etq?.alvo === 'arq_endereco') { const x = ends.find(y => y.etiqueta === etq.codigo); history.replaceState(null, '', '#/arquivo'); if (x) { ui.aba = 'enderecos'; ui.sala = x.local_id; ui.endAtual = x.id; } else toast(`Etiqueta ${etq.codigo}: prateleira não encontrada.`, true); }
     pintar(root);
   } catch (err) { fail(err); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Confira se o SQL 194 já foi executado.</div></div>'; }
@@ -79,7 +86,7 @@ function filtradas() {
   return D.caixas.filter(c => (ui.sit === 'todas' || (ui.sit === 'ativas' ? c.situacao !== 'descartada' : ui.sit === 'semend' ? c.situacao !== 'descartada' && !c.endereco_id : c.situacao === ui.sit))
     && (!ui.area || c.area === ui.area)
     && (!ano || D.itensDe(c.id).some(i => +i.inicio.slice(0, 4) <= ano && +i.fim.slice(0, 4) >= ano))
-    && (!t || String(c.numero) === t.replace(/^0+/, '') || [c.titulo, c.setor, c.etiqueta, ...D.itensDe(c.id).map(i => `${i.descricao || ''} ${D.tipo[i.tipo_id]?.nome || ''}`)].join(' ').toUpperCase().includes(t)));
+    && (!t || String(c.numero) === t.replace(/^0+/, '') || [c.titulo, c.setor, c.etiqueta, ...D.itensDe(c.id).map(i => `${i.descricao || ''} ${D.tipo[i.tipo_id]?.nome || ''}`), ...D.pastasDe(c.id).map(p => `${p.titulo} ${p.descricao || ''} ${p.etiqueta}`)].join(' ').toUpperCase().includes(t)));
 }
 function abaCaixas(c) {
   const L = filtradas(), anos = [...new Set(D.itens.flatMap(i => { const a = []; for (let y = +i.inicio.slice(0, 4); y <= +i.fim.slice(0, 4) && a.length < 80; y++) a.push(y); return a; }))].sort((a, b) => b - a);
@@ -133,18 +140,89 @@ function ficha(x) {
     <h3 style="margin:14px 0 6px">Conteúdo</h3>
     <div class="table-wrap"><table class="small"><thead><tr><th>Documento</th><th>Descrição</th><th>Período</th><th>Prazo</th></tr></thead><tbody>
     ${its.map(i => { const t = D.tipo[i.tipo_id] || {}; return `<tr><td>${esc(t.nome || '')}</td><td>${esc(i.descricao || '')}</td><td>${esc(periodoCaixa(i.inicio, i.fim))}</td><td>${t.prazo_anos == null ? 'permanente' : `${t.prazo_anos} anos${t.prazo_confirmado ? '' : ' <span class="badge aberto">sugerido</span>'}`}</td></tr>`; }).join('') || '<tr><td colspan="4" class="empty">Sem conteúdo registrado.</td></tr>'}</tbody></table></div>
+    ${D.temPastas ? `<div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><h3 style="margin:0">Pastas</h3><span class="spacer"></span>
+      ${D.gestor && x.situacao !== 'descartada' ? '<button class="btn small" id="fc-np">Nova pasta</button>' : ''}${D.pastasDe(x.id).length ? '<button class="btn ghost small" id="fc-ep">Etiquetas das pastas</button>' : ''}</div>
+    <div class="table-wrap"><table class="small"><thead><tr><th>Pasta</th><th>Título</th><th>Período</th><th class="num">PDFs</th></tr></thead><tbody>
+    ${D.pastasDe(x.id).map(p => `<tr data-pa="${p.id}" style="cursor:pointer"><td><b>${numPasta(x.numero, p.numero)}</b></td><td>${esc(p.titulo)}</td><td>${esc(periodoCaixa(p.inicio, p.fim))}</td><td class="num">${D.arqsDe(p.id).length || ''}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="empty">Nenhuma pasta. Cada pasta ganha a sua etiqueta e pode ter os PDFs digitalizados.</td></tr>'}</tbody></table></div>` : ''}
     ${hist.length ? `<h3 style="margin:14px 0 6px">Retiradas</h3><div class="table-wrap"><table class="small"><thead><tr><th>Situação</th><th>Quem levou / pediu</th><th>Motivo</th><th>Retirada</th><th>Devolver até</th><th>Devolvida</th></tr></thead><tbody>
       ${hist.map(e => `<tr><td>${esc({ pedido: 'Pedido', retirada: 'Fora', devolvida: 'Devolvida', cancelado: 'Cancelado' }[e.situacao])}</td><td>${esc(e.para_nome || e.pedido_nome || '')}</td><td class="wrap">${esc(e.motivo || '')}</td>
         <td>${e.retirado_em ? dateBR(e.retirado_em) : ''}</td><td>${e.previsto ? dateBR(e.previsto) : ''}</td><td>${e.devolvido_em ? dateBR(e.devolvido_em) : ''}</td></tr>`).join('')}</tbody></table></div>` : ''}`,
     foot: `<button class="btn" id="fc-etq">Etiqueta</button>${D.gestor && x.situacao !== 'descartada' ? '<button class="btn" id="fc-ed">Editar</button>' : ''}<span class="spacer"></span>
       ${x.situacao === 'arquivada' && !meuPedido && !D.gestor ? '<button class="btn primary" id="fc-ped">Pedir esta caixa</button>' : ''}
       ${D.gestor && x.situacao === 'arquivada' ? '<button class="btn primary" id="fc-ret">Registrar retirada</button>' : ''}${D.gestor && aberto ? '<button class="btn primary" id="fc-dev">Registrar devolução</button>' : ''}<button class="btn" data-close>Fechar</button>` });
+  $('#fc-np', m.el) && ($('#fc-np', m.el).onclick = () => { m.close(); editarPasta(null, x); });
+  $('#fc-ep', m.el) && ($('#fc-ep', m.el).onclick = () => imprimirPastas(D.pastasDe(x.id).map(p => ({ ...p, caixa_numero: x.numero })), tamPasta()));
+  $$('[data-pa]', m.el).forEach(tr => tr.onclick = () => { m.close(); pasta(D.pastas.find(p => p.id === tr.dataset.pa)); });
   $('#fc-etq', m.el).onclick = () => imprimirCaixas([{ ...x, endereco: D.end[x.endereco_id]?.codigo, local: D.loc[D.end[x.endereco_id]?.local_id]?.nome }]);
   $('#fc-ed', m.el) && ($('#fc-ed', m.el).onclick = () => { m.close(); editar(x); });
   $('#fc-ped', m.el) && ($('#fc-ped', m.el).onclick = async () => { const mot = (prompt('Para que precisa da caixa?') || '').trim(); if (!mot) return;
     try { await q(sb.rpc('arq_emp_pedir', { p_caixa: x.id, p_motivo: mot })); m.close(); toast('Pedido registrado: quem cuida do arquivo vai separar a caixa'); recarregar(); } catch (err) { fail(err); } });
   $('#fc-ret', m.el) && ($('#fc-ret', m.el).onclick = () => { m.close(); retirar(x, [...hist].reverse().find(e => e.situacao === 'pedido') || null); });   // atende o pedido mais antigo, se houver
   $('#fc-dev', m.el) && ($('#fc-dev', m.el).onclick = async () => { try { await q(sb.rpc('arq_emp_devolver', { p_emprestimo: aberto.id })); m.close(); toast(`Caixa ${n4(x.numero)} devolvida. Guarde em ${endTxt(x.endereco_id) || 'um endereço'}.`); recarregar(); } catch (err) { fail(err); } });
+}
+
+// ------------------------------------------------------------ pastas e digitalização (SQL 195)
+const tamPasta = () => ({ largura_mm: D.cfg.pasta_largura_mm || 70, altura_mm: D.cfg.pasta_altura_mm || 35 });
+const kb = (n) => (n == null ? '' : n > 1048576 ? `${(n / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+function pasta(pa) {
+  if (!pa) return;
+  const x = D.cx[pa.caixa_id] || {}, A = D.arqsDe(pa.id), pode = D.gestor && x.situacao !== 'descartada';
+  const m = modal({ title: `Pasta ${numPasta(x.numero, pa.numero)} — ${pa.titulo}`, wide: true, body: `
+    <div class="grid-form small">
+      <div><span class="muted">Caixa</span><div><b>${String(x.numero).padStart(4, '0')}</b> ${esc(x.titulo || '')}</div></div>
+      <div><span class="muted">Onde está</span><div>${esc(endTxt(x.endereco_id) || 'sem endereço')}${x.situacao === 'emprestada' ? ' · caixa retirada' : ''}</div></div>
+      <div><span class="muted">Documento</span><div>${esc(D.tipo[pa.tipo_id]?.nome || '—')}</div></div><div><span class="muted">Período</span><div>${esc(periodoCaixa(pa.inicio, pa.fim) || '—')}</div></div>
+      <div><span class="muted">Etiqueta</span><div style="font-family:monospace">${esc(pa.etiqueta)}</div></div>${pa.descricao ? `<div class="span2"><span class="muted">Descrição</span><div>${esc(pa.descricao)}</div></div>` : ''}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><h3 style="margin:0">Digitalização (${A.length})</h3><span class="spacer"></span>
+      ${pode ? '<label class="btn primary small" style="margin:0;cursor:pointer">Enviar PDFs<input type="file" id="pa-up" accept="application/pdf,.pdf" multiple hidden></label>' : ''}</div>
+    <div id="pa-prog" class="small"></div>
+    <div class="table-wrap"><table class="small"><thead><tr><th>Arquivo</th><th class="num">Tamanho</th><th>Enviado</th><th></th></tr></thead><tbody>
+    ${A.map(a => `<tr><td><a href="#" data-ab="${a.id}">${esc(a.nome)}</a></td><td class="num">${kb(a.tamanho)}</td><td>${esc(a.enviado_nome || '')} <span class="muted">${dateBR(a.enviado_em)}</span></td>
+      <td style="white-space:nowrap"><button class="btn ghost small" data-ab="${a.id}">Abrir</button>${D.gestor ? ` <button class="btn ghost small" data-ap="${a.id}">Apagar</button>` : ''}</td></tr>`).join('')
+      || `<tr><td colspan="4" class="empty">${pode ? 'Nenhum PDF ainda. Digitalize as folhas da pasta no scanner e use Enviar PDFs (pode escolher vários de uma vez, até 50 MB cada).' : 'Nenhum PDF.'}</td></tr>`}</tbody></table></div>
+    <p class="small muted">A digitalização é para consulta: o papel continua guardado até o prazo de guarda da caixa.</p>`,
+    foot: `<button class="btn" id="pa-etq">Etiqueta</button>${pode ? '<button class="btn" id="pa-ed">Editar</button>' : ''}${pode && !A.length ? '<button class="btn ghost" id="pa-ex">Excluir a pasta</button>' : ''}<span class="spacer"></span>
+      <button class="btn" id="pa-cx">Ver a caixa</button><button class="btn" data-close>Fechar</button>` });
+  $('#pa-etq', m.el).onclick = () => imprimirPastas([{ ...pa, caixa_numero: x.numero }], tamPasta());
+  $('#pa-cx', m.el).onclick = () => { m.close(); ficha(x); };
+  $('#pa-ed', m.el) && ($('#pa-ed', m.el).onclick = () => { m.close(); editarPasta(pa, x); });
+  $('#pa-ex', m.el) && ($('#pa-ex', m.el).onclick = async () => { if (!confirm('Excluir esta pasta? A etiqueta dela deixa de valer.')) return;
+    try { await q(sb.rpc('arq_pasta_excluir', { p_pasta: pa.id })); m.close(); toast('Pasta excluída'); recarregar(); } catch (err) { fail(err); } });
+  $$('[data-ab]', m.el).forEach(b => b.onclick = async (ev) => { ev.preventDefault(); const a = A.find(y => y.id === b.dataset.ab);
+    const w = window.open('', '_blank'); const { data, error } = await sb.storage.from('arquivo').createSignedUrl(a.caminho, 600);
+    if (error) { w?.close(); return fail(error); } if (w) w.location = data.signedUrl; else location.href = data.signedUrl; });
+  $$('[data-ap]', m.el).forEach(b => b.onclick = async () => { const a = A.find(y => y.id === b.dataset.ap); if (!confirm(`Apagar a digitalização "${a.nome}"? O papel não é afetado.`)) return;
+    try { const cam = await q(sb.rpc('arq_arquivo_excluir', { p_arquivo: a.id })); await sb.storage.from('arquivo').remove([cam]); m.close(); toast('Digitalização apagada'); await recarregar(); pasta(D.pastas.find(p => p.id === pa.id)); } catch (err) { fail(err); } });
+  const up = $('#pa-up', m.el); if (up) up.onchange = async () => {
+    const fs = [...up.files]; up.value = ''; if (!fs.length) return;
+    const ruins = fs.filter(f => !/\.pdf$/i.test(f.name) && f.type !== 'application/pdf'), grandes = fs.filter(f => f.size > 52428800);
+    if (ruins.length) return toast(`Só PDF: ${ruins.map(f => f.name).join(', ')}`, true);
+    if (grandes.length) return toast(`Acima de 50 MB: ${grandes.map(f => f.name).join(', ')}. Digitalize em partes ou com menos resolução (200 dpi, preto e branco).`, true);
+    const prog = $('#pa-prog', m.el); let ok = 0;
+    for (const [k, f] of fs.entries()) {
+      prog.textContent = `Enviando ${k + 1} de ${fs.length}: ${f.name}…`;
+      const cam = `${state.empresa.id}/${x.id}/${pa.id}/${crypto.randomUUID()}.pdf`;
+      try { const { error } = await sb.storage.from('arquivo').upload(cam, f, { contentType: 'application/pdf', upsert: false }); if (error) throw error;
+        await q(sb.rpc('arq_arquivo_registrar', { p_pasta: pa.id, p_caminho: cam, p_nome: f.name })); ok++; }
+      catch (err) { fail(err); await sb.storage.from('arquivo').remove([cam]).catch(() => {}); }
+    }
+    toast(`${ok} de ${fs.length} PDF(s) enviado(s)`); m.close(); await recarregar(); pasta(D.pastas.find(p => p.id === pa.id));
+  };
+}
+function editarPasta(pa, x) {
+  const m = modal({ title: pa ? `Editar a pasta ${numPasta(x.numero, pa.numero)}` : `Nova pasta na caixa ${String(x.numero).padStart(4, '0')}`, body: `<div class="grid-form">
+      <label class="span2">Título<input id="pp-t" maxlength="120" value="${esc(pa?.titulo || '')}" placeholder="ex.: Notas de entrada — janeiro"></label>
+      <label class="span2">Documento (opcional)<select id="pp-tp"><option value="">—</option>${D.tipos.filter(t => t.ativo || t.id === pa?.tipo_id).map(t => `<option value="${t.id}" ${t.id === pa?.tipo_id ? 'selected' : ''}>${esc(AREAS_ARQ[t.area])} · ${esc(t.nome)}</option>`).join('')}</select></label>
+      <label>De (mês)<input type="month" id="pp-i" value="${(pa?.inicio || '').slice(0, 7)}"></label><label>Até (mês)<input type="month" id="pp-f" value="${(pa?.fim || '').slice(0, 7)}"></label>
+      <label class="span2">Descrição (opcional)<input id="pp-d" maxlength="300" value="${esc(pa?.descricao || '')}"></label></div>`,
+    foot: `<button class="btn" data-close>Cancelar</button>${pa ? '' : '<button class="btn" id="pp-ok2">Salvar e nova</button>'}<button class="btn primary" id="pp-ok">Salvar</button>` });
+  $('#pp-i', m.el).onchange = (ev) => { if (!$('#pp-f', m.el).value) $('#pp-f', m.el).value = ev.target.value; };
+  const salvar = async (nova) => {
+    const p = { id: pa?.id, caixa_id: x.id, titulo: $('#pp-t', m.el).value, tipo_id: $('#pp-tp', m.el).value || null, inicio: mesIni($('#pp-i', m.el).value) || null, fim: mesFim($('#pp-f', m.el).value) || null, descricao: $('#pp-d', m.el).value };
+    try { const id = await q(sb.rpc('arq_pasta_salvar', { p_empresa: state.empresa.id, p })); m.close(); toast(pa ? 'Pasta salva' : 'Pasta criada: imprima a etiqueta'); await recarregar();
+      if (nova) editarPasta(null, D.cx[x.id]); else pasta(D.pastas.find(y => y.id === id)); } catch (err) { fail(err); } };
+  $('#pp-ok', m.el).onclick = () => salvar(false); $('#pp-ok2', m.el) && ($('#pp-ok2', m.el).onclick = () => salvar(true));
 }
 
 const mesIni = (v) => (v ? v + '-01' : ''), mesFim = (v) => { if (!v) return ''; const [a, mm] = v.split('-').map(Number); return new Date(Date.UTC(a, mm, 0)).toISOString().slice(0, 10); };
@@ -232,13 +310,14 @@ async function abaDescarte(c) {
   let V = [], P = [], PC = [];
   try { [V, P, PC] = await Promise.all([q(sb.rpc('arq_descartaveis', { p_empresa: state.empresa.id })), q(sb.from('arq_descartes').select('*').eq('empresa_id', state.empresa.id).order('numero', { ascending: false }).limit(50)),
     q(sb.from('arq_descarte_caixas').select('descarte_id,caixa_id'))]); } catch (err) { return fail(err); }
-  const pode = V.filter(v => !v.impede), selD = new Set();
+  const selD = new Set(), digDesc = D.arqs.filter(a => D.cx[D.pastas.find(p => p.id === a.pasta_id)?.caixa_id]?.situacao === 'descartada');
   c.innerHTML = `${D.cfg.descarte_suspenso ? `<div class="card small" style="border-left:3px solid var(--danger,#c33);margin-bottom:12px"><b>Descarte suspenso.</b> ${esc(D.cfg.descarte_suspenso_motivo || '')}. Nenhuma caixa é descartada enquanto a suspensão estiver ligada (Parâmetros).</div>` : ''}
     <div class="card flush" style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;padding:12px 14px 6px"><h3 style="margin:0">Prazo de guarda vencido ou vencendo em 12 meses (${V.length})</h3><span class="spacer"></span>
       ${D.gestor && !D.cfg.descarte_suspenso ? '<button class="btn primary" id="ds-pr" disabled>Propor o descarte dos marcados</button>' : ''}</div>
       <div class="table-wrap"><table class="small"><thead><tr><th style="width:28px"></th><th>Caixa</th><th>Área</th><th>Período</th><th>Pode sair a partir de</th><th>Situação</th></tr></thead><tbody>
       ${V.map(v => `<tr><td>${!v.impede && D.gestor ? `<input type="checkbox" data-v="${v.caixa_id}">` : ''}</td><td><b>${n4(v.numero)}</b> ${esc(v.titulo)}</td><td>${esc(AREAS_ARQ[v.area])}</td><td>${esc(periodoCaixa(v.periodo_inicio, v.periodo_fim))}</td>
         <td>${dateBR(v.descartar_em)}</td><td>${v.impede ? `<span class="small muted">${esc(v.impede)}</span>` : '<span class="badge pago">pode ser descartada</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma caixa com o prazo vencendo.</td></tr>'}</tbody></table></div></div>
+    ${digDesc.length && D.gestor ? `<div class="card small" style="border-left:3px solid var(--warn);margin-bottom:12px;display:flex;align-items:center;gap:10px"><span>${digDesc.length} PDF(s) digitalizado(s) de caixas já descartadas continuam guardados. Com o papel descartado pelo prazo, apague também as cópias digitais.</span><span class="spacer"></span><button class="btn small" id="ds-dig">Apagar as cópias digitais</button></div>` : ''}
     <div class="card flush"><h3 style="margin:12px 14px 6px">Propostas de descarte</h3><div class="table-wrap"><table class="small"><thead><tr><th>Nº</th><th>Situação</th><th class="num">Caixas</th><th>Proposto por</th><th>Decidido por</th><th>Executado</th><th></th></tr></thead><tbody>
       ${P.map(d => { const n = PC.filter(x => x.descarte_id === d.id).length; return `<tr><td><b>${d.numero}</b></td><td>${badge(SITD, d.situacao)}${d.motivo ? `<div class="small muted">${esc(d.motivo)}</div>` : ''}</td><td class="num">${n}</td>
         <td>${esc(d.proposto_nome || '')} <span class="small muted">${dateBR(d.proposto_em)}</span></td><td>${esc(d.decidido_nome || '')} <span class="small muted">${d.decidido_em ? dateBR(d.decidido_em) : ''}</span></td>
@@ -246,6 +325,9 @@ async function abaDescarte(c) {
         <td style="white-space:nowrap">${D.aprova && d.situacao === 'proposto' && d.proposto_por !== state.user.id ? `<button class="btn primary small" data-ap="${d.id}">Aprovar</button> <button class="btn ghost small" data-rc="${d.id}">Recusar</button> ` : ''}
           ${D.gestor && d.situacao === 'aprovado' ? `<button class="btn primary small" data-ex="${d.id}">Registrar o descarte</button> ` : ''}${['proposto', 'aprovado'].includes(d.situacao) ? `<button class="btn ghost small" data-cc="${d.id}">Cancelar</button> ` : ''}
           <button class="btn ghost small" data-tm="${d.id}">${d.situacao === 'executado' ? 'Termo de descarte' : 'Lista'}</button></td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">Nenhuma proposta.</td></tr>'}</tbody></table></div></div>`;
+  $('#ds-dig', c) && ($('#ds-dig', c).onclick = async (ev) => { if (!confirm(`Apagar ${digDesc.length} PDF(s) de caixas descartadas? Não dá para desfazer.`)) return; ev.target.disabled = true; let k = 0;
+    for (const a of digDesc) { try { const cam = await q(sb.rpc('arq_arquivo_excluir', { p_arquivo: a.id })); await sb.storage.from('arquivo').remove([cam]); k++; } catch (err) { fail(err); } }
+    toast(`${k} cópia(s) digital(is) apagada(s)`); recarregar(); });
   $$('[data-v]', c).forEach(b => b.onchange = () => { b.checked ? selD.add(b.dataset.v) : selD.delete(b.dataset.v); const bt = $('#ds-pr', c); if (bt) { bt.disabled = !selD.size; bt.textContent = `Propor o descarte dos marcados${selD.size ? ` (${selD.size})` : ''}`; } });
   $('#ds-pr', c) && ($('#ds-pr', c).onclick = async () => { const obs = prompt(`Propor o descarte de ${selD.size} caixa(s)? Outra pessoa (${D.cfg.papeis_descarte.join(', ')}) aprova. Observação (opcional):`); if (obs === null) return;
     try { await q(sb.rpc('arq_descarte_propor', { p_empresa: state.empresa.id, p_caixas: [...selD], p_obs: obs })); toast('Proposta de descarte enviada para aprovação'); recarregar(); } catch (err) { fail(err); } });
@@ -362,11 +444,12 @@ async function abaParametros(c) {
       <h3>Quem consulta e pede caixas</h3><div>${PAPEIS.map(([k]) => chk('c', k, g.papeis_consulta.includes(k))).join('')}</div>
       <p class="small muted">As caixas do RH só aparecem para quem vê o RH, para o administrador, o diretor e as pessoas nomeadas acima.</p>
       <h3>Quem confirma os prazos e aprova o descarte</h3><div>${PAPEIS.slice(0, 3).map(([k]) => chk('d', k, g.papeis_descarte.includes(k))).join('')}</div>
-      <div class="grid-form" style="margin-top:10px"><label>Prazo de devolução (dias)<input type="number" id="pa-d" min="1" max="90" value="${g.emprestimo_dias}"></label></div>
+      <div class="grid-form" style="margin-top:10px"><label>Prazo de devolução (dias)<input type="number" id="pa-d" min="1" max="90" value="${g.emprestimo_dias}"></label><span></span>
+        <label>Etiqueta da pasta: largura (mm)<input type="number" id="pa-pl" min="30" max="210" value="${g.pasta_largura_mm || 70}"></label><label>Etiqueta da pasta: altura (mm)<input type="number" id="pa-pa" min="15" max="297" value="${g.pasta_altura_mm || 35}"></label></div>
       <h3>Suspender o descarte</h3><label style="display:flex;flex-direction:row;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="pa-s" style="width:auto;margin:0" ${g.descarte_suspenso ? 'checked' : ''}> Nada é descartado enquanto ligado (por exemplo, durante processo judicial ou fiscalização)</label>
       <label>Motivo<input id="pa-sm" maxlength="300" value="${esc(g.descarte_suspenso_motivo || '')}"></label>
       <div style="margin-top:12px"><button class="btn primary" id="pa-ok">Salvar</button></div></div>`;
   const marc = (grp) => $$(`[data-${grp}]`, c).filter(x => x.checked).map(x => x.dataset[grp]);
   $('#pa-ok', c).onclick = async () => { try { await q(sb.rpc('arq_config_salvar', { p_empresa: state.empresa.id, p: { papeis_gestor: marc('g'), arquivistas: marc('a'), papeis_consulta: marc('c'), papeis_descarte: marc('d'),
-    emprestimo_dias: +$('#pa-d', c).value, descarte_suspenso: $('#pa-s', c).checked, descarte_suspenso_motivo: $('#pa-sm', c).value } })); toast('Parâmetros salvos'); recarregar(); } catch (err) { fail(err); } };
+    emprestimo_dias: +$('#pa-d', c).value, pasta_largura_mm: +$('#pa-pl', c).value, pasta_altura_mm: +$('#pa-pa', c).value, descarte_suspenso: $('#pa-s', c).checked, descarte_suspenso_motivo: $('#pa-sm', c).value } })); toast('Parâmetros salvos'); recarregar(); } catch (err) { fail(err); } };
 }

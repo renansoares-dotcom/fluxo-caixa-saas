@@ -2,7 +2,7 @@
 // mostrar o saldo por local e movimentar (transferir ou dar saída) sem escolher produto e lote na mão.
 import { sb, state, q } from './data.js';
 import { $, $$, esc, modal, toast, fail, dateBR, today } from './ui.js';
-import { PADRAO, TIPOS_CODIGO, expandir, documentoEtiquetas, htmlEtiqueta, cssEtiquetas, documentoEnderecos, htmlEndereco, cssEnderecos, documentoCaixas } from './etiquetas.js';
+import { PADRAO, TIPOS_CODIGO, expandir, documentoEtiquetas, htmlEtiqueta, cssEtiquetas, documentoEnderecos, htmlEndereco, cssEnderecos, documentoCaixas, documentoPastas } from './etiquetas.js';
 import { EMPRESA_REL } from './relatorio-base.js';
 
 const PODE_MOVIMENTAR = ['admin', 'financeiro', 'diretor', 'compras', 'producao'];
@@ -100,6 +100,18 @@ export async function imprimirCaixas(lista) {
   } catch (err) { w.close(); fail(err); }
 }
 
+/** etiquetas das pastas do arquivo (SQL 195): tamanho dos parâmetros do arquivo (padrão 70 × 35 mm) */
+export async function imprimirPastas(lista, tam) {
+  if (!lista?.length) return toast('Nenhuma pasta para imprimir', true);
+  if (lista.length > 600) return toast('Muitas etiquetas de uma vez (máximo 600).', true);
+  const w = window.open('', '_blank'); if (!w) return toast('Libere as janelas pop-up para imprimir', true);
+  try {
+    const cfg = await etqConfig(), svgs = {};
+    for (const x of lista) svgs[x.etiqueta] = await desenhar(x.etiqueta, cfg.codigo);
+    w.document.write(documentoPastas(lista, cfg, tam, svgs)); w.document.close();
+  } catch (err) { w.close(); fail(err); }
+}
+
 /** etiqueta de prateleira lida: o que deve estar no endereço e o saldo de cada produto no local */
 export async function enderecoLido(r) {
   const e = state.empresa?.id; if (!e) return;
@@ -129,7 +141,7 @@ export async function enderecoLido(r) {
 export async function etiquetaLida(r) {
   const e = state.empresa?.id; if (!e) return;
   if (r.alvo === 'endereco') return enderecoLido(r);
-  if (r.alvo === 'caixa' || r.alvo === 'arq_endereco') {   // arquivo morto (SQL 194): abre a caixa ou a prateleira no Arquivo Morto
+  if (r.alvo === 'caixa' || r.alvo === 'arq_endereco' || r.alvo === 'pasta') {   // arquivo morto (SQL 194): abre a caixa ou a prateleira no Arquivo Morto
     const alvo = `#/arquivo?etq=${r.codigo}`; if (location.hash === alvo) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = alvo; return;
   }
   let p, l = null, S, LOC, TM;

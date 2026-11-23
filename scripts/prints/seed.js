@@ -2965,3 +2965,15 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
     arq_descarte_propor: () => 'ad9', arq_descarte_decidir: () => null, arq_descarte_executar: () => 1, arq_descarte_cancelar: () => null, arq_tipo_salvar: () => 'at0', arq_configurar: () => 20,
     arq_local_salvar: () => 'al1', arq_end_gerar: () => 16, arq_config_salvar: () => null });
 }
+
+// ---------- arquivo morto: pastas e digitalização (SQL 195) — FICTÍCIO ----------
+{
+  const E0 = DB.empresas[0].id; let n = 5400; const tp = (nome) => DB.arq_tipos.find(t => t.nome === nome)?.id;
+  DB.arq_config[0].pasta_largura_mm = 70; DB.arq_config[0].pasta_altura_mm = 35;
+  DB.arq_pastas = [['ac3', 1, 'Apuração de ICMS — 2019', 'Livros e apurações fiscais', '2019-01-01', '2019-12-31'], ['ac3', 2, 'Apuração de ICMS — 2020', 'Livros e apurações fiscais', '2020-01-01', '2020-12-31'],
+    ['ac3', 3, 'Guias DARF e GNRE — 2019 e 2020', 'Guias de recolhimento de tributos', '2019-01-01', '2020-12-31'], ['ac2', 1, 'Notas de saída — 1º semestre', 'Notas fiscais de entrada e saída', '2019-01-01', '2019-06-30']]
+    .map(([cx, numero, titulo, tipo, inicio, fim]) => ({ id: `pa-${cx}-${numero}`, empresa_id: E0, caixa_id: cx, numero, etiqueta: 'F' + String(++n).padStart(7, '0'), titulo, tipo_id: tp(tipo), inicio, fim, descricao: null }));
+  DB.arq_arquivos = [['pa-ac3-1', 'ICMS 2019 jan-jun.pdf', 8400000], ['pa-ac3-1', 'ICMS 2019 jul-dez.pdf', 7900000], ['pa-ac3-3', 'Guias 2019.pdf', 3100000]]
+    .map(([pasta_id, nome, tamanho], k) => ({ id: 'aa' + k, empresa_id: E0, pasta_id, caminho: `${E0}/x/${pasta_id}/${k}.pdf`, nome, tamanho, enviado_nome: 'Ana Souza', enviado_em: '2026-11-21T14:00:00Z' }));
+  Object.assign(window.RPC, { arq_pasta_salvar: () => 'pa-ac3-1', arq_pasta_excluir: () => null, arq_arquivo_registrar: () => 'aa9', arq_arquivo_excluir: () => 'x' });
+}

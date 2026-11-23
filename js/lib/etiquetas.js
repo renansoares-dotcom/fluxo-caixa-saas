@@ -5,11 +5,11 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 export const PADRAO = { codigo: 'ambos', largura_mm: 100, altura_mm: 70, copias: 1, mostrar_fornecedor: true, end_largura_mm: 100, end_altura_mm: 40 };
 export const TIPOS_CODIGO = { ambos: 'Código de barras e QR', barras: 'Só código de barras', qr: 'Só QR' };
 
-/** o texto lido é um código de etiqueta? devolve { codigo, alvo: 'lote' | 'produto' | 'endereco' | 'caixa' | 'arq_endereco' } ou null */
+/** o texto lido é um código de etiqueta? devolve { codigo, alvo: 'lote' | 'produto' | 'endereco' | 'caixa' | 'arq_endereco' | 'pasta' } ou null */
 export function codigoEtiqueta(txt) {
   const t = String(txt ?? '').trim().toUpperCase();
-  const m = /^([LPECS])(\d{7,12})$/.exec(t);   // C = caixa do arquivo morto, S = prateleira do arquivo (SQL 194)
-  return m ? { codigo: t, alvo: { L: 'lote', P: 'produto', E: 'endereco', C: 'caixa', S: 'arq_endereco' }[m[1]] } : null;
+  const m = /^([LPECSF])(\d{7,12})$/.exec(t);   // C = caixa do arquivo morto, S = prateleira do arquivo (SQL 194), F = pasta (SQL 195)
+  return m ? { codigo: t, alvo: { L: 'lote', P: 'produto', E: 'endereco', C: 'caixa', S: 'arq_endereco', F: 'pasta' }[m[1]] } : null;
 }
 
 /** estantes digitadas: "A-F", "A, B, C", "1-12" ou uma mistura ("A-C, P"). Devolve a lista em maiúsculas, sem repetir, ou { erro } */
@@ -163,3 +163,33 @@ export function documentoCaixas(lista, cfg = PADRAO, svgs = {}, empresa = '', { 
     ${auto ? '<script>window.onload=()=>setTimeout(()=>print(),400)</script>' : ''}</body></html>`;
 }
 export { dBR };
+
+// ---------------------------------------------------------------- arquivo morto (SQL 195): etiqueta da pasta (menor, para a aba da pasta)
+export const numPasta = (caixa, pasta) => `${String(caixa).padStart(4, '0')}.${String(pasta).padStart(2, '0')}`;
+export function cssPastas(tam = { largura_mm: 70, altura_mm: 35 }) {
+  const W = +tam.largura_mm || 70, H = +tam.altura_mm || 35, u = Math.min(H / 35, W / 70), mm = (v) => (v * u).toFixed(2) + 'mm';
+  return `@page{size:${W}mm ${H}mm;margin:0} *{box-sizing:border-box} html,body{margin:0;padding:0}
+body{font-family:Arial,Helvetica,sans-serif;color:#000}
+.pst{width:${W}mm;height:${H}mm;padding:${mm(2)};display:flex;gap:${mm(2)};overflow:hidden;page-break-after:always;break-after:page}
+.pst:last-child{page-break-after:auto;break-after:auto}
+.pst .txt{flex:1;min-width:0;display:flex;flex-direction:column}
+.pst .num{font-size:${mm(6)};font-weight:bold;line-height:1;white-space:nowrap}
+.pst .tit{font-size:${mm(3)};font-weight:bold;line-height:1.15;margin-top:${mm(1)};max-height:${mm(7)};overflow:hidden}
+.pst .per{font-size:${mm(2.6)};margin-top:${mm(0.6)}}
+.pst .bar{margin-top:auto} .pst .bar svg{display:block;width:100%;height:${mm(6)}}
+.pst .cod{font-family:"Courier New",monospace;font-weight:bold;font-size:${mm(2.4)}}
+.pst .qr{flex:0 0 ${mm(21)};display:flex;align-items:center} .pst .qr svg{display:block;width:100%;height:auto}
+.barra{position:fixed;top:6px;right:6px;font-family:system-ui,sans-serif} .barra button{padding:8px 14px;font-size:13px;cursor:pointer}
+@media screen{body{background:#ddd;padding:12px} .pst{background:#fff;margin:0 auto 10px;box-shadow:0 1px 4px rgba(0,0,0,.3)}} @media print{.barra{display:none}}`;
+}
+/** p = { etiqueta, caixa_numero, numero, titulo, inicio, fim } */
+export function htmlPasta(p, cfg = PADRAO, svg = {}) {
+  const tipo = cfg.codigo || 'ambos', barras = tipo !== 'qr' && svg.barras, qr = tipo !== 'barras' && svg.qr, per = periodoCaixa(p.inicio, p.fim);
+  return `<div class="pst"><div class="txt"><div class="num">${esc(numPasta(p.caixa_numero, p.numero))}</div><div class="tit">${esc(p.titulo)}</div>${per ? `<div class="per">${esc(per)}</div>` : ''}
+    <div class="bar">${barras ? svg.barras : ''}<div class="cod">${esc(p.etiqueta)}</div></div></div>${qr ? `<div class="qr">${svg.qr}</div>` : ''}</div>`;
+}
+export function documentoPastas(lista, cfg = PADRAO, tam, svgs = {}, { auto = true } = {}) {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Etiquetas de pasta (${lista.length})</title><style>${cssPastas(tam)}</style></head><body>
+    <div class="barra"><button onclick="print()">Imprimir</button></div>${lista.map(p => htmlPasta(p, cfg, svgs[p.etiqueta] || {})).join('')}
+    ${auto ? '<script>window.onload=()=>setTimeout(()=>print(),400)</script>' : ''}</body></html>`;
+}

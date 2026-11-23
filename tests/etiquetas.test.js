@@ -83,3 +83,13 @@ test('etiqueta da caixa: número, área, título, guarda e código', () => {
   const h = htmlCaixa({ numero: 42, etiqueta: 'C0000042', area: 'rh', setor: 'DP', titulo: 'Rescisões <2018>', periodo_inicio: '2018-01-01', periodo_fim: '2018-12-31', descartar_em: '2024-01-01', endereco: 'A-01', local: 'Sala 2' }, { codigo: 'ambos' }, { barras: '<svg id="b"/>', qr: '<svg id="q"/>' }, 'IPLAMM');
   assert.match(h, /CAIXA 0042/); assert.match(h, /RH · DP/); assert.match(h, /&lt;2018&gt;/); assert.match(h, /Guardar até 31\/12\/2023/); assert.match(h, /Sala 2 · A-01/); assert.match(h, /C0000042/);
 });
+
+// ---------------------------------------------------------------- SQL 195: pasta do arquivo
+import { htmlPasta, cssPastas, numPasta } from '../js/lib/etiquetas.js';
+test('etiqueta da pasta: F, número caixa.pasta, título, período e tamanho próprio', () => {
+  assert.equal(codigoEtiqueta('F0001234').alvo, 'pasta');
+  assert.equal(numPasta(3, 2), '0003.02');
+  const h = htmlPasta({ etiqueta: 'F0001234', caixa_numero: 3, numero: 2, titulo: 'Notas de <fevereiro>', inicio: '2021-02-01', fim: '2021-02-28' }, { codigo: 'qr' }, { barras: '<svg id="b"/>', qr: '<svg id="q"/>' });
+  assert.match(h, /0003\.02/); assert.match(h, /&lt;fevereiro&gt;/); assert.match(h, /02\/2021 a 02\/2021/); assert.match(h, /id="q"/); assert.doesNotMatch(h, /id="b"/);
+  assert.match(cssPastas({ largura_mm: 80, altura_mm: 30 }), /@page\{size:80mm 30mm/);
+});
