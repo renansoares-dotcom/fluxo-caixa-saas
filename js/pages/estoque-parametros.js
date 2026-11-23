@@ -25,7 +25,8 @@ async function carregar() {
   await loadCadastros().catch(() => {});
   // travas do lançamento à mão (SQL 179): empresa sem configuração gravada usa 60 dias, 50 % e documento obrigatório
   const travas = cfg === undefined ? null : cfg ? { dias: cfg.dias_retroativos, desvio: cfg.custo_desvio_pct, doc: cfg.exigir_documento !== false } : { dias: 60, desvio: 50, doc: true };
-  D = { travas, consulta: cfg === undefined ? null : (cfg?.papeis_consulta || ['leitura']), locais, familias, tipos, regras, fech, setores, loc: Object.fromEntries(locais.map(l => [l.id, l])), fam: Object.fromEntries(familias.map(f => [f.id, f])), tm: Object.fromEntries(tipos.map(t => [t.id, t])) };
+  const aprovacao = { limite: cfg?.aprov_limite ?? null, tipos: cfg?.aprov_tipos || ['PERDA', 'AJ+', 'AJ-'], papeis: cfg?.aprov_papeis || ['admin', 'diretor', 'financeiro'] };   // SQL 192
+  D = { aprovacao, travas, consulta: cfg === undefined ? null : (cfg?.papeis_consulta || ['leitura']), locais, familias, tipos, regras, fech, setores, loc: Object.fromEntries(locais.map(l => [l.id, l])), fam: Object.fromEntries(familias.map(f => [f.id, f])), tm: Object.fromEntries(tipos.map(t => [t.id, t])) };
 }
 
 export async function render(root) {
@@ -213,7 +214,19 @@ function acesso(root) {
       <label>Diferença de custo aceita (%)<input type="number" min="1" step="1" id="tv-desvio" value="${D.travas.desvio ?? ''}" placeholder="sem trava" ${adm ? '' : 'disabled'}><span class="small muted">Entrada com custo mais distante do custo médio que isso só é lançada por administrador, financeiro ou diretor. Em branco = sem trava.</span></label>
     </div>
     <label style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;margin:10px 0"><input type="checkbox" id="tv-doc" style="width:auto;margin:3px 0 0;flex:none" ${D.travas.doc ? 'checked' : ''} ${adm ? '' : 'disabled'}><span><b>Exigir o documento</b><br><span class="small muted">Compra, produção e saldo inicial lançados à mão só entram com o número da nota, da ordem ou do inventário.</span></span></label>
-    ${adm ? '<div class="toolbar" style="margin:8px 0 0"><span class="spacer"></span><button class="btn primary" id="tv-ok">Salvar</button></div>' : ''}</div>`);
+    ${adm ? '<div class="toolbar" style="margin:8px 0 0"><span class="spacer"></span><button class="btn primary" id="tv-ok">Salvar</button></div>' : ''}</div>
+    <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Aprovação por valor</h3>
+    <p style="margin-top:0">Lançamento à mão dos tipos marcados com valor acima do limite não entra direto no Kardex: vira um pedido de aprovação. Em branco, desligado.</p>
+    <div class="grid2"><label>Limite por lançamento (R$)<input type="number" min="1" step="50" id="ap-lim" value="${D.aprovacao.limite ?? ''}" placeholder="desligado" ${adm ? '' : 'disabled'}></label></div>
+    <div class="small" style="margin:8px 0 4px">Tipos que pedem aprovação:</div><div style="display:flex;gap:4px 16px;flex-wrap:wrap">${D.tipos.filter(t => t.ativo !== false).map(t => `<label style="display:flex;flex-direction:row;gap:6px;align-items:center;font-weight:400"><input type="checkbox" class="ap-t" value="${esc(t.codigo)}" style="width:auto" ${D.aprovacao.tipos.includes(t.codigo) ? 'checked' : ''} ${adm ? '' : 'disabled'}> ${esc(t.nome)}</label>`).join('')}</div>
+    <div class="small" style="margin:10px 0 4px">Quem aprova (nunca quem pediu):</div><div style="display:flex;gap:4px 16px;flex-wrap:wrap">${[['admin', 'Administrador'], ['diretor', 'Diretor'], ['financeiro', 'Financeiro']].map(([k, n]) => `<label style="display:flex;flex-direction:row;gap:6px;align-items:center;font-weight:400"><input type="checkbox" class="ap-p" value="${k}" style="width:auto" ${D.aprovacao.papeis.includes(k) ? 'checked' : ''} ${adm ? '' : 'disabled'}> ${n}</label>`).join('')}</div>
+    ${adm ? '<div class="toolbar" style="margin:8px 0 0"><span class="spacer"></span><button class="btn primary" id="ap-ok">Salvar</button></div>' : '<p class="small muted">Só o administrador altera.</p>'}</div>`);
+  $('#ap-ok', root) && ($('#ap-ok', root).onclick = async (ev) => {
+    const v = $('#ap-lim', root).value.trim(), lim = v === '' ? null : +v, tipos = $$('.ap-t:checked', root).map(x => x.value), papeis = $$('.ap-p:checked', root).map(x => x.value);
+    if (lim != null && !(lim > 0)) return toast('Limite inválido', true); if (!tipos.length) return toast('Marque ao menos um tipo', true); if (!papeis.length) return toast('Marque quem aprova', true);
+    ev.target.disabled = true;
+    try { await q(sb.rpc('est_aprov_salvar', { p_empresa: state.empresa.id, p_limite: lim, p_tipos: tipos, p_papeis: papeis })); toast(lim ? 'Aprovação por valor ligada' : 'Aprovação por valor desligada'); await recarregar(root); } catch (err) { fail(err); ev.target.disabled = false; }
+  });
   $('#tv-ok', root) && ($('#tv-ok', root).onclick = async (ev) => {
     const n = (id) => $(id, root).value.trim() === '' ? null : +$(id, root).value, dias = n('#tv-dias'), desvio = n('#tv-desvio');
     if ((dias != null && !(dias >= 0)) || (desvio != null && !(desvio > 0))) return toast('Confira os valores', true);

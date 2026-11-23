@@ -1,7 +1,7 @@
 ---
 titulo: Kardex e parâmetros do estoque
 tela: Estoque › Kardex (EST002) e Parâmetros do Estoque (EST005)
-versao: 1.8
+versao: 1.9
 atualizado: 2026-11-22
 ---
 ## 1. Para que serve
@@ -214,6 +214,19 @@ As travas valem para o que é lançado pela tela. O que a plataforma lança sozi
 
   Os detalhes estão no manual Qualidade.
 
+### 5.1 Aprovação por valor
+
+Parâmetro em **Estoque › Parâmetros › Travas**, cartão **Aprovação por valor**. Em branco, fica desligado.
+
+Ligado, um lançamento à mão dos tipos marcados (por padrão, perda e os dois ajustes) com valor acima do limite não entra direto no Kardex:
+
+1. Ao lançar, a plataforma avisa que o valor passou do limite e pergunta se você quer **pedir a aprovação**.
+2. O pedido passa antes por todas as regras do lançamento à mão (perfil do tipo, documento, datas, saldo, local congelado). O que não entraria direto também não vira pedido.
+3. Quem aprova (administrador, diretor ou financeiro, conforme o parâmetro) recebe o aviso e vê o botão **Aprovações** no topo do Kardex.
+4. **Aprovar** lança o movimento com a data e os dados do pedido. **Recusar** exige o motivo. Quem pediu pode **Cancelar** enquanto o pedido estiver pendente.
+
+Quem pediu nunca aprova o próprio lançamento. O valor considerado é a quantidade ao custo informado ou, sem ele, ao custo médio do produto naquele momento. Os lançamentos que a plataforma faz sozinha (notas, requisições, inventário, recebimento) não passam por essa trava.
+
 ## 6. Perguntas frequentes e erros comuns
 
 **"Saldo insuficiente de … em …".** O local não tem a quantidade. Confira se o material está em outro local (transfira) ou se falta lançar uma entrada.
@@ -239,3 +252,4 @@ As travas valem para o que é lançado pela tela. O que a plataforma lança sozi
 | 1.6 | 22/11/2026 | Travas do lançamento à mão (data futura, limite de dias, documento, diferença de custo). Compra, produção e tipos de nota restritos por perfil. Estorno com motivo, data e perfil conferidos, ligado à requisição de origem. Parâmetros estruturais congelados depois do primeiro movimento. Posição do estoque guardada no fechamento. |
 | 1.7 | 22/11/2026 | Perda e requisição direta restritas por perfil. Primeiro custo de um produto confirmado por administrador, financeiro ou diretor. Saída com data antiga não deixa saldo negativo em nenhum dia. Estorno de movimento de outro documento é feito pelo documento. Só se fecha mês terminado. |
 | 1.8 | 22/11/2026 | Documento exigido em toda entrada lançada à mão. Estorno de entrada já consumida sai ao custo médio corrente. Criação de tipo e campos sensíveis só pelo administrador. Transferência sem diferença de centavo. |
+| 1.9 | 22/11/2026 | Aprovação por valor: perda e ajuste à mão acima do limite viram pedido, aprovado por administrador, diretor ou financeiro (nunca quem pediu). Parâmetro desligado por padrão (SQL 192). |

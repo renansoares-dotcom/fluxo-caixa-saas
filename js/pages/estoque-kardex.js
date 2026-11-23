@@ -32,11 +32,12 @@ async function carregar() {
     fetchAll(() => sb.from('est_lotes').select('*').eq('empresa_id', e).order('id')),
     q(sb.from('est_fechamentos').select('mes').eq('empresa_id', e)),
     carregarProdutos(true)]);
+  const aprov = await q(sb.from('est_mov_aprovacoes').select('*').eq('empresa_id', e).eq('situacao', 'pendente').order('numero')).catch(() => []);   // SQL 192
   const [cfg, pend] = await Promise.all([q(sb.from('est_config').select('*').eq('empresa_id', e)).catch(() => null),
     fetchAll(() => sb.from('est_pendencias').select('*, nfe_notas(numero,emissao,tipo,emit_nome,dest_nome,emissao_propria), nfe_itens(cprod,xprod,cfop,qcom,ucom)').eq('empresa_id', e).eq('status', 'aberta').order('criado_em')).catch(() => null)]);
   if (!ui.de) { ui.de = MES01(); ui.ate = today(); }
   const noPeriodo = ui.de === MES01() && ui.ate === today() ? movs : await buscarMovs(ui.de, ui.ate);
-  D = { cfg: cfg?.[0] || null, semB: cfg === null, pend: pend || [], locais, tipos, saldos, custos, movs: noPeriodo, movsMes: movs, lotes, fech, prods, loc: Object.fromEntries(locais.map(l => [l.id, l])), tm: Object.fromEntries(tipos.map(t => [t.id, t])),
+  D = { cfg: cfg?.[0] || null, semB: cfg === null, pend: pend || [], aprov: aprov || [], locais, tipos, saldos, custos, movs: noPeriodo, movsMes: movs, lotes, fech, prods, loc: Object.fromEntries(locais.map(l => [l.id, l])), tm: Object.fromEntries(tipos.map(t => [t.id, t])),
     prod: Object.fromEntries(prods.map(p => [p.id, p])), lote: Object.fromEntries(lotes.map(l => [l.id, l])), custo: Object.fromEntries(custos.map(c => [c.produto_id, c])) };
   // tipos inativos também aparecem no histórico
   const falta = [...new Set(movs.map(m => m.tipo_movimento_id))].filter(id => !D.tm[id]);
@@ -59,7 +60,7 @@ function pintar(root) {
   const comSaldo = new Set(D.saldos.filter(s => +s.quantidade).map(s => s.produto_id));
   const movMes = D.movsMes.filter(m => m.data.startsWith(mes));
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Kardex</h2><div class="muted small">Estoque oficial: saldo por local e lote, custo médio ponderado móvel por produto. Movimento não se altera nem se exclui — corrige-se por estorno.</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="kx-xls">Excel</button><button class="btn" id="kx-ler">Ler código</button>${podeMov() ? '<button class="btn" id="kx-trf">Transferir</button><button class="btn primary" id="kx-novo">Novo movimento</button>' : ''}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="kx-xls">Excel</button><button class="btn" id="kx-ler">Ler código</button>${D.aprov.length ? `<button class="btn" id="kx-aprov">Aprovações <span class="badge vencido">${D.aprov.length}</span></button>` : ''}${podeMov() ? '<button class="btn" id="kx-trf">Transferir</button><button class="btn primary" id="kx-novo">Novo movimento</button>' : ''}</div></div>
     ${veEstoque() ? '' : '<div class="card"><span class="badge vencido">sem acesso</span> Seu perfil não consulta saldo, custo e movimentos do estoque. Quem libera é o administrador, em Estoque › Parâmetros › Acesso.</div>'}
     ${faixaImplantacao()}
     <div class="kpis">
@@ -78,6 +79,8 @@ function pintar(root) {
   $('#kx-ler', root).onclick = () => abrirLeitura();
   $('#kx-xls', root).onclick = () => { const tb = $('#kx-corpo table', root); if (tb) exportXLSX(tb, 'kardex_' + ui.aba); };
   $('#kx-novo', root) && ($('#kx-novo', root).onclick = () => movimento(root));
+  $('#kx-aprov', root) && ($('#kx-aprov', root).onclick = () => aprovacoes(root));
+  if (/[?&]aprovacoes=1/.test(location.hash) && D.aprov.length) aprovacoes(root);
   $('#kx-impl', root) && ($('#kx-impl', root).onclick = () => implantar(root));
   $('#kx-auto', root) && ($('#kx-auto', root).onclick = async () => {
     const lig = !D.cfg.automatico; if (!await confirmDialog(lig ? 'Ligar os movimentos automáticos pelas notas?' : 'Desligar os movimentos automáticos? As notas importadas enquanto desligado não movimentam (dá para reprocessar o período depois).')) return;
@@ -241,11 +244,35 @@ function movimento(root, { produto = null, transferencia = false } = {}) {
         if (!lote) lote = (await q(sb.from('est_lotes').insert({ empresa_id: state.empresa.id, produto_id: p.id, codigo: V('mv-lote'), lote_fornecedor: V('mv-lf') || null, origem: t.codigo === 'PROD' ? 'producao' : t.codigo === 'SI' || t.documento === 'inventario' ? 'inventario' : 'compra' }).select('id').single())).id;
       }
       if (transferencia) await q(sb.rpc('est_transferir', { p_empresa: state.empresa.id, p_data: V('mv-dt'), p_produto: p.id, p_origem: V('mv-l'), p_destino: V('mv-d'), p_qtd: qv, p_lote: lote, p_tipo: t.id, p_obs: V('mv-obs') || null }));
-      else await q(sb.from('est_movimentos').insert({ empresa_id: state.empresa.id, data: V('mv-dt'), produto_id: p.id, local_id: V('mv-l'), lote_id: lote, tipo_movimento_id: t.id,
-        quantidade: t.sentido === 'S' ? -qv : qv, custo_unitario: entradaCusto ? cu : null, documento: V('mv-doc') || null, observacao: V('mv-obs') || null }));
+      else {
+        const dados = { empresa_id: state.empresa.id, data: V('mv-dt'), produto_id: p.id, local_id: V('mv-l'), lote_id: lote, tipo_movimento_id: t.id,
+          quantidade: t.sentido === 'S' ? -qv : qv, custo_unitario: entradaCusto ? cu : null, documento: V('mv-doc') || null, observacao: V('mv-obs') || null };
+        try { await q(sb.from('est_movimentos').insert(dados)); }
+        catch (err) {
+          // acima do limite de valor (SQL 192): o lançamento vira pedido de aprovação, com os mesmos dados
+          if (!/peça a aprovação/.test(String(err?.message || err))) throw err;
+          if (!await confirmDialog(`${String(err.message).split(':')[0]}.\n\nPedir a aprovação? O lançamento entra no Kardex quando for aprovado.`)) { ev.target.disabled = false; return; }
+          const id = await q(sb.rpc('est_mov_pedir', { p: dados }));
+          toast(`Pedido de aprovação registrado${id ? '' : ''}: quem aprova foi avisado`); m.close(); return recarregar(root);
+        }
+      }
       toast('Movimento lançado'); m.close(); await recarregar(root);
     } catch (err) { fail(err); ev.target.disabled = false; }
   };
+}
+
+// ------------------------------------------------------------ aprovação por valor (SQL 192)
+function aprovacoes(root) {
+  const eu = state.user.id, aprova = (D.cfg?.aprov_papeis || ['admin', 'diretor', 'financeiro']).includes(state.papel);
+  const m = modal({ title: 'Lançamentos aguardando aprovação', wide: true, body: `<div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Produto</th><th>Local</th><th>Tipo</th><th class="num">Quantidade</th><th class="num">Valor</th><th>Pedido por</th><th></th></tr></thead><tbody>
+    ${D.aprov.map(a => { const p = D.prod[a.produto_id], t = D.tm[a.tipo_movimento_id]; return `<tr><td>${a.numero}</td><td>${dateBR(a.data)}</td><td class="wrap"><b>${esc(p?.codigo || '')}</b> ${esc(p?.descricao || '')}${a.observacao ? `<div class="small muted">${esc(a.observacao)}</div>` : ''}</td>
+      <td>${esc(D.loc[a.local_id]?.nome || '')}</td><td>${esc(t?.nome || '')}</td><td class="num">${qtd(a.quantidade)}</td><td class="num"><b>${money(a.valor_estimado)}</b></td><td>${esc(a.pedido_nome || '')}<div class="small muted">${dateBR(a.pedido_em)}</div></td>
+      <td style="white-space:nowrap">${aprova && a.pedido_por !== eu ? `<button class="btn primary small" data-ap="${a.id}">Aprovar</button> <button class="btn ghost small" data-re="${a.id}">Recusar</button>` : ''}${a.pedido_por === eu ? `<button class="btn ghost small" data-ca="${a.id}">Cancelar</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
+    <p class="small muted">Aprovado, o lançamento entra no Kardex com a data e os dados do pedido. Quem pediu não aprova o próprio lançamento.</p>`, foot: '<button class="btn" data-close>Fechar</button>' });
+  const fazer = (sel, fn) => $$(sel, m.el).forEach(b => b.onclick = async () => { try { await fn(b.dataset[Object.keys(b.dataset)[0]]); m.close(); await recarregar(root); } catch (err) { fail(err); } });
+  fazer('[data-ap]', async (id) => { await q(sb.rpc('est_mov_decidir', { p_id: id, p_aprova: true })); toast('Aprovado: o lançamento entrou no Kardex'); });
+  fazer('[data-re]', async (id) => { const mot = (prompt('Motivo da recusa') || '').trim(); if (mot.length < 5) throw new Error('Informe o motivo da recusa'); await q(sb.rpc('est_mov_decidir', { p_id: id, p_aprova: false, p_motivo: mot })); toast('Pedido recusado'); });
+  fazer('[data-ca]', async (id) => { await q(sb.rpc('est_mov_cancelar_pedido', { p_id: id })); toast('Pedido cancelado'); });
 }
 
 // ------------------------------------------------------------ implantação e pendências (SQL 077)
