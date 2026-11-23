@@ -143,16 +143,16 @@ export function guardaCaixa(c) {
 export function cssCaixas(cfg = PADRAO) {
   const W = +cfg.largura_mm || 100, H = +cfg.altura_mm || 70, u = Math.min(H / 70, W / 100), mm = (v) => (v * u).toFixed(2) + 'mm';
   return cssEtiquetas(cfg) + `
-.etq .cx{display:flex;justify-content:space-between;align-items:baseline;margin-top:${mm(1)}} .etq .cx b{font-size:${mm(9)};line-height:1}
-.etq .cx span{font-size:${mm(3.6)};font-weight:bold;text-transform:uppercase}
-.etq .gd{font-size:${mm(3.2)};font-weight:bold;margin-top:${mm(0.9)}}`;
+.etq .cx{display:flex;justify-content:space-between;align-items:baseline;gap:${mm(3)};margin-top:${mm(1.2)}} .etq .cx b{font-size:${mm(8)};line-height:1;white-space:nowrap}
+.etq .cx span{font-size:${mm(3.4)};font-weight:bold;text-transform:uppercase;text-align:right}
+.etq .gd{font-size:${mm(3.8)};font-weight:bold;margin-top:${mm(1)};border:.3mm solid #000;display:inline-block;padding:${mm(0.4)} ${mm(1.5)}}`;
 }
 /** c = { numero, etiqueta, area, setor, titulo, periodo_inicio, periodo_fim, descartar_em, permanente, prazo_pendente, endereco, local } */
 export function htmlCaixa(c, cfg = PADRAO, svg = {}, empresa = '') {
   const tipo = cfg.codigo || 'ambos', barras = tipo !== 'qr' && svg.barras, qr = tipo !== 'barras' && svg.qr;
   const per = periodoCaixa(c.periodo_inicio, c.periodo_fim);
   return `<div class="etq"><div class="topo"><b>${esc(empresa)} · Arquivo</b>${c.endereco ? `<span class="vol">${esc([c.local, c.endereco].filter(Boolean).join(' · '))}</span>` : ''}</div>
-    <div class="cx"><b>CAIXA ${String(c.numero).padStart(4, '0')}</b><span>${esc(AREAS_ARQ[c.area] || c.area)}${c.setor ? ' · ' + esc(c.setor) : ''}</span></div>
+    <div class="cx"><b>CAIXA ${String(c.numero).padStart(4, '0')}</b><span>${esc(AREAS_ARQ[c.area] || c.area)}${c.setor && c.setor.toUpperCase() !== String(AREAS_ARQ[c.area] || '').toUpperCase() ? ' · ' + esc(c.setor) : ''}</span></div>
     <div class="desc">${esc(c.titulo)}</div>${per ? `<div class="lin">Período <b>${esc(per)}</b></div>` : ''}
     <div class="gd">${esc(guardaCaixa(c))}</div>
     <div class="base"><div class="bar">${barras ? svg.barras : ''}<div class="num">${esc(c.etiqueta)}</div></div>${qr ? `<div class="qr">${svg.qr}</div>` : ''}</div></div>`;
