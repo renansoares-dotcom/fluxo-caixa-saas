@@ -8,11 +8,16 @@
 // Fluxo da consulta: POST /{serviço}/{cnpj8} -> tíquete · GET /situacao/{tíquete} · GET /download/{tíquete} -> urlAssinada · GET na urlAssinada (sem token).
 // Ações: testar · solicitar (debitos | creditos | pagamentos | recolhimentos) · atualizar (situação + importação) · rad_gerar (DARF).
 // rad_gerar está TRAVADA (18/11/2026): só funciona com o segredo RFB_CBS_PERMITIR_DARF = sim. Sem ele, a função só testa e consulta.
+// PILOTO DA CBS (23/11/2026): ambiente = 'restrita' usa a produção restrita da Receita (simulação, sem efeito fiscal), com a credencial
+// própria RFB_CBS_PR_CHAVE / RFB_CBS_PR_SEGREDO e o endereço RFB_CBS_PR_BASE (padrão: /apuracao-cbs-prr/v2). No piloto só há
+// 'testar' e 'piloto_darf' (simulação de DARF para chaves de documentos simulados, desligada até RFB_CBS_PR_PERMITIR_DARF = sim);
+// nada do piloto é gravado nas tabelas da apuração real.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
-const BASE = 'https://api.receitafederal.gov.br/apuracao-cbs/v2', TOKEN_URL = 'https://api.receitafederal.gov.br/token';
+const BASE_PROD = 'https://api.receitafederal.gov.br/apuracao-cbs/v2', TOKEN_URL = 'https://api.receitafederal.gov.br/token';
+type Amb = { base: string; ch: string; sg: string };   // ambiente da requisição (produção ou produção restrita), passado a cada chamada
 const APIS = ['debitos', 'creditos', 'pagamentos', 'recolhimentos'];
 const so = (s: unknown) => String(s ?? '').replace(/\D/g, '');
 const num = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
@@ -23,9 +28,9 @@ const cache = new Map<string, { tok: string; ate: number }>();
 const resumoDe = async (s: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
 const LIMITE = /rate limit|too many|limite de (chamadas|requisi)/i;
 const MSG_LIMITE = 'A Receita Federal bloqueou novas chamadas por enquanto: o limite de chamadas desta credencial foi atingido. A credencial está correta. Aguarde e tente mais tarde, sem repetir cliques (cada tentativa conta no limite).';
-async function obterToken(adm: any, cnpj: string): Promise<{ tok?: string; motivo?: string; http?: number; limite?: boolean }> {
-  const id = segredo('RFB_CBS_CHAVE', cnpj), sec = segredo('RFB_CBS_SEGREDO', cnpj);
-  if (!id || !sec) return { motivo: `Falta o segredo ${!id ? 'RFB_CBS_CHAVE' : 'RFB_CBS_SEGREDO'} na função (Supabase › Edge Functions › Secrets).` };
+async function obterToken(adm: any, cnpj: string, E: Amb): Promise<{ tok?: string; motivo?: string; http?: number; limite?: boolean }> {
+  const id = segredo(E.ch, cnpj), sec = segredo(E.sg, cnpj);
+  if (!id || !sec) return { motivo: `Falta o segredo ${!id ? E.ch : E.sg} na função (Supabase › Edge Functions › Secrets).` };
   const c = cache.get(id); if (c && c.ate > Date.now() + 60000) return { tok: c.tok };
   const chave = await resumoDe(id);
   try { const { data: g } = await adm.from('rfb_tokens').select('token, expira_em').eq('credencial', chave).maybeSingle();
@@ -46,15 +51,14 @@ async function obterToken(adm: any, cnpj: string): Promise<{ tok?: string; motiv
       if (r.status === 429 || LIMITE.test(ultimo.motivo)) return { http: r.status, limite: true, motivo: MSG_LIMITE };
     } catch (e) { ultimo = { http: 0, motivo: 'Receita Federal inacessível: ' + (e as Error).message.slice(0, 150) }; }
   }
-  return { http: ultimo.http, motivo: `A Receita recusou a credencial ao pedir o token (${ultimo.motivo}). Confira os segredos RFB_CBS_CHAVE e RFB_CBS_SEGREDO.` };
+  return { http: ultimo.http, motivo: `A Receita recusou a credencial ao pedir o token (${ultimo.motivo}). Confira os segredos ${E.ch} e ${E.sg}.` };
 }
-async function esquecerToken(adm: any, cnpj: string) { const id = segredo('RFB_CBS_CHAVE', cnpj); cache.delete(id); try { await adm.from('rfb_tokens').delete().eq('credencial', await resumoDe(id)); } catch { /* nada */ } }
-let aoRecusar: (() => Promise<void>) | null = null;   // definido a cada requisição: token recusado (401) é esquecido
-async function rfb(tok: string, metodo: string, caminho: string, corpo?: unknown) {
+async function esquecerToken(adm: any, cnpj: string, E: Amb) { const id = segredo(E.ch, cnpj); cache.delete(id); try { await adm.from('rfb_tokens').delete().eq('credencial', await resumoDe(id)); } catch { /* nada */ } }
+async function rfb(E: Amb & { aoRecusar?: () => Promise<void> }, tok: string, metodo: string, caminho: string, corpo?: unknown) {
   try {
-    const r = await fetch(BASE + caminho, { method: metodo, headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json', ...(corpo !== undefined ? { 'Content-Type': 'application/json' } : {}) }, body: corpo !== undefined ? JSON.stringify(corpo) : undefined });
+    const r = await fetch(E.base + caminho, { method: metodo, headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json', ...(corpo !== undefined ? { 'Content-Type': 'application/json' } : {}) }, body: corpo !== undefined ? JSON.stringify(corpo) : undefined });
     const txt = await r.text(); let d: any = null; try { d = JSON.parse(txt); } catch { d = { mensagemErro: txt.slice(0, 300) }; }
-    if (r.status === 401 && aoRecusar) await aoRecusar();
+    if (r.status === 401 && E.aoRecusar) await E.aoRecusar();
     return { http: r.status, d };
   } catch (e) { return { http: 0, d: { codigoErro: 'SEM_CONEXAO', mensagemErro: 'Receita Federal inacessível: ' + (e as Error).message.slice(0, 150) } }; }
 }
@@ -78,8 +82,14 @@ Deno.serve(async (req) => {
     const cnpj = so(emp?.cnpj); if (cnpj.length !== 14) return json({ erro: 'O CNPJ da empresa não está cadastrado com 14 dígitos (Cadastros › Empresa).' }, 400);
     const { data: mb } = await adm.from('membros').select('nome').eq('empresa_id', empresa).eq('user_id', u.user.id).maybeSingle();
 
-    const t = await obterToken(adm, cnpj); aoRecusar = () => esquecerToken(adm, cnpj);
-    if (b.acao === 'testar') return json(t.tok ? { ok: true, motivo: 'Credencial aceita pela Receita Federal: token de acesso obtido.' } : { ok: false, http: t.http ?? null, motivo: t.motivo });
+    const piloto = b.ambiente === 'restrita';
+    const E: Amb & { aoRecusar?: () => Promise<void> } = piloto
+      ? { base: (Deno.env.get('RFB_CBS_PR_BASE') || 'https://api.receitafederal.gov.br/apuracao-cbs-prr/v2').trim().replace(/\/+$/, ''), ch: 'RFB_CBS_PR_CHAVE', sg: 'RFB_CBS_PR_SEGREDO' }
+      : { base: BASE_PROD, ch: 'RFB_CBS_CHAVE', sg: 'RFB_CBS_SEGREDO' };
+    if (piloto && !['testar', 'piloto_darf'].includes(b.acao)) return json({ erro: 'No piloto (produção restrita) só há o teste de conexão e a simulação de DARF.' }, 400);
+    if (!piloto && b.acao === 'piloto_darf') return json({ erro: 'A simulação de DARF é só do piloto.' }, 400);
+    const t = await obterToken(adm, cnpj, E); E.aoRecusar = () => esquecerToken(adm, cnpj, E);
+    if (b.acao === 'testar') return json(t.tok ? { ok: true, ambiente: piloto ? 'restrita' : 'producao', motivo: piloto ? 'Piloto da CBS: credencial aceita pela Receita Federal (produção restrita), token de acesso obtido.' : 'Credencial aceita pela Receita Federal: token de acesso obtido.' } : { ok: false, http: t.http ?? null, motivo: t.motivo });
     if (!t.tok) return json({ erro: t.motivo, limite: !!t.limite }, t.limite ? 429 : 400);
     const tok = t.tok;
 
@@ -91,7 +101,7 @@ Deno.serve(async (req) => {
       const hoje = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);   // dia no horário de Brasília
       const { count } = await adm.from('rfb_cbs_solicitacoes').select('id', { count: 'exact', head: true }).eq('empresa_id', empresa).eq('api', api).neq('situacao', 'RECUSADA').gte('solicitada_em', hoje + 'T03:00:00Z');
       if ((count || 0) >= 4) return json({ erro: 'A Receita aceita 4 consultas por dia para cada serviço. O limite de hoje já foi usado.' }, 429);
-      const r = await rfb(tok, 'POST', `/${api}/${cnpj.slice(0, 8)}`, { urlRetorno: '' });
+      const r = await rfb(E, tok, 'POST', `/${api}/${cnpj.slice(0, 8)}`, { urlRetorno: '' });
       const ok = r.http === 201 && r.d?.tiqueteSolicitacao;
       const { data: s } = await adm.from('rfb_cbs_solicitacoes').insert({ empresa_id: empresa, api, tiquete: ok ? r.d.tiqueteSolicitacao : null, situacao: ok ? 'PENDENTE' : 'RECUSADA', tea_segundos: ok ? num(r.d.tEASegundos) : null,
         codigo_erro: ok ? null : (r.d?.codigoErro || `HTTP_${r.http}`), mensagem_erro: ok ? null : String(r.d?.mensagemErro || '').slice(0, 300), solicitada_por: u.user.id, solicitada_por_nome: mb?.nome || u.user.email || null }).select('id').single();
@@ -104,7 +114,7 @@ Deno.serve(async (req) => {
       if (!s?.tiquete) return json({ erro: 'Consulta não encontrada.' }, 404);
       if (s.importada_em) return json({ ok: true, situacao: s.situacao, registros: s.registros, ja: true });
       // tentar de novo depois de uma falha no download: quem já está CONCLUIDA não consulta a situação outra vez
-      const r = s.situacao === 'CONCLUIDA' ? { http: 200, d: { situacao: 'CONCLUIDA' } as any } : await rfb(tok, 'GET', `/situacao/${encodeURIComponent(s.tiquete)}`);
+      const r = s.situacao === 'CONCLUIDA' ? { http: 200, d: { situacao: 'CONCLUIDA' } as any } : await rfb(E, tok, 'GET', `/situacao/${encodeURIComponent(s.tiquete)}`);
       const valida = ['PENDENTE', 'EM_PROCESSAMENTO', 'CONCLUIDA', 'ERRO', 'EXPIRADA'].includes(r.d?.situacao);
       if (!valida) {   // resposta fora do padrão (HTTP diferente de 200 ou sem o campo situacao): não muda a situação; guarda o HTTP e os NOMES dos campos
         const msg = String(r.d?.mensagemErro || r.d?.message || r.d?.mensagem || `HTTP ${r.http}`).slice(0, 200);
@@ -116,7 +126,7 @@ Deno.serve(async (req) => {
       const base: Record<string, unknown> = { situacao: sit, atualizada_em: new Date().toISOString(), codigo_erro: r.d?.codigoErro || null, mensagem_erro: r.d?.mensagemErro ? String(r.d.mensagemErro).slice(0, 300) : null };
       if (sit !== 'CONCLUIDA') { await adm.from('rfb_cbs_solicitacoes').update(base).eq('id', s.id); return json({ ok: sit !== 'ERRO' && sit !== 'EXPIRADA', situacao: sit, erro: r.d?.mensagemErro }); }
       // concluída: o link do arquivo vem de outro serviço — GET /download/{tíquete} devolve a urlAssinada (docs.receitafederal.gov.br/apuracao-cbs/download.html)
-      const dl = await rfb(tok, 'GET', `/download/${encodeURIComponent(s.tiquete)}`);
+      const dl = await rfb(E, tok, 'GET', `/download/${encodeURIComponent(s.tiquete)}`);
       const link = urlAssinadaDe(dl.d);
       if (dl.http !== 200 || !link) {   // sem link: continua CONCLUIDA para poder tentar de novo; guarda o HTTP e os NOMES dos campos (sem valores)
         const msg = String(dl.d?.mensagemErro || dl.d?.message || `HTTP ${dl.http}`).slice(0, 200);
@@ -148,6 +158,19 @@ Deno.serve(async (req) => {
       return json({ ok: !erros.length, situacao: sit, registros: n, resumo });
     }
 
+    // ---- PILOTO: simulação do DARF do RAD para chaves de documentos simulados no piloto. Nada é gravado; só devolve o que a Receita respondeu ----
+    if (b.acao === 'piloto_darf') {
+      if (Deno.env.get('RFB_CBS_PR_PERMITIR_DARF') !== 'sim') return json({ erro: 'A simulação de DARF do piloto está desligada (segredo RFB_CBS_PR_PERMITIR_DARF).' }, 403);
+      const chaves: string[] = (Array.isArray(b.chaves) ? b.chaves : []).map(so).filter((k: string) => k.length === 44).slice(0, 5);
+      if (!chaves.length) return json({ erro: 'Informe a chave de 44 dígitos de um documento simulado no piloto.' }, 400);
+      const vp = num(b.valor_parcial), opcao = vp > 0 ? 'PAGAMENTO_PARCIAL' : 'PAGAMENTO_TOTAL', out: unknown[] = [];
+      for (const k of chaves) { const x = await rfb(E, tok, 'POST', `/rad/${cnpj}`, [{ chaveDFE: k, opcaoPagamento: opcao, ...(vp > 0 ? { valorDarfParcial: Math.round(vp * 100) / 100 } : {}) }]);
+        const d = Array.isArray(x.d) ? x.d[0] : x.d;
+        out.push({ chave: k, http: x.http, cdRetorno: d?.cdRetorno || d?.codigoErro || `HTTP_${x.http}`, mensagem: d?.mensagem || d?.mensagemErro || (d?.dadosInvalidos ? 'Dados inválidos: ' + d.dadosInvalidos.join(', ') : null),
+          valor: d?.valorTotal ?? d?.valorDarf ?? null, vencimento: d?.dataMaximaPagamento ?? d?.dataVencimento ?? null, campos: Object.keys(d || {}) }); }
+      return json({ ok: true, ambiente: 'restrita', resultados: out });
+    }
+
     // ---- gera o DARF do recolhimento pelo adquirente para as notas marcadas (uma chamada por nota, para o retorno ser inequívoco) ----
     if (b.acao === 'rad_gerar') {
       // 18/11/2026 (pedido do Renan): por enquanto só teste e consulta. Gerar DARF fica travado aqui até o segredo RFB_CBS_PERMITIR_DARF = sim existir.
@@ -163,7 +186,7 @@ Deno.serve(async (req) => {
         if (!['marcado', 'darf_gerado'].includes(r.situacao)) { out.push({ id: r.id, ok: false, cdRetorno: 'SITUACAO', mensagem: 'A nota não está marcada.' }); continue; }
         if (so(r.chave).length !== 44) { out.push({ id: r.id, ok: false, cdRetorno: 'SEM_CHAVE', mensagem: 'A nota não tem a chave de 44 dígitos.' }); continue; }
         const vp = num(parcial[r.id]), opcao = vp > 0 ? 'PAGAMENTO_PARCIAL' : 'PAGAMENTO_TOTAL';
-        const x = await rfb(tok, 'POST', `/rad/${cnpj}`, [{ chaveDFE: so(r.chave), opcaoPagamento: opcao, ...(vp > 0 ? { valorDarfParcial: Math.round(vp * 100) / 100 } : {}) }]);
+        const x = await rfb(E, tok, 'POST', `/rad/${cnpj}`, [{ chaveDFE: so(r.chave), opcaoPagamento: opcao, ...(vp > 0 ? { valorDarfParcial: Math.round(vp * 100) / 100 } : {}) }]);
         const d = Array.isArray(x.d) ? x.d[0] : x.d, dados = { ...(d || {}), opcaoPagamento: opcao, cdRetorno: d?.cdRetorno || d?.codigoErro || `HTTP_${x.http}`, mensagem: d?.mensagem || d?.mensagemErro || (d?.dadosInvalidos ? 'Dados inválidos: ' + d.dadosInvalidos.join(', ') : null) };
         const { data: g, error } = await adm.rpc('rad_darf_registrar', { p_id: r.id, p_usuario: u.user.id, p_dados: dados });
         out.push({ id: r.id, ok: !error && !!g?.ok, cdRetorno: dados.cdRetorno, mensagem: error?.message || dados.mensagem, valor: g?.valor ?? null, lancamento_id: g?.lancamento_id ?? null });

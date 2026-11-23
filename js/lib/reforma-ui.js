@@ -234,7 +234,7 @@ export async function pintarCbs(c, mes) {
     const ult = rfb.cred.map(x => x.atualizacao).filter(Boolean).sort().pop(), SIT = { PENDENTE: ['aberto', 'na fila'], EM_PROCESSAMENTO: ['aberto', 'processando'], CONCLUIDA: ['pago', 'concluída'], ERRO: ['vencido', 'erro'], EXPIRADA: ['vencido', 'expirada'], RECUSADA: ['vencido', 'recusada'] };
     corpo = `<div class="card"><h3 style="margin:0 0 6px">Ligação com a Receita Federal</h3>
         <p class="small muted" style="margin:0 0 8px"><b>Só teste e consulta:</b> nada é gerado na Receita, nem DARF. A plataforma usa a credencial da empresa, guardada em segredo, para consultar a Apuração Assistida da CBS. As consultas não são imediatas: a Receita processa e libera um arquivo. Cada serviço aceita <b>4 consultas por dia</b> e devolve só o que mudou desde a última, então a plataforma guarda o histórico.</p>
-        ${podeEditar() ? `<div class="toolbar" style="margin:0"><button class="btn" id="rf-t">Testar a conexão</button><span class="spacer"></span>
+        ${podeEditar() ? `<div class="toolbar" style="margin:0"><button class="btn" id="rf-t">Testar a conexão</button><button class="btn ghost" id="rf-pt" title="Piloto da CBS: produção restrita da Receita, sem efeito fiscal">Testar o piloto</button><button class="btn ghost" id="rf-pd" title="Simula o DARF do RAD no piloto, para a chave de um documento simulado">Simular DARF no piloto</button><span class="spacer"></span>
           ${[['creditos', 'Consultar créditos'], ['recolhimentos', 'Consultar recolhimentos (RAD)'], ['debitos', 'Consultar débitos'], ['pagamentos', 'Consultar pagamentos']].map(([a2, t]) => `<button class="btn" data-sol="${a2}">${t}</button>`).join('')}</div><div id="rf-msg" class="small" style="margin-top:8px"></div>` : '<p class="small muted">Só administrador ou financeiro pede consultas.</p>'}</div>
       <div class="kpis">${k('Documentos com crédito na Receita', Object.keys(rfb.porChave).length, ult ? `última atualização ${new Date(ult).toLocaleDateString('pt-BR')}` : 'nenhuma consulta de créditos importada')}
         ${k('Crédito apurado', money(T.apurado), 'pelo que a Receita processou')}${k('A apropriar', money(T.a_apropriar), 'ainda não disponível para uso', T.a_apropriar ? 'warn' : '')}
@@ -263,6 +263,18 @@ export async function pintarCbs(c, mes) {
     const msg = (t, ruim = false) => { const el = $('#rf-msg', c); if (el) el.innerHTML = `<span class="${ruim ? 'neg' : 'pos'}">${esc(t)}</span>`; };
     $('#rf-t', c) && ($('#rf-t', c).onclick = async (ev) => { ev.target.disabled = true; msg('Testando…');
       try { const r = await fn({ acao: 'testar' }); msg(r.motivo || (r.ok ? 'Conexão ok.' : 'Falhou.'), !r.ok); } catch (err) { msg(err.message, true); } ev.target.disabled = false; });
+    // Piloto da CBS (produção restrita, sem efeito fiscal): teste da credencial própria e simulação do DARF do RAD; nada é gravado
+    $('#rf-pt', c) && ($('#rf-pt', c).onclick = async (ev) => { ev.target.disabled = true; msg('Testando o piloto…');
+      try { const r = await fn({ acao: 'testar', ambiente: 'restrita' }); msg(r.motivo || (r.ok ? 'Piloto ok.' : 'Falhou.'), !r.ok); } catch (err) { msg(err.message, true); } ev.target.disabled = false; });
+    $('#rf-pd', c) && ($('#rf-pd', c).onclick = () => modal({ title: 'Simular o DARF do RAD no piloto da CBS', narrow: true,
+      body: `<p class="small">Ambiente de <b>produção restrita</b> da Receita: simulação, sem efeito fiscal. Use a chave de um documento <b>simulado no piloto</b> (as notas reais não existem lá). Nada é gravado na plataforma.</p>
+        <label>Chave do documento (44 dígitos)<input id="pd-k" inputmode="numeric" maxlength="60"></label>
+        <label>Valor parcial (opcional, R$)<input id="pd-v" inputmode="decimal" placeholder="vazio = todo o débito"></label><div id="pd-r" class="small" style="margin-top:8px"></div>`,
+      foot: '<button class="btn" data-close>Fechar</button><button class="btn primary" id="pd-ok">Simular</button>',
+      onMount: (md) => { $('#pd-ok', md).onclick = async (e2) => { e2.target.disabled = true; const v = +String($('#pd-v', md).value || '0').replace(/\./g, '').replace(',', '.');
+        try { const r = await fn({ acao: 'piloto_darf', ambiente: 'restrita', chaves: [$('#pd-k', md).value], valor_parcial: v > 0 ? v : 0 }), x = r.resultados?.[0];
+          $('#pd-r', md).innerHTML = x ? `<b class="${/^HTTP_2|^00|SUCESSO/i.test(x.cdRetorno) ? 'pos' : ''}">Retorno ${esc(x.cdRetorno)} (HTTP ${x.http})</b>${x.mensagem ? `<br>${esc(x.mensagem)}` : ''}${x.valor != null ? `<br>Valor: ${money(x.valor)}` : ''}${x.vencimento ? ` · pagar até ${dateBR(x.vencimento)}` : ''}<br><span class="muted">Campos devolvidos: ${esc((x.campos || []).join(', ') || '—')}</span>` : 'Sem resposta.'; }
+        catch (err) { $('#pd-r', md).innerHTML = `<b class="neg">${esc(err.message)}</b>`; } e2.target.disabled = false; }; } }));
     $$('[data-sol]', c).forEach(b => b.onclick = async () => { if (!await confirmDialog(`Pedir a consulta à Receita? Ela usa uma das 4 consultas de hoje deste serviço e o resultado leva alguns minutos.`)) return;
       b.disabled = true; try { const r = await fn({ acao: 'solicitar', api: b.dataset.sol }); toast(r.ok ? `Consulta pedida${r.tea_segundos > 0 ? `: tempo estimado ${Math.ceil(r.tea_segundos / 60)} min` : ''}. Clique em Atualizar daqui a pouco.` : 'A Receita não aceitou o pedido.', !r.ok); } catch (err) { fail(err); } pintarCbs(c, mes); });
     $$('[data-atu]', c).forEach(b => b.onclick = async () => { b.disabled = true;
