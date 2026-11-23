@@ -52,6 +52,9 @@ export async function render(root) {
   } catch (err) { fail(err); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Confira se o SQL 194 já foi executado.</div></div>'; }
 }
 const recarregar = () => render(D.root);
+// a caixa com o que a etiqueta precisa: endereço, sala e o conteúdo (tipo, descrição e período de cada linha)
+const paraEtiqueta = (x) => ({ ...x, endereco: D.end[x.endereco_id]?.codigo, local: D.loc[D.end[x.endereco_id]?.local_id]?.nome,
+  itens: D.itensDe(x.id).map(i => ({ tipo: D.tipo[i.tipo_id]?.nome, descricao: i.descricao, inicio: i.inicio, fim: i.fim })) });
 const endTxt = (id) => { const x = D.end[id]; return x ? `${D.loc[x.local_id]?.nome || ''} · ${x.codigo}` : ''; };
 
 function pintar(root) {
@@ -105,7 +108,7 @@ function abaCaixas(c) {
   $$('[data-c]', c).forEach(tr => tr.onclick = () => ficha(D.cx[tr.dataset.c]));
   $('#cx-novo', c) && ($('#cx-novo', c).onclick = () => editar(null));
   $('#cx-etq', c).onclick = () => imprimirCaixas((ui.sel.size ? D.caixas.filter(x => ui.sel.has(x.id)) : L).filter(x => x.situacao !== 'descartada')
-    .map(x => ({ ...x, endereco: D.end[x.endereco_id]?.codigo, local: D.loc[D.end[x.endereco_id]?.local_id]?.nome })));
+    .map(paraEtiqueta));
   $('#cx-mv', c) && ($('#cx-mv', c).onclick = () => mover([...ui.sel]));
   $('#cx-xls', c).onclick = () => exportXLSX($('#cx-tab', c), 'arquivo_morto');
   $('#cx-rel', c).onclick = () => relacao(L);
@@ -139,7 +142,7 @@ function ficha(x) {
     foot: `<button class="btn" id="fc-etq">Etiqueta</button>${D.gestor && x.situacao !== 'descartada' ? '<button class="btn" id="fc-ed">Editar</button>' : ''}<span class="spacer"></span>
       ${x.situacao === 'arquivada' && !meuPedido && !D.gestor ? '<button class="btn primary" id="fc-ped">Pedir esta caixa</button>' : ''}
       ${D.gestor && x.situacao === 'arquivada' ? '<button class="btn primary" id="fc-ret">Registrar retirada</button>' : ''}${D.gestor && aberto ? '<button class="btn primary" id="fc-dev">Registrar devolução</button>' : ''}<button class="btn" data-close>Fechar</button>` });
-  $('#fc-etq', m.el).onclick = () => imprimirCaixas([{ ...x, endereco: D.end[x.endereco_id]?.codigo, local: D.loc[D.end[x.endereco_id]?.local_id]?.nome }]);
+  $('#fc-etq', m.el).onclick = () => imprimirCaixas([paraEtiqueta(x)]);
   $('#fc-ed', m.el) && ($('#fc-ed', m.el).onclick = () => { m.close(); editar(x); });
   $('#fc-ped', m.el) && ($('#fc-ped', m.el).onclick = async () => { const mot = (prompt('Para que precisa da caixa?') || '').trim(); if (!mot) return;
     try { await q(sb.rpc('arq_emp_pedir', { p_caixa: x.id, p_motivo: mot })); m.close(); toast('Pedido registrado: quem cuida do arquivo vai separar a caixa'); recarregar(); } catch (err) { fail(err); } });

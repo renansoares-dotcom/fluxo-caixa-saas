@@ -83,3 +83,18 @@ test('etiqueta da caixa: número, área, título, guarda e código', () => {
   const h = htmlCaixa({ numero: 42, etiqueta: 'C0000042', area: 'rh', setor: 'DP', titulo: 'Rescisões <2018>', periodo_inicio: '2018-01-01', periodo_fim: '2018-12-31', descartar_em: '2024-01-01', endereco: 'A-01', local: 'Sala 2' }, { codigo: 'ambos' }, { barras: '<svg id="b"/>', qr: '<svg id="q"/>' }, 'IPLAMM');
   assert.match(h, /CAIXA 0042/); assert.match(h, /RH · DP/); assert.match(h, /&lt;2018&gt;/); assert.match(h, /Guardar até 31\/12\/2023/); assert.match(h, /Sala 2 · A-01/); assert.match(h, /C0000042/);
 });
+
+// ---------------------------------------------------------------- conteúdo da caixa na etiqueta (23/11/2026)
+import { conteudoEtiqueta, linhasConteudo } from '../js/lib/etiquetas.js';
+test('etiqueta da caixa: até 5 linhas do conteúdo em 70 mm; o resto vira "+ N outros"', () => {
+  assert.equal(linhasConteudo({ largura_mm: 100, altura_mm: 70 }), 5);
+  assert.ok(linhasConteudo({ largura_mm: 100, altura_mm: 100 }) > 5);
+  assert.equal(linhasConteudo({ largura_mm: 100, altura_mm: 50 }), 0);
+  const it = (n) => Array.from({ length: n }, (_, k) => ({ tipo: 'Notas fiscais', descricao: k ? '' : 'entrada', inicio: '2026-04-01', fim: '2026-04-30' }));
+  assert.deepEqual(conteudoEtiqueta(it(1), 5), ['Notas fiscais — entrada · 04/2026']);
+  assert.equal(periodoCaixa('2026-04-01', '2026-04-30'), '04/2026');
+  assert.equal(conteudoEtiqueta(it(5), 5).length, 5);
+  const L = conteudoEtiqueta(it(8), 5); assert.equal(L.length, 5); assert.equal(L[4].mais, '+ 4 outro(s) documento(s): veja pelo QR');
+  const h = htmlCaixa({ numero: 1, etiqueta: 'C1', area: 'fiscal', titulo: 'T', itens: it(2) }, { codigo: 'qr', altura_mm: 70, largura_mm: 100 }, {});
+  assert.match(h, /class="ct"/); assert.match(h, /Notas fiscais — entrada/);
+});
