@@ -130,7 +130,7 @@ const dBR = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('/') : 
 export function periodoCaixa(ini, fim) {
   if (!ini || !fim) return '';
   const [ai, mi] = ini.split('-'), [af, mf] = fim.split('-');
-  if (ai === af) return mi === '01' && mf === '12' ? ai : `${mi}/${ai} a ${mf}/${af}`;
+  if (ai === af) return mi === '01' && mf === '12' ? ai : mi === mf ? `${mi}/${ai}` : `${mi}/${ai} a ${mf}/${af}`;
   return `${ai} a ${af}`;
 }
 /** até quando a caixa fica guardada (a data de descarte é o primeiro dia em que pode sair) */
@@ -145,7 +145,22 @@ export function cssCaixas(cfg = PADRAO) {
   return cssEtiquetas(cfg) + `
 .etq .cx{display:flex;justify-content:space-between;align-items:baseline;gap:${mm(3)};margin-top:${mm(1.2)}} .etq .cx b{font-size:${mm(8)};line-height:1;white-space:nowrap}
 .etq .cx span{font-size:${mm(3.4)};font-weight:bold;text-transform:uppercase;text-align:right}
-.etq .gd{font-size:${mm(3.8)};font-weight:bold;margin-top:${mm(1)};border:.3mm solid #000;display:inline-block;padding:${mm(0.4)} ${mm(1.5)}}`;
+.etq .gd{font-size:${mm(3.8)};font-weight:bold;margin-top:${mm(1)};border:.3mm solid #000;display:inline-block;padding:${mm(0.4)} ${mm(1.5)}}
+.etq>*{flex-shrink:0} .etq .ct{flex-shrink:1;min-height:0;overflow:hidden;margin-top:${mm(1.2)};font-size:${mm(2.7)};line-height:1.3} .etq .ct div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etq .ct div::before{content:'• '} .etq .ct .mais{font-style:italic} .etq .ct .mais::before{content:''}`;
+}
+/** quantas linhas do conteúdo cabem na etiqueta da caixa: depende da altura (70 mm = 5 linhas) */
+export function linhasConteudo(cfg = PADRAO) {
+  const H = +cfg.altura_mm || 70, W = +cfg.largura_mm || 100, u = Math.min(H / 70, W / 100);
+  return Math.max(0, Math.min(10, Math.floor((H - 52 * u) / (3.6 * u))));
+}
+/** as linhas do conteúdo para a etiqueta: até "max"; se passar, as primeiras e "+ N outros (veja pelo QR)" */
+export function conteudoEtiqueta(itens = [], max = 5) {
+  if (!itens.length || max <= 0) return [];
+  const lin = itens.map(i => [i.tipo, i.descricao].filter(Boolean).join(' — ') + (i.inicio ? ` · ${periodoCaixa(i.inicio, i.fim)}` : ''));
+  if (lin.length <= max) return lin;
+  const resto = lin.length - (max - 1);
+  return [...lin.slice(0, max - 1), { mais: `+ ${resto} outro(s) documento(s): veja pelo QR` }];
 }
 /** c = { numero, etiqueta, area, setor, titulo, periodo_inicio, periodo_fim, descartar_em, permanente, prazo_pendente, endereco, local } */
 export function htmlCaixa(c, cfg = PADRAO, svg = {}, empresa = '') {
@@ -153,8 +168,9 @@ export function htmlCaixa(c, cfg = PADRAO, svg = {}, empresa = '') {
   const per = periodoCaixa(c.periodo_inicio, c.periodo_fim);
   return `<div class="etq"><div class="topo"><b>${esc(empresa)} · Arquivo</b>${c.endereco ? `<span class="vol">${esc([c.local, c.endereco].filter(Boolean).join(' · '))}</span>` : ''}</div>
     <div class="cx"><b>CAIXA ${String(c.numero).padStart(4, '0')}</b><span>${esc(AREAS_ARQ[c.area] || c.area)}${c.setor && c.setor.toUpperCase() !== String(AREAS_ARQ[c.area] || '').toUpperCase() ? ' · ' + esc(c.setor) : ''}</span></div>
-    <div class="desc">${esc(c.titulo)}</div>${per ? `<div class="lin">Período <b>${esc(per)}</b></div>` : ''}
-    <div class="gd">${esc(guardaCaixa(c))}</div>
+    ${(() => { const L = conteudoEtiqueta(c.itens, linhasConteudo(cfg));   // com o conteúdo listado (cada linha com o seu período), o período geral vai ao lado do título
+      return `<div class="desc">${esc(c.titulo)}${per && L.length ? ` <span style="font-weight:normal">· ${esc(per)}</span>` : ''}</div>${per && !L.length ? `<div class="lin">Período <b>${esc(per)}</b></div>` : ''}
+    <div class="gd">${esc(guardaCaixa(c))}</div>${L.length ? `<div class="ct">${L.map(l => typeof l === 'string' ? `<div>${esc(l)}</div>` : `<div class="mais">${esc(l.mais)}</div>`).join('')}</div>` : ''}`; })()}
     <div class="base"><div class="bar">${barras ? svg.barras : ''}<div class="num">${esc(c.etiqueta)}</div></div>${qr ? `<div class="qr">${svg.qr}</div>` : ''}</div></div>`;
 }
 export function documentoCaixas(lista, cfg = PADRAO, svgs = {}, empresa = '', { auto = true } = {}) {
