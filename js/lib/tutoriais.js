@@ -64,6 +64,8 @@ export const MANUAIS = [
     resumo: 'A nota de compra entra no estoque quando o material é conferido na chegada: conferência cega pelo celular ou leitor, data da chegada, custo da nota e aviso de divergência para Compras.' },
   { id: 'enderecos', titulo: 'Endereços e etiquetas — organizar o almoxarifado', area: 'Compras', rotas: ['estoque/enderecos'],
     resumo: 'Estante, prateleira e nível de cada produto, etiqueta de prateleira, endereçamento com o leitor, etiquetas de mercadoria em lote e guia de contagem na ordem do corredor.' },
+  { id: 'processos', titulo: 'Gestão de Processos — mapa, fluxograma e POPs', area: 'Painéis', rotas: ['processos'],
+    resumo: 'Os processos da empresa com dono e etapas, o fluxograma desenhado das etapas, a tela da plataforma de cada etapa e os POPs com versão, aprovação pelo dono, revisão periódica e confirmação de leitura.' },
   { id: 'arquivo-morto', titulo: 'Arquivo Morto — caixas, retirada e descarte', area: 'Cadastros', rotas: ['arquivo'],
     resumo: 'Caixas-arquivo numeradas e etiquetadas em estantes, o que tem em cada caixa, quem levou e quando devolve, prazo de guarda por tipo de documento e descarte com aprovação e termo.' },
   { id: 'inventario-geral', titulo: 'Inventário Geral — o inventário do dia 01', area: 'Compras', rotas: ['estoque/inventario-geral'],

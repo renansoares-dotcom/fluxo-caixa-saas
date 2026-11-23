@@ -138,6 +138,7 @@ const routes = {
   'estoque/recebimento': () => import(`./pages/estoque-recebimento.js?v=${V}`),
   'estoque/enderecos': () => import(`./pages/estoque-enderecos.js?v=${V}`),
   'arquivo': () => import(`./pages/arquivo.js?v=${V}`),
+  'processos': () => import(`./pages/processos.js?v=${V}`),
   'contab/dre': () => import(`./pages/contab-dre.js?v=${V}`),
   'contab/dfc': () => import(`./pages/contab-dfc.js?v=${V}`),
   'estoque/cadastro-notas': () => import(`./pages/cadastro-notas.js?v=${V}`),
@@ -451,9 +452,9 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#side
 // perfil producao (operador no terminal do setor)
 const rotaDeMotorista = (r) => ['logistica/motorista', 'portal', 'tutoriais', 'meus-avisos'].includes(r);   // motorista: só o app (melhoria 7.1)
 const rotaDeColaborador = (r) => ['portal', 'meus-avisos'].includes(r);   // colaborador: só o Meu Portal (melhoria 8.2)
-const rotaDeProducao = (r) => ['portal', 'problemas', 'relatorios/emitidos', 'almoxarifado', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'recuperadora/entradas', 'recuperadora/lotes', 'recuperadora/processamento', 'recuperadora/qualidade', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'estoque/inventario', 'estoque/inventario-geral', 'estoque/recebimento', 'estoque/enderecos', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
-const rotaDeVendas = (r) => r === 'comercial' || ['portal', 'problemas', 'relatorios/emitidos', 'almoxarifado', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'comercial/carteira', 'comercial/funil', 'comercial/mapa', 'comercial/comissoes', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
-const rotaDeCompras = (r) => ['portal', 'notas/sefaz', 'problemas', 'relatorios/emitidos', 'almoxarifado', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/reposicao', 'estoque/inventario', 'estoque/inventario-geral', 'estoque/recebimento', 'estoque/enderecos', 'arquivo', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
+const rotaDeProducao = (r) => ['portal', 'problemas', 'processos', 'relatorios/emitidos', 'almoxarifado', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'producao/terminal', 'producao/ordens', 'producao/rastreio', 'manutencao/celular', 'manutencao/ordens', 'qualidade/inspecoes', 'qualidade/nao-conformidades', 'tintas/ordens', 'tintas/receitas', 'tintas/previsao', 'recuperadora/entradas', 'recuperadora/lotes', 'recuperadora/processamento', 'recuperadora/qualidade', 'preimpressao', 'preimpressao/artes', 'estoque/kardex', 'estoque/inventario', 'estoque/inventario-geral', 'estoque/recebimento', 'estoque/enderecos', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
+const rotaDeVendas = (r) => r === 'comercial' || ['portal', 'problemas', 'processos', 'relatorios/emitidos', 'almoxarifado', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'comercial/carteira', 'comercial/funil', 'comercial/mapa', 'comercial/comissoes', 'preimpressao', 'preimpressao/artes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r);
+const rotaDeCompras = (r) => ['portal', 'notas/sefaz', 'problemas', 'processos', 'relatorios/emitidos', 'almoxarifado', 'hoje', 'agenda', 'orcamento-cc', 'perguntar', 'paraquedas', 'compras', 'estoque', 'estoque/implantacao', 'estoque/reposicao', 'estoque/inventario', 'estoque/inventario-geral', 'estoque/recebimento', 'estoque/enderecos', 'arquivo', 'estoque/produtos', 'estoque/kardex', 'estoque/parametros', 'qualidade/inspecoes', 'tutoriais', 'conversas', 'meus-avisos'].includes(r) || r.startsWith('compras/');
 let renderSeq = 0;
 async function render() {
   if (!state.empresa) return;
