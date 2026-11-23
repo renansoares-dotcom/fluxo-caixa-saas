@@ -39,6 +39,12 @@ export async function render(root) {
       ends, end: Object.fromEntries(ends.map(x => [x.id, x])), caixas, cx: Object.fromEntries(caixas.map(c => [c.id, c])), itens, emps, root };
     D.itensDe = (id) => D.itens.filter(i => i.caixa_id === id).sort((a, b) => a.ordem - b.ordem);
     if (!ui.sala) ui.sala = locais.find(l => l.ativo)?.id || '';
+    // primeira vez: quem cuida do arquivo já recebe os tipos de documento com prazo SUGERIDO (o descarte continua travado até confirmar)
+    if (gestor && !tipos.length) {
+      try { const k = await q(sb.rpc('arq_configurar', { p_empresa: e })); if (k) { tipos.push(...await q(sb.from('arq_tipos').select('*').eq('empresa_id', e).order('area').order('nome')));
+        D.tipo = Object.fromEntries(tipos.map(t => [t.id, t])); toast(`${k} tipos de documento preparados, com prazo de guarda sugerido (confirme em Tipos e prazos)`); } }
+      catch (err) { fail(err); }
+    }
     const etq = codigoEtiqueta(par.get('etq'));
     if (etq?.alvo === 'caixa') { const c = caixas.find(x => x.etiqueta === etq.codigo); history.replaceState(null, '', '#/arquivo'); pintar(root); return c ? ficha(c) : toast(`Etiqueta ${etq.codigo}: caixa não encontrada ou sem acesso.`, true); }
     if (etq?.alvo === 'arq_endereco') { const x = ends.find(y => y.etiqueta === etq.codigo); history.replaceState(null, '', '#/arquivo'); if (x) { ui.aba = 'enderecos'; ui.sala = x.local_id; ui.endAtual = x.id; } else toast(`Etiqueta ${etq.codigo}: prateleira não encontrada.`, true); }
@@ -155,7 +161,8 @@ function editar(x, modelo = null) {
       <label class="span2" style="display:flex;flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="ed-r" style="width:auto;margin:0" ${x?.reter ? 'checked' : ''}> Reter esta caixa (não entra no descarte mesmo com o prazo vencido)</label>
       <label class="span2" id="ed-rm-l" ${x?.reter ? '' : 'hidden'}>Motivo da retenção<input id="ed-rm" maxlength="300" value="${esc(x?.reter_motivo || '')}" placeholder="ex.: processo trabalhista nº…, fiscalização, recuperação judicial"></label>
       <label class="span2">Observação<input id="ed-o" maxlength="300" value="${esc(x?.observacao || '')}"></label></div>
-    <h3 style="margin:14px 0 6px">Conteúdo</h3><p class="small muted" style="margin-top:0">Uma linha por tipo de documento e período. O prazo de guarda da caixa sai do conteúdo: vale o documento que precisa ficar mais tempo.</p>
+    <h3 style="margin:14px 0 6px">Conteúdo</h3><p class="small muted" style="margin-top:0">Uma linha por tipo de documento e período. O prazo de guarda da caixa sai do conteúdo: vale o documento que precisa ficar mais tempo. Sem conteúdo a caixa é salva, mas fica sem prazo de guarda.</p>
+    ${D.tipos.length ? '' : '<p class="small" style="color:var(--warn)">Ainda não há tipos de documento para escolher. Abra a aba Tipos e prazos e use Preparar os tipos sugeridos (ou peça a quem cuida do arquivo).</p>'}
     <div class="table-wrap"><table class="small"><thead><tr><th>Documento</th><th>Descrição (opcional)</th><th style="width:130px">De (mês)</th><th style="width:130px">Até (mês)</th><th></th></tr></thead><tbody id="ed-it"></tbody></table></div>
     <button class="btn ghost small" id="ed-mais" style="margin-top:6px">+ linha</button>`,
     foot: `<button class="btn" data-close>Cancelar</button>${x ? '' : '<button class="btn" id="ed-ok2">Salvar e nova</button>'}<button class="btn primary" id="ed-ok">Salvar</button>` });
@@ -171,7 +178,9 @@ function editar(x, modelo = null) {
   $('#ed-mais', m.el).onclick = () => { ler(); const u = linhas[linhas.length - 1] || {}; linhas.push({ tipo_id: u.tipo_id || '', descricao: '', inicio: u.inicio || '', fim: u.fim || '' }); pinta(); };
   const salvar = async (nova) => { ler();
     const its = linhas.filter(l => l.tipo_id || l.inicio || l.fim || l.descricao);
-    if (its.some(l => !l.tipo_id || !l.inicio || !l.fim)) return toast('Em cada linha do conteúdo, informe o documento e os meses de início e fim', true);
+    const k = its.findIndex(l => !l.tipo_id || !l.inicio || !l.fim);
+    if (k >= 0) { const l = its[k], falta = [!l.tipo_id && 'o documento', !l.inicio && 'o mês de início', !l.fim && 'o mês de fim'].filter(Boolean);
+      return toast(`Linha ${k + 1} do conteúdo: falta ${falta.join(', ').replace(/, ([^,]*)$/, ' e $1')}. Se não for registrar o conteúdo agora, apague a linha (×).`, true); }
     const p = { id: x?.id, area: $('#ed-a', m.el).value, setor: $('#ed-s', m.el).value, titulo: $('#ed-t', m.el).value, endereco_id: $('#ed-e', m.el).value || null,
       reter: $('#ed-r', m.el).checked, reter_motivo: $('#ed-rm', m.el).value, observacao: $('#ed-o', m.el).value, itens: its };
     try { const id = await q(sb.rpc('arq_caixa_salvar', { p_empresa: state.empresa.id, p })); m.close(); toast(x ? 'Caixa salva' : 'Caixa registrada: imprima a etiqueta'); await recarregar();
