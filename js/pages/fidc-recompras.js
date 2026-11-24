@@ -8,6 +8,8 @@ import { $, $$, esc, toast, fail, modal, money, pct, dateBR, today, options, par
 import { kpiGrid } from '../lib/componentes.js';
 import { ACOES, SECOES, carregarMotivos, motivosModal, corMotivo } from '../lib/recompra-motivos.js';
 import { botaoConversa } from '../lib/mini-chat.js';
+import { abrirRelatorio } from '../lib/relatorio.js';
+import { relatorioRecompras } from '../lib/recompras-relatorio.js';
 
 export const title = 'Recompras';
 const ui = { f: 'aberto', mot: '' };
@@ -55,7 +57,7 @@ export async function alertasDecisao() {
 export async function render(root) {
   const e = state.empresa.id, ano = +today().slice(0, 4);
   root.innerHTML = `${CSS}<div class="mm-topo"><div><h2 style="margin:0">Recompras</h2><div class="muted small">Título negociado no fundo e recomprado pela empresa: a saída da recompra, os encargos e o que acontece com o título, conforme o motivo.</div></div>
-      <div class="pi-acoes" style="display:flex;gap:8px;align-items:end"><button class="btn ghost" id="rc-xls">Excel</button><button class="btn ghost" id="rc-mtv">Motivos</button>${pode() ? '<button class="btn ghost" id="rc-par">Parâmetros</button><button class="btn primary" id="rc-novo">Registrar recompra</button>' : ''}</div></div>
+      <div class="pi-acoes" style="display:flex;gap:8px;align-items:end"><button class="btn ghost" id="rc-xls">Excel</button><button class="btn ghost" id="rc-pdf">Relatório (PDF)</button><button class="btn ghost" id="rc-mtv">Motivos</button>${pode() ? '<button class="btn ghost" id="rc-par">Parâmetros</button><button class="btn primary" id="rc-novo">Registrar recompra</button>' : ''}</div></div>
     <div id="rc-corpo"><div class="loading">Carregando…</div></div>`;
   let L, P, Cf, M, Rz;
   try {
@@ -134,6 +136,7 @@ export async function render(root) {
     $$('[data-m]', corpo).forEach(b => b.onclick = () => trocarMotivo(e, L.find(x => x.id === b.dataset.m), M, re));
   };
   $('#rc-xls', root).onclick = () => exportXLSX($('#rc-tab', root), 'recompras');
+  $('#rc-pdf', root).onclick = () => dialogoRelatorio(e, L, M, Rz, ano);
   pintar();
 }
 
@@ -301,5 +304,33 @@ function parametros(e, cfg = {}, depois) {
     try { await q(sb.from('fidc_recompra_config').upsert({ empresa_id: e, plano_recompra_id: $('#rp-r', m.el).value || null, plano_encargos_id: $('#rp-e', m.el).value || null,
         prazo_dias: Math.max(0, parseInt($('#rp-d', m.el).value) || 0), limite_taxa_cliente: Math.max(0, parseNum($('#rp-l', m.el).value || '0')), atualizado_em: new Date().toISOString() }));
       m.close(); toast('Parâmetros salvos'); depois(); } catch (err) { fail(err); }
+  };
+}
+
+// Relatório de recompras em PDF (24/11/2026, Renan: "registrei as recompras, onde eu consulto ou pego relatório?" › "Quero sim").
+// Período, fundo, motivo e se entram as canceladas; o corpo é montado em lib/recompras-relatorio.js (testado).
+function dialogoRelatorio(e, L, M, Rz, ano) {
+  const fundos = [...new Set(L.map(x => x.fundo).filter(Boolean))].sort();
+  const ini = today().slice(0, 4) + '-01-01';
+  const m = modal({ title: 'Relatório de recompras', narrow: true, body: `<div class="grid-form">
+      <label>De<input type="date" id="rr-de" value="${ini}"></label><label>Até<input type="date" id="rr-ate" value="${today()}"></label>
+      <label>Fundo<select id="rr-fu"><option value="">Todos</option>${fundos.map(f => `<option>${esc(f)}</option>`).join('')}</select></label>
+      <label>Motivo<select id="rr-mo">${options(M, { selected: ui.mot, empty: 'Todos' })}</select></label>
+      <label class="chk span2"><input type="checkbox" id="rr-ca"> Incluir as recompras canceladas</label></div>
+      <p class="small muted">O período é a data da recompra. A taxa de recompra no fim do relatório é a do ano de ${ano}, como na tela.</p>`,
+    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rr-ok">Gerar PDF</button>' });
+  $('#rr-ok', m.el).onclick = async () => {
+    const f = { de: $('#rr-de', m.el).value, ate: $('#rr-ate', m.el).value, fundo: $('#rr-fu', m.el).value, motivo: $('#rr-mo', m.el).value, canceladas: $('#rr-ca', m.el).checked };
+    if (!f.de || !f.ate || f.de > f.ate) return toast('Informe um período válido.', true);
+    const V = L.filter(x => x.data >= f.de && x.data <= f.ate && (!f.fundo || x.fundo === f.fundo) && (!f.motivo || x.motivo_id === f.motivo) && (f.canceladas || !x.cancelada));
+    // valor do título que entrou no lugar (substituição), para mostrar a diferença
+    const ids = V.map(x => x.titulo_novo_id).filter(Boolean); let novos = {};
+    try { if (ids.length) novos = Object.fromEntries((await q(sb.from('lancamentos').select('id,valor').in('id', ids))).map(l => [l.id, +l.valor])); } catch (err) { return fail(err); }
+    const motNome = f.motivo ? (M.find(x => x.id === f.motivo)?.nome || '') : 'Todos';
+    const corpo = relatorioRecompras(V, { novos, resumo: Rz, ano, esc, money, pct, dateBR });
+    m.close();
+    abrirRelatorio({ rel: 'Recompras de títulos (FIDC)', nome: 'Recompras de Títulos', titulo: 'RECOMPRAS DE TÍTULOS NEGOCIADOS (FIDC)', paisagem: true, corpo,
+      parametros: [['Período', `${dateBR(f.de)} a ${dateBR(f.ate)}`], ['Fundo', f.fundo || 'Todos'], ['Motivo', motNome], ['Canceladas', f.canceladas ? 'incluídas' : 'fora']],
+      rodape: 'Base: Recompras (FIN021). A recompra sai em 2.07.11; o motivo decide a linha da DRE Gerencial. Na substituição, a diferença entre o título recomprado e o que entrou no lugar é redução da venda (custo da empresa).' });
   };
 }

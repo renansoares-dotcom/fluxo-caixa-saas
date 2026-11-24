@@ -1,8 +1,8 @@
 ---
 titulo: Recompras — título negociado recomprado do fundo, por motivo
 tela: Financeiro › Crédito / FIDC › Recompras (FIN021)
-versao: 1.1
-atualizado: 2026-11-07
+versao: 1.2
+atualizado: 2026-11-24
 ---
 ## 1. Para que serve
 
@@ -92,6 +92,26 @@ Enquanto não tem registro, a recompra fica nas **despesas financeiras** da DRE,
 - **Taxa de recompra**: o valor recomprado dividido pelo valor cedido no ano, no total, por **fundo** e por **cliente**, com os motivos de cada cliente. É o número que o fundo acompanha para definir a taxa. Por cliente, mostra a quem vale a pena continuar cedendo títulos.
 - **Limite de alerta**: o cliente acima do limite (padrão 10%, ajustável em Parâmetros) aparece em vermelho e na Central de Decisões.
 
+### 3.4 Relatório em PDF
+
+O botão **Relatório (PDF)**, no alto da tela, gera o relatório no padrão da plataforma.
+
+1. Escolha o **período** (pela data da recompra), o **fundo**, o **motivo** e se as **canceladas** entram. As canceladas aparecem na lista, mas ficam fora dos totais.
+2. Clique em **Gerar PDF**. Os filtros escolhidos saem impressos no quadro de parâmetros.
+
+O relatório traz, nesta ordem:
+
+| Seção | O que mostra |
+|---|---|
+| Resumo | Quantidade, valor pago aos fundos (títulos e encargos) e, se houver, a diferença das substituições |
+| Por motivo | Quantidade, valor dos títulos, encargos, recompra e participação de cada motivo |
+| Por fundo | O mesmo, por fundo |
+| Substituições | Cada título recomprado, o título que entrou no lugar, os dois valores e a **diferença** |
+| Recompras | A lista completa, com a situação de cada título |
+| Taxa de recompra | A do ano, no total, por fundo e por cliente, como na tela |
+
+> Exemplo: a NF 4105 da Cliente Exemplo Ltda., em 5 parcelas de R$ 1.000,00, foi recomprada da Negocial e substituída pela NF 4120, em 5 parcelas de R$ 950,00. Em **Substituições**, cada linha mostra a diferença de R$ 50,00, e o total dá R$ 250,00. Essa diferença é redução da venda (custo da empresa), e não despesa bancária: na DRE Gerencial, a recompra entra em deduções da receita e a nota nova entra como venda. Escreva o motivo da diferença na observação da recompra, para ela sair no relatório.
+
 ## 4. Motivos: configurar
 
 ![Figura 4 — Motivos da recompra: o que acontece com o título, a linha na DRE e a contrapartida contábil (dados fictícios)](img/fidc-recompras-4.jpg)
@@ -146,3 +166,4 @@ Os **encargos** continuam nas despesas financeiras (2.07.08). O **fluxo de caixa
 |---|---|---|
 | 1.0 | 07/11/2026 | Primeira versão: registrar a recompra com saída, encargos e título de volta em aberto, vincular recompra lançada à mão e recebimento já feito, pendências do relatório do fundo e de 2.07.11, cancelar, parâmetros e Central de Decisões. |
 | 1.1 | 07/11/2026 | Motivos configuráveis (o que acontece com o título, a linha na DRE Gerencial e a contrapartida contábil), devolução total e parcial com nota e RNC, substituição por outro título, troca de motivo, painel por motivo e taxa de recompra por fundo e cliente com alerta na Central de Decisões. |
+| 1.2 | 24/11/2026 | Relatório em PDF: período, fundo, motivo e canceladas; resumo, por motivo, por fundo, substituições com a diferença a menor (custo da empresa), lista completa e taxa de recompra do ano. |
