@@ -92,10 +92,19 @@ function certificado() {
   const forge = require('node-forge');
   const der = forge.util.decode64(process.env.SEFAZ_PFX_B64);
   const p12 = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(der), process.env.SEFAZ_PFX_SENHA || '');
-  const chave = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag][0].key;
-  const cert = p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag][0].cert;
+  // a chave pode vir como pkcs8ShroudedKeyBag (o mais comum) ou keyBag
+  const kb = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || [];
+  const kb2 = p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || [];
+  const chave = (kb[0] || kb2[0] || {}).key;
+  if (!chave) throw new Error('chave privada não encontrada no certificado');
+  // o certificado da empresa é o que tem a mesma chave pública; os demais são a cadeia da AC
+  const certs = (p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || []).map(b => b.cert).filter(Boolean);
+  const pub = forge.pki.publicKeyToPem(forge.pki.setRsaPublicKey(chave.n, chave.e));
+  const cert = certs.find(c => forge.pki.publicKeyToPem(c.publicKey) === pub) || certs[0];
+  if (!cert) throw new Error('certificado não encontrado no arquivo');
+  // TLS com a chave e o certificado em PEM (o Node 22/OpenSSL 3 recusa o .pfx com criptografia antiga, RC2/3DES)
   _cert = {
-    pfx: Buffer.from(der, 'binary'),
+    tls: { key: forge.pki.privateKeyToPem(chave), cert: [cert, ...certs.filter(c => c !== cert)].map(c => forge.pki.certificateToPem(c)).join('') },
     chavePem: forge.pki.privateKeyToPem(chave),
     certB64: forge.util.encode64(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes()),
     validade: cert.validity.notAfter.toISOString(),
@@ -103,11 +112,11 @@ function certificado() {
   return _cert;
 }
 
-function soap(url, acao, corpo, pfx) {
+function soap(url, acao, corpo, tls) {
   return new Promise((ok, falha) => {
     const u = new URL(url);
     const req = https.request({ host: u.hostname, port: 443, path: u.pathname, method: 'POST', agent: false, servername: u.hostname,
-      pfx, passphrase: process.env.SEFAZ_PFX_SENHA || '',
+      key: tls.key, cert: tls.cert,
       headers: { 'Content-Type': `application/soap+xml; charset=utf-8; action="${acao}"`, 'Content-Length': Buffer.byteLength(corpo) } }, (res) => {
       const partes = []; res.on('data', (c) => partes.push(c)); res.on('end', () => ok({ status: res.statusCode || 0, corpo: Buffer.concat(partes).toString('utf8') }));
     });
@@ -127,7 +136,7 @@ async function handler(req, res) {
   try {
     const c = certificado();
     if (b?.acao === 'distribuicao') {
-      const r = await soap(URLS.distribuicao[ambiente], 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse', xmlDistribuicao({ ambiente, cUF: b.cUF, cnpj: b.cnpj, ultNSU: b.ultNSU, chave: b.chave }), c.pfx);
+      const r = await soap(URLS.distribuicao[ambiente], 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse', xmlDistribuicao({ ambiente, cUF: b.cUF, cnpj: b.cnpj, ultNSU: b.ultNSU, chave: b.chave }), c.tls);
       if (r.status !== 200) return res.end(JSON.stringify({ ok: false, erro: `SEFAZ respondeu HTTP ${r.status}`, corpo: r.corpo.slice(0, 500) }));
       return res.end(JSON.stringify({ ok: true, validade_certificado: c.validade, ...lerDistribuicao(r.corpo) }));
     }
@@ -136,7 +145,7 @@ async function handler(req, res) {
       if (!EVENTOS[tipo]) return res.end(JSON.stringify({ ok: false, erro: 'tipo de evento inválido' }));
       if (tipo === 210240 && String(b.justificativa || '').trim().length < 15) return res.end(JSON.stringify({ ok: false, erro: 'justificativa de 15 a 255 caracteres' }));
       const corpo = xmlEvento({ ambiente, cnpj: b.cnpj, chave: b.chave, tipo, justificativa: String(b.justificativa || '').slice(0, 255), dhEvento: dhAgora(), chavePem: c.chavePem, certB64: c.certB64 });
-      const r = await soap(URLS.evento[ambiente], 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEventoNF', corpo, c.pfx);
+      const r = await soap(URLS.evento[ambiente], 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEventoNF', corpo, c.tls);
       if (r.status !== 200) return res.end(JSON.stringify({ ok: false, erro: `SEFAZ respondeu HTTP ${r.status}`, corpo: r.corpo.slice(0, 500) }));
       return res.end(JSON.stringify({ ok: true, ...lerEvento(r.corpo) }));
     }
@@ -148,4 +157,4 @@ async function handler(req, res) {
 }
 
 module.exports = handler;
-module.exports.auxiliares = { xmlDistribuicao, lerDistribuicao, infEvento, assinar, xmlEvento, lerEvento, dhAgora, EVENTOS };
+module.exports.auxiliares = { certificado, xmlDistribuicao, lerDistribuicao, infEvento, assinar, xmlEvento, lerEvento, dhAgora, EVENTOS };
