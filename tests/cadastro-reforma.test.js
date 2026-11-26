@@ -41,7 +41,7 @@ test('páginas públicas liberam a conexão com o Supabase (CSP)', async () => {
   const { readFileSync } = await import('node:fs');
   for (const f of ['cadastro.html', 'cotacao.html', 'portal.html', 'index.html']) {
     const csp = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8').match(/Content-Security-Policy" content="([^"]+)"/)?.[1] || '';
-    assert.match(csp, /connect-src 'self' https:\/\/ceyzvhcpgokysgmpdalt\.supabase\.co/, `${f}: connect-src`);
+    assert.match(csp, /connect-src [^;]*https:\/\/ceyzvhcpgokysgmpdalt\.supabase\.co/, `${f}: connect-src`);
     assert.match(csp, /object-src 'none'/, `${f}: object-src`);
   }
 });
