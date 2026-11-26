@@ -419,10 +419,4 @@ export const FIGS = [
   ['cadastro-reforma', 'comercial/cadastro-reforma', '## 5.', 'Questionários: a situação de cada link, com as ações', 'click:[data-a="lista"]'],
   ['cadastro-reforma', 'comercial/cadastro-reforma', '## 6.', 'Conferir e aplicar: o cadastro atual ao lado da resposta, com as diferenças marcadas', 'click:[data-a="lista"]|click:[data-cf="cq5"]'],
   ['cadastro-reforma', 'comercial/cadastro-reforma', '## 8.', 'Parâmetros: validade do link, mensagem padrão e quem usa e quem aplica', 'click:[data-a="parametros"]'],
-  ['compra-inteligente', 'compras/requisicoes', '## 3.', 'Destinação de cada item na requisição: decide os créditos', 'click:#rq-novo'],
-  ['compra-inteligente', 'compras/requisicoes', '## 4.', 'Dados fiscais na cotação: UF, regime e ICMS, IPI e ICMS-ST por item, com o preenchimento pelas notas do fornecedor', 'click:#rq-lista tr[data-id="rq-cot"]|click:[data-ec="cq3"]'],
-  ['compra-inteligente', 'compras/requisicoes', '## 5.', 'O mapa pelo custo líquido: desembolso, créditos, custo líquido a valor presente e a leitura do PRODEPE', 'click:#rq-lista tr[data-id="rq-cot"]|scroll:#rq-liq'],
-  ['compra-inteligente', 'compras/requisicoes', '## 5.', 'Memória do custo líquido de um fornecedor, item a item', 'click:#rq-lista tr[data-id="rq-cot"]|click:[data-mem="cq2"]'],
-  ['compra-inteligente', 'compras/requisicoes', '## 6.', 'Simulação da reforma no mapa (2027 a 2033)', 'click:#rq-lista tr[data-id="rq-cot"]|click:#lq-rf|scroll:#lq-rf'],
-  ['compra-inteligente', 'compras/cadastro-fornecedores', '## 9.', 'Atualização Cadastral de Fornecedores: link, situação e conferência', 'click:[data-a="lista"]'],
 ];

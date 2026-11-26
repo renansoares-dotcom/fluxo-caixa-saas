@@ -34,7 +34,6 @@ const routes = {
   'compras/pedidos': () => import(`./pages/compras-pedidos.js?v=${V}`),
   'compras/recebimentos': () => import(`./pages/compras-recebimentos.js?v=${V}`),
   'compras/importacao': () => import(`./pages/importacao.js?v=${V}`),
-  'compras/cadastro-fornecedores': () => import(`./pages/compras-cadastro-fornecedores.js?v=${V}`),
   'rma': () => import(`./pages/rma.js?v=${V}`),
   'problemas': () => import(`./pages/problemas.js?v=${V}`),
   'estoque': () => import(`./pages/estoque.js?v=${V}`),

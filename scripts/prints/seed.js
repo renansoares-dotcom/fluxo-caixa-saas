@@ -3073,39 +3073,8 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
   Object.assign(window.RPC, { cadq_acesso: () => ({ usa: true, aplica: true, admin: true, validade_dias: 30 }),
     cadq_gerar: (a) => (a.p_favorecidos || []).map((f, i) => ({ id: 'cqn' + i, numero: 6 + i, favorecido_id: f, cliente: DB.favorecidos.find(x => x.id === f)?.nome, token: tk(6 + i), expira_em: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10), novo: true })),
     cadq_aplicar: () => null, cadq_situacao: () => null, cadq_config_salvar: () => null,
-    cadq_link_abrir: (a) => ({ publico: String(a?.p_token || '').startsWith('f') ? 'fornecedor' : 'cliente', empresa: 'PLÁSTICOS EXEMPLO LTDA', numero: 4, cliente: cli[1]?.nome || 'CLIENTE EXEMPLO', situacao: 'aberto', expira_em: new Date(Date.now() + 25 * 864e5).toISOString().slice(0, 10), vencido: false,
+    cadq_link_abrir: () => ({ empresa: 'PLÁSTICOS EXEMPLO LTDA', numero: 4, cliente: cli[1]?.nome || 'CLIENTE EXEMPLO', situacao: 'aberto', expira_em: new Date(Date.now() + 25 * 864e5).toISOString().slice(0, 10), vencido: false,
       mensagem: 'Qualquer dúvida, fale com o seu representante.', atual: { razao_social: cli[1]?.nome || 'CLIENTE EXEMPLO', documento: cli[1]?.documento || '12.345.678/0001-90', uf: 'PE', municipio: 'CARUARU', email_nfe: 'compras@cliente.exemplo',
         regime: 'presumido', contribuinte_icms: '1', destinacao: [], especiais: {}, contato_fiscal: {}, contador: {} } }),
     cadq_link_responder: () => null });
-}
-// Compra inteligente (SQL 199) — dados fiscais FICTÍCIOS na cotação da requisição 53 e questionários de fornecedores
-{
-  const E0 = DB.empresas[0].id;
-  // na tela de compras, a empresa fictícia aparece como Lucro Real (para mostrar os créditos)
-  if (!/regime|apuracao|reforma|simples/.test(location.href)) DB.empresa_tributacao.push({ id: 'trib-aq', empresa_id: E0, vigencia_inicio: '2026-11-01', regime: 'real', pis_cofins: 'nao_cumulativo', irpj_apuracao: 'trimestral',
-    simples_atividades: [], sublimite_excedido: false, ibscbs_regular: false, incentivos: 'PRODEPE', uf: 'PE', municipio_ibge: '2604106', cnae_principal: '2222-6/00', fonte: 'fictício' });
-  const NCM = { rqi1: '39011092', rqi2: '32061190', rqi3: '38123990' };
-  DB.compras_requisicao_itens.forEach(i => { if (NCM[i.id]) Object.assign(i, { ncm: NCM[i.id], destinacao: 'insumo' }); });
-  const FC = { cq1: { uf: 'SP', regime: 'real' }, cq2: { uf: 'PE', regime: 'simples', simples_credito_pct: 2.5, simples_regular: 'avaliando' }, cq3: { uf: 'BA', regime: 'real' } };
-  DB.compras_cotacoes.forEach(c => { if (FC[c.id]) Object.assign(c, FC[c.id]); });
-  const AL = { cq1: 7, cq2: null, cq3: 12 }, IPI = { rqi1: 0, rqi2: 5, rqi3: 5 };
-  DB.compras_cotacao_itens.forEach(x => { if (x.cotacao_id in AL) Object.assign(x, { icms_aliq: AL[x.cotacao_id], ipi_aliq: IPI[x.requisicao_item_id] ?? 0, st_un: 0, fonte_fiscal: x.cotacao_id === 'cq1' ? 'comprador' : 'fornecedor' }); });
-  Object.assign(DB.compras_parametros[0], { aq_prodepe_saidas_pct: 100, aq_simples_credito_ibs_pct: 3, aq_ciap_meses: 48, aq_ipi_contribuinte: true, aq_reforma: false });
-  DB.trib_aliquotas = [[2027, 8.8, 0.05, 0.05, 100], [2029, 8.8, 1.6, 0.2, 90], [2031, 8.8, 4.8, 0.6, 70], [2033, 8.8, 15.1, 2.6, 0]]
-    .map(([ano, cbs, ibs_uf, ibs_mun, icms_pct]) => ({ id: 'ta' + ano, empresa_id: E0, ano, cbs, ibs_uf, ibs_mun, pis_cofins: false, icms_pct, situacao: 'estimada' }));
-  window.RPC.compras_hist_fiscal = () => [{ ncm: '39011092', p_icms: 12, ipi_pct: 0, st_un: 0, orig: '0', uf: 'BA', simples: false, emissao: '2026-10-20' }, { ncm: '32061190', p_icms: 12, ipi_pct: 5, st_un: 0, orig: '0', uf: 'BA', simples: false, emissao: '2026-10-20' }];
-  // a página do fornecedor com os dados fiscais e a sugestão pelas notas
-  const ca = window.RPC.cotacao_link_abrir;
-  window.RPC.cotacao_link_abrir = (a) => { const r = ca(a); r.itens = r.itens.map(i => ({ ...i, ncm: NCM[i.id] }));
-    return { ...r, fiscal: { uf: 'PE', regime: 'simples', simples_credito_pct: 2.5, simples_regular: null }, historico: [{ ncm: '39011092', p_icms: 0, ipi_pct: 0, st_un: 0, orig: '0', uf: 'PE', simples: true, emissao: '2026-09-15' }] }; };
-  // questionários: os de antes são de clientes; dois de fornecedores
-  (DB.cadq_questionarios || []).forEach(x => { x.publico = x.publico || 'cliente'; });
-  const forn = DB.favorecidos.filter(f => f.tipo === 'FORNECEDORES');
-  const tk2 = (n) => ('f' + n).repeat(40).slice(0, 64);
-  DB.cadq_questionarios.push(
-    { id: 'cqf2', empresa_id: E0, numero: 7, publico: 'fornecedor', favorecido_id: forn[0]?.id, cliente: forn[0]?.nome || 'FORNECEDOR EXEMPLO', token: tk2(2), expira_em: new Date(Date.now() + 28 * 864e5).toISOString().slice(0, 10), situacao: 'respondido',
-      criado_em: new Date(Date.now() - 2 * 864e5).toISOString(), respondido_em: new Date(Date.now() - 864e5).toISOString(), respondido_por: 'Roberto Lima (Comercial)',
-      resposta: { regime: 'simples', simples_credito_pct: '2.5', simples_regular: 'avaliando', atividade: 'distribuidor', uf: 'PE', contribuinte_icms: '1', email_nfe: 'nfe@fornecedor.exemplo', declarante: { nome: 'Roberto Lima', cargo: 'Comercial' }, aceite: true } },
-    { id: 'cqf1', empresa_id: E0, numero: 6, publico: 'fornecedor', favorecido_id: forn[1]?.id, cliente: forn[1]?.nome || 'FORNECEDOR DOIS', token: tk2(1), expira_em: new Date(Date.now() + 25 * 864e5).toISOString().slice(0, 10), situacao: 'enviado', criado_em: new Date(Date.now() - 5 * 864e5).toISOString() });
-  window.RPC.cadq_acesso_publico = () => ({ usa: true, aplica: true, admin: true, validade_dias: 30 });
 }

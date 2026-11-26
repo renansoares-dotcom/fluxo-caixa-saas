@@ -5,10 +5,6 @@ import { cadCompras, ST_REQ, badge, qtd, inp, unit, num, diasTxt, lerDias, podeA
 import { carregarProdutos, datalistProdutos, ligarItensProduto, produtoDoItem } from '../lib/produtos.js';
 import { mapaCotacoes } from '../lib/cotacao-calc.js';
 import { selo } from '../lib/iqf.js';
-import { DESTINACOES, REGIMES_FORN, mapaLiquido, mapaReforma, fatorIcmsEfetivo, sugestaoFiscal, divergencias, br as br2, fmt } from '../lib/aquisicao.js';
-import { aliqInterna } from '../lib/competitividade.js';
-import { abrirRelatorio } from '../lib/relatorio.js';
-import { relatorioMapa, relatorioPeriodo } from '../lib/aquisicao-relatorio.js';
 
 export const title = 'Requisições e Cotações';
 const ui = { filtro: 'abertas', busca: '' };
@@ -19,13 +15,12 @@ const FILTROS = [['abertas', 'Em andamento', ['pendente', 'aprovada']], ['penden
 
 export async function render(root) {
   root.innerHTML = `<div class="mm-topo"><div><h2 style="margin:0">Requisições e Cotações</h2><div class="muted small">Quem precisa pede; a direção aprova; Compras cota e gera o pedido.</div></div>
-      <div style="display:flex;gap:8px"><button class="btn ghost" id="rq-rel" title="Compras do período pelo custo líquido: créditos capturados, escolhas e fornecedores do Simples">Relatório de compra inteligente</button>${['admin', 'diretor'].includes(state.papel) ? '<button class="btn ghost" id="rq-par">Parâmetros da cotação</button>' : ''}<button class="btn primary" id="rq-novo">Nova requisição</button></div></div>
+      <div style="display:flex;gap:8px">${['admin', 'diretor'].includes(state.papel) ? '<button class="btn ghost" id="rq-par">Parâmetros da cotação</button>' : ''}<button class="btn primary" id="rq-novo">Nova requisição</button></div></div>
     <div class="card toolbar"><div class="chips" id="rq-f">${FILTROS.map(([k, t]) => `<span class="chip ${ui.filtro === k ? 'on' : ''}" data-f="${k}">${t}</span>`).join('')}</div>
       <input id="rq-busca" placeholder="Procurar item, solicitante ou nº" value="${esc(ui.busca)}" style="min-width:240px"></div>
     <div id="rq-lista" style="margin-top:12px"><div class="loading">Carregando…</div></div>`;
   $('#rq-novo', root).onclick = () => editar(null, root);
   $('#rq-par', root) && ($('#rq-par', root).onclick = () => parametrosCotacao());
-  $('#rq-rel', root).onclick = () => relatorioCompraInteligente();
   $('#rq-f', root).onclick = (e) => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { ui.filtro = f; $$('#rq-f .chip', root).forEach(c => c.classList.toggle('on', c.dataset.f === f)); pintar(root); } };
   $('#rq-busca', root).oninput = (e) => { ui.busca = e.target.value; pintar(root); };
   const ab = state.abrir?.tipo === 'requisicao' ? state.abrir : null; if (ab) delete state.abrir;
@@ -68,7 +63,6 @@ function linhaItem(i = {}) {
     <td><input class="it-q" value="${i.quantidade ? inp(i.quantidade) : ''}" style="width:100px"></td>
     <td><input class="it-v" value="${i.valor_estimado ? String(+i.valor_estimado).replace('.', ',') : ''}" placeholder="opcional" style="width:110px"></td>
     <td><input class="it-n" value="${esc(i.ncm || '')}" style="width:100px"></td>
-    <td><select class="it-dst" title="Decide os créditos de ICMS, IPI e PIS/COFINS">${DESTINACOES.map(([v, t]) => `<option value="${v}" ${(i.destinacao || 'insumo') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
     <td><button class="btn ghost icon it-x" title="Tirar">✕</button></td></tr>`;
 }
 function editar(r, root) {
@@ -83,7 +77,7 @@ function editar(r, root) {
       <label class="full">Observação / justificativa<input id="rq-obs" value="${esc(v.observacao || '')}"></label>
     </div>
     <h3 style="margin:14px 0 6px">Itens <span class="muted small" style="font-weight:400">escolha o produto do cadastro na lista ou escreva livre</span></h3>${datalistProdutos('dl-prod', PRODS)}
-    <div class="table-wrap"><table><thead><tr><th>Descrição *</th><th>Unid.</th><th>Quantidade *</th><th>Valor unit. estimado</th><th>NCM</th><th>Destinação</th><th></th></tr></thead><tbody id="rq-itens">${v.itens.map(linhaItem).join('')}</tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Descrição *</th><th>Unid.</th><th>Quantidade *</th><th>Valor unit. estimado</th><th>NCM</th><th></th></tr></thead><tbody id="rq-itens">${v.itens.map(linhaItem).join('')}</tbody></table></div>
     <button class="btn ghost small" id="rq-mais" style="margin-top:6px">+ Item</button>`,
     foot: `<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rq-salvar">${r ? 'Salvar' : 'Enviar para aprovação'}</button>` });
   const tb = $('#rq-itens', m.el);
@@ -92,7 +86,7 @@ function editar(r, root) {
   tb.onclick = (e) => { if (e.target.closest('.it-x')) e.target.closest('tr').remove(); };
   $('#rq-salvar', m.el).onclick = async (ev) => {
     const itens = $$('tr', tb).map(tr => ({ produto_id: produtoDoItem(tr), descricao: $('.it-d', tr).value.trim(), unidade: $('.it-u', tr).value.trim().toUpperCase() || 'UN',
-      quantidade: num($('.it-q', tr).value), valor_estimado: $('.it-v', tr).value.trim() ? num($('.it-v', tr).value) : null, ncm: $('.it-n', tr).value.replace(/\D/g, '') || null, destinacao: $('.it-dst', tr).value || 'insumo' }))
+      quantidade: num($('.it-q', tr).value), valor_estimado: $('.it-v', tr).value.trim() ? num($('.it-v', tr).value) : null, ncm: $('.it-n', tr).value.replace(/\D/g, '') || null }))
       .filter(i => i.descricao || i.quantidade);
     const sol = $('#rq-sol', m.el).value.trim();
     if (!sol) return toast('Informe o solicitante', true);
@@ -115,7 +109,7 @@ function editar(r, root) {
 
 // ------------------------------------------------------------ detalhe
 async function abrir(r, root) {
-  let cots = [], citens = [], peds = [], conv = [], par = null, IQF = {}, BF = null, HIST = {};
+  let cots = [], citens = [], peds = [], conv = [], par = null, IQF = {};
   try {
     [cots, peds, conv, par] = await Promise.all([q(sb.from('compras_cotacoes').select('*').eq('requisicao_id', r.id).order('criado_em')),
       q(sb.from('compras_pedidos').select('id,numero,status,total').eq('requisicao_id', r.id)),
@@ -123,8 +117,6 @@ async function abrir(r, root) {
       q(sb.from('compras_parametros').select('*').eq('empresa_id', state.empresa.id)).then(x => x[0] || null).catch(() => null)]);
     if (cots.length) citens = await q(sb.from('compras_cotacao_itens').select('*').in('cotacao_id', cots.map(c => c.id)));
     if (cots.some(c => c.favorecido_id)) IQF = Object.fromEntries((await q(sb.rpc('compras_iqf', { p_empresa: state.empresa.id })).catch(() => [])).map(f => [f.favorecido_id, f]));   // melhoria 5.6
-    BF = await baseFiscal(par);   // compra inteligente (SQL 199)
-    for (const c of cots.filter(x => x.favorecido_id && x.respondida_pelo_fornecedor)) HIST[c.id] = await q(sb.rpc('compras_hist_fiscal', { p_empresa: state.empresa.id, p_fav: c.favorecido_id })).catch(() => []);
   } catch (err) { return fail(err); }
   const m = modal({ title: `Requisição nº ${r.numero}`, wide: true, body: '<div id="rq-det"></div>', foot: '<div id="rq-acoes" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%"></div>' });
   const det = $('#rq-det', m.el), ac = $('#rq-acoes', m.el);
@@ -164,7 +156,6 @@ async function abrir(r, root) {
     </tbody></table></div>
     ${melhor && cots.filter(completa).length > 1 ? (() => { const mx = Math.max(...cots.filter(completa).map(totalCot)), mn = totalCot(melhor);
       return `<p class="small" style="margin:8px 0 0">Menor total: <b>${esc(melhor.fornecedor)}</b> ${money(mn)} — ${money(mx - mn)} abaixo da cotação mais cara.${M.melhorVP && M.melhorVP.id !== melhor.id ? ` Pela condição de pagamento (valor presente), a melhor é <b>${esc(M.melhorVP.fornecedor)}</b>.` : ''}${M.economiaDividir > 0.5 ? ` Comprando cada item de quem cobra menos, a mercadoria sairia ${money(M.economiaDividir)} mais barata (sem contar fretes e pedido mínimo).` : ''}</p>`; })() : ''}
-    <div id="rq-liq"></div>
     ${conv.length || r.status === 'aprovada' ? `<h3 style="margin:14px 0 6px">Cotação por link</h3>
       <div class="table-wrap"><table class="small"><thead><tr><th>Fornecedor</th><th>Contato</th><th>Situação</th><th>Vale até</th><th></th></tr></thead><tbody>
       ${conv.map(c => `<tr><td>${esc(c.fornecedor)}</td><td>${esc([c.email, c.telefone].filter(Boolean).join(' · ') || '–')}</td>
@@ -172,7 +163,6 @@ async function abrir(r, root) {
         <td class="${c.expira_em < today() ? 'neg' : ''}">${dateBR(c.expira_em)}</td>
         <td style="white-space:nowrap">${c.situacao !== 'cancelado' ? `<button class="btn ghost small" data-cl="${c.token}">Copiar link</button>${c.telefone ? `<a class="btn ghost small" target="_blank" rel="noopener" href="https://wa.me/55${esc(String(c.telefone).replace(/\D/g, '').replace(/^55/, ''))}?text=${encodeURIComponent(`Olá! Segue o pedido de cotação nº ${r.numero}: ${linkCot(c.token)}`)}">WhatsApp</a>` : ''}${c.situacao !== 'respondido' ? `<button class="btn ghost small" data-cx="${c.id}">Cancelar</button>` : ''}` : ''}</td></tr>`).join('')
       || '<tr><td colspan="5" class="empty">Nenhum fornecedor convidado. Use "Convidar por link": o fornecedor preenche os preços numa página, sem cadastro.</td></tr>'}</tbody></table></div>` : ''}`;
-  if (cots.length) pintarLiquido($('#rq-liq', det), r, cots, citens, M, BF, HIST, par);
   $$('[data-cl]', det).forEach(b => b.onclick = async () => { const l = linkCot(b.dataset.cl); try { await navigator.clipboard.writeText(l); toast('Link copiado'); } catch { prompt('Copie o link:', l); } });
   $$('[data-cx]', det).forEach(b => b.onclick = async () => { if (!await confirmDialog('Cancelar o convite? O link deixa de funcionar.')) return;
     try { await q(sb.from('compras_cotacao_convites').update({ situacao: 'cancelado' }).eq('id', b.dataset.cx)); m.close(); abrir(r, root); } catch (err) { fail(err); } });
@@ -196,91 +186,6 @@ async function abrir(r, root) {
   }
   $$('[data-ec]', det).forEach(b => b.onclick = () => cotacao(r, cots.find(c => c.id === b.dataset.ec), citens, m, root));
   $$('[data-pc]', det).forEach(b => b.onclick = () => gerarPedido(r, cots.find(c => c.id === b.dataset.pc), citens, m, root));
-}
-
-// ------------------------------------------------------------ compra inteligente: custo líquido de aquisição (SQL 199)
-async function baseFiscal(par) {
-  const e = state.empresa.id, hoje = today(), um = (x) => (Array.isArray(x) ? x[0] : x) || null;
-  const [trib, fisc, interna, anos] = await Promise.all([
-    q(sb.from('empresa_tributacao').select('*').eq('empresa_id', e).lte('vigencia_inicio', hoje).order('vigencia_inicio', { ascending: false }).limit(1)).then(um).catch(() => null),
-    q(sb.from('fisc_param').select('*').eq('empresa_id', e).lte('vigencia_inicio', hoje).order('vigencia_inicio', { ascending: false }).limit(1)).then(um).catch(() => null),
-    fetchAll(() => sb.from('fisc_icms_interna').select('*').eq('empresa_id', e)).catch(() => []),
-    q(sb.from('trib_aliquotas').select('*').eq('empresa_id', e).order('ano')).catch(() => [])]);
-  const nos = { uf: trib?.uf || null, ipi_contribuinte: par?.aq_ipi_contribuinte !== false, pc_nao_cumulativo: trib?.pis_cofins ? trib.pis_cofins === 'nao_cumulativo' : !['simples', 'mei'].includes(trib?.regime),
-    simples: ['simples', 'mei'].includes(trib?.regime), ibscbs_regular: !!trib?.ibscbs_regular };
-  const P = { pc_pct: fisc ? (+fisc.pis_pct || 0) + (+fisc.cofins_pct || 0) || 9.25 : 9.25, pc_excluir_icms: fisc?.pc_excluir_icms !== false, pc_incluir_frete: fisc?.pc_incluir_frete !== false,
-    pc_incluir_ipi: !!fisc?.pc_incluir_ipi, ciap_meses: par?.aq_ciap_meses || 48, taxa_mensal: +(par?.taxa_mensal_vp ?? 1.5),
-    fator_icms: fatorIcmsEfetivo(fisc, { prodepe_saidas_pct: +(par?.aq_prodepe_saidas_pct ?? 100) }), simples_credito_ibs_pct: +(par?.aq_simples_credito_ibs_pct || 0),
-    internaDe: (ncm) => aliqInterna(interna, nos.uf, ncm, hoje)?.aliquota ?? null };
-  return { nos, P, fisc, anos, semInterna: !interna.length, semUf: !nos.uf, reforma: !!par?.aq_reforma };
-}
-function calcLiquido(r, cots, citens, M, BF) {
-  const mc = (c) => M.cots.find(x => x.id === c.id) || {};
-  const cs = cots.map(c => ({ ...c, vpFator: mc(c).total ? mc(c).vp / mc(c).total : 1 }));
-  return { ML: mapaLiquido(r.itens, cs, citens, BF.nos, BF.P), RF: mapaReforma(r.itens, cs, citens, BF.nos, BF.P, BF.anos), cs };
-}
-function pintarLiquido(el, r, cots, citens, M, BF, HIST, par, comReforma = BF.reforma) {
-  const { ML, RF } = calcLiquido(r, cots, citens, M, BF), L = (c) => ML.cots.find(x => x.id === c.id), fat = BF.P.fator_icms, var2 = ML.cots.filter(x => x.completa).length > 1;
-  const melhor = (k, c) => var2 && k && k.id === c.id ? 'pos' : '';
-  const div = cots.flatMap(c => (HIST[c.id] || []).length ? r.itens.map(i => { const x = citens.find(z => z.cotacao_id === c.id && z.requisicao_item_id === i.id);
-    return x ? divergencias(x, sugestaoFiscal(HIST[c.id], i.ncm)).map(t => `${c.fornecedor} · ${i.descricao}: ${t}`) : []; }).flat() : []);
-  const lin = (rot, f, cls = '', tip = '') => `<tr class="${cls}"><td ${tip ? `title="${esc(tip)}"` : ''}>${rot}</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => f(c, L(c))).join('')}</tr>`;
-  el.innerHTML = `<h3 style="margin:16px 0 6px">Custo líquido de aquisição <span class="muted small" style="font-weight:400">o que a compra custa depois dos créditos de ICMS, IPI e PIS/COFINS</span></h3>
-    ${BF.semUf ? '<p class="small warn">Cadastre a UF e o regime da empresa (Configurações › Empresa › Regime tributário) para calcular os créditos.</p>' : ''}
-    ${BF.semInterna ? '<p class="small warn">Sem a alíquota interna por UF: o DIFAL do uso e consumo e do ativo não entra. Abra uma vez a Análise de Competitividade de Preço (Comercial) para carregar a tabela.</p>' : ''}
-    <div class="table-wrap"><table><thead><tr><th></th><th></th>${r.itens.some(x => x.valor_estimado) ? '<th></th>' : ''}${cots.map(c => `<th class="num" style="min-width:150px">${esc(c.fornecedor)}<div class="small muted" style="font-weight:400">${esc([c.uf, (REGIMES_FORN.find(x => x[0] === c.regime) || [])[1]].filter(Boolean).join(' · ') || 'sem dados fiscais')}</div></th>`).join('')}</tr></thead><tbody>
-      ${lin('Desembolso', (c, x) => `<td class="num ${melhor(ML.melhorPreco, c)}">${money(x.desembolso)}</td>`, '', 'Preço + IPI + ICMS-ST + frete + DIFAL (uso e consumo e ativo de outra UF)')}
-      ${lin('(−) Créditos', (c, x) => `<td class="num">${money(-x.creditos)}${x.faltaFiscal ? '<div class="small warn">sem alíquota de ICMS</div>' : ''}</td>`, '', 'ICMS, IPI e PIS/COFINS que voltam na apuração')}
-      ${lin('Custo líquido', (c, x) => `<td class="num" style="font-weight:600">${money(x.custo)}${x.completa ? '' : '<div class="small neg">incompleta</div>'}</td>`)}
-      ${lin(`Custo líquido a valor presente <span class="muted small">(${String(BF.P.taxa_mensal).replace('.', ',')}% a.m.)</span>`, (c, x) => `<td class="num ${melhor(ML.melhorLiq, c)}" style="font-weight:600">${money(x.custoVp)}</td>`)}
-      ${fat < 1 ? lin(`Com o PRODEPE <span class="muted small">(crédito de ICMS vale ${fmt(fat * 100)}%)</span>`, (c, x) => `<td class="num ${melhor(ML.melhorEf, c)}">${money(x.custoEfVp)}</td>`, '',
-        'Com o crédito presumido calculado sobre o saldo devedor, cada R$ 1 de crédito de ICMS reduz também o benefício (e o FEEF)') : ''}
-      ${lin('', (c) => `<td class="num"><button class="btn ghost small" data-mem="${c.id}">Memória</button></td>`)}
-    </tbody></table></div>
-    ${var2 ? `<p class="small" style="margin:8px 0 0">${ML.melhorPreco && ML.melhorLiq && ML.melhorPreco.id !== ML.melhorLiq.id
-      ? `Pelo preço, a melhor é <b>${esc(ML.melhorPreco.fornecedor)}</b>; <b>pelo custo líquido, é ${esc(ML.melhorLiq.fornecedor)}</b>, ${money(ML.ganho)} a menos por causa dos créditos.`
-      : `Pelo custo líquido, a melhor é <b>${esc(ML.melhorLiq?.fornecedor || '')}</b>.`}${fat < 1 && ML.melhorEf && ML.melhorEf.id !== ML.melhorLiq?.id ? ` Considerando o PRODEPE, a melhor passa a ser <b>${esc(ML.melhorEf.fornecedor)}</b>.` : ''}</p>` : ''}
-    ${div.length ? `<div class="cp-aviso small" style="margin-top:6px"><b>Confira com o fornecedor</b> (diferente da última nota dele):<br>${div.map(esc).join('<br>')}</div>` : ''}
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn ghost small" id="lq-rf">${comReforma ? 'Esconder a reforma' : 'Simular a reforma (2027–2033)'}</button><button class="btn ghost small" id="lq-pdf">PDF do mapa</button></div>
-    ${comReforma ? (RF.length ? `<div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Ano</th><th class="num">ICMS</th><th class="num">CBS+IBS</th>${cots.map(c => `<th class="num">${esc(c.fornecedor)}</th>`).join('')}</tr></thead><tbody>
-      ${RF.map(a => `<tr><td>${a.ano}</td><td class="num">${fmt(a.icms_pct)}%</td><td class="num">${fmt(a.t)}%</td>${cots.map(c => { const x = a.cots.find(z => z.id === c.id); return `<td class="num ${a.melhor === c.id && var2 ? 'pos' : ''}">${money(x?.custo)}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
-      <p class="small muted">Mesmos preços; ICMS reduzido na transição, IPI e PIS/COFINS zerados, CBS/IBS por fora com crédito integral. Fornecedor do Simples que não optar pelo regime regular transfere só o crédito estimado (${fmt(BF.P.simples_credito_ibs_pct)}% do preço, em Parâmetros da cotação).</p>`
-      : '<p class="small muted">Sem as alíquotas de 2027 em diante no Simulador da reforma.</p>') : ''}`;
-  $('#lq-rf', el).onclick = () => pintarLiquido(el, r, cots, citens, M, BF, HIST, par, !comReforma);
-  $('#lq-pdf', el).onclick = () => abrirRelatorio({ rel: 'Mapa de cotação por custo líquido', nome: 'Mapa de Cotação por Custo Líquido', titulo: `MAPA DE COTAÇÃO — REQUISIÇÃO Nº ${r.numero}`,
-    corpo: relatorioMapa(r, cots, citens, M, ML, comReforma ? RF : [], BF, div, { esc, money, dateBR }),
-    parametros: [['Requisição', `nº ${r.numero}`], ['Cotações', String(cots.length)], ['Valor presente', `${String(BF.P.taxa_mensal).replace('.', ',')}% a.m.`], ['Reforma', comReforma ? 'incluída' : 'fora']],
-    rodape: 'Base: Compras › Requisições e Cotações (CMP002). Créditos pelas regras vigentes; PRODEPE, FEEF e PIS/COFINS de Fiscal › Apuração › Parâmetros; CBS/IBS do Simulador da reforma.' });
-  $$('[data-mem]', el).forEach(b => b.onclick = () => { const c = cots.find(x => x.id === b.dataset.mem), x = L(c);
-    modal({ title: `Memória do custo líquido — ${c.fornecedor}`, wide: true, body: r.itens.filter(i => x.porItem[i.id]).map(i => `<h3 style="margin:10px 0 4px">${esc(i.descricao)} <span class="muted small">${qtd(i.quantidade)} ${esc(i.unidade)} · ${esc((DESTINACOES.find(d => d[0] === (i.destinacao || 'insumo')) || [])[1] || '')}</span></h3>
-      <table class="cp-mt"><tbody>${x.porItem[i.id].linhas.map(l => `<tr class="${['desemb', 'custo', 'custo_ef'].includes(l.k) ? 'cp-tot' : ''}"><td>${esc(l.txt)}${l.obs ? `<div class="muted small">${esc(l.obs)}</div>` : ''}</td><td class="num">${br2(l.v)}</td></tr>`).join('')}</tbody></table>`).join(''),
-      foot: '<button class="btn primary" data-close>Fechar</button>' }); });
-}
-
-async function relatorioCompraInteligente() {
-  const ini = today().slice(0, 8) + '01';
-  const m = modal({ title: 'Relatório de compra inteligente', narrow: true, body: `<p class="small muted" style="margin-top:0">Requisições com cotação pedidas no período, comparadas pelo custo líquido (depois dos créditos).</p>
-    <div class="grid-form"><label>De<input type="date" id="ri-de" value="${ini}"></label><label>Até<input type="date" id="ri-ate" value="${today()}"></label></div>`,
-    foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ri-ok">Gerar PDF</button>' });
-  $('#ri-ok', m.el).onclick = async (ev) => {
-    const de = $('#ri-de', m.el).value, ate = $('#ri-ate', m.el).value;
-    ev.target.disabled = true;
-    try {
-      const reqs = R.filter(r => r.nCot && String(r.criado_em).slice(0, 10) >= de && String(r.criado_em).slice(0, 10) <= ate);
-      if (!reqs.length) { ev.target.disabled = false; return toast('Nenhuma requisição com cotação no período', true); }
-      const ids = reqs.map(r => r.id);
-      const par = (await q(sb.from('compras_parametros').select('*').eq('empresa_id', state.empresa.id)).catch(() => []))[0] || null;
-      const [cots, BF] = await Promise.all([fetchAll(() => sb.from('compras_cotacoes').select('*').in('requisicao_id', ids).order('id')), baseFiscal(par)]);
-      const citens = cots.length ? await fetchAll(() => sb.from('compras_cotacao_itens').select('*').in('cotacao_id', cots.map(c => c.id)).order('id')) : [];
-      const taxa = +(par?.taxa_mensal_vp ?? 1.5);
-      const A = reqs.map(r => { const cs = cots.filter(c => c.requisicao_id === r.id), M = mapaCotacoes(r.itens, cs, citens, { taxa }), { ML } = calcLiquido(r, cs, citens, M, BF);
-        return { r, cots: cs, ML, escolhida: cs.find(c => c.escolhida) || null }; });
-      m.close();
-      abrirRelatorio({ rel: 'Relatório de compra inteligente', nome: 'Compra Inteligente', titulo: 'COMPRAS PELO CUSTO LÍQUIDO — CRÉDITOS E ESCOLHAS', paisagem: true,
-        corpo: relatorioPeriodo(A, { esc, money, dateBR }), parametros: [['Período', `${dateBR(de)} a ${dateBR(ate)}`], ['Requisições', String(A.length)], ['Valor presente', `${String(taxa).replace('.', ',')}% a.m.`]],
-        rodape: 'Base: Compras › Requisições e Cotações (CMP002). Custo líquido = desembolso − créditos de ICMS, IPI e PIS/COFINS, pelas regras vigentes; PRODEPE de Fiscal › Apuração › Parâmetros.' });
-    } catch (err) { fail(err); ev.target.disabled = false; }
-  };
 }
 
 // ------------------------------------------------------------ cotação por link (melhoria 5.2, SQL 132)
@@ -315,29 +220,18 @@ async function parametrosCotacao() {
       <label class="xs">O link vale por (dias)<input id="pc-d" type="number" min="1" max="60" value="${p.cotacao_link_dias ?? 5}"></label>
       <label class="xs">Taxa para o valor presente (% ao mês)<input id="pc-t" inputmode="decimal" value="${String(p.taxa_mensal_vp ?? 1.5).replace('.', ',')}"></label></div>
     <label class="chk" style="margin-top:8px"><input type="checkbox" id="pc-e" ${p.cotacao_mostra_estimado ? 'checked' : ''}> Mostrar ao fornecedor o preço estimado da requisição como referência</label>
-    <label style="margin-top:8px">Mensagem padrão do convite<textarea id="pc-m" rows="3" maxlength="1000">${esc(p.cotacao_mensagem || '')}</textarea></label>
-    <h3 style="margin:14px 0 6px">Compra inteligente (custo líquido)</h3><div class="grid-form">
-      <label>Parcela das saídas com PRODEPE (%)<input id="pc-pp" inputmode="decimal" value="${String(p.aq_prodepe_saidas_pct ?? 100).replace('.', ',')}"></label>
-      <label>Crédito de CBS/IBS do fornecedor do Simples, na reforma (% do preço)<input id="pc-sn" inputmode="decimal" value="${String(p.aq_simples_credito_ibs_pct ?? 0).replace('.', ',')}"></label>
-      <label class="xs">CIAP do ativo (meses)<input id="pc-ci" type="number" min="1" max="120" value="${p.aq_ciap_meses ?? 48}"></label></div>
-    <label class="chk" style="margin-top:8px"><input type="checkbox" id="pc-ipi" ${p.aq_ipi_contribuinte !== false ? 'checked' : ''}> A empresa é contribuinte do IPI (credita o IPI dos insumos)</label>
-    <label class="chk"><input type="checkbox" id="pc-rf" ${p.aq_reforma ? 'checked' : ''}> Mostrar a simulação da reforma no mapa</label>
-    <p class="small muted">PRODEPE, FEEF e PIS/COFINS vêm de Fiscal › Apuração › Parâmetros; a alíquota interna, dos Parâmetros da Análise de Competitividade; CBS/IBS por ano, do Simulador da reforma.</p>`,
+    <label style="margin-top:8px">Mensagem padrão do convite<textarea id="pc-m" rows="3" maxlength="1000">${esc(p.cotacao_mensagem || '')}</textarea></label>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pc-ok">Salvar</button>' });
   $('#pc-ok', m.el).onclick = async () => { const t = parseFloat($('#pc-t', m.el).value.replace(',', '.'));
     if (!(t >= 0 && t <= 20)) return toast('Taxa de 0 a 20% ao mês', true);
     try { await q(sb.from('compras_parametros').upsert({ empresa_id: state.empresa.id, cotacao_link_dias: Math.min(60, Math.max(1, +$('#pc-d', m.el).value || 5)), taxa_mensal_vp: t,
-        cotacao_mostra_estimado: $('#pc-e', m.el).checked, cotacao_mensagem: $('#pc-m', m.el).value.trim() || null, atualizado_em: new Date().toISOString(),
-        aq_prodepe_saidas_pct: Math.min(100, Math.max(0, num($('#pc-pp', m.el).value) || 0)), aq_simples_credito_ibs_pct: Math.min(30, Math.max(0, num($('#pc-sn', m.el).value) || 0)),
-        aq_ciap_meses: Math.min(120, Math.max(1, +$('#pc-ci', m.el).value || 48)), aq_ipi_contribuinte: $('#pc-ipi', m.el).checked, aq_reforma: $('#pc-rf', m.el).checked })); m.close(); toast('Parâmetros salvos'); } catch (err) { fail(err); } };
+        cotacao_mostra_estimado: $('#pc-e', m.el).checked, cotacao_mensagem: $('#pc-m', m.el).value.trim() || null, atualizado_em: new Date().toISOString() })); m.close(); toast('Parâmetros salvos'); } catch (err) { fail(err); } };
 }
 
 // ------------------------------------------------------------ cotação
 function cotacao(r, c, citens, pai, root) {
   const v = c || { parcelas_dias: [28], frete: 0 };
   const preco = (i) => citens.find(x => x.cotacao_id === c?.id && x.requisicao_item_id === i.id)?.valor_unitario;
-  const ci = (i) => citens.find(x => x.cotacao_id === c?.id && x.requisicao_item_id === i.id) || {};
-  const pct = (x) => (x == null || x === '' ? '' : String(+x).replace('.', ','));
   const m = modal({ title: `${c ? 'Editar cotação' : 'Nova cotação'} — requisição nº ${r.numero}`, wide: true, body: `
     <div class="grid-form">
       <label class="span2">Fornecedor *<input id="ct-f" list="ct-forn" value="${esc(v.fornecedor || '')}" placeholder="nome do cadastro ou como veio na proposta">
@@ -349,57 +243,23 @@ function cotacao(r, c, citens, pai, root) {
       <label>Válida até<input type="date" id="ct-val" value="${v.validade || ''}"></label>
       <label class="span2">Observação<input id="ct-obs" value="${esc(v.observacao || '')}"></label>
     </div>
-    <h3 style="margin:14px 0 6px">Dados fiscais do fornecedor <span class="muted small" style="font-weight:400">decidem os créditos no mapa</span></h3>
-    <div class="grid-form">
-      <label class="xs">UF de saída<input id="ct-uf" maxlength="2" value="${esc(v.uf || '')}" style="text-transform:uppercase"></label>
-      <label>Regime<select id="ct-reg"><option value="">—</option>${REGIMES_FORN.map(([k, t]) => `<option value="${k}" ${v.regime === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label>Simples: crédito de ICMS permitido (%)<input id="ct-scp" inputmode="decimal" value="${pct(v.simples_credito_pct)}"></label>
-      <label>Simples: IBS/CBS pelo regime regular?<select id="ct-sr"><option value="">—</option>${[['sim', 'Sim'], ['nao', 'Não'], ['avaliando', 'Avaliando']].map(([k, t]) => `<option value="${k}" ${v.simples_regular === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <div style="align-self:end"><button class="btn ghost small" id="ct-hist" type="button">Preencher pelas notas do fornecedor</button></div></div>
-    <p class="small muted" id="ct-hmsg" style="margin:4px 0 0"></p>
-    <h3 style="margin:14px 0 6px">Preço e impostos por item</h3>
-    <div class="table-wrap"><table><thead><tr><th>Item</th><th class="num">Quant.</th><th>Valor unitário *</th><th>ICMS %</th><th>IPI %</th><th>ICMS-ST por unid.</th></tr></thead><tbody>
-      ${r.itens.map(i => `<tr data-row="${i.id}"><td>${esc(i.descricao)} <span class="muted small">${esc(i.unidade)}${i.ncm ? ' · NCM ' + esc(i.ncm) : ''} · ${esc((DESTINACOES.find(d => d[0] === (i.destinacao || 'insumo')) || [])[1] || '')}</span></td><td class="num">${qtd(i.quantidade)}</td>
-        <td><input class="ct-p" data-i="${i.id}" value="${preco(i) != null ? String(+preco(i)).replace('.', ',') : ''}" style="width:120px"></td>
-        <td><input class="ct-icms" value="${pct(ci(i).icms_aliq)}" style="width:70px"></td><td><input class="ct-ipi" value="${pct(ci(i).ipi_aliq)}" style="width:70px"></td>
-        <td><input class="ct-st" value="${pct(ci(i).st_un)}" style="width:90px"></td></tr>`).join('')}</tbody></table></div>`,
+    <h3 style="margin:14px 0 6px">Preço unitário por item</h3>
+    <div class="table-wrap"><table><thead><tr><th>Item</th><th class="num">Quant.</th><th>Valor unitário *</th></tr></thead><tbody>
+      ${r.itens.map(i => `<tr><td>${esc(i.descricao)} <span class="muted small">${esc(i.unidade)}</span></td><td class="num">${qtd(i.quantidade)}</td>
+        <td><input class="ct-p" data-i="${i.id}" value="${preco(i) != null ? String(+preco(i)).replace('.', ',') : ''}" style="width:130px"></td></tr>`).join('')}</tbody></table></div>`,
     foot: `${c ? '<button class="btn danger" id="ct-del" style="margin-right:auto">Excluir cotação</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ct-ok">Salvar</button>` });
   $('#ct-del', m.el) && ($('#ct-del', m.el).onclick = async () => {
     if (!await confirmDialog('Excluir esta cotação?')) return;
     try { await q(sb.from('compras_cotacoes').delete().eq('id', c.id)); m.close(); pai.close(); toast('Cotação excluída'); await carregar(root); abrir(R.find(x => x.id === r.id), root); } catch (err) { fail(err); }
   });
-  // sugestão pelas notas de entrada do fornecedor (XML importados)
-  $('#ct-hist', m.el).onclick = async () => {
-    const fav = C.fornecedores.find(f => f.nome.toLowerCase() === $('#ct-f', m.el).value.trim().toLowerCase());
-    if (!fav) return toast('Escolha um fornecedor do cadastro para buscar as notas dele', true);
-    try {
-      const H = await q(sb.rpc('compras_hist_fiscal', { p_empresa: state.empresa.id, p_fav: fav.id }));
-      if (!H.length) { $('#ct-hmsg', m.el).textContent = 'Nenhuma nota de entrada deste fornecedor importada na plataforma.'; return; }
-      let k = 0;
-      r.itens.forEach(i => { const sg = sugestaoFiscal(H, i.ncm), tr = $(`[data-row="${i.id}"]`, m.el); if (!sg || !tr) return;
-        if (sg.icms_aliq != null && !$('.ct-icms', tr).value) { $('.ct-icms', tr).value = pct(sg.icms_aliq); k++; }
-        if (sg.ipi_aliq != null && !$('.ct-ipi', tr).value) $('.ct-ipi', tr).value = pct(sg.ipi_aliq);
-        if (sg.st_un && !$('.ct-st', tr).value) $('.ct-st', tr).value = pct(sg.st_un); });
-      const g = sugestaoFiscal(H, '');
-      if (g?.uf && !$('#ct-uf', m.el).value) $('#ct-uf', m.el).value = g.uf;
-      if (g?.simples && !$('#ct-reg', m.el).value) $('#ct-reg', m.el).value = 'simples';
-      $('#ct-hmsg', m.el).textContent = `${H.length} item(ns) de nota encontrados; última em ${dateBR(String(H[0].emissao).slice(0, 10))}. ${k} item(ns) preenchido(s) pelo mesmo NCM. Confira.`;
-    } catch (err) { fail(err); }
-  };
   $('#ct-ok', m.el).onclick = async (ev) => {
     const forn = $('#ct-f', m.el).value.trim(); if (!forn) return toast('Informe o fornecedor', true);
-    const opc = (x) => (x.trim() === '' ? null : num(x));
-    const precos = $$('.ct-p', m.el).filter(x => x.value.trim()).map(x => { const tr = x.closest('tr');
-      return { requisicao_item_id: x.dataset.i, valor_unitario: num(x.value), icms_aliq: opc($('.ct-icms', tr).value), ipi_aliq: opc($('.ct-ipi', tr).value), st_un: opc($('.ct-st', tr).value),
-        fonte_fiscal: $('.ct-icms', tr).value.trim() ? 'comprador' : null }; });
-    const uf = $('#ct-uf', m.el).value.trim().toUpperCase();
-    if (uf && !/^[A-Z]{2}$/.test(uf)) return toast('UF de saída inválida', true);
+    const precos = $$('.ct-p', m.el).filter(x => x.value.trim()).map(x => ({ requisicao_item_id: x.dataset.i, valor_unitario: num(x.value) }));
     if (!precos.length) return toast('Informe ao menos um preço', true);
     const fav = C.fornecedores.find(f => f.nome.toLowerCase() === forn.toLowerCase());
     const cab = { fornecedor: forn, favorecido_id: fav?.id || null, prazo_entrega_dias: $('#ct-pz', m.el).value.trim() ? parseInt($('#ct-pz', m.el).value) : null,
       parcelas_dias: lerDias($('#ct-pd', m.el).value), condicao_pagamento: $('#ct-cd', m.el).value.trim() || null, frete: num($('#ct-fr', m.el).value),
-      validade: $('#ct-val', m.el).value || null, observacao: $('#ct-obs', m.el).value.trim() || null,
-      uf: uf || null, regime: $('#ct-reg', m.el).value || null, simples_credito_pct: opc($('#ct-scp', m.el).value), simples_regular: $('#ct-sr', m.el).value || null };
+      validade: $('#ct-val', m.el).value || null, observacao: $('#ct-obs', m.el).value.trim() || null };
     ev.target.disabled = true;
     try {
       const e = state.empresa.id; let id = c?.id;

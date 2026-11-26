@@ -54,8 +54,6 @@ export const MANUAIS = [
     resumo: 'Montar as duplicatas e o endosso, gerar o PDF para assinatura digital e cancelar com termo.' },
   { id: 'comercial', titulo: 'Comercial — painel, carteira, funil e metas', area: 'Comercial', rotas: ['comercial', 'comercial/carteira', 'comercial/funil', 'comercial/vendedores', 'comercial/mapa', 'comercial/comissoes'],
     resumo: 'Faturado × meta, situação dos clientes, contatos, oportunidades, propostas com calculadora e metas.' },
-  { id: 'compra-inteligente', titulo: 'Compra inteligente — cotação pelo custo líquido de aquisição', area: 'Compras', rotas: ['compras/cadastro-fornecedores'],
-    resumo: 'Dados fiscais na cotação por link, mapa pelo custo líquido (créditos de ICMS, IPI e PIS/COFINS), PRODEPE, reforma, questionário de fornecedores e relatório para a direção.' },
   { id: 'cadastro-reforma', titulo: 'Atualização Cadastral da Reforma — questionário por link para o cliente', area: 'Comercial', rotas: ['comercial/cadastro-reforma'],
     resumo: 'Escolha os clientes, gere o link e mande por WhatsApp ou e-mail; o cliente responde sem login; você compara com o cadastro e aplica.' },
   { id: 'competitividade', titulo: 'Análise de Competitividade de Preço — custo líquido para o cliente', area: 'Comercial', rotas: ['comercial/competitividade'],

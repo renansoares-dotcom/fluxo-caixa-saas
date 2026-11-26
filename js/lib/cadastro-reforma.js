@@ -7,7 +7,6 @@ export const CONTRIB = [['1', 'Sim, contribuinte do ICMS (tem inscrição estadu
 export const SIM_NAO = [['sim', 'Sim'], ['nao', 'Não'], ['nao_sei', 'Não sei']];
 export const SIMPLES_REGULAR = [['sim', 'Sim, vamos optar pelo regime regular'], ['nao', 'Não, vamos continuar recolhendo tudo pelo Simples'], ['avaliando', 'Ainda estamos avaliando']];
 export const TIPOS = [['industria', 'Indústria'], ['comercio', 'Comércio'], ['consumidor_contrib', 'Consumidor final contribuinte'], ['nao_contrib', 'Não contribuinte']];
-export const ATIVIDADES = [['fabricante', 'Fabricante (indústria)'], ['importador', 'Importador'], ['distribuidor', 'Distribuidor ou atacadista'], ['prestador', 'Prestador de serviço']];
 export const REDUCOES = [['nenhuma', 'Nenhuma'], ['reducao_30', 'Redução de 30%'], ['reducao_60', 'Redução de 60%'], ['aliquota_zero', 'Alíquota zero'], ['regime_especifico', 'Regime específico'], ['nao_sei', 'Não sei']];
 
 const rot = (L) => Object.fromEntries(L);
@@ -22,7 +21,6 @@ export const CAMPOS = [
   ['cnae', 'CNAE principal', 'Perfil de ICMS', 'pf'],
   ['regime', 'Regime tributário', 'Regime e créditos', 'fav'], ['cred_icms', 'Aproveita crédito de ICMS', 'Regime e créditos', 'pf'],
   ['cred_pc', 'Aproveita crédito de PIS/COFINS', 'Regime e créditos', 'pf'], ['simples_regular', 'Simples/MEI: IBS e CBS pelo regime regular', 'Regime e créditos', 'pf'],
-  ['simples_credito_pct', 'Simples: crédito de ICMS na nota (%)', 'Regime e créditos', 'pf'], ['atividade', 'Atividade do fornecedor', 'Perfil de ICMS', 'pf'],
   ['especiais', 'Situações especiais', 'Situações especiais', 'pf'],
 ].map(([chave, rotulo, bloco, destino]) => ({ chave, rotulo, bloco, destino }));
 
@@ -41,8 +39,6 @@ export function texto(chave, v) {
     case 'contato_fiscal': case 'contador': return pessoa(v);
     case 'especiais': return Object.entries(v || {}).filter(([, x]) => x !== false && x !== '' && x != null && x !== 'nenhuma')
       .map(([k, x]) => (x === true ? ESP[k] || k : `${ESP[k] || k}: ${k === 'reducao' ? rot(REDUCOES)[x] || x : x}`)).join(' · ');
-    case 'atividade': return rot(ATIVIDADES)[v] || String(v);
-    case 'simples_credito_pct': return `${String(v).replace('.', ',')}%`;
     case 'cep': return String(v).replace(/\D/g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2');
     default: return String(v).trim();
   }
@@ -55,7 +51,7 @@ export function atualDoCadastro(f = {}, pf = {}) {
   return { nome_fantasia: f.nome_fantasia, ie: f.ie, im: f.im, cep: f.cep, logradouro: f.logradouro, numero: f.numero, complemento: f.complemento, bairro: f.bairro,
     municipio: f.municipio, uf: f.uf, email_nfe: f.email, telefone: f.telefone, contribuinte_icms: f.contribuinte_icms, regime: reg[f.regime_tributario] || pf?.regime || '',
     tipo: pf?.tipo, destinacao: pf?.destinacao || [], cnae: pf?.cnae || f.receita_dados?.cnae, cred_icms: pf?.cred_icms, cred_pc: pf?.cred_pc, simples_regular: pf?.simples_regular,
-    especiais: pf?.especiais || {}, contato_fiscal: pf?.contato_fiscal || {}, contador: pf?.contador || {}, simples_credito_pct: pf?.simples_credito_pct, atividade: pf?.atividade };
+    especiais: pf?.especiais || {}, contato_fiscal: pf?.contato_fiscal || {}, contador: pf?.contador || {} };
 }
 
 /** linhas da comparação: { chave, rotulo, bloco, atual, novo, muda } — só o que o cliente respondeu */
@@ -80,13 +76,11 @@ export function perfilParaCompetitividade(pf, f) {
 }
 
 /** confere a resposta antes de enviar: lista de problemas (vazia = ok) */
-export function conferir(d, publico = 'cliente') {
+export function conferir(d) {
   const P = [], email = (x) => !x || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(x).trim());
   if (!d.contribuinte_icms) P.push('Informe se a empresa é contribuinte do ICMS.');
   if (!d.regime) P.push('Informe o regime tributário.');
-  if (publico === 'fornecedor') { if (!d.atividade) P.push('Informe a atividade da empresa.'); }
-  else if (!(d.destinacao || []).length) P.push('Marque para que a empresa usa o que compra de nós.');
-  if (d.simples_credito_pct !== undefined && d.simples_credito_pct !== '' && !(+String(d.simples_credito_pct).replace(',', '.') >= 0 && +String(d.simples_credito_pct).replace(',', '.') <= 20)) P.push('O crédito do Simples vai de 0 a 20%.');
+  if (!(d.destinacao || []).length) P.push('Marque para que a empresa usa o que compra de nós.');
   for (const [x, t] of [[d.email_nfe, 'e-mail para NF-e'], [d.declarante?.email, 'seu e-mail'], [d.contato_fiscal?.email, 'e-mail do contato fiscal'], [d.contador?.email, 'e-mail da contabilidade']])
     if (!email(x)) P.push(`Confira o ${t}.`);
   if (d.cep && String(d.cep).replace(/\D/g, '').length !== 8) P.push('O CEP tem 8 números.');

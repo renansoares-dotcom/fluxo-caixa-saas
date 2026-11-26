@@ -1,7 +1,7 @@
 ---
 titulo: Atualização Cadastral da Reforma — questionário por link para o cliente
 tela: Comercial › Atualização Cadastral da Reforma (COM010)
-versao: 1.1
+versao: 1.0
 atualizado: 2026-11-26
 ---
 ## 1. Para que serve
@@ -68,7 +68,7 @@ Enquanto o link vale e a resposta não foi aplicada, o cliente pode abrir de nov
 | Situação | O que significa |
 |---|---|
 | Enviado | Link gerado, ainda não aberto |
-| Aberto pelo link | O cliente abriu a página, mas não enviou |
+| Aberto pelo cliente | O cliente abriu a página, mas não enviou |
 | Respondido — conferir | Resposta recebida, aguardando a conferência |
 | Aplicado | Conferido e levado ao cadastro |
 | Descartado | Conferido e não aproveitado (com o motivo) |
@@ -125,13 +125,8 @@ O vendedor vê e envia só para os clientes da carteira dele. Só o administrado
 
 **Posso mandar para um possível cliente que não está no cadastro?** Ainda não: o link é sempre de um cliente do cadastro. Cadastre o cliente antes.
 
-## 11. Versão para fornecedores
-
-A mesma ferramenta existe em **Compras › Atualização Cadastral de Fornecedores** (CMP006), para quem compra. O questionário do fornecedor pergunta a atividade (fabricante, importador, distribuidor, prestador) no lugar do destino das compras e, no Simples, o percentual de crédito de ICMS que vai na nota. O regime, o crédito do Simples e a opção pelo IBS/CBS regular entram no perfil do fornecedor e já vêm preenchidos nas próximas cotações por link. Detalhes no manual **Compra inteligente**.
-
-## 12. Histórico de versões
+## 11. Histórico de versões
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 26/11/2026 | Primeira versão. O questionário tem dados cadastrais e contato, perfil de ICMS, regime e créditos (com a opção do Simples pelo IBS/CBS regular), situações especiais e a declaração de quem responde. Link único por cliente, sem login, válido por 30 dias, com reaproveitamento, prorrogação e cancelamento; envio por WhatsApp, e-mail ou cópia; aviso de resposta. A conferência compara a resposta com o cadastro e aplica os campos escolhidos ao cadastro e ao perfil fiscal, que passa a alimentar a Análise de Competitividade. Tem PDF da resposta e da lista e parâmetros de validade, mensagem e papéis (SQL 198). |
-| 1.1 | 26/11/2026 | Versão para fornecedores em Compras (CMP006), com atividade e crédito do Simples; a situação "Aberto pelo cliente" passa a se chamar "Aberto pelo link" (SQL 199). |

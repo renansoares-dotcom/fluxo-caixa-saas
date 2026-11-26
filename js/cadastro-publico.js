@@ -4,7 +4,7 @@
 import { createClient } from '../vendor/supabase-2.117.2.esm.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { $, $$, esc, dateBR, toast, fail } from './lib/ui.js';
-import { DESTINACOES, REGIMES, CONTRIB, SIM_NAO, SIMPLES_REGULAR, REDUCOES, ATIVIDADES, conferir, tipoPelaDestinacao } from './lib/cadastro-reforma.js';
+import { DESTINACOES, REGIMES, CONTRIB, SIM_NAO, SIMPLES_REGULAR, REDUCOES, conferir, tipoPelaDestinacao } from './lib/cadastro-reforma.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
@@ -26,15 +26,14 @@ const campo = (rot, nome, v, extra = '', cls = '') => `<label class="${cls}">${r
 
 function pintar(C) {
   const a = C.atual || {}, fechado = C.vencido || ['cancelado', 'aplicado', 'descartado'].includes(C.situacao), dis = fechado ? 'disabled' : '';
-  const e = a.especiais || {}, cf = a.contato_fiscal || {}, ct = a.contador || {}, dc = a.declarante || {}, forn = C.publico === 'fornecedor';
+  const e = a.especiais || {}, cf = a.contato_fiscal || {}, ct = a.contador || {}, dc = a.declarante || {};
   const aviso = C.situacao === 'cancelado' ? '<div class="cq-aviso">Este questionário foi cancelado. Se precisar, peça um novo link.</div>'
     : ['aplicado', 'descartado'].includes(C.situacao) ? '<div class="cq-ok">Recebemos e conferimos as suas informações. Obrigado!</div>'
     : C.vencido ? `<div class="cq-aviso">O prazo deste link terminou em ${dateBR(C.expira_em)}. Peça um novo link a quem enviou.</div>`
     : C.situacao === 'respondido' ? `<div class="cq-ok">Recebemos as suas respostas em ${new Date(C.respondido_em).toLocaleString('pt-BR').slice(0, 17)}. Você pode corrigir e enviar de novo até ${dateBR(C.expira_em)}.</div>`
     : `<div class="small muted">Leva uns 5 minutos. Preencha até <b>${dateBR(C.expira_em)}</b>. Os campos já preenchidos são os que temos hoje: confira e corrija o que estiver diferente.</div>`;
   main.innerHTML = `<div class="card"><h2 style="margin:0">${esc(C.cliente)}</h2>
-      <p style="margin:8px 0 0">${forn ? `${esc(C.empresa)} está atualizando o cadastro dos <b>fornecedores</b> para a <b>reforma tributária</b> (o IBS e a CBS, que vão substituir o ICMS, o ISS, o PIS e a COFINS; a transição começou em 2026). Com estas informações, as suas propostas são avaliadas corretamente nas nossas cotações.`
-        : `${esc(C.empresa)} está atualizando o cadastro dos clientes para a <b>reforma tributária</b> (o IBS e a CBS, que vão substituir o ICMS, o ISS, o PIS e a COFINS; a transição começou em 2026). Com estas informações, as nossas notas fiscais saem certas para a sua empresa e você aproveita os créditos a que tem direito.`}</p>
+      <p style="margin:8px 0 0">${esc(C.empresa)} está atualizando o cadastro dos clientes para a <b>reforma tributária</b> (o IBS e a CBS, que vão substituir o ICMS, o ISS, o PIS e a COFINS; a transição começou em 2026). Com estas informações, as nossas notas fiscais saem certas para a sua empresa e você aproveita os créditos a que tem direito.</p>
       ${C.mensagem ? `<p style="white-space:pre-wrap;margin:10px 0 0">${esc(C.mensagem)}</p>` : ''}<div style="margin-top:10px">${aviso}</div></div>
     <form id="cq-f" novalidate>
     <div class="card" style="margin-top:12px"><h3>1. Dados da empresa</h3><div class="grid-form">
@@ -52,15 +51,12 @@ function pintar(C) {
       ${campo('Nome', 'ct_nome', ct.nome, `maxlength="80" ${dis}`)}${campo('E-mail', 'ct_email', ct.email, `type="email" maxlength="120" ${dis}`)}${campo('Telefone', 'ct_tel', ct.telefone, `maxlength="20" ${dis}`)}</div></div>
     <div class="card" style="margin-top:12px"><h3>2. ICMS</h3>
       <div class="cq-q">A empresa é contribuinte do ICMS? *</div>${radios('contribuinte_icms', CONTRIB, a.contribuinte_icms, dis)}
-      ${forn ? `<div class="cq-q">Qual é a atividade da empresa? *</div>${radios('atividade', ATIVIDADES, a.atividade, dis)}`
-        : `<div class="cq-q">Para que a empresa usa o que compra de nós? *</div><div class="cq-dica">Pode marcar mais de um.</div>${checks('destinacao', DESTINACOES, a.destinacao, dis)}`}
+      <div class="cq-q">Para que a empresa usa o que compra de nós? *</div><div class="cq-dica">Pode marcar mais de um.</div>${checks('destinacao', DESTINACOES, a.destinacao, dis)}
       <div class="grid-form">${campo('CNAE principal (opcional)', 'cnae', a.cnae, `maxlength="12" ${dis} placeholder="ex.: 2222-6/00"`)}</div></div>
     <div class="card" style="margin-top:12px"><h3>3. Regime tributário e créditos</h3>
       <div class="cq-q">Regime tributário *</div>${radios('regime', REGIMES, a.regime, dis)}
       <div id="cq-cred"><div class="cq-q">A empresa aproveita o crédito do ICMS das compras?</div>${radios('cred_icms', SIM_NAO, a.cred_icms, dis)}</div>
       <div id="cq-pc"><div class="cq-q">A empresa aproveita o crédito de PIS/COFINS das compras (não cumulativo)?</div>${radios('cred_pc', SIM_NAO, a.cred_pc, dis)}</div>
-      <div id="cq-scp"><div class="grid-form">${campo('Crédito de ICMS permitido que vai na nota (%)', 'simples_credito_pct', a.simples_credito_pct != null ? String(a.simples_credito_pct).replace('.', ',') : '', `inputmode="decimal" maxlength="6" ${dis} placeholder="ex.: 2,5"`)}</div>
-        <div class="cq-dica">É o percentual do art. 23 da LC 123/2006 informado nas notas do Simples. Deixe em branco se não destaca.</div></div>
       <div id="cq-sn"><div class="cq-q">Na reforma, a empresa vai recolher o IBS e a CBS pelo regime regular, fora do Simples?</div>
         <div class="cq-dica">A partir de 2027, a empresa do Simples pode escolher recolher o IBS e a CBS por fora do Simples. Com isso, quem compra dela aproveita o crédito integral.</div>${radios('simples_regular', SIMPLES_REGULAR, a.simples_regular, dis)}</div></div>
     <div class="card" style="margin-top:12px"><h3>4. Situações especiais</h3><div class="cq-dica">Preencha só o que se aplica à sua empresa.</div>
@@ -79,26 +75,24 @@ function pintar(C) {
     <p class="small muted" style="margin-top:12px">As respostas vão direto para ${esc(C.empresa)}. Esta página não pede cadastro nem senha.</p>`;
   const f = $('#cq-f'), val = (n) => f.querySelector(`[name="${n}"]:checked`)?.value || '';
   const mostrar = () => { const r = val('regime'), c = val('contribuinte_icms');
-    $('#cq-cred').style.display = forn || c === '9' || r === 'simples' || r === 'mei' ? 'none' : '';
-    $('#cq-pc').style.display = !forn && r === 'real' ? '' : 'none';
-    $('#cq-scp').style.display = forn && (r === 'simples' || r === 'mei') ? '' : 'none';
+    $('#cq-cred').style.display = c === '9' || r === 'simples' || r === 'mei' ? 'none' : '';
+    $('#cq-pc').style.display = r === 'real' ? '' : 'none';
     $('#cq-sn').style.display = r === 'simples' || r === 'mei' ? '' : 'none'; };
   f.onchange = mostrar; mostrar();
   f.onsubmit = async (ev) => {
     ev.preventDefault();
     const t = (n) => (f.elements[n]?.value || '').trim(), r = val('regime'), c = val('contribuinte_icms');
-    const destinacao = forn ? [] : $$('[name=destinacao]:checked', f).map(x => x.value);
+    const destinacao = $$('[name=destinacao]:checked', f).map(x => x.value);
     const d = { nome_fantasia: t('nome_fantasia'), ie: t('ie'), im: t('im'), cep: t('cep'), logradouro: t('logradouro'), numero: t('numero'), complemento: t('complemento'),
       bairro: t('bairro'), municipio: t('municipio'), uf: t('uf'), email_nfe: t('email_nfe').toLowerCase(), telefone: t('telefone'),
       contato_fiscal: { nome: t('cf_nome'), email: t('cf_email'), telefone: t('cf_tel') }, contador: { nome: t('ct_nome'), email: t('ct_email'), telefone: t('ct_tel') },
-      contribuinte_icms: c, destinacao, tipo: forn ? '' : tipoPelaDestinacao(destinacao, c), cnae: t('cnae'), regime: r,
-      ...(forn ? { atividade: val('atividade'), simples_credito_pct: r === 'simples' || r === 'mei' ? t('simples_credito_pct').replace(',', '.') : '' } : {}),
+      contribuinte_icms: c, destinacao, tipo: tipoPelaDestinacao(destinacao, c), cnae: t('cnae'), regime: r,
       cred_icms: c === '9' || r === 'simples' || r === 'mei' ? 'nao' : val('cred_icms'), cred_pc: r === 'real' ? val('cred_pc') : 'nao',
       simples_regular: r === 'simples' || r === 'mei' ? val('simples_regular') : '',
       especiais: { beneficio_icms: t('beneficio_icms'), reducao: t('reducao'), imunidade: t('imunidade'), zfm: f.zfm.checked, orgao_publico: f.orgao_publico.checked,
         produtor_rural: f.produtor_rural.checked, observacao: t('observacao') },
       declarante: { nome: t('dc_nome'), cargo: t('dc_cargo'), email: t('dc_email') }, aceite: f.aceite.checked };
-    const P = conferir(d, forn ? 'fornecedor' : 'cliente');
+    const P = conferir(d);
     if (P.length) return toast(P[0], true);
     const btn = f.querySelector('[type=submit]'); btn.disabled = true;
     try {
