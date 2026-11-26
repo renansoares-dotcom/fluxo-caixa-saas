@@ -8,7 +8,7 @@ import { sb, state, q, fetchAll } from '../lib/data.js';
 import { $, $$, esc, fail, toast, modal, money, dateBR, today, exportXLSX, parseNum, confirmDialog } from '../lib/ui.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 import { TIPOS_CLIENTE, REGIMES_CLIENTE, UFS, STATUS, perfilPadrao, aliqInterna, regraInter, aliqInterSugerida, antecipacaoPct,
-  analisar, simularReforma, br, fmtPct } from '../lib/competitividade.js';
+  analisar, simularReforma, br, fmtPct, UNIDADES, rotuloUn, baseDoProduto, converter } from '../lib/competitividade.js';
 import { relatorioAnalise, relatorioHistorico } from '../lib/competitividade-relatorio.js';
 
 export const title = 'Análise de Competitividade de Preço';
@@ -22,10 +22,10 @@ const ui = { aba: 'nova', busca: '', status: '', de: '', ate: '' };
 const F0 = () => ({
   id: null, numero: null, data: today(), status: 'negociacao',
   cliente_id: '', cliente_nome: '', cliente: { uf: 'PE', tipo: 'industria', regime: 'real', cred_icms: true, cred_pc: true, documento: '' },
-  produto_id: '', produto_desc: '', ncm: '',
-  concorrente: { nome: '', uf: '', preco: '', aliq: '', aliq_manual: false, importado: false, simples: false, credito_simples_pct: '', frete_tipo: 'CIF', frete_un: '', prazo_dias: '' },
-  proposta: { preco: '', aliq: '', aliq_manual: false, frete_tipo: 'CIF', frete_un: '', prazo_dias: '', credito_simples_pct: '' },
-  margem: { custo_un: '', custo_fonte: '', cred_insumos_un: '', despesas_pct: null, margem_min_pct: null },
+  produto_id: '', produto_desc: '', ncm: '', produto_unidade: '', base: 'UN', peso_un: '',
+  concorrente: { nome: '', uf: '', unid: 'UN', preco: '', aliq: '', aliq_manual: false, importado: false, simples: false, credito_simples_pct: '', frete_tipo: 'CIF', frete_un: '', prazo_dias: '' },
+  proposta: { unid: 'UN', preco: '', aliq: '', aliq_manual: false, frete_tipo: 'CIF', frete_un: '', prazo_dias: '', credito_simples_pct: '' },
+  margem: { custo_un: '', custo_unid: 'UN', custo_fonte: '', cred_insumos_un: '', despesas_pct: null, margem_min_pct: null },
   reforma: false,
 });
 
@@ -80,15 +80,16 @@ function montar(F = D.F) {
   const ant = (uf, al) => (uf && uf !== c.uf && c.tipo === 'comercio' ? antecipacaoPct(D.antec, c.uf, al, intd, c.tipo, data) : null);
   const kAnt = ant(k.uf, kAliq), pAnt = ant(nossaUf, pAliq);
   const cfg = D.cfg, P = { pc_pct: +(cfg.pc_pct ?? 9.25), pc_excluir_icms: cfg.pc_excluir_icms !== false, taxa_mensal: +(cfg.taxa_mensal || 0) };
-  const conc = { preco: parseNum(k.preco), uf_origem: k.uf, aliq: kAliq, interna_dest: intd, simples: k.simples, credito_simples_pct: parseNum(k.credito_simples_pct),
-    antecip_pct: kAnt?.pct || 0, frete_tipo: k.frete_tipo, frete_un: parseNum(k.frete_un), prazo_dias: parseNum(k.prazo_dias) };
-  const nos = { preco: parseNum(p.preco), uf_origem: nossaUf, aliq: pAliq, interna_dest: intd, simples: simplesNos, credito_simples_pct: parseNum(p.credito_simples_pct),
-    antecip_pct: pAnt?.pct || 0, frete_tipo: p.frete_tipo, frete_un: parseNum(p.frete_un), prazo_dias: parseNum(p.prazo_dias) };
+  const peso = parseNum(F.peso_un), cv = (v, de) => converter(parseNum(v), de, F.base, peso);
+  const conc = { preco: cv(k.preco, k.unid), uf_origem: k.uf, aliq: kAliq, interna_dest: intd, simples: k.simples, credito_simples_pct: parseNum(k.credito_simples_pct),
+    antecip_pct: kAnt?.pct || 0, frete_tipo: k.frete_tipo, frete_un: cv(k.frete_un, k.unid), prazo_dias: parseNum(k.prazo_dias) };
+  const nos = { preco: cv(p.preco, p.unid), uf_origem: nossaUf, aliq: pAliq, interna_dest: intd, simples: simplesNos, credito_simples_pct: parseNum(p.credito_simples_pct),
+    antecip_pct: pAnt?.pct || 0, frete_tipo: p.frete_tipo, frete_un: cv(p.frete_un, p.unid), prazo_dias: parseNum(p.prazo_dias) };
   let m = null;
   if (D.ac.margem) {
     const f = D.base.fisc || {}, pcReg = D.base.pis_cofins, mm = F.margem;
-    m = { aliq: pAliq, ncm: F.ncm, cfop: nossaUf === c.uf ? '5101' : '6101', custo_un: parseNum(mm.custo_un), custo_fonte: mm.custo_fonte || 'informado',
-      cred_insumos_un: parseNum(mm.cred_insumos_un), frete_cif_un: p.frete_tipo === 'CIF' ? parseNum(p.frete_un) : 0,
+    m = { aliq: pAliq, ncm: F.ncm, cfop: nossaUf === c.uf ? '5101' : '6101', custo_un: cv(mm.custo_un, mm.custo_unid), custo_fonte: [mm.custo_fonte || 'informado', mm.custo_unid !== F.base && mm.custo_un !== '' ? `${br(parseNum(mm.custo_un))} por ${rotuloUn(mm.custo_unid)} convertido` : ''].filter(Boolean).join(' · '),
+      cred_insumos_un: parseNum(mm.cred_insumos_un), frete_cif_un: p.frete_tipo === 'CIF' ? cv(p.frete_un, p.unid) || 0 : 0,
       despesas_pct: mm.despesas_pct ?? +(cfg.despesas_pct || 0),
       prodepe: { ativo: !!f.prodepe_ativo, pct: +f.prodepe_credito_pct || 0, base: f.prodepe_base, ncm: f.prodepe_ncm || [], cfops: f.prodepe_cfops || [] },
       feef: { pct: +f.feef_pct || 0, base: f.feef_base },
@@ -96,10 +97,16 @@ function montar(F = D.F) {
       simples_pct: simplesNos ? cfg.simples_pct : null };
   }
   const E = { cli: c, conc, nos, P, m, margem_min_pct: F.margem.margem_min_pct ?? +(cfg.margem_min_pct ?? 10) };
-  const ok = conc.preco > 0 && nos.preco > 0 && intd != null && kAliq != null && pAliq != null && !!c.uf && !!k.uf && !!nossaUf;
+  const semPeso = conc.preco === null || nos.preco === null || conc.frete_un === null || nos.frete_un === null || (m && m.custo_un === null);
+  if (m && m.custo_un === null) m.custo_un = 0;
+  const ok = !semPeso && conc.preco > 0 && nos.preco > 0 && intd != null && kAliq != null && pAliq != null && !!c.uf && !!k.uf && !!nossaUf;
   const R = ok ? analisar(E) : null;
+  if (R) {   // na memória, o preço como foi cotado quando a unidade é outra
+    const nota = (x, side) => { if (side.unid !== F.base && side.preco !== '') x.linhas[0].obs += ` · cotado ${br(parseNum(side.preco))} por ${rotuloUn(side.unid)} (${peso.toLocaleString('pt-BR', { maximumFractionDigits: 4 })} kg por unidade)`; };
+    nota(R.conc, k); nota(R.nos, p);
+  }
   const reforma = ok && F.reforma ? simularReforma(E, D.base.reforma || []) : [];
-  return { E, R, reforma, ok, intRow, kAliq, pAliq, kAnt, pAnt, regra, nossaUf, falta: !c.uf ? 'a UF do cliente' : !k.uf ? 'a UF do fornecedor atual' : !nossaUf ? 'a UF da nossa empresa (Configurações › Empresa › Regime tributário)'
+  return { E, R, reforma, ok, intRow, kAliq, pAliq, kAnt, pAnt, regra, nossaUf, un: rotuloUn(F.base), falta: semPeso ? `o peso de uma unidade (kg), para converter os valores cotados em outra unidade para ${rotuloUn(F.base)}` : !c.uf ? 'a UF do cliente' : !k.uf ? 'a UF do fornecedor atual' : !nossaUf ? 'a UF da nossa empresa (Configurações › Empresa › Regime tributário)'
     : intd == null ? `a alíquota interna de ${c.uf} (Parâmetros)` : !(conc.preco > 0) ? 'o preço atual' : !(nos.preco > 0) ? 'o nosso preço' : '' };
 }
 
@@ -123,29 +130,34 @@ function abaNova(el) {
     <div class="card cp-bloco"><h3>2. Produto</h3><div class="grid-form">
       <label class="span2">Do cadastro<input id="f-prod" list="f-prods" placeholder="procure pelo código ou descrição" value="${esc(F.produto_desc)}"><datalist id="f-prods">${D.produtos.map(x => `<option value="${esc(`${x.codigo} — ${x.descricao}`)}">`).join('')}</datalist></label>
       <label>NCM<input id="f-ncm" value="${esc(F.ncm)}" maxlength="10" inputmode="numeric"></label>
-      <label>Data da análise<input type="date" id="f-data" value="${F.data}"></label></div>
+      <label>Data da análise<input type="date" id="f-data" value="${F.data}"></label>
+      <label>Comparar por<select id="f-base">${opt([['UN', 'unidade'], ['KG', 'kg (peso)']], F.base)}</select></label>
+      <label>Peso de uma unidade (kg)<input id="f-peso" inputmode="decimal" value="${esc(num(F.peso_un))}" placeholder="ex.: 0,05"></label></div>
       <p class="muted small" id="f-pdica"></p></div>
     <div class="card cp-bloco"><h3>3. Fornecedor atual</h3><div class="grid-form">
       <label class="span2">Nome (só na versão interna)<input id="k-nome" value="${esc(k.nome)}" maxlength="80"></label>
       <label>UF de origem<select id="k-uf">${ufOpt(k.uf)}</select></label>
-      <label>Preço unitário (R$)<input id="k-preco" inputmode="decimal" value="${esc(num(k.preco))}"></label>
+      <label>Preço (R$)<input id="k-preco" inputmode="decimal" value="${esc(num(k.preco))}"></label>
+      <label>Cotado<select id="k-unid">${opt(UNIDADES.map(([v, t]) => [v, `por ${t}`]), k.unid)}</select></label>
       <label>ICMS da operação (%)<input id="k-aliq" inputmode="decimal" value="${esc(num(k.aliq))}"></label>
       <label class="chk"><input type="checkbox" id="k-imp" ${k.importado ? 'checked' : ''}> Importado (4%)</label>
       <label class="chk"><input type="checkbox" id="k-simp" ${k.simples ? 'checked' : ''}> Fornecedor do Simples</label>
       <label id="k-csl">Crédito permitido (%)<input id="k-cs" inputmode="decimal" value="${esc(num(k.credito_simples_pct))}"></label>
       <label>Frete<select id="k-ft">${opt([['CIF', 'CIF (no preço)'], ['FOB', 'FOB (cliente paga)']], k.frete_tipo)}</select></label>
-      <label id="k-fvl">Frete por unidade (R$)<input id="k-fv" inputmode="decimal" value="${esc(num(k.frete_un))}"></label>
+      <label id="k-fvl"><span>Frete (R$ <span class="cp-u" data-u="k"></span>)</span><input id="k-fv" inputmode="decimal" value="${esc(num(k.frete_un))}"></label>
       <label>Prazo (dias)<input id="k-pz" inputmode="numeric" value="${esc(num(k.prazo_dias))}"></label></div></div>
     <div class="card cp-bloco"><h3>4. Nossa proposta</h3><div class="grid-form">
-      <label>Preço unitário (R$)<input id="p-preco" inputmode="decimal" value="${esc(num(p.preco))}"></label>
+      <label>Preço (R$)<input id="p-preco" inputmode="decimal" value="${esc(num(p.preco))}"></label>
+      <label>Cotado<select id="p-unid">${opt(UNIDADES.map(([v, t]) => [v, `por ${t}`]), p.unid)}</select></label>
       <label>ICMS da operação (%)<input id="p-aliq" inputmode="decimal" value="${esc(num(p.aliq))}"></label>
       ${['simples', 'mei'].includes(D.base.regime) ? `<label>Crédito permitido ao cliente (%)<input id="p-cs" inputmode="decimal" value="${esc(num(p.credito_simples_pct))}"></label>` : ''}
       <label>Frete<select id="p-ft">${opt([['CIF', 'CIF (no preço)'], ['FOB', 'FOB (cliente paga)']], p.frete_tipo)}</select></label>
-      <label>Frete por unidade (R$)<input id="p-fv" inputmode="decimal" value="${esc(num(p.frete_un))}"></label>
+      <label><span>Frete (R$ <span class="cp-u" data-u="p"></span>)</span><input id="p-fv" inputmode="decimal" value="${esc(num(p.frete_un))}"></label>
       <label>Prazo (dias)<input id="p-pz" inputmode="numeric" value="${esc(num(p.prazo_dias))}"></label></div></div>
     ${D.ac.margem ? `<div class="card cp-bloco cp-interno"><h3>5. Nossa margem <span class="badge">uso interno</span></h3><div class="grid-form">
-      <label>Custo do produto por unidade (R$)<input id="m-custo" inputmode="decimal" value="${esc(num(mm.custo_un))}"></label>
-      <label>Crédito de ICMS dos insumos por unidade (R$)<input id="m-cred" inputmode="decimal" value="${esc(num(mm.cred_insumos_un))}"></label>
+      <label>Custo do produto (R$)<input id="m-custo" inputmode="decimal" value="${esc(num(mm.custo_un))}"></label>
+      <label>Custo informado<select id="m-cunid">${opt(UNIDADES.map(([v, t]) => [v, `por ${t}`]), mm.custo_unid)}</select></label>
+      <label><span>Crédito de ICMS dos insumos (R$ <span class="cp-u" data-u="b"></span>)</span><input id="m-cred" inputmode="decimal" value="${esc(num(mm.cred_insumos_un))}"></label>
       <label>Despesas variáveis de venda (%)<input id="m-desp" inputmode="decimal" value="${esc(num(mm.despesas_pct ?? D.cfg.despesas_pct ?? 0))}"></label>
       <label>Margem mínima (%)<input id="m-min" inputmode="decimal" value="${esc(num(mm.margem_min_pct ?? D.cfg.margem_min_pct ?? 10))}"></label></div>
       <p class="muted small" id="m-dica"></p></div>` : ''}
@@ -156,23 +168,25 @@ function abaNova(el) {
   const ler = () => {
     const v = (id) => $(id, el)?.value ?? '', ck = (id) => !!$(id, el)?.checked;
     c.uf = v('#f-cuf'); c.tipo = v('#f-ctipo'); c.regime = v('#f-creg'); c.documento = v('#f-cdoc'); c.cred_icms = ck('#f-cicms'); c.cred_pc = ck('#f-cpc');
-    F.cliente_nome = v('#f-cnome'); F.ncm = v('#f-ncm').replace(/\D/g, ''); F.data = v('#f-data') || today(); F.reforma = ck('#f-ref');
-    Object.assign(k, { nome: v('#k-nome'), uf: v('#k-uf'), preco: v('#k-preco'), aliq: v('#k-aliq'), importado: ck('#k-imp'), simples: ck('#k-simp'), credito_simples_pct: v('#k-cs'),
+    F.base = v('#f-base') || 'UN'; F.peso_un = v('#f-peso'); F.cliente_nome = v('#f-cnome'); F.ncm = v('#f-ncm').replace(/\D/g, ''); F.data = v('#f-data') || today(); F.reforma = ck('#f-ref');
+    Object.assign(k, { nome: v('#k-nome'), uf: v('#k-uf'), unid: v('#k-unid') || 'UN', preco: v('#k-preco'), aliq: v('#k-aliq'), importado: ck('#k-imp'), simples: ck('#k-simp'), credito_simples_pct: v('#k-cs'),
       frete_tipo: v('#k-ft'), frete_un: v('#k-fv'), prazo_dias: v('#k-pz') });
-    Object.assign(p, { preco: v('#p-preco'), aliq: v('#p-aliq'), frete_tipo: v('#p-ft'), frete_un: v('#p-fv'), prazo_dias: v('#p-pz'), credito_simples_pct: v('#p-cs') });
-    if (D.ac.margem) Object.assign(mm, { custo_un: v('#m-custo'), cred_insumos_un: v('#m-cred'), despesas_pct: parseNum(v('#m-desp')), margem_min_pct: parseNum(v('#m-min')) });
+    Object.assign(p, { unid: v('#p-unid') || 'UN', preco: v('#p-preco'), aliq: v('#p-aliq'), frete_tipo: v('#p-ft'), frete_un: v('#p-fv'), prazo_dias: v('#p-pz'), credito_simples_pct: v('#p-cs') });
+    if (D.ac.margem) Object.assign(mm, { custo_un: v('#m-custo'), custo_unid: v('#m-cunid') || 'UN', cred_insumos_un: v('#m-cred'), despesas_pct: parseNum(v('#m-desp')), margem_min_pct: parseNum(v('#m-min')) });
   };
   const mostrar = () => {
     $('#k-csl', el).style.display = k.simples ? '' : 'none';
     $('#k-fvl', el).style.opacity = k.frete_tipo === 'FOB' ? 1 : .55;
     const M = montar();
+    $$('.cp-u', el).forEach(x => { x.textContent = `por ${rotuloUn(x.dataset.u === 'k' ? k.unid : x.dataset.u === 'p' ? p.unid : F.base)}`; });
+    $('#f-peso', el).closest('label').style.opacity = (k.unid !== F.base || p.unid !== F.base || (D.ac.margem && mm.custo_unid !== F.base)) ? 1 : .55;
     // alíquotas sugeridas, enquanto não forem digitadas à mão
     if (!k.aliq_manual) { $('#k-aliq', el).value = M.kAliq == null ? '' : num(M.kAliq); k.aliq = $('#k-aliq', el).value; }
     if (!p.aliq_manual) { $('#p-aliq', el).value = M.pAliq == null ? '' : num(M.pAliq); p.aliq = $('#p-aliq', el).value; }
     const pf = perfilPadrao(c.tipo, c.regime);
     $('#f-cdica', el).textContent = `Normalmente: ${pf.cred_icms ? 'aproveita' : 'não aproveita'} o crédito do ICMS e ${pf.cred_pc ? 'aproveita' : 'não aproveita'} o de PIS/COFINS. ${c.tipo === 'comercio' ? 'Comércio de outra UF recolhe a antecipação parcial.' : c.tipo === 'nao_contrib' ? 'O DIFAL de compra interestadual é do fornecedor.' : !c.cred_icms ? 'Sem crédito em compra de outra UF: DIFAL com base dupla.' : ''}`;
-    $('#f-pdica', el).textContent = M.intRow ? `Alíquota interna de ${c.uf}${M.intRow.ncm_prefixo ? ` para o NCM ${M.intRow.ncm_prefixo}…` : ''}: ${fmtPct(M.intRow.aliquota)} desde ${dateBR(M.intRow.vigencia_inicio)} (${M.intRow.norma || 'norma não informada'})${M.intRow.situacao === 'a_conferir' ? ' — a conferir em Parâmetros' : ''}.`
-      : c.uf ? `Sem alíquota interna de ${c.uf} cadastrada em Parâmetros.` : '';
+    $('#f-pdica', el).textContent = (F.produto_unidade ? `Unidade do cadastro: ${F.produto_unidade}. ` : '') + (M.intRow ? `Alíquota interna de ${c.uf}${M.intRow.ncm_prefixo ? ` para o NCM ${M.intRow.ncm_prefixo}…` : ''}: ${fmtPct(M.intRow.aliquota)} desde ${dateBR(M.intRow.vigencia_inicio)} (${M.intRow.norma || 'norma não informada'})${M.intRow.situacao === 'a_conferir' ? ' — a conferir em Parâmetros' : ''}.`
+      : c.uf ? `Sem alíquota interna de ${c.uf} cadastrada em Parâmetros.` : '');
     if (D.ac.margem) $('#m-dica', el).textContent = `${mm.custo_fonte ? `Custo: ${mm.custo_fonte}. ` : ''}${D.base.fisc ? `PRODEPE ${D.base.fisc.prodepe_ativo ? `${fmtPct(D.base.fisc.prodepe_credito_pct)} (${D.base.fisc.prodepe_base === 'debito_incentivado' ? 'sobre o débito' : 'sobre o saldo'})` : 'desligado'}, FEEF ${fmtPct(D.base.fisc.feef_pct || 0)}: Fiscal › Apuração › Parâmetros.` : 'Sem parâmetros da apuração (PRODEPE, PIS/COFINS) cadastrados: Fiscal › Apuração › Parâmetros.'}`;
     pintarResultado($('#cp-res', el), M);
   };
@@ -199,6 +213,8 @@ function abaNova(el) {
     if (id === 'f-prod') {
       const t = ev.target.value, x = D.produtos.find(y => `${y.codigo} — ${y.descricao}` === t);
       F.produto_id = x?.id || ''; F.produto_desc = x ? `${x.codigo} — ${x.descricao}` : t; if (x?.ncm) F.ncm = String(x.ncm).replace(/\D/g, '');
+      if (x) { F.produto_unidade = x.unidade || ''; F.base = baseDoProduto(x.unidade); k.unid = p.unid = mm.custo_unid = F.base;
+        const ant = D.analises.find(a => a.produto_id === x.id && +a.resultado?.peso_un > 0); if (ant && !F.peso_un) F.peso_un = String(ant.resultado.peso_un); }
       if (x && D.ac.margem) {
         try {
           const b = await q(sb.rpc('comp_base', { p_empresa: state.empresa.id, p_produto: x.id, p_data: F.data }));
@@ -226,7 +242,8 @@ function pintarResultado(el, M) {
       <div class="${ganha ? 'pos' : 'neg'}"><span>Diferença</span><b>${R.dif > 0 ? '+' : ''}${br(R.dif)}</b><small>${R.dif > 0 ? '+' : ''}${(Math.round(R.difPct * 10) / 10).toLocaleString('pt-BR')}%</small></div>
       <div><span>Preço de empate</span><b>${R.empate == null ? '–' : br(R.empate)}</b></div>
     </div>
-    <p class="small">${ganha ? `<b>Nossa proposta já é mais barata</b> para o cliente em ${br(-R.dif)} por unidade.` : `Nossa proposta fica <b>${br(R.dif)}</b> mais cara por unidade. Para empatar, o preço precisa ir a <b>${br(R.empate)}</b> (o valor exato, ${(+R.empateBruto).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}, arredonda para baixo).`}</p>
+    <p class="muted small" style="margin:-4px 0 6px">Valores em R$ por ${M.un}.</p>
+    <p class="small">${ganha ? `<b>Nossa proposta já é mais barata</b> para o cliente em ${br(-R.dif)} por ${M.un}.` : `Nossa proposta fica <b>${br(R.dif)}</b> mais cara por ${M.un}. Para empatar, o preço precisa ir a <b>${br(R.empate)}</b> (o valor exato, ${(+R.empateBruto).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}, arredonda para baixo).`}</p>
     ${mg ? `<div class="cp-interno small">${R.faixa.viavel ? `<b>Faixa sugerida:</b> de ${br(R.faixa.de)} (margem mínima de ${fmtPct(M.E.margem_min_pct)}) a ${br(R.faixa.ate)} (empate).`
       : `<b>Sem faixa competitiva</b> com a margem mínima de ${fmtPct(M.E.margem_min_pct)}: ela pede ${R.faixa.de == null ? '—' : br(R.faixa.de)}, acima do empate.`}
       <table class="cp-mt"><thead><tr><th></th><th class="num">Preço</th><th class="num">Margem</th><th class="num">%</th></tr></thead><tbody>
@@ -254,9 +271,9 @@ function registroDaTela(M) {
   const F = D.F, R = M.R, enxuto = (x) => ({ custo: x.custo, custoVp: x.custoVp, icms: x.icms, cred: x.cred, difal: x.difal, baseDifal: x.baseDifal, antecip: x.antecip, credPc: x.credPc, linhas: x.linhas, avisos: x.avisos });
   return { id: F.id, numero: F.numero, data: F.data, status: F.status, cliente_id: F.cliente_id || null, cliente_nome: F.cliente_nome.trim(),
     cliente: { ...F.cliente }, produto_id: F.produto_id || null, produto_desc: F.produto_desc, ncm: F.ncm,
-    concorrente: { ...F.concorrente, preco: M.E.conc.preco, aliq: M.E.conc.aliq, frete_un: M.E.conc.frete_un, prazo_dias: M.E.conc.prazo_dias, credito_simples_pct: M.E.conc.credito_simples_pct },
-    proposta: { ...F.proposta, uf: M.nossaUf, preco: M.E.nos.preco, aliq: M.E.nos.aliq, frete_un: M.E.nos.frete_un, prazo_dias: M.E.nos.prazo_dias },
-    resultado: { conc: enxuto(R.conc), nos: enxuto(R.nos), dif: R.dif, difPct: R.difPct, empate: R.empate, empateBruto: R.empateBruto, ganha: R.ganha,
+    concorrente: { ...F.concorrente, preco_informado: parseNum(F.concorrente.preco), frete_informado: parseNum(F.concorrente.frete_un), preco: M.E.conc.preco, aliq: M.E.conc.aliq, frete_un: M.E.conc.frete_un, prazo_dias: M.E.conc.prazo_dias, credito_simples_pct: M.E.conc.credito_simples_pct },
+    proposta: { ...F.proposta, preco_informado: parseNum(F.proposta.preco), frete_informado: parseNum(F.proposta.frete_un), uf: M.nossaUf, preco: M.E.nos.preco, aliq: M.E.nos.aliq, frete_un: M.E.nos.frete_un, prazo_dias: M.E.nos.prazo_dias },
+    resultado: { base: F.base, peso_un: parseNum(F.peso_un) || null, conc: enxuto(R.conc), nos: enxuto(R.nos), dif: R.dif, difPct: R.difPct, empate: R.empate, empateBruto: R.empateBruto, ganha: R.ganha,
       reforma: M.reforma.map(({ margem, ...r }) => r) },
     parametros: { data: F.data, interna: M.intRow && { uf: M.intRow.uf, ncm_prefixo: M.intRow.ncm_prefixo, aliquota: +M.intRow.aliquota, vigencia_inicio: M.intRow.vigencia_inicio, norma: M.intRow.norma, situacao: M.intRow.situacao },
       antecipacao: (M.kAnt || M.pAnt) && { pct: +(M.kAnt || M.pAnt).pct, norma: (M.kAnt || M.pAnt).norma }, regra: M.regra && { vigencia_inicio: M.regra.vigencia_inicio, aliq_ss_para_nne: M.regra.aliq_ss_para_nne, aliq_geral: M.regra.aliq_geral, aliq_importado: M.regra.aliq_importado },
@@ -267,7 +284,7 @@ function margemDaTela(M) {
   const R = M.R; if (!R.margem) return null;
   const sl = (m) => m && { margem: m.margem, pct: m.pct, linhas: m.linhas };
   return { proposta: sl(R.margem.proposta), empate: sl(R.margem.empate), piso: sl(R.margem.piso), faixa: R.faixa, margem_min_pct: M.E.margem_min_pct,
-    custo_un: M.E.m.custo_un, custo_fonte: M.E.m.custo_fonte, cred_insumos_un: M.E.m.cred_insumos_un, despesas_pct: M.E.m.despesas_pct,
+    custo_un: M.E.m.custo_un, custo_informado: parseNum(D.F.margem.custo_un), custo_unid: D.F.margem.custo_unid, custo_fonte: M.E.m.custo_fonte, cred_insumos_un: M.E.m.cred_insumos_un, despesas_pct: M.E.m.despesas_pct,
     prodepe: M.E.m.prodepe, reforma: M.reforma.map(r => ({ ano: r.ano, margem: r.margem })), fisc_vigencia: D.base.fisc?.vigencia_inicio || null };
 }
 
@@ -287,9 +304,9 @@ async function pdfAnalise(a, mg, interna) {
   const corpo = relatorioAnalise(a, interna ? mg : null, { esc, money, dateBR, interna, empresa: state.empresa?.nome ? `Nossa proposta (${state.empresa.nome})` : 'Nossa proposta' });
   abrirRelatorio({ rel: interna ? 'Análise de competitividade de preço (interna)' : 'Análise de custo líquido para o cliente', nome: interna ? 'Análise de Competitividade de Preço' : 'Análise de Custo Líquido de Aquisição',
     titulo: interna ? 'ANÁLISE DE COMPETITIVIDADE DE PREÇO — USO INTERNO' : 'ANÁLISE DE CUSTO LÍQUIDO DE AQUISIÇÃO', tipo: 'relatorio', corpo,
-    parametros: [['Análise', a.numero ? `nº ${a.numero}` : 'não salva'], ['Data', dateBR(a.data)], ['Cliente', a.cliente_nome || '—'], ['Produto', a.produto_desc || '—'], ['Versão', interna ? 'interna (com margem)' : 'para o cliente']],
+    parametros: [['Análise', a.numero ? `nº ${a.numero}` : 'não salva'], ['Valores', `R$ por ${rotuloUn(a.resultado?.base)}`], ['Data', dateBR(a.data)], ['Cliente', a.cliente_nome || '—'], ['Produto', a.produto_desc || '—'], ['Versão', interna ? 'interna (com margem)' : 'para o cliente']],
     rodape: interna ? 'Base: Análise de Competitividade de Preço (COM009). Parâmetros por vigência: alíquotas internas e interestaduais, antecipação (Parâmetros da tela), PRODEPE/FEEF e PIS/COFINS (Fiscal › Apuração), CBS/IBS (Simulador da reforma). Documento interno: contém margem.'
-      : 'Simulação com as regras vigentes na data da análise. Valores por unidade.' });
+      : `Simulação com as regras vigentes na data da análise. Valores em R$ por ${rotuloUn(a.resultado?.base)}.` });
 }
 
 // ============================================================ histórico
@@ -307,11 +324,11 @@ function abaHistorico(el) {
     <div class="tbl-wrap" id="h-t"></div></div>`;
   const pin = () => {
     const L = filtrados(), mgOn = D.ac.margem;
-    $('#h-t', el).innerHTML = `<table><thead><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Produto</th><th>Fornecedor atual</th><th class="num">Preço atual</th><th class="num">Nosso preço</th><th class="num">Custo atual</th><th class="num">Nosso custo</th><th class="num">Dif.</th><th class="num">Empate</th>${mgOn ? '<th class="num">Margem</th>' : ''}<th>Status</th><th>Responsável</th><th></th></tr></thead><tbody>
+    $('#h-t', el).innerHTML = `<table><thead><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Produto</th><th>Fornecedor atual</th><th class="num">Preço atual</th><th class="num">Nosso preço</th><th class="num">Custo atual</th><th class="num">Nosso custo</th><th class="num">Dif.</th><th class="num">Empate</th><th>Base</th>${mgOn ? '<th class="num">Margem</th>' : ''}<th>Status</th><th>Responsável</th><th></th></tr></thead><tbody>
       ${L.map(a => { const R = a.resultado || {}, k = a.concorrente || {}, m = D.margens[a.id];
         return `<tr><td>${a.numero}</td><td>${dateBR(a.data)}</td><td>${esc(a.cliente_nome)}</td><td>${esc(a.produto_desc || '')}</td><td>${esc(k.nome ? `${k.nome} (${k.uf})` : k.uf || '')}</td>
         <td class="num">${br(k.preco)}</td><td class="num">${br(a.proposta?.preco)}</td><td class="num">${br(R.conc?.custoVp)}</td><td class="num">${br(R.nos?.custoVp)}</td>
-        <td class="num ${R.ganha ? 'pos' : 'neg'}">${br(R.difPct)}%</td><td class="num">${br(R.empate)}</td>${mgOn ? `<td class="num">${m?.proposta ? br(m.proposta.pct) + '%' : '–'}</td>` : ''}
+        <td class="num ${R.ganha ? 'pos' : 'neg'}">${br(R.difPct)}%</td><td class="num">${br(R.empate)}</td><td>${R.base === 'KG' ? 'kg' : 'un'}</td>${mgOn ? `<td class="num">${m?.proposta ? br(m.proposta.pct) + '%' : '–'}</td>` : ''}
         <td><span class="badge ${STB[a.status]}">${STATUS[a.status]}</span>${a.status_obs ? `<div class="muted small">${esc(a.status_obs)}</div>` : ''}</td><td>${esc(a.responsavel_nome || '')}</td>
         <td style="white-space:nowrap"><button class="btn sm" data-abrir="${a.id}">Abrir</button> <button class="btn sm" data-st="${a.id}">Status</button> <button class="btn sm ghost" data-dup="${a.id}" title="Duplicar">⧉</button>
           <button class="btn sm ghost" data-pdf="${a.id}" title="PDF">PDF</button> <button class="btn sm ghost" data-del="${a.id}" title="Excluir">✕</button></td></tr>`; }).join('') || `<tr><td colspan="15" class="empty">Nenhuma análise${D.analises.length ? ' neste filtro' : ': faça a primeira na aba Nova análise'}.</td></tr>`}</tbody></table>`;
@@ -337,9 +354,11 @@ function carregar(a, duplicar) {
   Object.assign(F, { id: duplicar ? null : a.id, numero: duplicar ? null : a.numero, data: duplicar ? today() : a.data, status: a.status, cliente_id: a.cliente_id || '', cliente_nome: a.cliente_nome,
     produto_id: a.produto_id || '', produto_desc: a.produto_desc || '', ncm: a.ncm || '', reforma: !!a.parametros?.reforma });
   Object.assign(F.cliente, a.cliente || {});
-  Object.assign(F.concorrente, a.concorrente || {}, { aliq_manual: true });
-  Object.assign(F.proposta, a.proposta || {}, { aliq_manual: true });
-  if (mg) Object.assign(F.margem, { custo_un: mg.custo_un, custo_fonte: mg.custo_fonte, cred_insumos_un: mg.cred_insumos_un, despesas_pct: mg.despesas_pct, margem_min_pct: mg.margem_min_pct });
+  const volta = (o) => ({ ...o, aliq_manual: true, unid: o.unid || 'UN', preco: o.preco_informado ?? o.preco, frete_un: o.frete_informado ?? o.frete_un });
+  Object.assign(F.concorrente, volta(a.concorrente || {}));
+  Object.assign(F.proposta, volta(a.proposta || {}));
+  F.base = a.resultado?.base || 'UN'; F.peso_un = a.resultado?.peso_un ? String(a.resultado.peso_un) : '';
+  if (mg) Object.assign(F.margem, { custo_un: mg.custo_informado ?? mg.custo_un, custo_unid: mg.custo_unid || F.base, custo_fonte: mg.custo_fonte, cred_insumos_un: mg.cred_insumos_un, despesas_pct: mg.despesas_pct, margem_min_pct: mg.margem_min_pct });
   D.F = F;
   if (duplicar) toast(`Cópia da análise nº ${a.numero}: ajuste e salve como nova`);
 }

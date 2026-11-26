@@ -223,6 +223,19 @@ export function simularReforma(e, anos) {
   });
 }
 
+// ------------------------------------------------------------ unidade de venda (por unidade ou por peso)
+export const UNIDADES = [['UN', 'unidade'], ['KG', 'kg']];
+export const rotuloUn = (u) => (u === 'KG' ? 'kg' : 'unidade');
+/** unidade-base sugerida pelo cadastro do produto: KG/G/T → KG; o resto → UN */
+export const baseDoProduto = (unidade) => (['KG', 'G', 'GR', 'T', 'TON'].includes(String(unidade || '').toUpperCase()) ? 'KG' : 'UN');
+/** converte um valor em R$ por "de" para R$ por "para"; peso = kg de uma unidade. null se faltar o peso */
+export function converter(valor, de, para, peso) {
+  if (valor === '' || valor == null || isNaN(+valor)) return valor;
+  if ((de || 'UN') === (para || 'UN')) return +valor;
+  if (!(+peso > 0)) return null;
+  return de === 'UN' ? +valor / +peso : +valor * +peso;   // R$/un ÷ kg/un = R$/kg ; R$/kg × kg/un = R$/un
+}
+
 // ------------------------------------------------------------ textos
 export const br = (v) => n(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const fmtPct = (v) => `${n(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;

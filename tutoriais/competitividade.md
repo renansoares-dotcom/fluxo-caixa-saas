@@ -1,7 +1,7 @@
 ---
 titulo: Análise de Competitividade de Preço — custo líquido para o cliente
 tela: Comercial › Análise de Competitividade de Preço (COM009)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-26
 ---
 ## 1. Para que serve
@@ -53,14 +53,29 @@ O menu é **Comercial › Análise de Competitividade de Preço**. A tela tem tr
    - **Alíquota interestadual:** vem sugerida (4% importado, 7% do Sul/Sudeste para N/NE/CO/ES, 12% nos demais casos). Pode ser trocada à mão.
    - **Fornecedor do Simples:** marque e informe o crédito permitido que vem na nota.
    - **Frete e prazo:** frete CIF ou FOB, com o valor por unidade; prazo opcional.
-4. **Nossa proposta.** Preço, frete e prazo. O ICMS vem da UF da nossa empresa e da UF do cliente.
+4. **Nossa proposta.** Preço (por unidade ou por kg), frete e prazo. O ICMS vem da UF da nossa empresa e da UF do cliente.
 5. **Nossa margem** (só para quem tem a liberação): custo do produto, que vem do Kardex quando há custo médio, crédito de ICMS dos insumos por unidade, despesas variáveis e margem mínima.
 
 O resultado muda a cada campo preenchido.
 
+### Venda por unidade ou por peso
+
+Vendemos por unidade e por peso, e o fornecedor atual pode cotar de outro jeito. Por isso cada preço tem a sua unidade:
+
+- **Comparar por** (bloco Produto): a base do resultado, **unidade** ou **kg**. Ao escolher o produto, a tela sugere a unidade do cadastro (KG → kg; as demais → unidade).
+- **Cotado** (fornecedor atual e nossa proposta): por unidade ou por kg. O frete segue a mesma unidade do preço.
+- **Peso de uma unidade (kg)**: obrigatório quando alguma cotação está numa unidade diferente da base. A tela converte (R$ por unidade ÷ kg = R$ por kg; R$ por kg × kg = R$ por unidade). O peso fica salvo na análise e volta sugerido na próxima do mesmo produto.
+- **Custo informado** (nossa margem): o custo do Kardex vem na unidade do cadastro e também é convertido.
+
+> Exemplo (dados fictícios): o fornecedor cobra R$ 0,85 o saco de 50 g e nós cotamos R$ 20,00 o kg. Com **Comparar por: kg** e peso de 0,05 kg, o preço dele vira R$ 17,00 por kg e o resultado é o mesmo do exemplo do item 1: 14,96 × 15,90 e empate em R$ 18,81 por kg. A memória de cálculo mostra o preço como foi cotado.
+
+![Figura 2 — Venda por unidade ou por peso: o fornecedor cota por unidade, nós por kg, e a comparação sai por kg (dados fictícios)](img/competitividade-2.jpg)
+
+Todos os valores do resultado, do histórico e dos PDFs aparecem na base escolhida (R$ por kg ou R$ por unidade).
+
 ## 4. Ler o resultado
 
-![Figura 2 — O resultado: custo líquido de cada caminho, diferença, preço de empate, faixa, margem e memória de cálculo (dados fictícios)](img/competitividade-2.jpg)
+![Figura 3 — O resultado: custo líquido de cada caminho, diferença, preço de empate, faixa, margem e memória de cálculo (dados fictícios)](img/competitividade-3.jpg)
 
 - **Custo atual × nosso custo**, a **diferença** (vermelha quando ficamos mais caros) e o **preço de empate**.
 - **Faixa sugerida** (visão interna): vai do preço que ainda dá a **margem mínima** até o **empate**.
@@ -75,13 +90,13 @@ O resultado muda a cada campo preenchido.
 
 ## 5. Cliente sem crédito de ICMS
 
-![Figura 3 — Cliente sem crédito de ICMS (uso e consumo): DIFAL com base dupla no fornecedor de outra UF (dados fictícios)](img/competitividade-3.jpg)
+![Figura 4 — Cliente sem crédito de ICMS (uso e consumo): DIFAL com base dupla no fornecedor de outra UF (dados fictícios)](img/competitividade-4.jpg)
 
 Desmarque **Aproveita o crédito do ICMS**. Na compra de outra UF, a memória mostra a base dupla e o DIFAL que o cliente recolhe; na nossa venda interna não há DIFAL. É o caso em que a venda dentro do estado mais se aproxima do fornecedor de fora.
 
 ## 6. Cliente do comércio: antecipação parcial
 
-![Figura 4 — Cliente do comércio: antecipação parcial de PE na compra de outra UF, com efeito só no caixa (dados fictícios)](img/competitividade-4.jpg)
+![Figura 5 — Cliente do comércio: antecipação parcial de PE na compra de outra UF, com efeito só no caixa (dados fictícios)](img/competitividade-5.jpg)
 
 Para o comércio que compra de outra UF, a tela calcula a antecipação parcial do estado de destino, pelo percentual cadastrado em Parâmetros.
 
@@ -90,7 +105,7 @@ Para o comércio que compra de outra UF, a tela calcula a antecipação parcial 
 
 ## 7. Simulação da reforma tributária
 
-![Figura 5 — Simulação da reforma: a mesma comparação de 2027 a 2033 (dados fictícios)](img/competitividade-5.jpg)
+![Figura 6 — Simulação da reforma: a mesma comparação de 2027 a 2033 (dados fictícios)](img/competitividade-6.jpg)
 
 Marque **Simular a reforma tributária**. A mesma comparação é refeita ano a ano, com as alíquotas do Simulador da reforma (Fiscal › Apuração):
 
@@ -109,7 +124,7 @@ Clique em **Salvar a análise**. Ela recebe um número e o status **Em negociaç
 
 Assim, a análise antiga continua mostrando a regra da época. A margem fica gravada à parte, só para quem tem a liberação.
 
-![Figura 6 — Histórico: análises salvas, com o resultado, a margem e o status (dados fictícios)](img/competitividade-6.jpg)
+![Figura 7 — Histórico: análises salvas, com o resultado, a margem e o status (dados fictícios)](img/competitividade-7.jpg)
 
 Na aba **Histórico**:
 
@@ -136,7 +151,7 @@ Quem não tem a liberação da margem só gera a versão para o cliente.
 
 ## 10. Parâmetros
 
-![Figura 7 — Parâmetros: acesso, margem mínima, alíquotas internas por UF, regra interestadual e antecipação (dados fictícios)](img/competitividade-7.jpg)
+![Figura 8 — Parâmetros: acesso, margem mínima, alíquotas internas por UF, regra interestadual e antecipação (dados fictícios)](img/competitividade-8.jpg)
 
 | Parâmetro | Padrão | Para que serve |
 |---|---|---|
@@ -194,4 +209,5 @@ Cada empresa da plataforma tem os próprios parâmetros, com a UF e o regime del
 
 | Versão | Data | O que mudou |
 |---|---|---|
+| 1.1 | 26/11/2026 | Venda por unidade ou por peso: base da comparação (unidade ou kg), unidade de cada cotação e do custo, peso de uma unidade para converter; resultado, histórico e PDFs na base escolhida. |
 | 1.0 | 26/11/2026 | Primeira versão. Inclui: custo líquido para o cliente com crédito de ICMS conforme o perfil; DIFAL com base dupla; antecipação parcial do comércio (efeito no caixa); crédito de PIS/COFINS sem o ICMS na base; frete CIF/FOB; prazo a valor presente opcional; preço de empate arredondado para baixo; faixa da margem mínima ao empate; margem interna com PRODEPE, FEEF e PIS/COFINS; simulação da reforma 2027–2033; histórico com status e motivo da perda; PDF interno e para o cliente; parâmetros por vigência e por empresa, com a pré-carga das 27 UFs, da regra interestadual e da antecipação de PE; liberação da margem por perfil e por pessoa (SQL 197). |

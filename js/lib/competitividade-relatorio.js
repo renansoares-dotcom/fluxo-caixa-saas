@@ -1,6 +1,6 @@
 // Relatórios em PDF da Análise de Competitividade de Preço (COM009). Sem DOM: recebe a análise salva (ou a da tela) e devolve as seções.
 // Duas versões: interna (com empate, faixa e margem) e para o cliente (só o custo líquido de cada caminho e a memória de cálculo).
-import { STATUS, TIPOS_CLIENTE, REGIMES_CLIENTE } from './competitividade.js';
+import { STATUS, TIPOS_CLIENTE, REGIMES_CLIENTE, rotuloUn } from './competitividade.js';
 
 const TIPO = Object.fromEntries(TIPOS_CLIENTE), REG = Object.fromEntries(REGIMES_CLIENTE);
 const pc = (v) => (v == null || !isFinite(v) ? '–' : `${(+v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`);
@@ -8,13 +8,15 @@ const pc = (v) => (v == null || !isFinite(v) ? '–' : `${(+v).toLocaleString('p
 function tab(cab, linhas, rod = '') {
   return `<table><thead><tr>${cab.map(([t, n]) => `<th${n ? ' class="n"' : ''}>${t}</th>`).join('')}</tr></thead><tbody>${linhas || `<tr><td colspan="${cab.length}">Nenhum registro.</td></tr>`}</tbody>${rod ? `<tfoot>${rod}</tfoot>` : ''}</table>`;
 }
-const memoria = (L, { esc, money }) => tab([['Item', 0], ['R$ por unidade', 1], ['Observação', 0]],
+const memoria = (L, { esc, money, un = 'unidade' }) => tab([['Item', 0], [`R$ por ${un}`, 1], ['Observação', 0]],
   (L || []).map(l => { const tot = l.k === 'custo' || l.k === 'vp' || /^Margem/.test(l.txt || ''); const c = tot ? 'th' : 'td';
     return `<tr><${c}>${esc(l.txt)}</${c}><${c} class="n">${money(l.v)}</${c}><${c}>${esc(l.obs || '')}</${c}></tr>`; }).join(''));
 
 /** a: análise (como gravada: cliente, concorrente, proposta, resultado, parametros…); mg: dados da margem (ou null); o.interna: versão interna */
 export function relatorioAnalise(a, mg, o) {
-  const { esc, money, dateBR, interna } = o, R = a.resultado || {}, c = a.cliente || {}, k = a.concorrente || {}, p = a.proposta || {};
+  const R = a.resultado || {}, un = rotuloUn(R.base); o = { ...o, un };
+  const { esc, money, dateBR, interna } = o, c = a.cliente || {}, k = a.concorrente || {}, p = a.proposta || {};
+  const cotado = (x) => (x.unid && x.unid !== (R.base || 'UN') && x.preco_informado != null ? `${money(x.preco_informado)} por ${rotuloUn(x.unid)}` : '');
   let n = 0; const h = (t) => `<h2>${++n}. ${t}</h2>`, out = [];
   const forn = interna && k.nome ? `${k.nome} (${k.uf})` : `Fornecedor atual (${k.uf || '—'})`;
   const nosso = o.empresa || 'Nossa proposta';
@@ -22,18 +24,20 @@ export function relatorioAnalise(a, mg, o) {
     ['Análise', `nº ${a.numero || '—'} de ${dateBR(a.data)}${interna ? ` · ${STATUS[a.status] || a.status || ''}` : ''}`],
     ['Cliente', `${a.cliente_nome || ''}${c.documento ? ` · ${c.documento}` : ''}`],
     ['Perfil fiscal do cliente', `${c.uf || '—'} · ${TIPO[c.tipo] || c.tipo || '—'} · ${REG[c.regime] || c.regime || '—'} · crédito de ICMS: ${c.cred_icms ? 'sim' : 'não'} · crédito de PIS/COFINS: ${c.cred_pc ? 'sim' : 'não'}`],
-    ['Produto', `${a.produto_desc || '—'}${a.ncm ? ` · NCM ${a.ncm}` : ''}`],
+    ['Produto', `${a.produto_desc || '—'}${a.ncm ? ` · NCM ${a.ncm}` : ''}${+R.peso_un ? ` · ${(+R.peso_un).toLocaleString('pt-BR', { maximumFractionDigits: 4 })} kg por unidade` : ''}`],
+    ['Base da comparação', `R$ por ${un}`],
     ...(interna ? [['Responsável', a.responsavel_nome || '—']] : []),
   ].map(([x, y]) => `<tr><td>${esc(x)}</td><td>${esc(y)}</td></tr>`).join('')));
   const dif = R.dif, ganha = dif != null && dif <= 1e-9;
-  out.push(h('Comparação do custo líquido por unidade'), tab([['', 0], [esc(forn), 1], [esc(nosso), 1]], [
+  out.push(h(`Comparação do custo líquido por ${un}`), tab([['', 0], [esc(forn), 1], [esc(nosso), 1]], [
+    ...(cotado(k) || cotado(p) ? [['Preço cotado', cotado(k) || `${money(k.preco)} por ${un}`, cotado(p) || `${money(p.preco)} por ${un}`]] : []),
     ['Origem → destino', `${k.uf || '—'} → ${c.uf || '—'}`, `${p.uf || '—'} → ${c.uf || '—'}`],
-    ['Preço unitário', money(k.preco), money(p.preco)],
+    [`Preço por ${un}`, money(k.preco), money(p.preco)],
     ['Alíquota de ICMS da operação', pc(k.aliq), pc(p.aliq)],
-    ['Frete', k.frete_tipo === 'FOB' ? `FOB ${money(k.frete_un)}` : 'CIF', p.frete_tipo === 'FOB' ? `FOB ${money(p.frete_un)}` : 'CIF'],
+    ['Frete', k.frete_tipo === 'FOB' ? `FOB ${money(k.frete_un)} por ${un}` : 'CIF', p.frete_tipo === 'FOB' ? `FOB ${money(p.frete_un)} por ${un}` : 'CIF'],
     ['Custo líquido para o cliente', money(R.conc?.custoVp), money(R.nos?.custoVp)],
-  ].map(([x, y, z], i) => `<tr><${i === 4 ? 'th' : 'td'}>${x}</${i === 4 ? 'th' : 'td'}><${i === 4 ? 'th' : 'td'} class="n">${y}</${i === 4 ? 'th' : 'td'}><${i === 4 ? 'th' : 'td'} class="n">${z}</${i === 4 ? 'th' : 'td'}></tr>`).join('')),
-  `<p>${ganha ? `O custo líquido da nossa proposta é ${money(-dif)} menor por unidade (${pc(-R.difPct)}).` : `O custo líquido da nossa proposta é ${money(dif)} maior por unidade (${pc(R.difPct)}).`}
+  ].map(([x, y, z]) => { const c2 = /^Custo/.test(x) ? 'th' : 'td'; return `<tr><${c2}>${x}</${c2}><${c2} class="n">${y}</${c2}><${c2} class="n">${z}</${c2}></tr>`; }).join('')),
+  `<p>${ganha ? `O custo líquido da nossa proposta é ${money(-dif)} menor por ${un} (${pc(-R.difPct)}).` : `O custo líquido da nossa proposta é ${money(dif)} maior por ${un} (${pc(R.difPct)}).`}
    O custo líquido é o preço pago menos os créditos que o cliente recupera (ICMS e, quando aplicável, PIS/COFINS), mais o DIFAL ou a antecipação que ele recolhe e não recupera.</p>`);
   out.push(h(`Memória de cálculo — ${esc(forn)}`), memoria(R.conc?.linhas, o));
   out.push(h(`Memória de cálculo — ${esc(nosso)}`), memoria(R.nos?.linhas, o));
@@ -79,11 +83,11 @@ export function relatorioHistorico(L, M, o) {
   const mot = {}; for (const a of L) if (a.status === 'perdida') { const k = (a.status_obs || 'sem motivo').trim().toLowerCase(); mot[k] = (mot[k] || 0) + 1; }
   const out = [h('Resumo'), `<p>${L.length} análise(s): ${st.negociacao} em negociação, ${st.ganha} ganha(s) e ${st.perdida} perdida(s)${fech ? `; taxa de êxito nas fechadas de ${pc(st.ganha / fech * 100)}` : ''}.</p>`];
   if (Object.keys(mot).length) out.push(tab([['Motivo da perda', 0], ['Qtd.', 1]], Object.entries(mot).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v}</td></tr>`).join('')));
-  out.push(h('Análises'), tab([['Nº', 1], ['Data', 0], ['Cliente', 0], ['Produto', 0], ['Fornecedor atual', 0], ['Preço atual', 1], ['Nosso preço', 1], ['Custo atual', 1], ['Nosso custo', 1], ['Dif. %', 1], ['Empate', 1],
+  out.push(h('Análises'), tab([['Nº', 1], ['Data', 0], ['Cliente', 0], ['Produto', 0], ['Fornecedor atual', 0], ['Preço atual', 1], ['Nosso preço', 1], ['Custo atual', 1], ['Nosso custo', 1], ['Dif. %', 1], ['Empate', 1], ['Base', 0],
     ...(interna && M ? [['Margem %', 1]] : []), ['Status', 0], ['Responsável', 0]],
   L.map(a => { const R = a.resultado || {}, k = a.concorrente || {}, m = M?.[a.id];
     return `<tr><td class="n">${a.numero}</td><td>${dateBR(a.data)}</td><td>${esc(a.cliente_nome)}</td><td>${esc(a.produto_desc || '')}</td><td>${esc(k.nome ? `${k.nome} (${k.uf})` : k.uf || '')}</td>
-      <td class="n">${money(k.preco)}</td><td class="n">${money(a.proposta?.preco)}</td><td class="n">${money(R.conc?.custoVp)}</td><td class="n">${money(R.nos?.custoVp)}</td><td class="n">${pc(R.difPct)}</td><td class="n">${money(R.empate)}</td>
+      <td class="n">${money(k.preco)}</td><td class="n">${money(a.proposta?.preco)}</td><td class="n">${money(R.conc?.custoVp)}</td><td class="n">${money(R.nos?.custoVp)}</td><td class="n">${pc(R.difPct)}</td><td class="n">${money(R.empate)}</td><td>${R.base === 'KG' ? 'kg' : 'un'}</td>
       ${interna && M ? `<td class="n">${m ? pc(m.proposta?.pct) : '–'}</td>` : ''}<td>${esc(STATUS[a.status] || a.status)}${a.status_obs ? ` (${esc(a.status_obs)})` : ''}</td><td>${esc(a.responsavel_nome || '')}</td></tr>`; }).join('')));
   return out.join('');
 }

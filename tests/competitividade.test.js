@@ -121,3 +121,17 @@ test('relatório: versão para o cliente não leva margem, empate nem o nome do 
   assert.ok(intTxt.includes('CONCORRENTE X') && intTxt.includes('18,81') && intTxt.includes('Nossa margem'));
   assert.ok(relatorioHistorico([{ ...a, id: 'x', status: 'perdida', status_obs: 'preço' }], { x: mg }, { ...o, interna: true }).includes('preço'));
 });
+
+test('venda por unidade ou por peso: conversão para a mesma base', async () => {
+  const { converter, baseDoProduto } = await import('../js/lib/competitividade.js');
+  assert.equal(converter(0.85, 'UN', 'KG', 0.05), 17);           // R$ 0,85 o saco de 50 g = R$ 17,00/kg
+  assert.equal(r2(converter(20, 'KG', 'UN', 0.05)), 1);          // R$ 20,00/kg = R$ 1,00 o saco
+  assert.equal(converter(17, 'KG', 'KG', null), 17);
+  assert.equal(converter(17, 'UN', 'KG', 0), null, 'sem o peso não converte');
+  assert.equal(baseDoProduto('kg'), 'KG');
+  assert.equal(baseDoProduto('MIL'), 'UN');
+  // o caso real dá o mesmo resultado com o concorrente cotando por unidade
+  const R = analisar({ cli, conc: { ...conc, preco: converter(0.85, 'UN', 'KG', 0.05) }, nos, P });
+  assert.equal(r2(R.conc.custo), 14.96);
+  assert.equal(R.empate, 18.81);
+});
