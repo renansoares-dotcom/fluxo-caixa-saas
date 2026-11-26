@@ -1,8 +1,10 @@
 // Service worker: recebe os avisos (Web Push) e abre a plataforma no ponto certo ao clicar.
 // Modo sem internet (melhoria 1.5): os arquivos da plataforma (página, scripts, estilos, ícones) ficam guardados no aparelho.
 // Com sinal, sempre vem a versão nova do servidor (e a cópia é atualizada); sem sinal, abre a última cópia.
+// Scripts e estilos são sempre conferidos com o servidor (cache: 'no-cache'): sem isso, o cache do navegador (10 min no GitHub Pages)
+// misturava uma tela nova com um módulo antigo logo depois de cada publicação ("does not provide an export named...").
 // Os dados (Supabase) não passam por aqui: o js/lib/offline.js guarda as leituras das telas de chão de fábrica.
-const CACHE = 'iplamm-app-v1';
+const CACHE = 'iplamm-app-v2';
 const BASE = ['./', 'index.html', 'manifest.webmanifest', 'assets/icon-192.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(BASE)).catch(() => {})); self.skipWaiting(); });
 self.addEventListener('activate', (e) => e.waitUntil((async () => {
@@ -15,7 +17,7 @@ self.addEventListener('fetch', (e) => {
   e.respondWith((async () => {
     const c = await caches.open(CACHE), nav = r.mode === 'navigate', app = /\/(index\.html)?$/.test(u.pathname);   // portal.html e cotacao.html não viram o index guardado
     try {
-      const resp = await fetch(r);
+      const resp = nav ? await fetch(r) : await fetch(r, { cache: 'no-cache' });
       if (resp.ok && resp.type === 'basic' && (!nav || app)) c.put(nav ? 'index.html' : r, resp.clone()).catch(() => {});
       return resp;
     } catch (err) {
