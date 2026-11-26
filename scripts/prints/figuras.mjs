@@ -414,4 +414,9 @@ export const FIGS = [
   ['competitividade', 'comercial/competitividade', '## 7.', 'Simulação da reforma: a mesma comparação de 2027 a 2033', 'select:#f-cli=TORREFAÇÃO|select:#k-uf=SE|fill:#k-nome=EMBALAGENS LITORAL|fill:#k-preco=17,00|fill:#p-preco=20,00|fill:#m-custo=12,35|click:#f-ref|scroll:#cp-res'],
   ['competitividade', 'comercial/competitividade', '## 8.', 'Histórico: análises salvas, com o resultado, a margem e o status', 'click:[data-a="historico"]'],
   ['competitividade', 'comercial/competitividade', '## 10.', 'Parâmetros: acesso, margem mínima, alíquotas internas por UF, regra interestadual e antecipação', 'click:[data-a="parametros"]'],
+  ['cadastro-reforma', 'comercial/cadastro-reforma', '## 3.', 'Enviar: escolha os clientes e gere os links', 'click:[data-c]|click:tr:nth-child(2) [data-c]'],
+  ['cadastro-reforma', 'comercial/cadastro-reforma', '## 3.', 'Links gerados: copiar, WhatsApp ou e-mail para cada cliente', 'select:#e-f=Todos|click:tr:nth-child(1) [data-c]|click:tr:nth-child(2) [data-c]|click:#e-ger'],
+  ['cadastro-reforma', 'comercial/cadastro-reforma', '## 5.', 'Questionários: a situação de cada link, com as ações', 'click:[data-a="lista"]'],
+  ['cadastro-reforma', 'comercial/cadastro-reforma', '## 6.', 'Conferir e aplicar: o cadastro atual ao lado da resposta, com as diferenças marcadas', 'click:[data-a="lista"]|click:[data-cf="cq5"]'],
+  ['cadastro-reforma', 'comercial/cadastro-reforma', '## 8.', 'Parâmetros: validade do link, mensagem padrão e quem usa e quem aplica', 'click:[data-a="parametros"]'],
 ];

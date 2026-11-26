@@ -1240,3 +1240,6 @@ div.cp-interno{background:var(--bg2,rgba(0,0,0,.02));padding:8px 10px;border-rad
 #cp-corpo label.chk{display:flex;flex-direction:row;align-items:center;gap:6px;font-weight:400}
 #cp-corpo .areas-chk label.chk{display:inline-flex}
 #cp-corpo label.chk input{min-height:0;width:auto;margin:0}
+/* COM010 Atualização Cadastral da Reforma */
+.cq-chk label.chk{display:inline-flex;flex-direction:row;align-items:center;gap:6px;font-weight:400}
+.cq-chk label.chk input{min-height:0;width:auto;margin:0}

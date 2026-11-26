@@ -10,6 +10,7 @@ import { abrirRelatorio } from '../lib/relatorio.js';
 import { TIPOS_CLIENTE, REGIMES_CLIENTE, UFS, STATUS, perfilPadrao, aliqInterna, regraInter, aliqInterSugerida, antecipacaoPct,
   analisar, simularReforma, br, fmtPct, UNIDADES, rotuloUn, baseDoProduto, converter } from '../lib/competitividade.js';
 import { relatorioAnalise, relatorioHistorico } from '../lib/competitividade-relatorio.js';
+import { perfilParaCompetitividade } from '../lib/cadastro-reforma.js';
 
 export const title = 'Análise de Competitividade de Preço';
 const PAPEIS = [['admin', 'Administrador'], ['diretor', 'Diretor'], ['financeiro', 'Financeiro'], ['vendas', 'Vendas'], ['leitura', 'Leitura'], ['compras', 'Compras'], ['producao', 'Produção']];
@@ -35,7 +36,7 @@ export async function render(root) {
     const e = state.empresa.id, ac = await q(sb.rpc('comp_acesso', { p_empresa: e }));
     if (!ac?.usa) { root.innerHTML = '<div class="card"><div class="empty">Seu perfil não usa a análise de competitividade. O administrador libera em Análise de Competitividade › Parâmetros.</div></div>'; return; }
     try { const k = await q(sb.rpc('comp_configurar', { p_empresa: e })); if (k) toast('Parâmetros pré-carregados: alíquota interna das 27 UFs, regra interestadual e antecipação de PE (a conferir em Parâmetros)'); } catch (err) { fail(err); }
-    const [cfg, interna, regra, antec, base, clientes, geo, produtos, analises, margens] = await Promise.all([
+    const [cfg, interna, regra, antec, base, clientes, geo, produtos, analises, margens, perfis] = await Promise.all([
       q(sb.from('com_comp_config').select('*').eq('empresa_id', e).maybeSingle()),
       fetchAll(() => sb.from('fisc_icms_interna').select('*').eq('empresa_id', e).order('uf')),
       q(sb.from('fisc_icms_inter_regra').select('*').eq('empresa_id', e).order('vigencia_inicio')),
@@ -45,10 +46,11 @@ export async function render(root) {
       q(sb.rpc('comercial_geo_clientes', { p_empresa: e })).catch(() => []),
       fetchAll(() => sb.from('produtos').select('id,codigo,descricao,ncm,unidade,ativo').eq('empresa_id', e).eq('ativo', true).order('descricao')).catch(() => []),
       fetchAll(() => sb.from('com_competitividade').select('*').eq('empresa_id', e).order('numero', { ascending: false })),
-      ac.margem ? fetchAll(() => sb.from('com_competitividade_margem').select('*').eq('empresa_id', e)) : Promise.resolve([])]);
+      ac.margem ? fetchAll(() => sb.from('com_competitividade_margem').select('*').eq('empresa_id', e)) : Promise.resolve([]),
+      fetchAll(() => sb.from('cad_perfil_fiscal').select('*').eq('empresa_id', e)).catch(() => [])]);
     const ufCli = Object.fromEntries((geo || []).filter(g => g.uf).map(g => [g.id, g.uf]));
     D = { ac, cfg: cfg || {}, interna, regra, antec, base: base || {}, clientes: (clientes || []).filter(c => c.ativo !== false), ufCli, produtos, analises,
-      margens: Object.fromEntries(margens.map(m => [m.analise_id, m.dados])), root, F: D?.F || { ...F0(), reforma: !!cfg?.reforma_padrao } };
+      margens: Object.fromEntries(margens.map(m => [m.analise_id, m.dados])), perfis: Object.fromEntries((perfis || []).map(p => [p.favorecido_id, p])), root, F: D?.F || { ...F0(), reforma: !!cfg?.reforma_padrao } };
     pintar();
   } catch (err) { fail(err); root.innerHTML = '<div class="card"><div class="empty">Não foi possível carregar. Confira se o SQL 197 já foi executado.</div></div>'; }
 }
@@ -205,8 +207,10 @@ function abaNova(el) {
       const x = D.clientes.find(y => y.id === ev.target.value);
       F.cliente_id = x?.id || ''; F.cliente_nome = x?.nome || ''; c.documento = x?.documento || '';
       // o perfil fiscal da última análise do cliente; senão a UF do cadastro
-      const ult = x && D.analises.find(a => a.cliente_id === x.id);
+      // perfil fiscal: o do questionário da reforma (COM010) tem prioridade; senão, o da última análise; senão, a UF do cadastro
+      const ult = x && D.analises.find(a => a.cliente_id === x.id), pq = x && perfilParaCompetitividade(D.perfis[x.id], { uf: D.ufCli[x.id] });
       if (ult) Object.assign(c, ult.cliente, { documento: x.documento || '' }); else if (x && D.ufCli[x.id]) c.uf = D.ufCli[x.id];
+      if (pq) { Object.assign(c, pq); toast('Perfil fiscal do cliente trazido da atualização cadastral da reforma'); }
       k.aliq_manual = p.aliq_manual = false;
       return abaNova(el);
     }

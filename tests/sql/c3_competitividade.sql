@@ -85,7 +85,7 @@ select public.comp_excluir((select id from _g where k = 'a1'));
 select pg_temp.ok(not exists (select 1 from com_competitividade where empresa_id = :E::uuid), 'admin exclui');
 reset role;
 select pg_temp.ok((select count(*) from pg_proc p join pg_namespace s on s.oid = p.pronamespace where s.nspname = 'public' and p.prosecdef
-  and has_function_privilege('anon', p.oid, 'execute')) = 7, 'anon continua com 7 funções');
+  and has_function_privilege('anon', p.oid, 'execute') and p.proname like 'comp%') = 0, 'nenhuma função da competitividade sem login');
 -- base de cálculo
 select pg_temp.entrar(:VEN::uuid);
 select pg_temp.ok(public.comp_base(:E::uuid) ? 'reforma', 'base com a reforma');

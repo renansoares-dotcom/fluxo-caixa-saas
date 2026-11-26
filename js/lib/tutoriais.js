@@ -54,6 +54,8 @@ export const MANUAIS = [
     resumo: 'Montar as duplicatas e o endosso, gerar o PDF para assinatura digital e cancelar com termo.' },
   { id: 'comercial', titulo: 'Comercial — painel, carteira, funil e metas', area: 'Comercial', rotas: ['comercial', 'comercial/carteira', 'comercial/funil', 'comercial/vendedores', 'comercial/mapa', 'comercial/comissoes'],
     resumo: 'Faturado × meta, situação dos clientes, contatos, oportunidades, propostas com calculadora e metas.' },
+  { id: 'cadastro-reforma', titulo: 'Atualização Cadastral da Reforma — questionário por link para o cliente', area: 'Comercial', rotas: ['comercial/cadastro-reforma'],
+    resumo: 'Escolha os clientes, gere o link e mande por WhatsApp ou e-mail; o cliente responde sem login; você compara com o cadastro e aplica.' },
   { id: 'competitividade', titulo: 'Análise de Competitividade de Preço — custo líquido para o cliente', area: 'Comercial', rotas: ['comercial/competitividade'],
     resumo: 'Nossa proposta contra o fornecedor atual: créditos de ICMS e PIS/COFINS, DIFAL, antecipação, preço de empate, faixa de negociação, margem interna, reforma e PDF interno e para o cliente.' },
   { id: 'preimpressao', titulo: 'Pré-impressão — artes, aprovação do cliente no Portal e clicheria', area: 'Comercial', rotas: ['preimpressao', 'preimpressao/artes'],

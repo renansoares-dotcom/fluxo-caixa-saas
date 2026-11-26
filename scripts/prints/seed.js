@@ -3051,3 +3051,30 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
     comercial_geo_clientes: window.RPC.comercial_geo_clientes || (() => DB.favorecidos.filter(f => f.tipo === 'CLIENTES').map(f => ({ id: f.id, uf: f.uf || 'PE' }))),
     comp_pessoas: () => DB.membros.map(m => ({ user_id: m.user_id, nome: m.nome, papel: m.papel })), comp_salvar: () => ({ id: 'ca4', numero: 4 }), comp_status: () => null, comp_excluir: () => null, comp_config_salvar: () => null });
 }
+// Atualização Cadastral da Reforma (SQL 198) — questionários FICTÍCIOS
+{
+  const E0 = DB.empresas[0].id, ha = (d) => { const x = new Date(); x.setDate(x.getDate() - d); return x.toISOString(); };
+  const cli = DB.favorecidos.filter(f => f.tipo === 'CLIENTES');
+  const tk = (i) => String(i).repeat(64).slice(0, 64).replace(/[^0-9a-f]/g, 'a');
+  const Q = (n, i, sit, dias, extra = {}) => ({ id: 'cq' + n, empresa_id: E0, numero: n, favorecido_id: cli[i]?.id, cliente: cli[i]?.nome || 'CLIENTE EXEMPLO', token: tk(n),
+    expira_em: new Date(Date.now() + (30 - dias) * 864e5).toISOString().slice(0, 10), situacao: sit, criado_em: ha(dias), ...extra });
+  const resp = { nome_fantasia: 'SERRA AZUL', ie: '0456789-12', cep: '55660-000', logradouro: 'RUA DAS FLORES', numero: '120', bairro: 'CENTRO', municipio: 'BEZERROS', uf: 'PE',
+    email_nfe: 'nfe@serraazul.exemplo', telefone: '(81) 3728-0000', contato_fiscal: { nome: 'Joana Lima', email: 'fiscal@serraazul.exemplo' }, contador: { nome: 'Contábil Exemplo', email: 'contato@contabil.exemplo' },
+    contribuinte_icms: '1', destinacao: ['industrializacao'], tipo: 'industria', cnae: '1081-3/02', regime: 'real', cred_icms: 'sim', cred_pc: 'sim', simples_regular: '',
+    especiais: { beneficio_icms: 'PRODEPE', reducao: 'nenhuma', zfm: false, orgao_publico: false, produtor_rural: false }, declarante: { nome: 'Joana Lima', cargo: 'Analista fiscal', email: 'fiscal@serraazul.exemplo' }, aceite: true };
+  DB.cadq_questionarios = [
+    Q(5, 0, 'respondido', 3, { respondido_em: ha(1), respondido_por: 'Joana Lima (Analista fiscal) <fiscal@serraazul.exemplo>', resposta: resp }),
+    Q(4, 1, 'aberto', 5, { aberto_em: ha(4) }), Q(3, 2, 'enviado', 6),
+    Q(2, 3, 'aplicado', 12, { respondido_em: ha(10), respondido_por: 'Carlos Souza (Compras)', resposta: { ...resp, regime: 'simples', simples_regular: 'avaliando', cred_icms: 'nao', cred_pc: 'nao' }, aplicado_em: ha(9), aplicado_por: 'Ana Souza', aplicado_campos: ['regime', 'simples_regular'] }),
+    Q(1, 4, 'enviado', 40)];
+  DB.cadq_config = [{ empresa_id: E0, validade_dias: 30, mensagem: 'Qualquer dúvida, fale com o seu representante.', papeis_usa: ['admin', 'diretor', 'financeiro', 'vendas'], papeis_aplicar: ['admin', 'diretor', 'financeiro'] }];
+  DB.cad_perfil_fiscal = [];
+  if (cli[0]) Object.assign(cli[0], { email: 'compras@serraazul.exemplo', uf: 'PE', regime_tributario: 'Lucro Presumido', cep: '55660000', municipio: 'BEZERROS', telefone: '(81) 3728-0000' });
+  Object.assign(window.RPC, { cadq_acesso: () => ({ usa: true, aplica: true, admin: true, validade_dias: 30 }),
+    cadq_gerar: (a) => (a.p_favorecidos || []).map((f, i) => ({ id: 'cqn' + i, numero: 6 + i, favorecido_id: f, cliente: DB.favorecidos.find(x => x.id === f)?.nome, token: tk(6 + i), expira_em: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10), novo: true })),
+    cadq_aplicar: () => null, cadq_situacao: () => null, cadq_config_salvar: () => null,
+    cadq_link_abrir: () => ({ empresa: 'PLÁSTICOS EXEMPLO LTDA', numero: 4, cliente: cli[1]?.nome || 'CLIENTE EXEMPLO', situacao: 'aberto', expira_em: new Date(Date.now() + 25 * 864e5).toISOString().slice(0, 10), vencido: false,
+      mensagem: 'Qualquer dúvida, fale com o seu representante.', atual: { razao_social: cli[1]?.nome || 'CLIENTE EXEMPLO', documento: cli[1]?.documento || '12.345.678/0001-90', uf: 'PE', municipio: 'CARUARU', email_nfe: 'compras@cliente.exemplo',
+        regime: 'presumido', contribuinte_icms: '1', destinacao: [], especiais: {}, contato_fiscal: {}, contador: {} } }),
+    cadq_link_responder: () => null });
+}
