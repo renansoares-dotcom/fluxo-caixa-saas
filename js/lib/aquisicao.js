@@ -160,3 +160,35 @@ export function divergencias(declarado, sug) {
 
 export const fmt = (v) => n(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 export const br = (v) => n(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * Custo líquido cotado × realizado (SQL 200), pelo mesmo motor da cotação.
+ * linhas: compras_liquido_realizado() — um registro por item recebido com nota:
+ *   { pedido_id, pedido, fornecedor, uf, regime, simples_credito_pct, uf_nota, nota, item, destinacao, quantidade,
+ *     vu_pedido, icms_pedido, ipi_pedido, st_un_pedido, vu_nota, icms_nota, nota_simples, ipi_nota, st_un_nota, comparavel }
+ * Cotado: preço e impostos do pedido. Realizado: preço e impostos da nota. Nota do Simples: crédito pelo % do pedido
+ * (se o pedido também previa Simples) ou zero (a nota não informa o crédito na base).
+ * Devolve { itens, pedidos, total } com desembolso, créditos e custo dos dois lados e a diferença (realizado − cotado).
+ */
+export function realizadoCotado(linhas, nos, P) {
+  const itens = (linhas || []).map(l => {
+    const q = n(l.quantidade), interna = P.internaDe ? P.internaDe(l.ncm) : nos.interna, N = { ...nos, interna };
+    const cot = custoUnitario({ preco: l.vu_pedido, destinacao: l.destinacao, icms_aliq: l.icms_pedido, ipi_aliq: l.ipi_pedido, st_un: l.st_un_pedido, uf_origem: l.uf || l.uf_nota },
+      { regime: l.regime || 'real', simples_credito_pct: l.simples_credito_pct }, N, P);
+    const regNota = l.nota_simples ? 'simples' : (simplesDe(l.regime) ? 'real' : (l.regime || 'real'));
+    const rea = custoUnitario({ preco: l.vu_nota, destinacao: l.destinacao, icms_aliq: l.nota_simples ? 0 : l.icms_nota, ipi_aliq: l.ipi_nota, st_un: l.st_un_nota, uf_origem: l.uf_nota || l.uf },
+      { regime: regNota, simples_credito_pct: l.nota_simples && simplesDe(l.regime) ? l.simples_credito_pct : 0 }, N, P);
+    const tot = (u) => ({ desembolso: r2(u.desembolso * q), creditos: r2(u.creditos * q), custo: r2(u.custo * q), custoEf: r2(u.custoEf * q) });
+    const c = tot(cot), r = tot(rea);
+    return { ...l, cotado: c, realizado: r, dif: r2(r.custo - c.custo), difDesembolso: r2(r.desembolso - c.desembolso), difCreditos: r2(r.creditos - c.creditos) };
+  });
+  const soma = (L) => { const z = { desembolso: 0, creditos: 0, custo: 0, custoEf: 0 }, c = { ...z }, r = { ...z };
+    for (const x of L) for (const k of Object.keys(z)) { c[k] += x.cotado[k]; r[k] += x.realizado[k]; }
+    for (const k of Object.keys(z)) { c[k] = r2(c[k]); r[k] = r2(r[k]); }
+    return { cotado: c, realizado: r, dif: r2(r.custo - c.custo), difDesembolso: r2(r.desembolso - c.desembolso), difCreditos: r2(r.creditos - c.creditos) }; };
+  const comp = itens.filter(x => x.comparavel), porPed = {};
+  for (const x of comp) (porPed[x.pedido_id] = porPed[x.pedido_id] || []).push(x);
+  const pedidos = Object.values(porPed).map(L => ({ pedido_id: L[0].pedido_id, pedido: L[0].pedido, fornecedor: L[0].fornecedor, notas: [...new Set(L.map(x => x.nota))], itens: L, ...soma(L) }))
+    .sort((a, b) => b.dif - a.dif);
+  return { itens, pedidos, total: soma(comp), semDados: itens.length - comp.length };
+}

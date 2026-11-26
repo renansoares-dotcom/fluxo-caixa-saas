@@ -117,3 +117,28 @@ test('relatório da requisição: identificação, itens, mapa, custo líquido n
   const sem = relatorioRequisicao({ ...r, status: 'pendente' }, { cots: [], conv: [], peds: [], taxa: 1.5 }, o);
   assert.match(sem, /Nenhuma cotação registrada/);
 });
+
+test('cotado × realizado (SQL 200): NF com ICMS 7% contra 12% do pedido perde crédito; Simples e IPI a mais', async () => {
+  const { realizadoCotado } = await import('../js/lib/aquisicao.js');
+  const P2 = { pc_pct: 9.25, pc_excluir_icms: true, pc_incluir_frete: true, fator_icms: 1, taxa_mensal: 0, ciap_meses: 48 };
+  const base = { pedido_id: 'p1', pedido: 7, fornecedor: 'NORPOLIM', uf: 'PB', regime: 'real', uf_nota: 'PB', nota: 9253, item: 'PL720N', destinacao: 'insumo',
+    quantidade: 27000, vu_pedido: 10.6667, icms_pedido: 12, ipi_pedido: 5, st_un_pedido: null, vu_nota: 10.6667, icms_nota: 12, nota_simples: false, ipi_nota: 5, st_un_nota: 0, comparavel: true };
+  const igual = realizadoCotado([base], nos, P2);
+  assert.equal(igual.total.dif, 0, 'nota igual ao pedido: sem diferença');
+  assert.equal(igual.total.cotado.custo, 229997.52, 'o mesmo custo líquido do mapa');
+  const R = realizadoCotado([{ ...base, icms_nota: 7 }], nos, P2);
+  // ICMS perdido 5% × 288.000,90 = 14.400,05; o PIS/COFINS sobe 9,25% disso (a base é sem o ICMS) = 1.332,00
+  assert.ok(Math.abs(R.total.difCreditos + (14400.05 - 14400.05 * 0.0925)) <= 0.02, 'crédito perdido líquido do PIS/COFINS');
+  assert.equal(R.total.dif, 13068.04);
+  assert.equal(R.total.difDesembolso, 0);
+  const S = realizadoCotado([{ ...base, quantidade: 1000, nota_simples: true, icms_nota: null }], nos, P2);
+  assert.ok(S.total.dif > 1000, 'nota do Simples: sem crédito de ICMS');
+  const L = realizadoCotado([{ ...base, item: 'LUVA', destinacao: 'uso_consumo', quantidade: 100, vu_pedido: 10, vu_nota: 10, ipi_pedido: 0, ipi_nota: 10, st_un_pedido: 1.5, st_un_nota: 4 }], nos, P2);
+  assert.equal(L.total.difDesembolso, 100 + 250, 'IPI e ST a mais no desembolso');
+  assert.equal(L.total.dif, 350, 'uso e consumo: tudo vira custo');
+  const sem = realizadoCotado([{ ...base, comparavel: false }], nos, P2);
+  assert.equal(sem.pedidos.length, 0); assert.equal(sem.semDados, 1);
+  const { relatorioPeriodo } = await import('../js/lib/aquisicao-relatorio.js');
+  const html = relatorioPeriodo([], { esc: (x) => String(x ?? ''), money: (v) => (+v || 0).toFixed(2), dateBR: (d) => d || '' }, R);
+  assert.match(html, /Cotado × realizado/); assert.match(html, /13068\.04/);
+});

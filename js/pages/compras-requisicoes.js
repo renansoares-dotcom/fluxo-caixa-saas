@@ -5,8 +5,8 @@ import { cadCompras, ST_REQ, badge, qtd, inp, unit, num, diasTxt, lerDias, podeA
 import { carregarProdutos, datalistProdutos, ligarItensProduto, produtoDoItem } from '../lib/produtos.js';
 import { mapaCotacoes } from '../lib/cotacao-calc.js';
 import { selo } from '../lib/iqf.js';
-import { DESTINACOES, REGIMES_FORN, mapaLiquido, mapaReforma, fatorIcmsEfetivo, sugestaoFiscal, divergencias, br as br2, fmt } from '../lib/aquisicao.js';
-import { aliqInterna } from '../lib/competitividade.js';
+import { DESTINACOES, REGIMES_FORN, mapaLiquido, mapaReforma, sugestaoFiscal, divergencias, realizadoCotado, br as br2, fmt } from '../lib/aquisicao.js';
+import { baseFiscal } from '../lib/aquisicao-base.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
 import { relatorioMapa, relatorioPeriodo, relatorioRequisicao } from '../lib/aquisicao-relatorio.js';
 
@@ -130,6 +130,9 @@ async function abrir(r, root) {
   const det = $('#rq-det', m.el), ac = $('#rq-acoes', m.el);
   const totalCot = (c) => r.itens.reduce((t, i) => t + (+citens.find(x => x.cotacao_id === c.id && x.requisicao_item_id === i.id)?.valor_unitario || 0) * +i.quantidade, 0) + +c.frete;
   const completa = (c) => r.itens.every(i => citens.some(x => x.cotacao_id === c.id && x.requisicao_item_id === i.id));
+  const totalPagar = (c) => r.itens.reduce((t, i) => { const x = citens.find(z => z.cotacao_id === c.id && z.requisicao_item_id === i.id); if (!x) return t;
+    return t + +x.valor_unitario * +i.quantidade * (1 + (+x.ipi_aliq || 0) / 100) + (+x.st_un || 0) * +i.quantidade; }, 0) + +c.frete;
+  const temImp = cots.some(c => Math.abs(totalPagar(c) - totalCot(c)) > 0.005);
   const melhor = cots.filter(completa).sort((a, b) => totalCot(a) - totalCot(b))[0];
   // mapa comparativo (melhoria 5.2): menor preço por item, prazo, valor presente da condição e quanto custaria dividir a compra
   const taxa = +(par?.taxa_mensal_vp ?? 1.5), M = mapaCotacoes(r.itens, cots, citens, { taxa }), mc = (c) => M.cots.find(x => x.id === c.id);
@@ -156,7 +159,8 @@ async function abrir(r, root) {
       ${cots.length ? `<tr><td title="Avaliação do fornecedor: qualidade dos lotes, pontualidade e notas que conferem com o pedido (Painel de Compras)">Avaliação (IQF)</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num">${selo(c.favorecido_id ? IQF[c.favorecido_id] : null)}</td>`).join('')}</tr>
         <tr><td>Prazo de entrega</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num">${c.prazo_entrega_dias != null ? c.prazo_entrega_dias + ' dias' : '–'}</td>`).join('')}</tr>
         <tr><td>Frete</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num">${money(c.frete)}</td>`).join('')}</tr>
-        <tr style="font-weight:600"><td>Total</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num ${c === melhor && cots.length > 1 ? 'pos' : ''}">${money(totalCot(c))}${completa(c) ? '' : '<div class="small neg">incompleta</div>'}</td>`).join('')}</tr>
+        <tr style="font-weight:600"><td>${temImp ? 'Total das mercadorias' : 'Total'}</td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num ${c === melhor && cots.length > 1 ? 'pos' : ''}">${money(totalCot(c))}${completa(c) ? '' : '<div class="small neg">incompleta</div>'}</td>`).join('')}</tr>
+        ${temImp ? `<tr style="font-weight:600"><td title="Mercadorias + IPI + ICMS-ST + frete: o valor da nota, que vai para o pedido e para a previsão do contas a pagar">Total a pagar <span class="muted small" style="font-weight:400">(com IPI e ICMS-ST)</span></td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num">${money(totalPagar(c))}</td>`).join('')}</tr>` : ''}
         <tr><td title="Parcelas trazidas a valor presente a ${String(taxa).replace('.', ',')}% ao mês: compara prazos de pagamento diferentes">Valor presente <span class="muted small">(${String(taxa).replace('.', ',')}% a.m.)</span></td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num ${M.melhorVP && M.melhorVP.id === c.id && M.cots.filter(x => x.completa).length > 1 ? 'pos' : ''}">${money(mc(c).vp)}<div class="small muted">${esc(diasTxt(c.parcelas_dias))}</div></td>`).join('')}</tr>
         <tr><td></td><td></td>${r.itens.some(x => x.valor_estimado) ? '<td></td>' : ''}${cots.map(c => `<td class="num">${c.respondida_pelo_fornecedor ? '<div class="small muted">pelo link</div>' : ''}<div style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">
           ${r.status === 'aprovada' ? `<button class="btn ghost small" data-ec="${c.id}">Editar</button><button class="btn primary small" data-pc="${c.id}">Gerar pedido</button>` : ''}</div>
@@ -200,21 +204,6 @@ async function abrir(r, root) {
 }
 
 // ------------------------------------------------------------ compra inteligente: custo líquido de aquisição (SQL 199)
-async function baseFiscal(par) {
-  const e = state.empresa.id, hoje = today(), um = (x) => (Array.isArray(x) ? x[0] : x) || null;
-  const [trib, fisc, interna, anos] = await Promise.all([
-    q(sb.from('empresa_tributacao').select('*').eq('empresa_id', e).lte('vigencia_inicio', hoje).order('vigencia_inicio', { ascending: false }).limit(1)).then(um).catch(() => null),
-    q(sb.from('fisc_param').select('*').eq('empresa_id', e).lte('vigencia_inicio', hoje).order('vigencia_inicio', { ascending: false }).limit(1)).then(um).catch(() => null),
-    fetchAll(() => sb.from('fisc_icms_interna').select('*').eq('empresa_id', e)).catch(() => []),
-    q(sb.from('trib_aliquotas').select('*').eq('empresa_id', e).order('ano')).catch(() => [])]);
-  const nos = { uf: trib?.uf || null, ipi_contribuinte: par?.aq_ipi_contribuinte !== false, pc_nao_cumulativo: trib?.pis_cofins ? trib.pis_cofins === 'nao_cumulativo' : !['simples', 'mei'].includes(trib?.regime),
-    simples: ['simples', 'mei'].includes(trib?.regime), ibscbs_regular: !!trib?.ibscbs_regular };
-  const P = { pc_pct: fisc ? (+fisc.pis_pct || 0) + (+fisc.cofins_pct || 0) || 9.25 : 9.25, pc_excluir_icms: fisc?.pc_excluir_icms !== false, pc_incluir_frete: fisc?.pc_incluir_frete !== false,
-    pc_incluir_ipi: !!fisc?.pc_incluir_ipi, ciap_meses: par?.aq_ciap_meses || 48, taxa_mensal: +(par?.taxa_mensal_vp ?? 1.5),
-    fator_icms: fatorIcmsEfetivo(fisc, { prodepe_saidas_pct: +(par?.aq_prodepe_saidas_pct ?? 100) }), simples_credito_ibs_pct: +(par?.aq_simples_credito_ibs_pct || 0),
-    internaDe: (ncm) => aliqInterna(interna, nos.uf, ncm, hoje)?.aliquota ?? null };
-  return { nos, P, fisc, anos, semInterna: !interna.length, semUf: !nos.uf, reforma: !!par?.aq_reforma };
-}
 function divergenciasDe(r, cots, citens, HIST) {
   return cots.flatMap(c => (HIST[c.id] || []).length ? r.itens.map(i => { const x = citens.find(z => z.cotacao_id === c.id && z.requisicao_item_id === i.id);
     return x ? divergencias(x, sugestaoFiscal(HIST[c.id], i.ncm)).map(t => `${c.fornecedor} · ${i.descricao}: ${t}`) : []; }).flat() : []);
@@ -275,7 +264,7 @@ function pintarLiquido(el, r, cots, citens, M, BF, HIST, par, comReforma = BF.re
 
 async function relatorioCompraInteligente() {
   const ini = today().slice(0, 8) + '01';
-  const m = modal({ title: 'Relatório de compra inteligente', narrow: true, body: `<p class="small muted" style="margin-top:0">Requisições com cotação pedidas no período, comparadas pelo custo líquido (depois dos créditos).</p>
+  const m = modal({ title: 'Relatório de compra inteligente', narrow: true, body: `<p class="small muted" style="margin-top:0">Requisições com cotação pedidas no período, comparadas pelo custo líquido (depois dos créditos), e o cotado × realizado dos recebimentos com nota no período.</p>
     <div class="grid-form"><label>De<input type="date" id="ri-de" value="${ini}"></label><label>Até<input type="date" id="ri-ate" value="${today()}"></label></div>`,
     foot: '<button class="btn" data-close>Cancelar</button><button class="btn primary" id="ri-ok">Gerar PDF</button>' });
   $('#ri-ok', m.el).onclick = async (ev) => {
@@ -283,17 +272,19 @@ async function relatorioCompraInteligente() {
     ev.target.disabled = true;
     try {
       const reqs = R.filter(r => r.nCot && String(r.criado_em).slice(0, 10) >= de && String(r.criado_em).slice(0, 10) <= ate);
-      if (!reqs.length) { ev.target.disabled = false; return toast('Nenhuma requisição com cotação no período', true); }
       const ids = reqs.map(r => r.id);
       const par = (await q(sb.from('compras_parametros').select('*').eq('empresa_id', state.empresa.id)).catch(() => []))[0] || null;
-      const [cots, BF] = await Promise.all([fetchAll(() => sb.from('compras_cotacoes').select('*').in('requisicao_id', ids).order('id')), baseFiscal(par)]);
+      const [cots, BF, linhas] = await Promise.all([ids.length ? fetchAll(() => sb.from('compras_cotacoes').select('*').in('requisicao_id', ids).order('id')) : [], baseFiscal(par),
+        q(sb.rpc('compras_liquido_realizado', { p_empresa: state.empresa.id, p_de: de, p_ate: ate, p_pedido: null })).catch(() => [])]);
+      const RZ = realizadoCotado(linhas || [], BF.nos, BF.P);
+      if (!reqs.length && !RZ.itens.length) { ev.target.disabled = false; return toast('Nenhuma requisição com cotação nem recebimento com nota no período', true); }
       const citens = cots.length ? await fetchAll(() => sb.from('compras_cotacao_itens').select('*').in('cotacao_id', cots.map(c => c.id)).order('id')) : [];
       const taxa = +(par?.taxa_mensal_vp ?? 1.5);
       const A = reqs.map(r => { const cs = cots.filter(c => c.requisicao_id === r.id), M = mapaCotacoes(r.itens, cs, citens, { taxa }), { ML } = calcLiquido(r, cs, citens, M, BF);
         return { r, cots: cs, ML, escolhida: cs.find(c => c.escolhida) || null }; });
       m.close();
       abrirRelatorio({ rel: 'Relatório de compra inteligente', nome: 'Compra Inteligente', titulo: 'COMPRAS PELO CUSTO LÍQUIDO — CRÉDITOS E ESCOLHAS', paisagem: true,
-        corpo: relatorioPeriodo(A, { esc, money, dateBR }), parametros: [['Período', `${dateBR(de)} a ${dateBR(ate)}`], ['Requisições', String(A.length)], ['Valor presente', `${String(taxa).replace('.', ',')}% a.m.`]],
+        corpo: relatorioPeriodo(A, { esc, money, dateBR }, RZ), parametros: [['Período', `${dateBR(de)} a ${dateBR(ate)}`], ['Requisições', String(A.length)], ['Recebimentos com nota', String(new Set(RZ.itens.map(x => x.pedido_id + '|' + x.nota)).size)], ['Valor presente', `${String(taxa).replace('.', ',')}% a.m.`]],
         rodape: 'Base: Compras › Requisições e Cotações (CMP002). Custo líquido = desembolso − créditos de ICMS, IPI e PIS/COFINS, pelas regras vigentes; PRODEPE de Fiscal › Apuração › Parâmetros.' });
     } catch (err) { fail(err); ev.target.disabled = false; }
   };
@@ -442,9 +433,12 @@ function gerarPedido(r, c, citens, pai, root) {
       const ped = await q(sb.from('compras_pedidos').insert({ empresa_id: e, favorecido_id: fav, requisicao_id: r.id, cotacao_id: c?.id || null,
         centro_custo_id: r.centro_custo_id, frete: c ? +c.frete : 0, parcelas_dias: c?.parcelas_dias?.length ? c.parcelas_dias : [28],
         condicao_pagamento: c?.condicao_pagamento || null, entrega_prevista: c?.prazo_entrega_dias != null ? addDias(today(), c.prazo_entrega_dias) : r.necessidade,
-        observacao: r.observacao }).select('id,numero').single());
-      const itens = r.itens.map(i => ({ empresa_id: e, pedido_id: ped.id, requisicao_item_id: i.id, produto_id: i.produto_id || null, descricao: i.descricao, unidade: i.unidade, ncm: i.ncm, quantidade: +i.quantidade,
-        valor_unitario: c ? +(citens.find(x => x.cotacao_id === c.id && x.requisicao_item_id === i.id)?.valor_unitario || 0) : +(i.valor_estimado || 0) }));
+        observacao: r.observacao, uf: c?.uf || null, regime: c?.regime || null, simples_credito_pct: c?.simples_credito_pct ?? null }).select('id,numero').single());
+      // os impostos cotados vão para o pedido (SQL 200): o total soma IPI e ICMS-ST e o recebimento confere a nota contra eles
+      const itens = r.itens.map(i => { const x = c ? citens.find(z => z.cotacao_id === c.id && z.requisicao_item_id === i.id) : null;
+        return { empresa_id: e, pedido_id: ped.id, requisicao_item_id: i.id, produto_id: i.produto_id || null, descricao: i.descricao, unidade: i.unidade, ncm: i.ncm, quantidade: +i.quantidade,
+          valor_unitario: c ? +(x?.valor_unitario || 0) : +(i.valor_estimado || 0), destinacao: i.destinacao || 'insumo',
+          icms_aliq: x?.icms_aliq ?? null, ipi_aliq: x?.ipi_aliq ?? null, st_un: x?.st_un ?? null }; });
       await q(sb.from('compras_pedido_itens').insert(itens));
       if (c) await q(sb.from('compras_cotacoes').update({ escolhida: true }).eq('id', c.id));
       await q(sb.from('compras_requisicoes').update({ status: 'atendida' }).eq('id', r.id));

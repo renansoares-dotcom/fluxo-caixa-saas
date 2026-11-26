@@ -33,7 +33,7 @@ export function relatorioMapa(r, cots, citens, M, ML, RF, BF, div, o) {
 /**
  * Resumo do período para a direção. A: [{ r, cots, ML, escolhida }]
  */
-export function relatorioPeriodo(A, o) {
+export function relatorioPeriodo(A, o, RZ = null) {
   const { esc, money, dateBR } = o; let n = 0; const h = (t) => `<h2>${++n}. ${t}</h2>`, out = [];
   const comEsc = A.filter(a => a.escolhida), L = (a, c) => a.ML.cots.find(x => x.id === c?.id);
   const soma = (f) => comEsc.reduce((s, a) => s + (f(a) || 0), 0);
@@ -55,6 +55,17 @@ export function relatorioPeriodo(A, o) {
     Object.values(sn).sort((a, b) => b.n - a.n).map(({ c, n: k }) => `<tr><td>${esc(c.fornecedor)}</td><td class="n">${k}</td><td class="n">${c.simples_credito_pct != null ? fmt(c.simples_credito_pct) + '%' : '–'}</td><td>${esc({ sim: 'Sim', nao: 'Não', avaliando: 'Avaliando' }[c.simples_regular] || 'Não informou')}</td></tr>`).join(''))
     + '<p>A partir de 2027, o fornecedor do Simples que continuar recolhendo tudo no Simples transfere pouco crédito de CBS/IBS. Vale conversar com os principais: pedir a opção pelo regime regular ou renegociar o preço.</p>'
     : '<p>Nenhum fornecedor do Simples nas cotações do período (ou o regime não foi informado).</p>');
+  if (RZ) {
+    const T = RZ.total, piores = RZ.pedidos.filter(x => Math.abs(x.dif) > 0.005);
+    out.push(h('Cotado × realizado: o que as notas trouxeram'), RZ.pedidos.length
+      ? `<p>Recebimentos com nota no período, de pedidos com os impostos da cotação: ${RZ.pedidos.length} pedido(s). Custo líquido cotado de ${money(T.cotado.custo)} e realizado de ${money(T.realizado.custo)}
+        (${T.dif > 0.005 ? `${money(T.dif)} a mais` : T.dif < -0.005 ? `${money(-T.dif)} a menos` : 'sem diferença'}); créditos ${money(T.realizado.creditos)} contra ${money(T.cotado.creditos)} cotados.${RZ.semDados ? ` Outros ${RZ.semDados} item(ns) recebidos vieram de pedidos sem os impostos da cotação e ficam fora da comparação.` : ''}</p>`
+        + tab([['Pedido', 0], ['Fornecedor', 0], ['Nota(s)', 0], ['Custo cotado', 1], ['Custo realizado', 1], ['Créditos (dif.)', 1], ['Desembolso (dif.)', 1], ['Diferença', 1]],
+          RZ.pedidos.map(x => `<tr><td>PC ${esc(String(x.pedido))}</td><td>${esc(x.fornecedor || '')}</td><td>${x.notas.map(n => esc(String(n))).join(', ')}</td><td class="n">${money(x.cotado.custo)}</td><td class="n">${money(x.realizado.custo)}</td>
+            <td class="n">${money(x.difCreditos)}</td><td class="n">${money(x.difDesembolso)}</td><td class="n">${money(x.dif)}</td></tr>`).join(''))
+        + (piores.length ? '<p>Diferença positiva: a compra saiu mais cara do que a cotação prometia (crédito menor, IPI ou ICMS-ST a mais, nota do Simples). Vale cobrar do fornecedor e registrar no IQF.</p>' : '<p>As notas trouxeram os impostos combinados.</p>')
+      : `<p>Nenhum recebimento com nota no período de pedido que tenha os impostos da cotação.${RZ.semDados ? ` (${RZ.semDados} item(ns) recebidos sem os impostos no pedido.)` : ''}</p>`);
+  }
   return out.join('');
 }
 
@@ -71,6 +82,8 @@ export function relatorioRequisicao(r, d, o) {
   const q = (v) => (+v).toLocaleString('pt-BR', { maximumFractionDigits: 4 }), u = (v) => 'R$ ' + (+v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   const pr = (c, i) => { const v = +citens.find(x => x.cotacao_id === c.id && x.requisicao_item_id === i.id)?.valor_unitario; return isNaN(v) ? null : v; };
   const mc = (c) => M?.cots.find(x => x.id === c.id) || {};
+  const pagar = cots.map(c => r.itens.reduce((t, i) => { const x = citens.find(z => z.cotacao_id === c.id && z.requisicao_item_id === i.id); if (!x) return t;
+    return t + +x.valor_unitario * +i.quantidade * (1 + (+x.ipi_aliq || 0) / 100) + (+x.st_un || 0) * +i.quantidade; }, 0) + (+c.frete || 0));
   out.push(h('Identificação'), tab([['Campo', 0], ['Informação', 0]], [
     ['Situação', (SIT_REQ[r.status] || r.status) + (r.prioridade === 'urgente' ? ' — urgente' : '')], ['Solicitante', r.solicitante || '—'], ['Setor', d.setor || '—'],
     ['Pedida em', dateBR(r.criado_em)], ['Precisa até', dateBR(r.necessidade) || '—'],
@@ -87,6 +100,7 @@ export function relatorioRequisicao(r, d, o) {
       + `<tr><td>Pagamento</td><td></td>${cots.map(c => `<td class="n">${esc(c.condicao_pagamento || (c.parcelas_dias || []).join('/') || '–')}</td>`).join('')}</tr>`
       + `<tr><td>Frete</td><td></td>${cots.map(c => `<td class="n">${money(c.frete)}</td>`).join('')}</tr>`
       + `<tr><td><b>Total</b></td><td></td>${cots.map(c => `<td class="n"><b>${money(mc(c).total)}</b>${mc(c).completa === false ? '<br>incompleta' : ''}</td>`).join('')}</tr>`
+      + (pagar.some((v, k) => Math.abs(v - (mc(cots[k]).total || 0)) > 0.005) ? `<tr><td><b>Total a pagar (com IPI e ICMS-ST)</b></td><td></td>${pagar.map(v => `<td class="n"><b>${money(v)}</b></td>`).join('')}</tr>` : '')
       + `<tr><td>Valor presente (${fmt(d.taxa)}% a.m.)</td><td></td>${cots.map(c => `<td class="n">${money(mc(c).vp)}</td>`).join('')}</tr>`
       + `<tr><td>Origem · validade</td><td></td>${cots.map(c => `<td class="n">${c.respondida_pelo_fornecedor ? 'pelo link' : 'digitada'}${c.validade ? ' · até ' + dateBR(c.validade) : ''}</td>`).join('')}</tr>`),
       cots.length > 1 ? '<p>* menor preço do item.</p>' : '');

@@ -1,7 +1,7 @@
 ---
 titulo: Compra inteligente — cotação pelo custo líquido de aquisição
 tela: Compras › Requisições e Cotações (CMP002) e Atualização Cadastral de Fornecedores (CMP006)
-versao: 1.1
+versao: 1.2
 atualizado: 2026-11-26
 ---
 ## 1. Para que serve
@@ -145,7 +145,25 @@ O que for aplicado já vem preenchido nas próximas cotações por link.
 
 Quem usa: Compras, Financeiro, Diretor e Administrador. O aviso de resposta vai para Compras e Administrador.
 
-## 10. Relatório da requisição
+## 10. Do pedido ao recebimento: os impostos combinados viram conferência
+
+O que foi cotado não fica só no mapa:
+
+1. **Gerar pedido** leva para o pedido a UF e o regime do fornecedor e, por item, a destinação, o ICMS, o IPI e o ICMS-ST cotados. O **total do pedido soma IPI e ICMS-ST**, que é o que se paga. No mapa, a linha **Total a pagar** mostra esse valor ao lado do total das mercadorias.
+2. O **pedido impresso** traz os impostos de cada item e avisa o fornecedor de que a nota deve vir igual.
+3. No **recebimento**, o confronto pedido × nota confere os impostos da nota contra o pedido:
+   - **ICMS menor** que o combinado: crédito perdido;
+   - **nota do Simples** quando se esperava regime normal: crédito de ICMS perdido;
+   - **IPI acima** do combinado: valor a mais a pagar (no insumo volta como crédito, mas o desembolso conta);
+   - **ICMS-ST acima** do combinado: valor a mais, sem crédito.
+   Cada divergência mostra o efeito em reais. Acima da tolerância de impostos (padrão R$ 50,00 por item, em Recebimentos › Parâmetros do confronto), o pagamento da nota trava até a liberação com motivo. Abaixo, só avisa.
+4. No **pedido recebido**, o quadro **Custo líquido: cotado × realizado** recalcula pela mesma conta do mapa o que a cotação prometia e o que a nota trouxe.
+
+Exemplo (dados fictícios): pedido de 27.000 kg a R$ 10,6667 com ICMS de 12% e IPI de 5%. A nota chega com ICMS de 7%. O crédito de ICMS cai R$ 14.400,05 e o de PIS/COFINS sobe R$ 1.332,00, porque a base é sem o ICMS. Resultado: a compra sai **R$ 13.068,04 mais cara** do que a cotação. O recebimento trava o pagamento e mostra o valor a cobrar do fornecedor.
+
+![Figura 10 — Custo líquido cotado × realizado no pedido recebido (dados fictícios)](img/compra-inteligente-11.jpg)
+
+## 11. Relatório da requisição
 
 No detalhe de qualquer requisição, o botão **Relatório da requisição** (rodapé da janela) gera o PDF completo, no padrão de relatórios da plataforma. Funciona em qualquer situação: aguardando aprovação, aprovada, atendida ou cancelada.
 
@@ -160,9 +178,9 @@ O relatório traz, em seções numeradas:
 
 Sem cotação, o relatório traz a identificação, os itens e a observação de que ainda não há cotação. O **PDF do mapa** (seção 5) continua disponível para quem quer só a comparação.
 
-![Figura 10 — Relatório da requisição: identificação, itens e mapa comparativo (dados fictícios)](img/compra-inteligente-10.jpg)
+![Figura 11 — Relatório da requisição: identificação, itens e mapa comparativo (dados fictícios)](img/compra-inteligente-10.jpg)
 
-## 11. Relatório de compra inteligente (para a direção)
+## 12. Relatório de compra inteligente (para a direção)
 
 Na lista de requisições, o botão **Relatório de compra inteligente** gera o PDF do período, com:
 
@@ -170,8 +188,9 @@ Na lista de requisições, o botão **Relatório de compra inteligente** gera o 
 - **Compras do período:** escolhida, menor preço e menor custo líquido de cada requisição.
 - **Escolhas acima do menor custo líquido:** a diferença de cada uma. Pode haver motivo, como prazo, qualidade ou pedido mínimo.
 - **Fornecedores do Simples:** crédito informado e a resposta sobre o regime regular. São os candidatos a uma conversa antes de 2027.
+- **Cotado × realizado:** para os recebimentos com nota no período, o custo líquido que a cotação prometia e o que as notas trouxeram, por pedido, com a diferença de créditos e de desembolso. Mostra se o crédito prometido veio de fato.
 
-## 12. Dúvidas comuns
+## 13. Dúvidas comuns
 
 **O fornecedor não sabe a alíquota.** Ele pode deixar como está na sugestão, que vem da última nota dele. Se for o primeiro fornecimento, o comprador completa na cotação.
 
@@ -181,9 +200,10 @@ Na lista de requisições, o botão **Relatório de compra inteligente** gera o 
 
 **Os números da reforma são certos?** São uma estimativa com os mesmos preços e as alíquotas cadastradas por ano. Servem para ver a tendência e conversar com o fornecedor, não para fechar preço de 2033.
 
-## 13. Histórico de versões
+## 14. Histórico de versões
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 26/11/2026 | Primeira versão. Inclui destinação por item; dados fiscais na cotação por link e na cotação digitada, com sugestão pelas notas de entrada do fornecedor e alerta de divergência; mapa pelo custo líquido (créditos de ICMS, IPI e PIS/COFINS, DIFAL, CIAP, valor presente), com a leitura do PRODEPE e a simulação da reforma; memória por item; PDF do mapa e relatório do período para a direção; Atualização Cadastral de Fornecedores (CMP006); parâmetros da compra inteligente (SQL 199). |
 | 1.1 | 26/11/2026 | Botão **Relatório da requisição** no detalhe da requisição: PDF completo com identificação, itens, mapa comparativo, custo líquido, cotação por link e pedidos (seção 10). |
+| 1.2 | 26/11/2026 | Do pedido ao recebimento (seção 10): o pedido leva os impostos da cotação e o total soma IPI e ICMS-ST; linha **Total a pagar** no mapa; o recebimento confere ICMS, regime, IPI e ICMS-ST da nota com tolerância em reais; **cotado × realizado** no pedido e no relatório do período (SQL 200). |

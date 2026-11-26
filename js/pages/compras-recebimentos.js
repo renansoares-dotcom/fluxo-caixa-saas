@@ -194,7 +194,7 @@ async function confronto(root) {
         <td class="small" style="white-space:nowrap">${tit.length ? tit.map(t => `${t.bloqueado ? '🔒 ' : ''}${dateBR(t.data)} ${money(t.valor)}${t.status === 'Pago' ? ' (pago)' : ''}`).join('<br>') : '<span class="muted">nenhum</span>'}</td>
         <td><span class="${cls}">${rot}</span>${st === 'bloqueada' && libera ? `<div style="margin-top:6px"><button class="btn small" data-lib="${n.bloqueio.id}">Liberar pagamento</button></div>` : ''}</td></tr>`; }).join('')
     || '<tr><td colspan="7" class="empty">Nenhuma nota nesta situação.</td></tr>'}</tbody></table></div></div>
-    <p class="small muted">Tolerâncias: preço ${String(PAR.conf_tol_preco_pct ?? 2).replace('.', ',')}% · quantidade ${String(PAR.conf_tol_qtd_pct ?? 5).replace('.', ',')}% · itens fora do pedido ${money(PAR.conf_tol_valor ?? 10)} · vencimento ${PAR.conf_tol_prazo_dias ?? 3} dia(s) antes do combinado · entrega ${PAR.conf_tol_entrega_dias ?? 2} dia(s) (só informa). ${PAR.conf_bloquear === false ? '<b>O bloqueio do pagamento está desligado.</b>' : ''}</p>`;
+    <p class="small muted">Tolerâncias: preço ${String(PAR.conf_tol_preco_pct ?? 2).replace('.', ',')}% · quantidade ${String(PAR.conf_tol_qtd_pct ?? 5).replace('.', ',')}% · itens fora do pedido ${money(PAR.conf_tol_valor ?? 10)} · vencimento ${PAR.conf_tol_prazo_dias ?? 3} dia(s) antes do combinado · entrega ${PAR.conf_tol_entrega_dias ?? 2} dia(s) (só informa) · impostos ${PAR.conf_impostos === false ? 'não conferidos' : `acima de ${money(PAR.conf_tol_imposto_valor ?? 50)} por item`}. ${PAR.conf_bloquear === false ? '<b>O bloqueio do pagamento está desligado.</b>' : ''}</p>`;
   $('#cf-f', c).onclick = (e) => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { ui.filtro = f; confronto(root); } };
   $('#cf-d', c).onchange = (e) => { ui.dias = +e.target.value; confronto(root); };
   $$('[data-lib]', c).forEach(b => b.onclick = () => liberar(L.find(n => n.bloqueio?.id === b.dataset.lib), root));
@@ -227,6 +227,10 @@ function parametros(root) {
       <label class="xs">Itens da nota fora do pedido (R$)<input id="pf-v" inputmode="decimal" value="${v(p.conf_tol_valor, 10)}"></label>
       <label class="xs">Vencimento antes do combinado (dias)<input id="pf-d" type="number" min="0" max="60" value="${p.conf_tol_prazo_dias ?? 3}"></label>
       <label class="xs">Entrega depois do previsto (dias; só informa)<input id="pf-e" type="number" min="0" max="60" value="${p.conf_tol_entrega_dias ?? 2}"></label></div>
+    <fieldset style="margin-top:10px"><legend>Impostos da nota × pedido</legend>
+      <label class="chk"><input type="checkbox" id="pf-i" ${p.conf_impostos === false ? '' : 'checked'}> Conferir ICMS, IPI, ICMS-ST e regime da nota contra o pedido (o que veio da cotação)</label>
+      <div class="grid-form" style="margin-top:6px"><label class="xs" title="Acima deste valor por item a divergência trava o pagamento; abaixo, só avisa">Trava acima de (R$ por item)<input id="pf-iv" inputmode="decimal" value="${v(p.conf_tol_imposto_valor, 50)}"></label></div>
+      <p class="small muted" style="margin:4px 0 0">Efeito = crédito perdido (ICMS menor, nota do Simples) ou valor a mais a pagar (IPI e ICMS-ST acima do combinado). IPI de insumo volta como crédito, mas o desembolso conta.</p></fieldset>
     <div style="margin-top:10px"><b class="small">Quem libera o pagamento bloqueado</b> <span class="small muted">(o administrador sempre libera)</span>
       <div style="display:flex;gap:14px;margin-top:4px">${papeis.map(([k, t]) => `<label class="chk"><input type="checkbox" class="pf-r" value="${k}" ${sel.includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div></div>
     <p class="small muted">O prazo de pagamento conta da emissão da nota: cada parcela é comparada com os dias da condição do pedido.</p>`,
@@ -234,7 +238,8 @@ function parametros(root) {
   $('#pf-ok', m.el).onclick = async (ev) => {
     const row = { empresa_id: state.empresa.id, conf_bloquear: $('#pf-b', m.el).checked, conf_tol_preco_pct: num($('#pf-p', m.el).value), conf_tol_qtd_pct: num($('#pf-q', m.el).value),
       conf_tol_valor: num($('#pf-v', m.el).value), conf_tol_prazo_dias: +$('#pf-d', m.el).value || 0, conf_tol_entrega_dias: +$('#pf-e', m.el).value || 0,
-      conf_papeis_liberar: ['admin', ...$$('.pf-r:checked', m.el).map(x => x.value)] };
+      conf_papeis_liberar: ['admin', ...$$('.pf-r:checked', m.el).map(x => x.value)], conf_impostos: $('#pf-i', m.el).checked, conf_tol_imposto_valor: num($('#pf-iv', m.el).value) };
+    if (!(row.conf_tol_imposto_valor >= 0)) return toast('Tolerância dos impostos em reais, zero ou mais', true);
     if ([row.conf_tol_preco_pct, row.conf_tol_qtd_pct].some(x => !(x >= 0 && x <= 100))) return toast('Percentual entre 0 e 100', true);
     ev.target.disabled = true;
     try { await q(sb.from('compras_parametros').upsert(row)); m.close(); toast('Parâmetros salvos'); render(root); }

@@ -3109,3 +3109,18 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
     { id: 'cqf1', empresa_id: E0, numero: 6, publico: 'fornecedor', favorecido_id: forn[1]?.id, cliente: forn[1]?.nome || 'FORNECEDOR DOIS', token: tk2(1), expira_em: new Date(Date.now() + 25 * 864e5).toISOString().slice(0, 10), situacao: 'enviado', criado_em: new Date(Date.now() - 5 * 864e5).toISOString() });
   window.RPC.cadq_acesso_publico = () => ({ usa: true, aplica: true, admin: true, validade_dias: 30 });
 }
+// ---------- impostos no pedido e no recebimento (SQL 200)
+{
+  const ped = (n) => DB.compras_pedidos.find(p => p.numero === n), it = (p) => DB.compras_pedido_itens.filter(i => i.pedido_id === p.id);
+  const p117 = ped(117), p116 = ped(116);
+  Object.assign(p117, { uf: 'SP', regime: 'real' }); it(p117).forEach(i => Object.assign(i, { destinacao: 'insumo', ncm: '39011092', icms_aliq: 7, ipi_aliq: 5, st_un: null }));
+  p117.total = Math.round(it(p117).reduce((t, i) => t + i.quantidade * i.valor_unitario * 1.05, 0) * 100) / 100;
+  Object.assign(p116, { uf: 'BA', regime: 'real' }); it(p116).forEach(i => Object.assign(i, { destinacao: 'insumo', ncm: '39011092', icms_aliq: 12, ipi_aliq: 0, st_un: null }));
+  if (!DB.compras_recebimentos.some(r => r.pedido_id === p116.id))
+    DB.compras_recebimentos.push({ id: 'rc116', empresa_id: p116.empresa_id, pedido_id: p116.id, nfe_nota_id: 'nf116', data: '2026-10-21', observacao: null,
+      divergencias: [{ tipo: 'imposto_icms', item: 'RESINA PEBD LINEAR', esperado: 12, recebido: 7, custo: 3095, desembolso: 0, valor: 3095, bloqueia: true, texto: 'RESINA PEBD LINEAR: ICMS da nota 7% × pedido 12% — crédito R$ 3.095,00 menor' }] });
+  window.RPC.compras_liquido_realizado = (a) => [{ pedido_id: p116.id, pedido: 116, fornecedor: 'RESINAS DO BRASIL S.A.', uf: 'BA', regime: 'real', simples_credito_pct: null, recebimento: '2026-10-21', nota: 45120, uf_nota: 'BA',
+    item: 'RESINA PEBD LINEAR', unidade: 'KG', ncm: '39011092', destinacao: 'insumo', quantidade: 10000, vu_pedido: 6.19, icms_pedido: 12, ipi_pedido: 0, st_un_pedido: null,
+    vu_nota: 6.19, icms_nota: 7, nota_simples: false, ipi_nota: 0, st_un_nota: 0, comparavel: true }].filter(x => !a.p_pedido || x.pedido_id === a.p_pedido);
+  window.RPC.compras_confrontar = window.RPC.compras_confrontar || (() => []);
+}

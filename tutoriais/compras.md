@@ -1,7 +1,7 @@
 ---
 titulo: Compras — requisições, pedidos e recebimentos
 tela: Compras › Painel de Compras (CMP001), Requisições e Cotações (CMP002), Pedidos de Compra (CMP003) e Recebimentos (CMP004)
-versao: 1.9
+versao: 2.0
 atualizado: 2026-11-26
 ---
 ## 1. Para que serve
@@ -96,7 +96,7 @@ Abra a requisição (filtro **Aguardando aprovação**) e clique em **Aprovar** 
 
 > Desde 26/11/2026 a cotação também recebe os dados fiscais e o mapa mostra o **custo líquido de aquisição** (depois dos créditos de ICMS, IPI e PIS/COFINS), com a leitura do PRODEPE e a simulação da reforma. Veja o manual **Compra inteligente**.
 
-> **Relatório da requisição:** no rodapé do detalhe de qualquer requisição, o botão gera o PDF completo (identificação, itens, mapa comparativo, custo líquido, cotação por link e pedidos). Detalhes no manual **Compra inteligente**, seção 10.
+> **Relatório da requisição:** no rodapé do detalhe de qualquer requisição, o botão gera o PDF completo (identificação, itens, mapa comparativo, custo líquido, cotação por link e pedidos). Detalhes no manual **Compra inteligente**, seção 11.
 
 1. Abra a requisição aprovada (filtro **Aprovadas (cotar)**) e clique em **Nova cotação**.
 2. Informe o **fornecedor**, o prazo de entrega em dias, as **parcelas** (por exemplo `28/56/84`), a condição de pagamento, o **frete**, a validade e o **preço unitário de cada item**.
@@ -157,6 +157,11 @@ Também dá para criar um pedido avulso, sem requisição, em **Pedidos de Compr
 - **Pedido**: fornecedor (obrigatório), data do pedido, entrega prevista, nº do pedido no Iniflex, parcelas (dias após a entrega), condição em texto, classificação (plano de contas, obrigatória para aprovar), centro de custo, frete, desconto e observação.
 - **Itens**: descrição, unidade, quantidade, valor unitário e NCM de cada item. Escolha o produto do cadastro na lista ou escreva livre.
 
+**Impostos no pedido.** O pedido gerado de uma cotação leva os impostos combinados: a **UF de origem** e o **regime do fornecedor** (com o crédito do Simples, se for o caso) e, por item, a **destinação**, o **ICMS**, o **IPI** e o **ICMS-ST**. No pedido avulso ou sem cotação, esses campos podem ser preenchidos à mão, ou deixados em branco se não forem conhecidos.
+
+- O **total do pedido soma o IPI e o ICMS-ST**: é o que vai ser pago ao fornecedor. Esse total vale para a alçada de aprovação e para a previsão no contas a pagar. No mapa da cotação, a linha **Total a pagar** mostra o mesmo valor.
+- Depois de aprovado, os impostos dos itens não mudam, como o preço e a quantidade.
+
 ### 4.5 Completar e aprovar o pedido
 
 ![Figura 10 — Pedidos de Compra (dados fictícios)](img/compras-2.jpg)
@@ -168,7 +173,9 @@ A lista mostra o **Nº** (com a data do pedido e o nº do Iniflex na 2ª linha),
 3. Salve e clique em:
    - **Aprovar**, se o valor estiver dentro da sua alçada (ou se você for diretor ou administrador);
    - **Enviar para aprovação**, se estiver acima. A direção aprova.
-4. Depois de aprovado, clique em **Imprimir** para gerar o pedido no padrão IPLAMM, com campos de assinatura, e mande ao fornecedor. Clique em **Marcar como enviado**.
+4. Depois de aprovado, clique em **Imprimir** para gerar o pedido no padrão IPLAMM, com campos de assinatura, e mande ao fornecedor. Clique em **Marcar como enviado**. Quando o pedido tem impostos, o impresso traz o ICMS, o IPI e o ICMS-ST de cada item e avisa que a nota deve vir com os mesmos valores.
+
+![Figura 11 — Pedido com os impostos da cotação: ICMS, IPI e ICMS-ST por item e o total a pagar (dados fictícios)](img/compras-15.jpg)
 
 > **Pagamento antes da entrega:** o pedido aprovado tem o botão **Pagamento antecipado**, que abre o pedido de pagamento já preenchido (veja o manual de Pagamentos Antecipados).
 
@@ -187,7 +194,7 @@ A lista mostra o **Nº** (com a data do pedido e o nº do Iniflex na 2ª linha),
 6. Leia o quadro do **confronto** abaixo da tabela. Ele é a mesma conferência que o sistema faz ao registrar e diz se o pagamento da nota vai ficar **bloqueado** (veja a seção 4.7).
 7. Clique em **Registrar recebimento**.
 
-![Figura 11 — Recebimento com divergência acima da tolerância: o pagamento da nota ficará bloqueado (dados fictícios)](img/compras-7.jpg)
+![Figura 12 — Recebimento com divergência acima da tolerância: o pagamento da nota ficará bloqueado (dados fictícios)](img/compras-7.jpg)
 
 Os recebimentos ficam em **Últimos recebimentos**, com as divergências encontradas. Se faltou algo, o pedido fica como **Recebido em parte** e a previsão é refeita pelo que ainda falta.
 
@@ -203,8 +210,14 @@ Ao registrar o recebimento, o sistema compara a nota com o pedido e aplica as **
 | Prazo de pagamento | uma parcela da nota vence antes do combinado no pedido, contando da emissão da nota, além da tolerância (padrão 3 dias) |
 | Número de parcelas | só informa |
 | Entrega atrasada | só informa (alimenta a avaliação do fornecedor) |
+| ICMS | a nota destaca ICMS **menor** que o do pedido e o crédito perdido passa da tolerância de impostos (padrão R$ 50,00 por item). Uso e consumo não tem crédito: não bloqueia. |
+| Regime | a nota vem do **Simples** (sem ICMS destacado) quando o pedido previa regime normal: o crédito perdido entra na mesma tolerância |
+| IPI | a nota cobra IPI **acima** do pedido: o valor a mais a pagar passa da tolerância. No insumo, o IPI volta como crédito, mas o desembolso conta. |
+| ICMS-ST | a nota traz ICMS-ST **acima** do pedido: o valor a mais (sem crédito) passa da tolerância |
 
-Preço **abaixo** do pedido e quantidade **menor** não bloqueiam.
+Preço **abaixo** do pedido e quantidade **menor** não bloqueiam. Imposto a favor (ICMS maior, IPI ou ST menor) também não. Abaixo da tolerância, a divergência de imposto aparece como aviso.
+
+A conferência dos impostos só acontece quando o pedido tem os impostos (veio de cotação com os dados fiscais ou foram preenchidos à mão). Cada divergência mostra o **efeito em reais**: o crédito que se perde ou o valor que se paga a mais. Esse efeito entra no valor divergente do bloqueio e, como as demais divergências que bloqueiam, tira pontos do fornecedor no IQF.
 
 Quando alguma conferência bloqueia:
 
@@ -220,11 +233,11 @@ A aba **Confronto pedido × nota**, em Recebimentos, lista as notas de entrada d
 - **Liberada**;
 - **Confere**.
 
-![Figura 12 — Confronto pedido × nota: notas bloqueadas, divergências, títulos e notas sem pedido (dados fictícios)](img/compras-8.jpg)
+![Figura 13 — Confronto pedido × nota: notas bloqueadas, divergências, títulos e notas sem pedido (dados fictícios)](img/compras-8.jpg)
 
 Para **liberar o pagamento**, quem tem permissão clica em **Liberar pagamento** e escreve o motivo, por exemplo "fornecedor emitiu nota de débito" ou "reajuste aprovado pela diretoria". Os títulos voltam a poder ser autorizados e pagos. A liberação fica registrada com o nome, a data e o motivo.
 
-![Figura 13 — Liberar o pagamento com o motivo (dados fictícios)](img/compras-9.jpg)
+![Figura 14 — Liberar o pagamento com o motivo (dados fictícios)](img/compras-9.jpg)
 
 **Conferência da chegada.** Com o Recebimento de Notas ligado (Compras › Estoque › Recebimento de Notas), quem atende o almoxarifado confere o material quando ele chega. O que faltou ou chegou avariado, ao preço unitário da nota, entra no **mesmo bloqueio** do confronto: os títulos da nota ficam travados, a divergência aparece aqui com o 🔒 e a liberação é a mesma, com o motivo. Sobra não bloqueia.
 
@@ -232,15 +245,21 @@ Para **liberar o pagamento**, quem tem permissão clica em **Liberar pagamento**
 
 - ligar ou desligar o bloqueio;
 - as tolerâncias de preço, quantidade, itens fora do pedido, vencimento e entrega;
+- **Impostos da nota × pedido**: ligar ou desligar a conferência de ICMS, IPI, ICMS-ST e regime, e o valor por item acima do qual a divergência trava o pagamento (padrão R$ 50,00);
 - quem libera: diretor, financeiro e/ou compras. O administrador sempre libera.
 
-![Figura 14 — Parâmetros do confronto pedido × nota (dados fictícios)](img/compras-10.jpg)
+![Figura 15 — Parâmetros do confronto pedido × nota (dados fictícios)](img/compras-10.jpg)
+
+**Custo líquido: cotado × realizado.** No pedido recebido com nota, o quadro **Custo líquido: cotado × realizado** compara o que o pedido previa com o que a nota trouxe: desembolso, créditos e custo líquido, pela mesma conta do mapa da cotação (créditos de ICMS, IPI e PIS/COFINS, DIFAL e PRODEPE). A diferença positiva é o quanto a compra saiu mais cara do que a cotação prometia, por exemplo por ICMS menor na nota. É o valor a cobrar do fornecedor (nota complementar, abatimento ou carta de correção). O mesmo comparativo do período está no **Relatório de compra inteligente** (manual Compra inteligente).
+
+![Figura 16 — Custo líquido cotado × realizado no pedido: a nota veio com ICMS de 7% e o pedido previa 12% (dados fictícios)](img/compras-14.jpg)
 
 ## 5. Regras e travas
 
 - O pedido precisa de **classificação (plano de contas)** e valor para ser aprovado.
 - Acima da **alçada**, só **diretor ou administrador** aprovam.
-- Pedido aprovado **não muda** de fornecedor, frete ou desconto. Para mudar, use **Voltar para rascunho** (só sem recebimento) ou cancele.
+- Pedido aprovado **não muda** de fornecedor, frete, desconto, nem de preço, quantidade e impostos dos itens. Para mudar, use **Voltar para rascunho** (só sem recebimento) ou cancele.
+- O total do pedido soma **IPI e ICMS-ST**: é ele que vale para a alçada e para a previsão no contas a pagar.
 - Cancelar exige **motivo**. Pedido já recebido não pode ser cancelado.
 - Pedido com recebimento **não volta** para rascunho.
 - A previsão no contas a pagar é refeita sempre que o pedido muda, e sai quando ele é recebido ou cancelado.
@@ -292,3 +311,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.7 | 22/11/2026 | A conferência da chegada (Recebimento de Notas) entra no mesmo bloqueio do confronto: falta e avaria travam o pagamento da nota e aparecem aqui. |
 | 1.8 | 26/11/2026 | Destinação de cada item (insumo, revenda, uso e consumo, ativo), dados fiscais na cotação e mapa pelo custo líquido: detalhes no manual Compra inteligente (SQL 199). |
 | 1.9 | 26/11/2026 | Botão **Relatório da requisição** no detalhe: PDF completo da requisição (ver Compra inteligente, seção 10). |
+| 2.0 | 26/11/2026 | **Impostos no pedido e no recebimento (SQL 200):** o pedido leva da cotação a UF, o regime e, por item, a destinação, o ICMS, o IPI e o ICMS-ST; o total soma IPI e ICMS-ST; o confronto do recebimento confere ICMS, regime, IPI e ICMS-ST da nota com tolerância em reais (parâmetro); quadro **Custo líquido: cotado × realizado** no pedido. |
