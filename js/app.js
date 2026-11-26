@@ -515,8 +515,15 @@ async function render() {
     // padrão de relatórios (SQL 174): filtros pedidos em "Repetir" ou numa variante são recolocados ao abrir a tela
     if (seq === renderSeq && sessionStorage.getItem('relp-repetir')) aplicarPendente(route, toast).catch(() => {});
     if (state.abrir?.tipo === 'lancamento') { const id = state.abrir.id; delete state.abrir; abrirLancamentoPorId(id); }
-  } catch (e) { fail(e); page.innerHTML = `<div class="card empty">Não foi possível carregar esta tela.<br><span class="small">${esc(e.message || e)}</span></div>`; }
+  } catch (e) {
+    // logo depois de uma publicação, o navegador pode juntar um módulo novo com outro ainda antigo ("does not provide an export named...").
+    // Recarrega uma vez, buscando tudo de novo no servidor; se repetir em menos de 2 minutos, mostra o erro.
+    if (versaoMisturada(e)) { const ult = +sessionStorage.getItem('fc-recarga-versao') || 0;
+      if (Date.now() - ult > 120000) { sessionStorage.setItem('fc-recarga-versao', String(Date.now())); page.innerHTML = '<div class="card empty">Atualizando a plataforma para a versão nova…</div>'; location.reload(); return; } }
+    fail(e); page.innerHTML = `<div class="card empty">Não foi possível carregar esta tela.<br><span class="small">${esc(e.message || e)}</span>${versaoMisturada(e) ? '<br><span class="small">Tecle Ctrl+F5 para carregar a versão nova.</span>' : ''}</div>`;
+  }
 }
+export const versaoMisturada = (e) => /does not provide an export named|dynamically imported module|Importing a module script failed|error loading dynamically imported/i.test(String(e?.message || e));
 async function abrirLancamentoPorId(id) {
   try {
     const l = await q(sb.from('lancamentos').select('*').eq('id', id).maybeSingle());
