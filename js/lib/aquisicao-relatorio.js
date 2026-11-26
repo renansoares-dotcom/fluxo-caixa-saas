@@ -16,7 +16,7 @@ export function relatorioMapa(r, cots, citens, M, ML, RF, BF, div, o) {
       <td class="n">${c.prazo_entrega_dias != null ? c.prazo_entrega_dias + ' dias' : '–'}</td><td>${esc(c.condicao_pagamento || (c.parcelas_dias || []).join('/'))}</td><td class="n">${money(c.frete)}</td></tr>`).join('')));
   const f = BF.P.fator_icms;
   out.push(h('Comparação: preço × custo líquido'), tab([['Fornecedor', 0], ['Total pelo preço', 1], ['Desembolso', 1], ['Créditos', 1], ['Custo líquido', 1], ['Custo líquido a VP', 1], ...(f < 1 ? [['Com o PRODEPE', 1]] : [])],
-    cots.map(c => { const x = L(c); return `<tr><td>${esc(c.fornecedor)}${x.completa ? '' : ' (incompleta)'}</td><td class="n">${money(mc(c).total)}</td><td class="n">${money(x.desembolso)}</td><td class="n">${money(-x.creditos)}</td>
+    cots.map(c => { const x = L(c); return `<tr><td>${esc(c.fornecedor)}${x.completa ? '' : ' (incompleta)'}</td><td class="n">${money(mc(c).total)}</td><td class="n">${money(x.desembolso)}</td><td class="n">${money(x.creditos ? -x.creditos : 0)}</td>
       <td class="n">${money(x.custo)}</td><td class="n">${money(x.custoVp)}</td>${f < 1 ? `<td class="n">${money(x.custoEfVp)}</td>` : ''}</tr>`; }).join('')),
   `<p>${ML.melhorPreco && ML.melhorLiq && ML.melhorPreco.id !== ML.melhorLiq.id ? `Pelo preço, a melhor cotação é ${esc(ML.melhorPreco.fornecedor)}; pelo custo líquido, é ${esc(ML.melhorLiq.fornecedor)}, ${money(ML.ganho)} a menos.`
     : ML.melhorLiq ? `A melhor cotação pelo custo líquido é ${esc(ML.melhorLiq.fornecedor)}.` : 'Não há cotação completa para comparar.'}
@@ -46,7 +46,7 @@ export function relatorioPeriodo(A, o) {
     ${certas.length} de ${comEsc.length} escolhas foram pelo menor custo líquido${ganho > 0.005 ? `, com ${money(ganho)} de economia em relação ao menor preço` : ''}.${perdas.length ? ` Em ${perdas.length} compra(s), a escolha ficou ${money(perdas.reduce((s, x) => s + x.dif, 0))} acima da melhor pelo custo líquido (veja a seção 3).` : ''}</p>`);
   out.push(h('Compras do período'), tab([['Req.', 1], ['Data', 0], ['Escolhida', 0], ['Menor preço', 0], ['Menor custo líquido', 0], ['Desembolso', 1], ['Créditos', 1], ['Custo líquido', 1]],
     A.map(a => { const x = L(a, a.escolhida); return `<tr><td class="n">${a.r.numero}</td><td>${dateBR(a.r.criado_em)}</td><td>${esc(a.escolhida?.fornecedor || '—')}</td><td>${esc(a.ML.melhorPreco?.fornecedor || '—')}</td><td>${esc(a.ML.melhorLiq?.fornecedor || '—')}</td>
-      <td class="n">${x ? money(x.desembolso) : '–'}</td><td class="n">${x ? money(-x.creditos) : '–'}</td><td class="n">${x ? money(x.custo) : '–'}</td></tr>`; }).join('')));
+      <td class="n">${x ? money(x.desembolso) : '–'}</td><td class="n">${x ? money(x.creditos ? -x.creditos : 0) : '–'}</td><td class="n">${x ? money(x.custo) : '–'}</td></tr>`; }).join('')));
   out.push(h('Escolhas acima do menor custo líquido'), perdas.length ? tab([['Req.', 1], ['Escolhida', 0], ['Melhor pelo custo líquido', 0], ['Diferença', 1]],
     perdas.map(({ a, dif }) => `<tr><td class="n">${a.r.numero}</td><td>${esc(a.escolhida.fornecedor)}</td><td>${esc(a.ML.melhorLiq.fornecedor)}</td><td class="n">${money(dif)}</td></tr>`).join('')) + '<p>Pode haver motivo (prazo, qualidade, pedido mínimo): vale registrar a justificativa na requisição.</p>'
     : '<p>Nenhuma: todas as escolhas ficaram no menor custo líquido.</p>');
