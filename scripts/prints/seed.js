@@ -3018,3 +3018,36 @@ DB.rtc_classtrib_ncm_exc = [{"id":1,"fim":null,"ncm":"02074300","inicio":"2026-0
     proc_configurar: () => 0, proc_salvar: () => 'pp-SUP-01', proc_macro_salvar: () => 'pm-SUP', proc_excluir: () => null, proc_pop_criar: () => 'po3', proc_versao_salvar: () => null,
     proc_versao_enviar: () => 'dono', proc_versao_decidir: () => 'vigente', proc_pop_revisar: () => 'pv4', proc_versao_descartar: () => null, proc_pop_obsoletar: () => null, proc_ler: () => null, proc_config_salvar: () => null });
 }
+// Análise de Competitividade de Preço (SQL 197) — parâmetros pré-carregados e análises FICTÍCIAS
+{
+  const E0 = DB.empresas[0].id, ha = (d) => { const x = new Date(); x.setDate(x.getDate() - d); return x.toISOString().slice(0, 10); };
+  const UF = [['AC', 19], ['AL', 20.5], ['AM', 20], ['AP', 18], ['BA', 20.5], ['CE', 20], ['DF', 20], ['ES', 17], ['GO', 19], ['MA', 23], ['MG', 18], ['MS', 17], ['MT', 17], ['PA', 19], ['PB', 20], ['PE', 20.5], ['PI', 22.5],
+    ['PR', 19.5], ['RJ', 20], ['RN', 20], ['RO', 19.5], ['RR', 20], ['RS', 17], ['SC', 17], ['SE', 19], ['SP', 18], ['TO', 20]];
+  DB.fisc_icms_interna = UF.map(([uf, a], i) => ({ id: 'fi' + i, empresa_id: E0, uf, ncm_prefixo: '', aliquota: a, fecp: 0, vigencia_inicio: uf === 'PE' ? '2024-01-01' : '2023-04-01',
+    norma: uf === 'PE' ? 'Lei 15.730/2016, art. 15, VII (redação da Lei 18.305/2023)' : 'lei estadual', fonte: 'pré-carga', situacao: ['PE', 'SE', 'SP', 'BA'].includes(uf) ? 'vigente' : 'a_conferir', ativo: true }));
+  DB.fisc_icms_inter_regra = [{ id: 'fr1', empresa_id: E0, vigencia_inicio: '2013-01-01', ufs_sul_sudeste: ['SP', 'RJ', 'MG', 'PR', 'SC', 'RS'], aliq_ss_para_nne: 7, aliq_geral: 12, aliq_importado: 4,
+    norma: 'Resolução do Senado 22/1989 (7% e 12%) e 13/2012 (4% para importados)' }];
+  DB.fisc_antecipacao = [[7, 15.27, 'Sul/Sudeste, exceto ES'], [12, 8.34, 'N/NE/CO e ES'], [4, 19.44, 'importado a 4%']].map(([ai, pct, t], i) => ({ id: 'fa' + i, empresa_id: E0, uf_destino: 'PE', aliq_inter: ai, aliq_interna: 20.5, pct,
+    tipos_cliente: ['comercio'], vigencia_inicio: '2024-01-01', norma: `Decreto 44.650/2017 (redação do Decreto 55.981/2023): ${t}`, ativo: true }));
+  DB.com_comp_config = [{ empresa_id: E0, papeis_usa: ['admin', 'diretor', 'financeiro', 'vendas'], papeis_margem: ['admin', 'diretor'], usuarios_margem: [], margem_min_pct: 10, despesas_pct: 3, taxa_mensal: 0,
+    pc_pct: 9.25, pc_excluir_icms: true, pc_cumulativo_pct: 3.65, simples_pct: null, reforma_padrao: false }];
+  const pr = DB.produtos.find(p => p.codigo === 'PA-100');
+  const lin = (L) => L.map(([k, txt, v, obs]) => ({ k, txt, v, obs: obs || '' }));
+  const A = (n, d, cli, cnome, k, p, R, st, obs, resp) => ({ id: 'ca' + n, empresa_id: E0, numero: n, data: ha(d), cliente_id: cli, cliente_nome: cnome,
+    cliente: { uf: 'PE', tipo: 'industria', regime: 'real', cred_icms: true, cred_pc: false, documento: '' }, produto_id: pr?.id, produto_desc: pr ? `${pr.codigo} — ${pr.descricao}` : 'SACO PEBD', ncm: '39232190',
+    concorrente: k, proposta: p, resultado: R, parametros: { interna: { uf: 'PE', aliquota: 20.5, vigencia_inicio: '2024-01-01', norma: 'Lei 15.730/2016', situacao: 'vigente' }, pc_pct: 9.25, taxa_mensal: 0 },
+    status: st, status_obs: obs, historico: [{ em: ha(d) + 'T12:00:00Z', por: resp, status: 'negociacao', obs: 'Análise criada' }], responsavel_nome: resp, criado_em: ha(d) });
+  const R = (c, nn, e) => ({ conc: { custo: c, custoVp: c, linhas: [] }, nos: { custo: nn, custoVp: nn, linhas: [] }, dif: nn - c, difPct: (nn - c) / c * 100, empate: e, empateBruto: e, ganha: nn <= c });
+  DB.com_competitividade = [
+    A(3, 2, 'fv-sa', 'TORREFAÇÃO SERRA AZUL LTDA', { nome: 'EMBALAGENS LITORAL', uf: 'SE', preco: 17, aliq: 12, frete_tipo: 'CIF' }, { uf: 'PE', preco: 18.5, aliq: 20.5, frete_tipo: 'CIF' }, R(14.96, 14.71, 18.81), 'negociacao', null, 'Marcos Vendas'),
+    A(2, 9, 'fv-vd', 'VILA DOCE ALIMENTOS LTDA', { nome: 'PLÁSTICOS PAULISTA', uf: 'SP', preco: 16.2, aliq: 7, frete_tipo: 'FOB', frete_un: 0.4 }, { uf: 'PE', preco: 18.9, aliq: 20.5, frete_tipo: 'CIF' }, R(15.47, 15.03, 19.45), 'ganha', 'Fechado a 18,90 com frete CIF', 'Marcos Vendas'),
+    A(1, 21, 'fv-pv', 'POMAR DO VALE SUCOS LTDA', { nome: 'POLÍMEROS BAHIA', uf: 'BA', preco: 15.8, aliq: 12, frete_tipo: 'CIF' }, { uf: 'PE', preco: 20.4, aliq: 20.5, frete_tipo: 'CIF' }, R(13.9, 16.22, 17.49), 'perdida', 'preço', 'Renata Alves')];
+  DB.com_competitividade_margem = [{ analise_id: 'ca3', empresa_id: E0, dados: { proposta: { margem: 3.12, pct: 16.9 } } }, { analise_id: 'ca2', empresa_id: E0, dados: { proposta: { margem: 3.4, pct: 18 } } }, { analise_id: 'ca1', empresa_id: E0, dados: { proposta: { margem: 4.2, pct: 20.6 } } }];
+  Object.assign(window.RPC, { comp_acesso: () => ({ usa: true, margem: true, admin: true }), comp_configurar: () => 0,
+    comp_base: (a) => ({ uf: 'PE', regime: 'real', pis_cofins: 'nao_cumulativo', incentivos: 'PRODEPE', fisc: DB.fisc_param[0],
+      reforma: [{ ano: 2027, cbs: 8.8, ibs_uf: 0.05, ibs_mun: 0.05, pis_cofins: false, icms_pct: 100, situacao: 'estimada' }, { ano: 2029, cbs: 8.8, ibs_uf: 1.6, ibs_mun: 0.2, pis_cofins: false, icms_pct: 90, situacao: 'estimada' },
+        { ano: 2031, cbs: 8.8, ibs_uf: 4.8, ibs_mun: 0.6, pis_cofins: false, icms_pct: 70, situacao: 'estimada' }, { ano: 2033, cbs: 8.8, ibs_uf: 15.1, ibs_mun: 2.6, pis_cofins: false, icms_pct: 0, situacao: 'estimada' }],
+      custo: a?.p_produto ? { custo_medio: 12.35, quantidade: 4200, ultima_entrada: '2026-11-20' } : null }),
+    comercial_geo_clientes: window.RPC.comercial_geo_clientes || (() => DB.favorecidos.filter(f => f.tipo === 'CLIENTES').map(f => ({ id: f.id, uf: f.uf || 'PE' }))),
+    comp_pessoas: () => DB.membros.map(m => ({ user_id: m.user_id, nome: m.nome, papel: m.papel })), comp_salvar: () => ({ id: 'ca4', numero: 4 }), comp_status: () => null, comp_excluir: () => null, comp_config_salvar: () => null });
+}

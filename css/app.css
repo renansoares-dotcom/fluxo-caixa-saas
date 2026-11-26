@@ -1220,3 +1220,23 @@ table.metas-grade td.sticky{min-width:150px;white-space:normal}
 .tour-balao{position:fixed;z-index:952;background:var(--surface,#fff);color:var(--text,#111);border-radius:10px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .tour-balao p{margin:6px 0 10px}.tour-acoes{display:flex;gap:6px;align-items:center}
 @media print{.ajuda-painel,.tour-fundo,.tour-luz,.tour-balao{display:none!important}}
+/* COM009 Análise de Competitividade de Preço */
+.cp-grade{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start}
+.cp-grade>div:last-child{position:sticky;top:8px}
+.cp-bloco h3,.cp-res h3{margin:0 0 8px;font-size:15px}
+.cp-bloco{margin-bottom:12px}
+.cp-interno{border-left:3px solid var(--warn)}
+div.cp-interno{background:var(--bg2,rgba(0,0,0,.02));padding:8px 10px;border-radius:6px;margin:8px 0}
+.cp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.cp-kpis>div{border:1px solid var(--line,#ddd);border-radius:6px;padding:6px 8px;display:flex;flex-direction:column}
+.cp-kpis span{font-size:11px;color:var(--muted)}.cp-kpis b{font-size:18px}.cp-kpis small{font-size:11px}
+.cp-kpis .pos b{color:var(--ok,#1a7f37)}.cp-kpis .neg b{color:var(--danger,#c62828)}
+.cp-mt{width:100%;font-size:12.5px;margin:4px 0 8px}.cp-mt td,.cp-mt th{padding:3px 6px}
+.cp-mt tr.cp-tot td{font-weight:700;border-top:1px solid var(--text)}
+.cp-aviso{border-left:3px solid var(--warn);padding:6px 8px;margin:6px 0}
+.cp-res details{margin:6px 0}.cp-res summary{cursor:pointer;font-size:13px}
+.cp-acoes{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+@media (max-width:1000px){.cp-grade{grid-template-columns:1fr}.cp-grade>div:last-child{position:static}.cp-kpis{grid-template-columns:repeat(2,1fr)}}
+#cp-corpo label.chk{display:flex;flex-direction:row;align-items:center;gap:6px;font-weight:400}
+#cp-corpo .areas-chk label.chk{display:inline-flex}
+#cp-corpo label.chk input{min-height:0;width:auto;margin:0}

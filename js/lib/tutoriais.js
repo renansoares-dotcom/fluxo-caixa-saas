@@ -54,6 +54,8 @@ export const MANUAIS = [
     resumo: 'Montar as duplicatas e o endosso, gerar o PDF para assinatura digital e cancelar com termo.' },
   { id: 'comercial', titulo: 'Comercial — painel, carteira, funil e metas', area: 'Comercial', rotas: ['comercial', 'comercial/carteira', 'comercial/funil', 'comercial/vendedores', 'comercial/mapa', 'comercial/comissoes'],
     resumo: 'Faturado × meta, situação dos clientes, contatos, oportunidades, propostas com calculadora e metas.' },
+  { id: 'competitividade', titulo: 'Análise de Competitividade de Preço — custo líquido para o cliente', area: 'Comercial', rotas: ['comercial/competitividade'],
+    resumo: 'Nossa proposta contra o fornecedor atual: créditos de ICMS e PIS/COFINS, DIFAL, antecipação, preço de empate, faixa de negociação, margem interna, reforma e PDF interno e para o cliente.' },
   { id: 'preimpressao', titulo: 'Pré-impressão — artes, aprovação do cliente no Portal e clicheria', area: 'Comercial', rotas: ['preimpressao', 'preimpressao/artes'],
     resumo: 'Ficha técnica da embalagem, versões com SHA-256, checklist, pinos, comparação e diferença entre versões, aprovação do cliente no Portal com prova e certificado, clicheria, liberação e trava da OP.' },
   { id: 'compras', titulo: 'Compras — requisições, pedidos e recebimentos', area: 'Compras', secoes: { 'compras/requisicoes': '## 4.', 'compras/pedidos': '## 4.', 'compras/recebimentos': '## 4.' }, rotas: ['compras', 'compras/requisicoes', 'compras/pedidos', 'compras/recebimentos'],
