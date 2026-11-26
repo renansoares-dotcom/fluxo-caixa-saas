@@ -8,7 +8,7 @@ import { selo } from '../lib/iqf.js';
 import { DESTINACOES, REGIMES_FORN, mapaLiquido, mapaReforma, fatorIcmsEfetivo, sugestaoFiscal, divergencias, br as br2, fmt } from '../lib/aquisicao.js';
 import { aliqInterna } from '../lib/competitividade.js';
 import { abrirRelatorio } from '../lib/relatorio.js';
-import { relatorioMapa, relatorioPeriodo } from '../lib/aquisicao-relatorio.js';
+import { relatorioMapa, relatorioPeriodo, relatorioRequisicao } from '../lib/aquisicao-relatorio.js';
 
 export const title = 'Requisições e Cotações';
 const ui = { filtro: 'abertas', busca: '' };
@@ -179,6 +179,7 @@ async function abrir(r, root) {
   $$('[data-ped]', det).forEach(a => a.onclick = (e) => { e.preventDefault(); m.close(); state.abrir = { tipo: 'pedido', id: a.dataset.ped }; location.hash = '#/compras/pedidos'; });
 
   const btn = (t, cls, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = t; b.onclick = fn; ac.appendChild(b); };
+  btn('Relatório da requisição', 'ghost', () => relatorioDaRequisicao(r, { cots, citens, M, BF, HIST, conv, peds, taxa, IQF, comReforma: $('#rq-liq', det).dataset.rf === '1' }));
   const mudar = async (dados, msg) => { try { await q(sb.from('compras_requisicoes').update(dados).eq('id', r.id)); toast(msg); m.close(); await carregar(root); } catch (err) { fail(err); } };
   if (['pendente', 'rejeitada'].includes(r.status)) {
     btn('Cancelar requisição', 'ghost', async () => { if (await confirmDialog(`Cancelar a requisição nº ${r.numero}?`)) mudar({ status: 'cancelada' }, 'Requisição cancelada'); });
@@ -214,6 +215,20 @@ async function baseFiscal(par) {
     internaDe: (ncm) => aliqInterna(interna, nos.uf, ncm, hoje)?.aliquota ?? null };
   return { nos, P, fisc, anos, semInterna: !interna.length, semUf: !nos.uf, reforma: !!par?.aq_reforma };
 }
+function divergenciasDe(r, cots, citens, HIST) {
+  return cots.flatMap(c => (HIST[c.id] || []).length ? r.itens.map(i => { const x = citens.find(z => z.cotacao_id === c.id && z.requisicao_item_id === i.id);
+    return x ? divergencias(x, sugestaoFiscal(HIST[c.id], i.ncm)).map(t => `${c.fornecedor} · ${i.descricao}: ${t}`) : []; }).flat() : []);
+}
+// relatório completo da requisição (botão no rodapé do detalhe): identificação, itens, mapa, custo líquido, convites e pedidos
+function relatorioDaRequisicao(r, { cots, citens, M, BF, HIST, conv, peds, taxa, IQF, comReforma }) {
+  const calc = cots.length && BF ? calcLiquido(r, cots, citens, M, BF) : null;
+  const iqf = (c) => { const f = c.favorecido_id ? IQF[c.favorecido_id] : null; return f ? selo(f).replace(/<[^>]+>/g, '') : 'sem histórico'; };
+  const corpo = relatorioRequisicao(r, { setor: C.ccById[r.centro_custo_id]?.nome, cots, citens, M, ML: calc?.ML, RF: comReforma ? calc?.RF : [], BF, div: calc ? divergenciasDe(r, cots, citens, HIST) : [],
+    conv, peds, taxa, iqf }, { esc, money, dateBR });
+  abrirRelatorio({ rel: 'Relatório da requisição de compra', nome: `Requisição ${r.numero}`, titulo: `REQUISIÇÃO DE COMPRA Nº ${r.numero}`, corpo,
+    parametros: [['Requisição', `nº ${r.numero}`], ['Situação', ({ pendente: 'aguardando aprovação' }[r.status] || r.status)], ['Cotações', String(cots.length)], ['Valor presente', `${String(taxa).replace('.', ',')}% a.m.`], ['Reforma', comReforma ? 'incluída' : 'fora']],
+    rodape: 'Base: Compras › Requisições e Cotações (CMP002). Créditos pelas regras vigentes; PRODEPE, FEEF e PIS/COFINS de Fiscal › Apuração › Parâmetros; CBS/IBS do Simulador da reforma.' });
+}
 function calcLiquido(r, cots, citens, M, BF) {
   const mc = (c) => M.cots.find(x => x.id === c.id) || {};
   const cs = cots.map(c => ({ ...c, vpFator: mc(c).total ? mc(c).vp / mc(c).total : 1 }));
@@ -221,6 +236,7 @@ function calcLiquido(r, cots, citens, M, BF) {
 }
 function pintarLiquido(el, r, cots, citens, M, BF, HIST, par, comReforma = BF.reforma) {
   const { ML, RF } = calcLiquido(r, cots, citens, M, BF), L = (c) => ML.cots.find(x => x.id === c.id), fat = BF.P.fator_icms, var2 = ML.cots.filter(x => x.completa).length > 1;
+  el.dataset.rf = comReforma ? '1' : '';
   const melhor = (k, c) => var2 && k && k.id === c.id ? 'pos' : '';
   const div = cots.flatMap(c => (HIST[c.id] || []).length ? r.itens.map(i => { const x = citens.find(z => z.cotacao_id === c.id && z.requisicao_item_id === i.id);
     return x ? divergencias(x, sugestaoFiscal(HIST[c.id], i.ncm)).map(t => `${c.fornecedor} · ${i.descricao}: ${t}`) : []; }).flat() : []);

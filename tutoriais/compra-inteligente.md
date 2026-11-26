@@ -1,7 +1,7 @@
 ---
 titulo: Compra inteligente — cotação pelo custo líquido de aquisição
 tela: Compras › Requisições e Cotações (CMP002) e Atualização Cadastral de Fornecedores (CMP006)
-versao: 1.0
+versao: 1.1
 atualizado: 2026-11-26
 ---
 ## 1. Para que serve
@@ -145,7 +145,24 @@ O que for aplicado já vem preenchido nas próximas cotações por link.
 
 Quem usa: Compras, Financeiro, Diretor e Administrador. O aviso de resposta vai para Compras e Administrador.
 
-## 10. Relatório de compra inteligente (para a direção)
+## 10. Relatório da requisição
+
+No detalhe de qualquer requisição, o botão **Relatório da requisição** (rodapé da janela) gera o PDF completo, no padrão de relatórios da plataforma. Funciona em qualquer situação: aguardando aprovação, aprovada, atendida ou cancelada.
+
+O relatório traz, em seções numeradas:
+
+1. **Identificação:** situação, solicitante, setor, datas, observação e motivo.
+2. **Itens:** NCM, destinação, quantidade e o valor estimado, se houver.
+3. **Mapa comparativo de cotações:** preço por item de cada fornecedor (com o menor marcado), avaliação (IQF), prazo, pagamento, frete, total, valor presente, origem (pelo link ou digitada) e validade.
+4. **Custo líquido:** fornecedores e condições fiscais, comparação entre preço e custo líquido, PRODEPE, pontos a confirmar e a memória de cálculo. A simulação da reforma entra se estiver aberta na tela.
+5. **Cotação por link:** quem foi convidado, situação, data da resposta e validade do link.
+6. **Pedidos de compra** gerados a partir da requisição.
+
+Sem cotação, o relatório traz a identificação, os itens e a observação de que ainda não há cotação. O **PDF do mapa** (seção 5) continua disponível para quem quer só a comparação.
+
+![Figura 10 — Relatório da requisição: identificação, itens e mapa comparativo (dados fictícios)](img/compra-inteligente-10.jpg)
+
+## 11. Relatório de compra inteligente (para a direção)
 
 Na lista de requisições, o botão **Relatório de compra inteligente** gera o PDF do período, com:
 
@@ -154,7 +171,7 @@ Na lista de requisições, o botão **Relatório de compra inteligente** gera o 
 - **Escolhas acima do menor custo líquido:** a diferença de cada uma. Pode haver motivo, como prazo, qualidade ou pedido mínimo.
 - **Fornecedores do Simples:** crédito informado e a resposta sobre o regime regular. São os candidatos a uma conversa antes de 2027.
 
-## 11. Dúvidas comuns
+## 12. Dúvidas comuns
 
 **O fornecedor não sabe a alíquota.** Ele pode deixar como está na sugestão, que vem da última nota dele. Se for o primeiro fornecimento, o comprador completa na cotação.
 
@@ -164,8 +181,9 @@ Na lista de requisições, o botão **Relatório de compra inteligente** gera o 
 
 **Os números da reforma são certos?** São uma estimativa com os mesmos preços e as alíquotas cadastradas por ano. Servem para ver a tendência e conversar com o fornecedor, não para fechar preço de 2033.
 
-## 12. Histórico de versões
+## 13. Histórico de versões
 
 | Versão | Data | O que mudou |
 |---|---|---|
 | 1.0 | 26/11/2026 | Primeira versão. Inclui destinação por item; dados fiscais na cotação por link e na cotação digitada, com sugestão pelas notas de entrada do fornecedor e alerta de divergência; mapa pelo custo líquido (créditos de ICMS, IPI e PIS/COFINS, DIFAL, CIAP, valor presente), com a leitura do PRODEPE e a simulação da reforma; memória por item; PDF do mapa e relatório do período para a direção; Atualização Cadastral de Fornecedores (CMP006); parâmetros da compra inteligente (SQL 199). |
+| 1.1 | 26/11/2026 | Botão **Relatório da requisição** no detalhe da requisição: PDF completo com identificação, itens, mapa comparativo, custo líquido, cotação por link e pedidos (seção 10). |

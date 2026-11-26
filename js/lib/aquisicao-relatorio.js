@@ -7,11 +7,11 @@ const tab = (cab, linhas) => `<table><thead><tr>${cab.map(([t, n]) => `<th${n ? 
 
 /** mapa de uma requisição: preço, desembolso, créditos, custo líquido, PRODEPE, reforma e memória por item */
 export function relatorioMapa(r, cots, citens, M, ML, RF, BF, div, o) {
-  const { esc, money, dateBR } = o; let n = 0; const h = (t) => `<h2>${++n}. ${t}</h2>`, out = [];
+  const { esc, money, dateBR } = o; let n = o.inicio || 0; const h = (t) => `<h2>${++n}. ${t}</h2>`, out = [];
   const L = (c) => ML.cots.find(x => x.id === c.id), mc = (c) => M.cots.find(x => x.id === c.id) || {};
-  out.push(h('Requisição'), `<p>Nº ${r.numero}${r.solicitante ? `, pedida por ${esc(r.solicitante)}` : ''}${r.necessidade ? `, para ${dateBR(r.necessidade)}` : ''}. ${r.itens.length} item(ns); ${cots.length} cotação(ões).</p>`,
+  if (!o.semRequisicao) out.push(h('Requisição'), `<p>Nº ${r.numero}${r.solicitante ? `, pedida por ${esc(r.solicitante)}` : ''}${r.necessidade ? `, para ${dateBR(r.necessidade)}` : ''}. ${r.itens.length} item(ns); ${cots.length} cotação(ões).</p>`,
     tab([['Item', 0], ['Quant.', 1], ['NCM', 0], ['Destinação', 0]], r.itens.map(i => `<tr><td>${esc(i.descricao)}</td><td class="n">${(+i.quantidade).toLocaleString('pt-BR')} ${esc(i.unidade)}</td><td>${esc(i.ncm || '')}</td><td>${esc(DEST[i.destinacao || 'insumo'])}</td></tr>`).join('')));
-  out.push(h('Fornecedores e condições'), tab([['Fornecedor', 0], ['UF', 0], ['Regime', 0], ['Prazo de entrega', 1], ['Pagamento', 0], ['Frete', 1]],
+  if (!o.semFornecedores) out.push(h('Fornecedores e condições'), tab([['Fornecedor', 0], ['UF', 0], ['Regime', 0], ['Prazo de entrega', 1], ['Pagamento', 0], ['Frete', 1]],
     cots.map(c => `<tr><td>${esc(c.fornecedor)}${c.escolhida ? ' (escolhida)' : ''}</td><td>${esc(c.uf || '—')}</td><td>${esc(REG[c.regime] || '—')}${c.regime === 'simples' || c.regime === 'mei' ? ` · crédito ${fmt(c.simples_credito_pct)}%${c.simples_regular ? ` · regime regular: ${esc(c.simples_regular)}` : ''}` : ''}</td>
       <td class="n">${c.prazo_entrega_dias != null ? c.prazo_entrega_dias + ' dias' : '–'}</td><td>${esc(c.condicao_pagamento || (c.parcelas_dias || []).join('/'))}</td><td class="n">${money(c.frete)}</td></tr>`).join('')));
   const f = BF.P.fator_icms;
@@ -55,5 +55,47 @@ export function relatorioPeriodo(A, o) {
     Object.values(sn).sort((a, b) => b.n - a.n).map(({ c, n: k }) => `<tr><td>${esc(c.fornecedor)}</td><td class="n">${k}</td><td class="n">${c.simples_credito_pct != null ? fmt(c.simples_credito_pct) + '%' : '–'}</td><td>${esc({ sim: 'Sim', nao: 'Não', avaliando: 'Avaliando' }[c.simples_regular] || 'Não informou')}</td></tr>`).join(''))
     + '<p>A partir de 2027, o fornecedor do Simples que continuar recolhendo tudo no Simples transfere pouco crédito de CBS/IBS. Vale conversar com os principais: pedir a opção pelo regime regular ou renegociar o preço.</p>'
     : '<p>Nenhum fornecedor do Simples nas cotações do período (ou o regime não foi informado).</p>');
+  return out.join('');
+}
+
+const SIT_REQ = { pendente: 'Aguardando aprovação', aprovada: 'Aprovada', rejeitada: 'Rejeitada', cancelada: 'Cancelada', atendida: 'Atendida' };
+const SIT_CONV = { enviado: 'Enviado', aberto: 'Abriu o link', respondido: 'Respondeu', recusado: 'Não vai cotar', cancelado: 'Cancelado' };
+
+/**
+ * Relatório completo de uma requisição: identificação, itens, mapa de preços, custo líquido (se houver cotação),
+ * cotação por link e pedidos. d = { setor, cots, citens, M, ML, RF, BF, div, conv, peds, taxa, iqf }
+ */
+export function relatorioRequisicao(r, d, o) {
+  const { esc, money, dateBR } = o; let n = 0; const h = (t) => `<h2>${++n}. ${t}</h2>`, out = [];
+  const { cots = [], citens = [], M, conv = [], peds = [] } = d, est = r.itens.some(i => +i.valor_estimado);
+  const q = (v) => (+v).toLocaleString('pt-BR', { maximumFractionDigits: 4 }), u = (v) => 'R$ ' + (+v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  const pr = (c, i) => { const v = +citens.find(x => x.cotacao_id === c.id && x.requisicao_item_id === i.id)?.valor_unitario; return isNaN(v) ? null : v; };
+  const mc = (c) => M?.cots.find(x => x.id === c.id) || {};
+  out.push(h('Identificação'), tab([['Campo', 0], ['Informação', 0]], [
+    ['Situação', (SIT_REQ[r.status] || r.status) + (r.prioridade === 'urgente' ? ' — urgente' : '')], ['Solicitante', r.solicitante || '—'], ['Setor', d.setor || '—'],
+    ['Pedida em', dateBR(r.criado_em)], ['Precisa até', dateBR(r.necessidade) || '—'],
+    ...(r.decidido_em ? [[r.status === 'rejeitada' ? 'Rejeitada em' : 'Aprovada em', dateBR(r.decidido_em)]] : []),
+    ...(r.observacao ? [['Observação', r.observacao]] : []), ...(r.motivo ? [['Motivo', r.motivo]] : [])].map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join('')));
+  out.push(h('Itens'), tab([['Item', 0], ['NCM', 0], ['Destinação', 0], ['Quant.', 1], ...(est ? [['Estimado (un.)', 1], ['Estimado (total)', 1]] : [])],
+    r.itens.map(i => `<tr><td>${esc(i.descricao)}</td><td>${esc(i.ncm || '')}</td><td>${esc(DEST[i.destinacao || 'insumo'])}</td><td class="n">${q(i.quantidade)} ${esc(i.unidade || '')}</td>${est ? `<td class="n">${i.valor_estimado ? u(i.valor_estimado) : '–'}</td><td class="n">${i.valor_estimado ? money(i.valor_estimado * i.quantidade) : '–'}</td>` : ''}</tr>`).join('')));
+  if (cots.length) {
+    out.push(h('Mapa comparativo de cotações'), tab([['Item', 0], ['Quant.', 1], ...cots.map(c => [esc(c.fornecedor) + (c.escolhida ? ' (escolhida)' : ''), 1])],
+      r.itens.map(i => { const ps = cots.map(c => pr(c, i)), mn = Math.min(...ps.filter(v => v != null));
+        return `<tr><td>${esc(i.descricao)}</td><td class="n">${q(i.quantidade)}</td>${ps.map(v => `<td class="n">${v == null ? 'sem preço' : `${u(v)}${v === mn && cots.length > 1 ? ' *' : ''}<br>${money(v * i.quantidade)}`}</td>`).join('')}</tr>`; }).join('')
+      + `<tr><td>Avaliação (IQF)</td><td></td>${cots.map(c => `<td class="n">${esc(d.iqf?.(c) || '—')}</td>`).join('')}</tr>`
+      + `<tr><td>Prazo de entrega</td><td></td>${cots.map(c => `<td class="n">${c.prazo_entrega_dias != null ? c.prazo_entrega_dias + ' dias' : '–'}</td>`).join('')}</tr>`
+      + `<tr><td>Pagamento</td><td></td>${cots.map(c => `<td class="n">${esc(c.condicao_pagamento || (c.parcelas_dias || []).join('/') || '–')}</td>`).join('')}</tr>`
+      + `<tr><td>Frete</td><td></td>${cots.map(c => `<td class="n">${money(c.frete)}</td>`).join('')}</tr>`
+      + `<tr><td><b>Total</b></td><td></td>${cots.map(c => `<td class="n"><b>${money(mc(c).total)}</b>${mc(c).completa === false ? '<br>incompleta' : ''}</td>`).join('')}</tr>`
+      + `<tr><td>Valor presente (${fmt(d.taxa)}% a.m.)</td><td></td>${cots.map(c => `<td class="n">${money(mc(c).vp)}</td>`).join('')}</tr>`
+      + `<tr><td>Origem · validade</td><td></td>${cots.map(c => `<td class="n">${c.respondida_pelo_fornecedor ? 'pelo link' : 'digitada'}${c.validade ? ' · até ' + dateBR(c.validade) : ''}</td>`).join('')}</tr>`),
+      cots.length > 1 ? '<p>* menor preço do item.</p>' : '');
+    if (d.ML) out.push(relatorioMapa(r, cots, citens, M, d.ML, d.RF, d.BF, d.div, { ...o, inicio: n, semRequisicao: true }).replace(/<h2>(\d+)\./g, (m, k) => { n = +k; return m; }));
+  } else out.push(h('Cotações'), '<p>Nenhuma cotação registrada até a emissão.</p>');
+  if (conv.length) out.push(h('Cotação por link'), tab([['Fornecedor', 0], ['Contato', 0], ['Situação', 0], ['Respondido em', 0], ['Vale até', 0]],
+    conv.map(c => `<tr><td>${esc(c.fornecedor)}</td><td>${esc([c.email, c.telefone].filter(Boolean).join(' · ') || '—')}</td><td>${esc(SIT_CONV[c.situacao] || c.situacao)}${c.recusa_motivo ? ' — ' + esc(c.recusa_motivo) : ''}</td>
+      <td>${c.respondido_em ? new Date(c.respondido_em).toLocaleString('pt-BR').slice(0, 17) : '—'}</td><td>${dateBR(c.expira_em)}</td></tr>`).join('')));
+  out.push(h('Pedidos de compra'), peds.length ? tab([['Pedido', 0], ['Situação', 0], ['Total', 1]], peds.map(p => `<tr><td>PC ${esc(String(p.numero))}</td><td>${esc(p.status || '')}</td><td class="n">${money(p.total)}</td></tr>`).join(''))
+    : '<p>Nenhum pedido gerado até a emissão.</p>');
   return out.join('');
 }

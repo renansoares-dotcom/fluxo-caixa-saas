@@ -96,3 +96,24 @@ test('nossa empresa no Simples: sem créditos (e sem CBS/IBS sem a opção pelo 
   const rf = custoUnitario({ preco: 100, icms_aliq: 20.5, uf_origem: 'PE' }, { regime: 'real' }, { ...nos, simples: true, ibscbs_regular: true }, { ...P, ref: { t: 26.5, icms_pct: 0 } });
   assert.equal(r2(rf.custo), 100, 'com a opção pelo regular, credita a CBS/IBS');
 });
+
+test('relatório da requisição: identificação, itens, mapa, custo líquido numerado em sequência, convites e pedidos', async () => {
+  const { relatorioRequisicao } = await import('../js/lib/aquisicao-relatorio.js');
+  const { mapaCotacoes } = await import('../js/lib/cotacao-calc.js');
+  const o = { esc: (s) => String(s ?? ''), money: (v) => (+v || 0).toFixed(2), dateBR: (d) => d || '' };
+  const r = { numero: 2, status: 'aprovada', solicitante: 'Ana', criado_em: '2026-11-26', itens: [{ id: 'i1', descricao: 'Resina X', ncm: '39011020', unidade: 'KG', quantidade: 1000, destinacao: 'insumo' }] };
+  const cots = [{ id: 'c1', fornecedor: 'Fornecedor A', uf: 'PB', regime: 'real', frete: 0, parcelas_dias: [], respondida_pelo_fornecedor: true }];
+  const citens = [{ cotacao_id: 'c1', requisicao_item_id: 'i1', valor_unitario: 10, icms_aliq: 12, ipi_aliq: 5 }];
+  const M = mapaCotacoes(r.itens, cots, citens, { taxa: 1.5 });
+  const BF = { P: { ...P, fator_icms: 1, simples_credito_ibs_pct: 0, taxa_mensal: 1.5 } };
+  const ML = mapaLiquido(r.itens, cots.map(c => ({ ...c, vpFator: 1 })), citens, nos, BF.P);
+  const html = relatorioRequisicao(r, { setor: 'PRODUÇÃO', cots, citens, M, ML, RF: [], BF, div: [], conv: [{ fornecedor: 'Fornecedor A', situacao: 'respondido', expira_em: '2026-12-01' }], peds: [], taxa: 1.5, iqf: () => 'sem histórico' }, o);
+  const titulos = [...html.matchAll(/<h2>(\d+)\. ([^<]+)<\/h2>/g)].map(m => +m[1] + ' ' + m[2]);
+  assert.deepEqual(titulos.map(t => +t.split(' ')[0]), titulos.map((_, k) => k + 1), 'seções numeradas em sequência');
+  for (const t of ['Identificação', 'Itens', 'Mapa comparativo de cotações', 'Comparação: preço × custo líquido', 'Memória de cálculo por item', 'Cotação por link', 'Pedidos de compra'])
+    assert.ok(titulos.some(x => x.endsWith(t)), 'falta a seção ' + t);
+  assert.ok(!titulos.some(x => x.endsWith(' Requisição')), 'a identificação não se repete');
+  assert.match(html, /PRODUÇÃO/); assert.match(html, /Respondeu/); assert.match(html, /Nenhum pedido gerado/);
+  const sem = relatorioRequisicao({ ...r, status: 'pendente' }, { cots: [], conv: [], peds: [], taxa: 1.5 }, o);
+  assert.match(sem, /Nenhuma cotação registrada/);
+});

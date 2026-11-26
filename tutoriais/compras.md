@@ -1,7 +1,7 @@
 ---
 titulo: Compras — requisições, pedidos e recebimentos
 tela: Compras › Painel de Compras (CMP001), Requisições e Cotações (CMP002), Pedidos de Compra (CMP003) e Recebimentos (CMP004)
-versao: 1.8
+versao: 1.9
 atualizado: 2026-11-26
 ---
 ## 1. Para que serve
@@ -95,6 +95,8 @@ Abra a requisição (filtro **Aguardando aprovação**) e clique em **Aprovar** 
 ### 4.3 Cotar com os fornecedores
 
 > Desde 26/11/2026 a cotação também recebe os dados fiscais e o mapa mostra o **custo líquido de aquisição** (depois dos créditos de ICMS, IPI e PIS/COFINS), com a leitura do PRODEPE e a simulação da reforma. Veja o manual **Compra inteligente**.
+
+> **Relatório da requisição:** no rodapé do detalhe de qualquer requisição, o botão gera o PDF completo (identificação, itens, mapa comparativo, custo líquido, cotação por link e pedidos). Detalhes no manual **Compra inteligente**, seção 10.
 
 1. Abra a requisição aprovada (filtro **Aprovadas (cotar)**) e clique em **Nova cotação**.
 2. Informe o **fornecedor**, o prazo de entrega em dias, as **parcelas** (por exemplo `28/56/84`), a condição de pagamento, o **frete**, a validade e o **preço unitário de cada item**.
@@ -289,3 +291,4 @@ Veja o manual **Conversas** para os detalhes.
 | 1.6 | 08/11/2026 | Avaliação dos fornecedores (IQF) no Painel de Compras: qualidade, entrega e preço e nota com pesos, classes A/B/C, eventos de cada fornecedor e parâmetros; IQF no mapa comparativo das cotações. |
 | 1.7 | 22/11/2026 | A conferência da chegada (Recebimento de Notas) entra no mesmo bloqueio do confronto: falta e avaria travam o pagamento da nota e aparecem aqui. |
 | 1.8 | 26/11/2026 | Destinação de cada item (insumo, revenda, uso e consumo, ativo), dados fiscais na cotação e mapa pelo custo líquido: detalhes no manual Compra inteligente (SQL 199). |
+| 1.9 | 26/11/2026 | Botão **Relatório da requisição** no detalhe: PDF completo da requisição (ver Compra inteligente, seção 10). |
